@@ -1,0 +1,49 @@
+/* Career Essence トンマナ統一用CSS変数 */
+
+:root {
+  /* Colors */
+  --ce-bg: #f0f7f4;
+  --ce-surface: #ffffff;
+  --ce-text: #1c1c1c;
+  --ce-muted: #333333;
+  --ce-border: #d4e6dd;
+  --ce-primary: #00bf63;
+  --ce-primary-hover: #00a956;
+  --ce-link: #2697e8;
+  --ce-warning: #ff8d36;
+  --ce-success-bg: #dcf5da;
+  --ce-light-green: #a7d28f;
+  --ce-accent-yellow: #ffe641;
+  
+  /* Border Radius */
+  --ce-radius-card: 16px;
+  --ce-radius-control: 12px;
+  
+  /* Shadows */
+  --ce-shadow-card: 0 10px 30px rgba(0, 0, 0, 0.08);
+  
+  /* Fonts */
+  --ce-font-body: 'Noto Sans JP', system-ui, sans-serif;
+  --ce-font-heading: 'Noto Sans JP', system-ui, sans-serif;
+  
+  /* Tailwind互換変数 */
+  --color-background: var(--ce-bg);
+  --color-surface: var(--ce-surface);
+  --color-foreground: var(--ce-text);
+  --color-muted: var(--ce-muted);
+  --color-border: var(--ce-border);
+  --color-primary: var(--ce-primary);
+  --color-primary-hover: var(--ce-primary-hover);
+  --color-link: var(--ce-link);
+  --color-warning: var(--ce-warning);
+  --color-success-bg: var(--ce-success-bg);
+  
+  --radius-card: var(--ce-radius-card);
+  --radius-control: var(--ce-radius-control);
+  
+  --shadow-card: var(--ce-shadow-card);
+  
+  --font-sans: var(--ce-font-body);
+  --font-heading: var(--ce-font-heading);
+}
+
