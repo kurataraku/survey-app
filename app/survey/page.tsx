@@ -149,7 +149,7 @@ export default function SurveyPage() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'sans-serif' }}>回答完了</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4" style={{ fontFamily: 'sans-serif' }}>回答ありがとうございました！</h1>
           <p className="text-gray-700 mb-6 leading-relaxed" style={{ fontFamily: 'sans-serif' }}>
             あなたの体験談が通信制高校を検討されている方々にとって
             <br />
