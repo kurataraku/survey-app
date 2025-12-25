@@ -6,18 +6,18 @@ interface StepperProps {
 }
 
 const stepLabels = {
-  1: '基本情報',
-  2: '学習・環境',
-  3: '評価・感想',
+  1: 'あなたについて',
+  2: '学校について',
+  3: '満足度',
 };
 
 export default function Stepper({ currentStep, totalSteps }: StepperProps) {
   return (
     <div className="mb-8">
-      <div className="relative flex items-center justify-evenly px-8">
+      <div className="relative flex items-center justify-between px-8">
         {/* ステップ */}
         {[1, 2, 3].map((step) => (
-          <div key={step} className="flex flex-col items-center relative z-10">
+          <div key={step} className="flex flex-col items-center relative z-10 flex-1">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all duration-300"
               style={{
@@ -50,13 +50,22 @@ export default function Stepper({ currentStep, totalSteps }: StepperProps) {
           </div>
         ))}
         
-        {/* 接続線（Step1とStep2の間） */}
+        {/* 接続線（Step1からStep2まで） */}
         <div
-          className="absolute top-5 h-1"
+          className="absolute top-5 h-1 z-0"
           style={{
-            left: 'calc(25% + 1.25rem)',
-            width: 'calc(50% - 2.5rem)',
-            backgroundColor: 1 < currentStep ? 'var(--ce-primary)' : 'var(--ce-border)'
+            left: 'calc(16.67% + 1.25rem)',
+            width: 'calc(33.33% - 2.5rem)',
+            backgroundColor: 2 <= currentStep ? 'var(--ce-primary)' : 'var(--ce-border)'
+          }}
+        />
+        {/* 接続線（Step2からStep3まで） */}
+        <div
+          className="absolute top-5 h-1 z-0"
+          style={{
+            left: 'calc(50% + 1.25rem)',
+            width: 'calc(33.33% - 2.5rem)',
+            backgroundColor: 3 <= currentStep ? 'var(--ce-primary)' : 'var(--ce-border)'
           }}
         />
       </div>

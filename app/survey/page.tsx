@@ -344,10 +344,33 @@ export default function SurveyPage() {
                       onClick={() => {
                         // 最初のエラー項目にスクロール
                         const firstErrorId = step3RatingErrors[0];
-                        const errorElement = document.querySelector(`[name="${firstErrorId}"]`) as HTMLElement;
+                        if (!firstErrorId) return;
+                        
+                        // まず、name属性で要素を探す
+                        let errorElement = document.querySelector(`[name="${firstErrorId}"]`) as HTMLElement;
+                        
+                        // name属性がない場合（StarRatingなど）、質問のラベル要素を探す
+                        if (!errorElement) {
+                          // 質問のラベル要素を探す（data-question-id属性を使う）
+                          const questionElement = document.querySelector(`[data-question-id="${firstErrorId}"]`) as HTMLElement;
+                          if (questionElement) {
+                            errorElement = questionElement;
+                          } else {
+                            // フォールバック: エラーメッセージ要素を探す
+                            const errorMessage = document.querySelector(`[data-error-field="${firstErrorId}"]`) as HTMLElement;
+                            if (errorMessage) {
+                              errorElement = errorMessage.closest('.mb-6') as HTMLElement || errorMessage;
+                            }
+                          }
+                        }
+                        
                         if (errorElement) {
                           errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          errorElement.focus();
+                          // フォーカス可能な要素があればフォーカス
+                          const focusableElement = errorElement.querySelector('button, input, select, textarea') as HTMLElement;
+                          if (focusableElement) {
+                            focusableElement.focus();
+                          }
                         }
                       }}
                     >

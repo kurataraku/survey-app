@@ -53,7 +53,7 @@ export default function QuestionRenderer({
   const fieldName = question.id;
 
   return (
-    <div className="mb-6">
+    <div className="mb-6" data-question-id={question.id}>
       <label className={`block font-medium mb-2 ${
         question.id === 'overall_satisfaction' || question.id === 'good_comment' || question.id === 'bad_comment'
           ? 'text-lg font-semibold' 
@@ -68,7 +68,7 @@ export default function QuestionRenderer({
       </label>
       {/* エラー表示（入力欄の直下に1行だけ表示） */}
       {error && (
-        <p className="mb-2 text-sm" style={{ 
+        <p className="mb-2 text-sm" data-error-field={question.id} style={{ 
           fontFamily: 'var(--ce-font-body)',
           color: 'var(--ce-warning)'
         }}>

@@ -145,13 +145,12 @@ export const questions: Question[] = [
     label: '入学年',
     required: true,
     options: (() => {
-      const currentYear = new Date().getFullYear();
       const years = [];
-      // 過去15年から未来5年まで
-      for (let i = currentYear - 15; i <= currentYear + 5; i++) {
+      // 2000年から2026年まで（新しい年から順に表示）
+      for (let i = 2026; i >= 2000; i--) {
         years.push({ label: `${i}年`, value: `${i}` });
       }
-      return years.reverse(); // 新しい年から順に表示
+      return years;
     })(),
   },
 

@@ -45,31 +45,29 @@ export default function ChipSelect({
                         : [...selectedValues, option.value];
                       field.onChange(newValues);
                     }}
-                    className={`px-4 py-3 rounded-lg border transition-all text-left ${
+                    className={`px-4 py-3 rounded-lg border transition-all text-left flex items-center justify-between min-h-[56px] ${
                       isSelected
                         ? 'bg-orange-50 border-orange-300 text-orange-700'
                         : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                     style={{ fontFamily: 'sans-serif' }}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs">{option.label}</span>
-                      {isSelected && (
-                        <svg
-                          className="w-4 h-4 text-orange-500 flex-shrink-0 ml-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      )}
-                    </div>
+                    <span className="text-xs leading-relaxed pr-2 flex-1">{option.label}</span>
+                    {isSelected && (
+                      <svg
+                        className="w-4 h-4 text-orange-500 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
                   </button>
                 );
               })}

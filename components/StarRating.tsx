@@ -59,7 +59,7 @@ export default function StarRating({
           style={{ 
             fontFamily: 'var(--ce-font-body)',
             color: currentValue === 1 || currentValue === 2
-              ? 'var(--ce-warning)'
+              ? '#ff5722'
               : currentValue === 4 || currentValue === 5
               ? 'var(--ce-primary)'
               : 'var(--ce-muted)'
