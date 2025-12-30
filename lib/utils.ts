@@ -3,22 +3,24 @@
  */
 
 /**
- * 学校名からslug（URL用のスラッグ）を生成する関数
+ * 文字列からslug（URL用のスラッグ）を生成する関数
+ * 学校名や記事タイトルなどに使用可能
  * 
- * @param schoolName - 学校名
+ * @param text - スラッグを生成する文字列（学校名、記事タイトルなど）
  * @returns slug（小文字、ハイフン区切り）
  * 
  * @example
  * generateSlug('通信制高校A') // => '通信制高校a'
  * generateSlug('学校名 (正式名称)') // => '学校名-正式名称'
+ * generateSlug('記事タイトル') // => '記事タイトル'
  */
-export function generateSlug(schoolName: string): string {
-  if (!schoolName) {
+export function generateSlug(text: string): string {
+  if (!text) {
     return '';
   }
 
   // 1. 文字列を小文字に変換
-  let slug = schoolName.toLowerCase();
+  let slug = text.toLowerCase();
 
   // 2. 英数字、日本語（ひらがな、カタカナ、漢字）以外の文字をハイフンに変換
   slug = slug.replace(/[^a-z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '-');
@@ -36,6 +38,7 @@ export function generateSlug(schoolName: string): string {
 
   return slug;
 }
+
 
 
 
