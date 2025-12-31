@@ -21,3 +21,4 @@ export interface SchoolFormData {
   is_public: boolean;
 }
 
+

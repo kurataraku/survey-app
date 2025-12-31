@@ -667,3 +667,4 @@ export interface ReviewListResponse {
 - `survey_responses`テーブル（既存）: Epic1で作成済み、`is_public`カラムあり
 - `articles`テーブル（新規）: Epic3で作成
 
+

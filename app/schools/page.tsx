@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import SchoolCard from '@/components/SchoolCard';
+import SchoolSearchFilters from '@/components/SchoolSearchFilters';
 import { prefectures } from '@/lib/prefectures';
 
 interface School {
@@ -14,7 +15,7 @@ interface School {
   overall_avg: number | null;
 }
 
-export default function SchoolsPage() {
+function SchoolsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [schools, setSchools] = useState<School[]>([]);
@@ -26,12 +27,19 @@ export default function SchoolsPage() {
   const [selectedPrefecture, setSelectedPrefecture] = useState(
     searchParams.get('prefecture') || ''
   );
+  const [minRating, setMinRating] = useState<number | null>(
+    searchParams.get('min_rating') ? parseFloat(searchParams.get('min_rating')!) : null
+  );
+  const [minReviewCount, setMinReviewCount] = useState<number | null>(
+    searchParams.get('min_review_count') ? parseInt(searchParams.get('min_review_count')!) : null
+  );
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'name');
 
   const limit = 20;
 
   useEffect(() => {
     fetchSchools();
-  }, [page, searchQuery, selectedPrefecture]);
+  }, [page, searchQuery, selectedPrefecture, minRating, minReviewCount, sortBy]);
 
   const fetchSchools = async () => {
     setLoading(true);
@@ -45,6 +53,15 @@ export default function SchoolsPage() {
       }
       if (selectedPrefecture) {
         params.append('prefecture', selectedPrefecture);
+      }
+      if (minRating !== null) {
+        params.append('min_rating', minRating.toString());
+      }
+      if (minReviewCount !== null) {
+        params.append('min_review_count', minReviewCount.toString());
+      }
+      if (sortBy) {
+        params.append('sort', sortBy);
       }
 
       const response = await fetch(`/api/schools/search?${params.toString()}`);
@@ -67,28 +84,36 @@ export default function SchoolsPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    const params = new URLSearchParams();
-    if (searchQuery) {
-      params.append('q', searchQuery);
-    }
-    if (selectedPrefecture) {
-      params.append('prefecture', selectedPrefecture);
-    }
-    router.push(`/schools?${params.toString()}`);
-    fetchSchools();
+    updateURL();
   };
 
-  const handlePrefectureChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedPrefecture(e.target.value);
-    setPage(1);
+  const updateURL = () => {
+    updateURLWithFilters(selectedPrefecture, minRating, minReviewCount, sortBy);
+  };
+
+  const updateURLWithFilters = (
+    prefecture: string,
+    rating: number | null,
+    reviewCount: number | null,
+    sort: string
+  ) => {
     const params = new URLSearchParams();
     if (searchQuery) {
       params.append('q', searchQuery);
     }
-    if (e.target.value) {
-      params.append('prefecture', e.target.value);
+    if (prefecture) {
+      params.append('prefecture', prefecture);
     }
-    router.push(`/schools?${params.toString()}`);
+    if (rating !== null) {
+      params.append('min_rating', rating.toString());
+    }
+    if (reviewCount !== null) {
+      params.append('min_review_count', reviewCount.toString());
+    }
+    if (sort && sort !== 'name') {
+      params.append('sort', sort);
+    }
+    router.push(`/schools?${params.toString()}`, { scroll: false });
   };
 
   return (
@@ -99,40 +124,39 @@ export default function SchoolsPage() {
             通信制高校を探す
           </h1>
 
-          <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="学校名で検索"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-            <div className="md:w-48">
-              <select
-                value={selectedPrefecture}
-                onChange={handlePrefectureChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="">都道府県を選択</option>
-                {prefectures.map((pref) => (
-                  <option key={pref} value={pref}>
-                    {pref}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-            >
-              検索
-            </button>
-          </form>
+          <SchoolSearchFilters
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            selectedPrefecture={selectedPrefecture}
+            onPrefectureChange={(value) => {
+              setSelectedPrefecture(value);
+              setPage(1);
+              updateURLWithFilters(value, minRating, minReviewCount, sortBy);
+            }}
+            minRating={minRating}
+            onMinRatingChange={(value) => {
+              setMinRating(value);
+              setPage(1);
+              updateURLWithFilters(selectedPrefecture, value, minReviewCount, sortBy);
+            }}
+            minReviewCount={minReviewCount}
+            onMinReviewCountChange={(value) => {
+              setMinReviewCount(value);
+              setPage(1);
+              updateURLWithFilters(selectedPrefecture, minRating, value, sortBy);
+            }}
+            sortBy={sortBy}
+            onSortByChange={(value) => {
+              setSortBy(value);
+              setPage(1);
+              updateURLWithFilters(selectedPrefecture, minRating, minReviewCount, value);
+            }}
+            onSubmit={handleSearch}
+            prefectures={prefectures}
+          />
 
           {total > 0 && (
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-4">
               {total}件の学校が見つかりました
             </p>
           )}
@@ -187,6 +211,22 @@ export default function SchoolsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SchoolsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <p className="text-gray-600">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <SchoolsPageContent />
+    </Suspense>
   );
 }
 

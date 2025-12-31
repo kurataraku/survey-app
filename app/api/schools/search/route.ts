@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get('q') || '';
     const prefecture = searchParams.get('prefecture') || '';
+    const minRating = searchParams.get('min_rating');
+    const minReviewCount = searchParams.get('min_review_count');
+    const sortBy = searchParams.get('sort') || 'name';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = (page - 1) * limit;
@@ -93,12 +96,48 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    // フィルタリング（評価、口コミ数）
+    let filteredSchools = schoolsWithStats;
+    if (minRating) {
+      const minRatingValue = parseFloat(minRating);
+      filteredSchools = filteredSchools.filter(s => s.overall_avg !== null && s.overall_avg >= minRatingValue);
+    }
+    if (minReviewCount) {
+      const minReviewCountValue = parseInt(minReviewCount);
+      filteredSchools = filteredSchools.filter(s => s.review_count >= minReviewCountValue);
+    }
+
+    // ソート
+    switch (sortBy) {
+      case 'rating_desc':
+        filteredSchools.sort((a, b) => (b.overall_avg || 0) - (a.overall_avg || 0));
+        break;
+      case 'rating_asc':
+        filteredSchools.sort((a, b) => (a.overall_avg || 0) - (b.overall_avg || 0));
+        break;
+      case 'review_count_desc':
+        filteredSchools.sort((a, b) => b.review_count - a.review_count);
+        break;
+      case 'review_count_asc':
+        filteredSchools.sort((a, b) => a.review_count - b.review_count);
+        break;
+      case 'name':
+      default:
+        filteredSchools.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+        break;
+    }
+
+    // ページネーション
+    const total = filteredSchools.length;
+    const totalPages = Math.ceil(total / limit);
+    const paginatedSchools = filteredSchools.slice(offset, offset + limit);
+
     return NextResponse.json({
-      schools: schoolsWithStats,
-      total: count || 0,
+      schools: paginatedSchools,
+      total,
       page,
       limit,
-      total_pages: Math.ceil((count || 0) / limit),
+      total_pages: totalPages,
     });
   } catch (error) {
     console.error('APIエラー:', error);

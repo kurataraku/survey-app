@@ -23,3 +23,4 @@ COMMENT ON COLUMN article_schools.school_id IS '学校ID（schoolsテーブル�
 COMMENT ON COLUMN article_schools.display_order IS '記事内での学校の表示順序（0から開始、数値が小さいほど上位）';
 COMMENT ON COLUMN article_schools.note IS '記事内で学校に対して追加する説明文';
 
+

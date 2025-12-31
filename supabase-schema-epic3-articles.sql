@@ -52,3 +52,4 @@ COMMENT ON COLUMN articles.published_at IS '公開日時';
 COMMENT ON COLUMN articles.meta_title IS 'SEO用メタタイトル';
 COMMENT ON COLUMN articles.meta_description IS 'SEO用メタ説明文';
 
+

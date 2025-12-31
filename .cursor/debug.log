@@ -1,0 +1,8 @@
+{"location":"app/rankings/[type]/page.tsx:83","message":"ランキング取得開始","data":{"type":"review-count","page":1},"timestamp":1767146995501,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"app/rankings/[type]/page.tsx:83","message":"ランキング取得開始","data":{"type":"review-count","page":1},"timestamp":1767146995503,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
+{"location":"app/api/rankings/[type]/route.ts:9","message":"ランキングAPI呼び出し開始","data":{"type":"review-count"},"timestamp":1767146996941,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"app/api/rankings/[type]/route.ts:143","message":"ランキングAPI成功","data":{"type":"review-count","total":12,"paginatedCount":12,"page":1,"totalPages":1},"timestamp":1767146997788,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
+{"location":"app/rankings/[type]/page.tsx:90","message":"ランキング取得成功","data":{"type":"review-count","page":1,"schoolsCount":12,"total":12},"timestamp":1767146997809,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"app/api/rankings/[type]/route.ts:9","message":"ランキングAPI呼び出し開始","data":{"type":"review-count"},"timestamp":1767146997858,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
+{"location":"app/api/rankings/[type]/route.ts:143","message":"ランキングAPI成功","data":{"type":"review-count","total":12,"paginatedCount":12,"page":1,"totalPages":1},"timestamp":1767146998827,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
+{"location":"app/rankings/[type]/page.tsx:90","message":"ランキング取得成功","data":{"type":"review-count","page":1,"schoolsCount":12,"total":12},"timestamp":1767146998840,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
