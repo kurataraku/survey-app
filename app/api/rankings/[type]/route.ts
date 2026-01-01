@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 
 export async function GET(
   request: NextRequest,
@@ -9,9 +7,6 @@ export async function GET(
 ) {
   try {
     const { type } = await params;
-    // #region agent log
-    try{const logDir=join(process.cwd(),'.cursor');await mkdir(logDir,{recursive:true});const logPath=join(logDir,'debug.log');const logEntry={location:'app/api/rankings/[type]/route.ts:9',message:'ランキングAPI呼び出し開始',data:{type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};await writeFile(logPath,JSON.stringify(logEntry)+'\n',{flag:'a'});}catch(e){}
-    // #endregion
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -40,6 +35,8 @@ export async function GET(
     // 各学校の統計を取得
     const schoolsWithStats = await Promise.all(
       allSchools.map(async (school) => {
+        // ホームページAPIと同じロジックを使用
+        // school_idとis_publicで検索（カラムが存在する場合）
         const { count: reviewCount } = await supabase
           .from('survey_responses')
           .select('*', { count: 'exact', head: true })
@@ -49,34 +46,65 @@ export async function GET(
         // 評価データを取得
         const { data: reviews } = await supabase
           .from('survey_responses')
-          .select('overall_satisfaction, staff_rating, atmosphere_fit_rating, credit_rating, tuition_rating')
+          .select('overall_satisfaction, answers')
           .eq('school_id', school.id)
-          .eq('is_public', true);
+          .eq('is_public', true)
+          .not('overall_satisfaction', 'is', null);
 
         // 各評価項目の平均を計算
+        // 既に.not('overall_satisfaction', 'is', null)でフィルタリング済みなので、nullチェックは不要
         const overallAvg = reviews && reviews.length > 0
-          ? reviews.filter(r => r.overall_satisfaction !== null)
-            .reduce((sum, r) => sum + (r.overall_satisfaction || 0), 0) / reviews.filter(r => r.overall_satisfaction !== null).length
+          ? reviews.reduce((sum, r) => sum + (r.overall_satisfaction || 0), 0) / reviews.length
           : null;
 
-        const staffAvg = reviews && reviews.length > 0
-          ? reviews.filter(r => r.staff_rating !== null)
-            .reduce((sum, r) => sum + (r.staff_rating || 0), 0) / reviews.filter(r => r.staff_rating !== null).length
+        // answers JSONBから評価データを取得
+        // 評価値は1-5の範囲で、6は「評価できない」を意味するため除外
+        const staffRatings = reviews && reviews.length > 0
+          ? reviews
+              .map(r => r.answers?.staff_rating)
+              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
+              .map(r => parseInt(r, 10))
+              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
+          : [];
+
+        const atmosphereRatings = reviews && reviews.length > 0
+          ? reviews
+              .map(r => r.answers?.atmosphere_fit_rating)
+              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
+              .map(r => parseInt(r, 10))
+              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
+          : [];
+
+        const creditRatings = reviews && reviews.length > 0
+          ? reviews
+              .map(r => r.answers?.credit_rating)
+              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
+              .map(r => parseInt(r, 10))
+              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
+          : [];
+
+        const tuitionRatings = reviews && reviews.length > 0
+          ? reviews
+              .map(r => r.answers?.tuition_rating)
+              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
+              .map(r => parseInt(r, 10))
+              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
+          : [];
+
+        const staffAvg = staffRatings.length > 0
+          ? staffRatings.reduce((sum, r) => sum + r, 0) / staffRatings.length
           : null;
 
-        const atmosphereAvg = reviews && reviews.length > 0
-          ? reviews.filter(r => r.atmosphere_fit_rating !== null)
-            .reduce((sum, r) => sum + (r.atmosphere_fit_rating || 0), 0) / reviews.filter(r => r.atmosphere_fit_rating !== null).length
+        const atmosphereAvg = atmosphereRatings.length > 0
+          ? atmosphereRatings.reduce((sum, r) => sum + r, 0) / atmosphereRatings.length
           : null;
 
-        const creditAvg = reviews && reviews.length > 0
-          ? reviews.filter(r => r.credit_rating !== null)
-            .reduce((sum, r) => sum + (r.credit_rating || 0), 0) / reviews.filter(r => r.credit_rating !== null).length
+        const creditAvg = creditRatings.length > 0
+          ? creditRatings.reduce((sum, r) => sum + r, 0) / creditRatings.length
           : null;
 
-        const tuitionAvg = reviews && reviews.length > 0
-          ? reviews.filter(r => r.tuition_rating !== null)
-            .reduce((sum, r) => sum + (r.tuition_rating || 0), 0) / reviews.filter(r => r.tuition_rating !== null).length
+        const tuitionAvg = tuitionRatings.length > 0
+          ? tuitionRatings.reduce((sum, r) => sum + r, 0) / tuitionRatings.length
           : null;
 
         return {
@@ -101,9 +129,6 @@ export async function GET(
 
     // 進学実績ランキング関連のタイプを明示的に拒否
     if (type === 'graduation' || type === 'career' || type === 'advancement' || type === '進学実績') {
-      // #region agent log
-      try{const logDir=join(process.cwd(),'.cursor');await mkdir(logDir,{recursive:true});const logPath=join(logDir,'debug.log');const logEntry={location:'app/api/rankings/[type]/route.ts:98',message:'進学実績ランキング拒否',data:{type},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};await writeFile(logPath,JSON.stringify(logEntry)+'\n',{flag:'a'});}catch(e){}
-      // #endregion
       return NextResponse.json(
         { error: '進学実績ランキングは削除されました' },
         { status: 400 }
@@ -112,31 +137,28 @@ export async function GET(
 
     switch (type) {
       case 'overall':
-        // #region agent log
-        try{const logDir=join(process.cwd(),'.cursor');await mkdir(logDir,{recursive:true});const logPath=join(logDir,'debug.log');const logEntry={location:'app/api/rankings/[type]/route.ts:105',message:'overallランキング処理開始',data:{type,schoolsCount:schoolsWithStats.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};await writeFile(logPath,JSON.stringify(logEntry)+'\n',{flag:'a'});}catch(e){}
-        // #endregion
         rankedSchools = schoolsWithStats
-          .filter(s => s.overall_avg !== null && s.review_count >= 3)
+          .filter(s => s.overall_avg !== null && s.review_count >= 1)
           .sort((a, b) => (b.overall_avg || 0) - (a.overall_avg || 0));
         break;
       case 'staff':
         rankedSchools = schoolsWithStats
-          .filter(s => s.staff_avg !== null && s.review_count >= 3)
+          .filter(s => s.staff_avg !== null && s.review_count >= 1)
           .sort((a, b) => (b.staff_avg || 0) - (a.staff_avg || 0));
         break;
       case 'atmosphere':
         rankedSchools = schoolsWithStats
-          .filter(s => s.atmosphere_avg !== null && s.review_count >= 3)
+          .filter(s => s.atmosphere_avg !== null && s.review_count >= 1)
           .sort((a, b) => (b.atmosphere_avg || 0) - (a.atmosphere_avg || 0));
         break;
       case 'credit':
         rankedSchools = schoolsWithStats
-          .filter(s => s.credit_avg !== null && s.review_count >= 3)
+          .filter(s => s.credit_avg !== null && s.review_count >= 1)
           .sort((a, b) => (b.credit_avg || 0) - (a.credit_avg || 0));
         break;
       case 'tuition':
         rankedSchools = schoolsWithStats
-          .filter(s => s.tuition_avg !== null && s.review_count >= 3)
+          .filter(s => s.tuition_avg !== null && s.review_count >= 1)
           .sort((a, b) => (b.tuition_avg || 0) - (a.tuition_avg || 0));
         break;
       case 'review-count':
@@ -157,10 +179,6 @@ export async function GET(
     const offset = (page - 1) * limit;
     const paginatedSchools = rankedSchools.slice(offset, offset + limit);
 
-    // #region agent log
-    try{const logDir=join(process.cwd(),'.cursor');await mkdir(logDir,{recursive:true});const logPath=join(logDir,'debug.log');const logEntry={location:'app/api/rankings/[type]/route.ts:143',message:'ランキングAPI成功',data:{type,total,paginatedCount:paginatedSchools.length,page,totalPages},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};await writeFile(logPath,JSON.stringify(logEntry)+'\n',{flag:'a'});}catch(e){}
-    // #endregion
-
     return NextResponse.json({
       schools: paginatedSchools,
       total,
@@ -170,9 +188,6 @@ export async function GET(
       type,
     });
   } catch (error) {
-    // #region agent log
-    try{const logDir=join(process.cwd(),'.cursor');await mkdir(logDir,{recursive:true});const logPath=join(logDir,'debug.log');const logEntry={location:'app/api/rankings/[type]/route.ts:157',message:'ランキングAPIエラー',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};await writeFile(logPath,JSON.stringify(logEntry)+'\n',{flag:'a'});}catch(e){}
-    // #endregion
     console.error('ランキングAPIエラー:', error);
     return NextResponse.json(
       { error: 'サーバーエラーが発生しました' },

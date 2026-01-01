@@ -15,31 +15,19 @@ export async function GET(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // クエリパラメータを取得
     const searchParams = request.nextUrl.searchParams;
-    const schoolId = searchParams.get('school_id');
-    const schoolSlug = searchParams.get('school_slug');
-    const sort = searchParams.get('sort') || 'newest';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = (page - 1) * limit;
 
-    // 学校スラッグから学校IDを取得（必要な場合）
-    let targetSchoolId = schoolId;
-    if (schoolSlug && !targetSchoolId) {
-      const { data: school } = await supabase
-        .from('schools')
-        .select('id')
-        .eq('slug', schoolSlug)
-        .eq('is_public', true)
-        .single();
-      if (school) {
-        targetSchoolId = school.id;
-      }
-    }
+    // 総件数を取得
+    const { count: totalCount } = await supabase
+      .from('survey_responses')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_public', true);
 
-    // 口コミ検索クエリを構築
-    let query = supabase
+    // レビュー一覧を取得
+    const { data: reviewsData, error } = await supabase
       .from('survey_responses')
       .select(`
         id,
@@ -47,56 +35,24 @@ export async function GET(request: NextRequest) {
         school_name,
         overall_satisfaction,
         good_comment,
-        bad_comment,
-        enrollment_year,
-        attendance_frequency,
-        staff_rating,
-        atmosphere_fit_rating,
-        credit_rating,
-        tuition_rating,
         created_at,
-        schools(slug, name)
-      `, { count: 'exact' })
-      .eq('is_public', true);
-
-    // 学校IDでフィルタリング
-    if (targetSchoolId) {
-      query = query.eq('school_id', targetSchoolId);
-    }
-
-    // ソート順を設定
-    switch (sort) {
-      case 'oldest':
-        query = query.order('created_at', { ascending: true });
-        break;
-      case 'rating_desc':
-        query = query.order('overall_satisfaction', { ascending: false });
-        break;
-      case 'rating_asc':
-        query = query.order('overall_satisfaction', { ascending: true });
-        break;
-      case 'newest':
-      default:
-        query = query.order('created_at', { ascending: false });
-        break;
-    }
-
-    // ページネーション
-    query = query.range(offset, offset + limit - 1);
-
-    const { data: reviews, error, count } = await query;
+        schools(id, name, slug)
+      `)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('口コミ取得エラー:', error);
+      console.error('レビュー取得エラー:', error);
       return NextResponse.json(
-        { error: '口コミ取得に失敗しました', details: error.message },
+        { error: 'レビューの取得に失敗しました' },
         { status: 500 }
       );
     }
 
     // 各口コミのいいね数を取得
-    const reviewsWithLikes = await Promise.all(
-      (reviews || []).map(async (review: any) => {
+    const reviews = await Promise.all(
+      (reviewsData || []).map(async (review: any) => {
         const { count: likeCount } = await supabase
           .from('review_likes')
           .select('*', { count: 'exact', head: true })
@@ -108,35 +64,33 @@ export async function GET(request: NextRequest) {
           id: review.id,
           school_id: review.school_id,
           school_name: review.school_name,
-          school_slug: school?.slug || null,
           overall_satisfaction: review.overall_satisfaction,
           good_comment: review.good_comment,
-          bad_comment: review.bad_comment,
-          enrollment_year: review.enrollment_year,
-          attendance_frequency: review.attendance_frequency,
-          staff_rating: review.staff_rating,
-          atmosphere_fit_rating: review.atmosphere_fit_rating,
-          credit_rating: review.credit_rating,
-          tuition_rating: review.tuition_rating,
-          like_count: likeCount || 0,
           created_at: review.created_at,
+          like_count: likeCount || 0,
+          schools: school ? {
+            id: school.id,
+            name: school.name,
+            slug: school.slug,
+          } : null,
         };
       })
     );
 
+    const totalPages = Math.ceil((totalCount || 0) / limit);
+
     return NextResponse.json({
-      reviews: reviewsWithLikes,
-      total: count || 0,
+      reviews,
+      total: totalCount || 0,
       page,
+      total_pages: totalPages,
       limit,
-      total_pages: Math.ceil((count || 0) / limit),
     });
   } catch (error) {
-    console.error('APIエラー:', error);
+    console.error('レビュー一覧APIエラー:', error);
     return NextResponse.json(
       { error: 'サーバーエラーが発生しました' },
       { status: 500 }
     );
   }
 }
-

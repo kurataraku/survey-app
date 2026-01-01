@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeSearchQuery } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,26 +19,23 @@ export async function GET(request: NextRequest) {
     // クエリパラメータを取得
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get('q') || '';
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '20', 10);
-    const offset = (page - 1) * limit;
 
-    // 学校検索クエリを構築（非公開含む）
-    let query = supabase
-      .from('schools')
-      .select('*', { count: 'exact' });
-
-    // 学校名での検索
-    if (q) {
-      query = query.ilike('name', `%${q}%`);
+    if (!q || q.length < 1) {
+      return NextResponse.json({ suggestions: [] });
     }
 
-    // ページネーションとソート
-    query = query
-      .order('name', { ascending: true })
-      .range(offset, offset + limit - 1);
+    // 検索クエリを正規化（全角→半角変換）
+    const normalizedQuery = normalizeSearchQuery(q);
 
-    const { data: schools, error, count } = await query;
+    // 学校名での部分一致検索（最大10件）
+    // 正規化されたクエリで検索
+    const { data: schools, error } = await supabase
+      .from('schools')
+      .select('id, name, prefecture, slug')
+      .eq('is_public', true)
+      .ilike('name', `%${normalizedQuery}%`)
+      .order('name', { ascending: true })
+      .limit(10);
 
     if (error) {
       console.error('学校検索エラー:', error);
@@ -47,13 +45,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      schools: schools || [],
-      total: count || 0,
-      page,
-      limit,
-      total_pages: Math.ceil((count || 0) / limit),
-    });
+    const suggestions = (schools || []).map((school) => ({
+      id: school.id,
+      name: school.name,
+      prefecture: school.prefecture,
+      slug: school.slug,
+    }));
+
+    return NextResponse.json({ suggestions });
   } catch (error) {
     console.error('APIエラー:', error);
     return NextResponse.json(
@@ -62,6 +61,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-
 

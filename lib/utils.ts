@@ -3,6 +3,41 @@
  */
 
 /**
+ * 全角英数字を半角に変換する関数
+ * 検索クエリの正規化に使用
+ * 
+ * @param text - 変換する文字列
+ * @returns 全角英数字が半角に変換された文字列
+ * 
+ * @example
+ * normalizeSearchQuery('Ｎ高') // => 'N高'
+ * normalizeSearchQuery('ＡＢＣ123') // => 'ABC123'
+ */
+export function normalizeSearchQuery(text: string): string {
+  if (!text) {
+    return '';
+  }
+
+  // 全角英数字を半角に変換
+  return text
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => {
+      const code = char.charCodeAt(0);
+      // 全角英数字の範囲を半角に変換
+      if (code >= 0xFF21 && code <= 0xFF3A) {
+        // 全角大文字A-Z (0xFF21-0xFF3A) → 半角A-Z (0x41-0x5A)
+        return String.fromCharCode(code - 0xFEE0);
+      } else if (code >= 0xFF41 && code <= 0xFF5A) {
+        // 全角小文字a-z (0xFF41-0xFF5A) → 半角a-z (0x61-0x7A)
+        return String.fromCharCode(code - 0xFEE0);
+      } else if (code >= 0xFF10 && code <= 0xFF19) {
+        // 全角数字0-9 (0xFF10-0xFF19) → 半角0-9 (0x30-0x39)
+        return String.fromCharCode(code - 0xFEE0);
+      }
+      return char;
+    });
+}
+
+/**
  * 文字列からslug（URL用のスラッグ）を生成する関数
  * 学校名や記事タイトルなどに使用可能
  * 

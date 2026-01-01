@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import StarRatingDisplay from './StarRatingDisplay';
 
 interface ReviewCardProps {
@@ -26,6 +27,8 @@ export default function ReviewCard({
   likeCount,
   createdAt,
 }: ReviewCardProps) {
+  const router = useRouter();
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
@@ -40,10 +43,14 @@ export default function ReviewCard({
     ? goodComment.substring(0, 100) + '...'
     : goodComment;
 
+  const handleCardClick = () => {
+    router.push(`/reviews/${id}`);
+  };
+
   return (
-    <Link
-      href={`/reviews/${id}`}
-      className="block p-6 bg-white border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all"
+    <div
+      onClick={handleCardClick}
+      className="block p-6 bg-white border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all cursor-pointer"
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
@@ -97,9 +104,10 @@ export default function ReviewCard({
           続きを読む →
         </span>
       </div>
-    </Link>
+    </div>
   );
 }
+
 
 
 

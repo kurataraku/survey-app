@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeSearchQuery } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,9 +39,10 @@ export async function GET(request: NextRequest) {
       `, { count: 'exact' })
       .eq('is_public', true);
 
-    // 学校名での検索
+    // 学校名での検索（検索クエリを正規化）
     if (q) {
-      query = query.ilike('name', `%${q}%`);
+      const normalizedQuery = normalizeSearchQuery(q);
+      query = query.ilike('name', `%${normalizedQuery}%`);
     }
 
     // 都道府県でのフィルタリング

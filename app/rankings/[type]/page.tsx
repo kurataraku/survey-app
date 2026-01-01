@@ -83,25 +83,13 @@ function RankingsContent() {
   const fetchRankings = async () => {
     setLoading(true);
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/rankings/[type]/page.tsx:83',message:'ランキング取得開始',data:{type,page},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       const response = await fetch(`/api/rankings/${type}?page=${page}&limit=20`);
       if (!response.ok) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/rankings/[type]/page.tsx:86',message:'ランキング取得失敗',data:{type,page,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         throw new Error('ランキングの取得に失敗しました');
       }
       const rankingsData = await response.json();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/rankings/[type]/page.tsx:90',message:'ランキング取得成功',data:{type,page,schoolsCount:rankingsData.schools?.length||0,total:rankingsData.total},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       setData(rankingsData);
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/rankings/[type]/page.tsx:92',message:'ランキング取得エラー',data:{type,page,error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       console.error('ランキング取得エラー:', error);
       alert('ランキングの取得に失敗しました');
     } finally {

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SchoolCard from '@/components/SchoolCard';
 import ReviewCard from '@/components/ReviewCard';
 import ArticleCard from '@/components/ArticleCard';
 import { prefectures } from '@/lib/prefectures';
+import { normalizeSearchQuery } from '@/lib/utils';
 
 interface HomeData {
   topRankedSchools: Array<{
@@ -62,15 +63,85 @@ const majorPrefectures = [
   '愛知県',
 ];
 
+interface SchoolSuggestion {
+  id: string;
+  name: string;
+  prefecture: string;
+  slug: string | null;
+}
+
 export default function Home() {
   const router = useRouter();
   const [data, setData] = useState<HomeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrefecture, setSelectedPrefecture] = useState('');
+  const [suggestions, setSuggestions] = useState<SchoolSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchHomeData();
+  }, []);
+
+  // オートコンプリート候補を取得
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchQuery.trim().length < 1) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
+      setIsLoadingSuggestions(true);
+      try {
+        // 検索クエリを正規化（全角→半角変換）
+        const normalizedQuery = normalizeSearchQuery(searchQuery.trim());
+        const response = await fetch(`/api/schools/autocomplete?q=${encodeURIComponent(normalizedQuery)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSuggestions(data.suggestions || []);
+          setShowSuggestions(data.suggestions && data.suggestions.length > 0);
+        } else {
+          setSuggestions([]);
+          setShowSuggestions(false);
+        }
+      } catch (error) {
+        console.error('候補取得エラー:', error);
+        setSuggestions([]);
+        setShowSuggestions(false);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    };
+
+    // デバウンス処理（500ms待機）
+    const timeoutId = setTimeout(() => {
+      fetchSuggestions();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // クリックアウトサイドで候補を非表示
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const fetchHomeData = async () => {
@@ -90,10 +161,26 @@ export default function Home() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setShowSuggestions(false);
     const params = new URLSearchParams();
     if (searchQuery.trim()) {
-      params.append('q', searchQuery.trim());
+      // 検索クエリを正規化（全角→半角変換）
+      const normalizedQuery = normalizeSearchQuery(searchQuery.trim());
+      params.append('q', normalizedQuery);
     }
+    if (selectedPrefecture) {
+      params.append('prefecture', selectedPrefecture);
+    }
+    router.push(`/schools?${params.toString()}`);
+  };
+
+  const handleSuggestionClick = (suggestion: SchoolSuggestion) => {
+    setSearchQuery(suggestion.name);
+    setShowSuggestions(false);
+    const params = new URLSearchParams();
+    // 検索クエリを正規化（全角→半角変換）
+    const normalizedQuery = normalizeSearchQuery(suggestion.name);
+    params.append('q', normalizedQuery);
     if (selectedPrefecture) {
       params.append('prefecture', selectedPrefecture);
     }
@@ -145,14 +232,44 @@ export default function Home() {
           <div className="max-w-3xl mx-auto">
             <form onSubmit={handleSearch} className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
+                <div className="flex-1 relative" ref={searchInputRef}>
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      if (suggestions.length > 0) {
+                        setShowSuggestions(true);
+                      }
+                    }}
                     placeholder="学校名で検索"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
+                  {showSuggestions && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                    >
+                      {isLoadingSuggestions ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">読み込み中...</div>
+                      ) : suggestions.length > 0 ? (
+                        suggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.id}
+                            type="button"
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="w-full text-left px-4 py-3 hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-b-0"
+                          >
+                            <div className="font-medium text-gray-900">{suggestion.name}</div>
+                            <div className="text-sm text-gray-500">{suggestion.prefecture}</div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500">該当する学校が見つかりませんでした</div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="md:w-48">
                   <select
@@ -323,7 +440,7 @@ export default function Home() {
                 href={`/schools?prefecture=${encodeURIComponent(pref)}`}
                 className="px-4 py-2 bg-gray-50 hover:bg-orange-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-orange-600 hover:border-orange-300 transition-colors"
               >
-                {pref.replace('県', '').replace('府', '').replace('都', '')}
+                {pref.replace(/[都道府県]$/, '')}
               </Link>
             ))}
           </div>

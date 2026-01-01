@@ -24,3 +24,4 @@ COMMENT ON COLUMN article_schools.display_order IS '記事内での学校の表�
 COMMENT ON COLUMN article_schools.note IS '記事内で学校に対して追加する説明文';
 
 
+
