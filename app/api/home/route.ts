@@ -36,8 +36,13 @@ export async function GET(request: NextRequest) {
           .eq('is_public', true)
           .not('overall_satisfaction', 'is', null);
 
-        const overallAvg = reviews && reviews.length > 0
-          ? reviews.reduce((sum, r) => sum + r.overall_satisfaction, 0) / reviews.length
+        // 評価値6（該当なし）を除外し、1-5の範囲のみで平均を計算
+        const validRatings = reviews
+          ?.filter(r => r.overall_satisfaction !== null && r.overall_satisfaction !== 6 && r.overall_satisfaction >= 1 && r.overall_satisfaction <= 5)
+          .map(r => r.overall_satisfaction) || [];
+
+        const overallAvg = validRatings.length > 0
+          ? validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length
           : null;
 
         return {
@@ -61,14 +66,14 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, 5);
 
-    // 口コミ数順TOP5
+    // 口コミ数順TOP3
     const popularSchools = [...schoolsWithStats]
       .filter((s) => s.review_count > 0)
       .sort((a, b) => b.review_count - a.review_count)
-      .slice(0, 5);
+      .slice(0, 3);
 
-    // 2. 最新口コミ5件を取得
-    const { data: latestReviewsData } = await supabase
+    // 2. 注目の口コミ（いいね数順）3件を取得
+    const { data: allReviewsData } = await supabase
       .from('survey_responses')
       .select(`
         id,
@@ -76,16 +81,15 @@ export async function GET(request: NextRequest) {
         school_name,
         overall_satisfaction,
         good_comment,
+        bad_comment,
         created_at,
         schools(id, name, slug)
       `)
-      .eq('is_public', true)
-      .order('created_at', { ascending: false })
-      .limit(5);
+      .eq('is_public', true);
 
     // 各口コミのいいね数を取得
-    const latestReviews = await Promise.all(
-      (latestReviewsData || []).map(async (review: any) => {
+    const reviewsWithLikes = await Promise.all(
+      (allReviewsData || []).map(async (review: any) => {
         const { count: likeCount } = await supabase
           .from('review_likes')
           .select('*', { count: 'exact', head: true })
@@ -99,6 +103,7 @@ export async function GET(request: NextRequest) {
           school_name: review.school_name,
           overall_satisfaction: review.overall_satisfaction,
           good_comment: review.good_comment,
+          bad_comment: review.bad_comment,
           created_at: review.created_at,
           like_count: likeCount || 0,
           schools: school ? {
@@ -109,6 +114,11 @@ export async function GET(request: NextRequest) {
         };
       })
     );
+
+    // いいね数順でソートして上位3件を取得
+    const latestReviews = reviewsWithLikes
+      .sort((a, b) => b.like_count - a.like_count)
+      .slice(0, 3);
 
     // 3. 最新記事3件を取得
     const { data: latestArticles } = await supabase

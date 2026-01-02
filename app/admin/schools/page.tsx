@@ -96,7 +96,15 @@ function SchoolsPageContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">学校管理</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold text-gray-900">学校管理</h1>
+            <Link
+              href="/admin/schools/new"
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              新規作成
+            </Link>
+          </div>
 
           <form onSubmit={handleSearch} className="flex gap-4 mb-6">
             <div className="flex-1">

@@ -23,7 +23,7 @@ export async function GET(
 
     const reviewId = resolvedParams.id;
 
-    // 口コミ情報を取得
+    // 口コミ情報を取得（answers JSONBも含める）
     const { data: review, error: reviewError } = await supabase
       .from('survey_responses')
       .select(`
@@ -32,16 +32,12 @@ export async function GET(
         school_name,
         respondent_role,
         status,
+        graduation_path,
+        graduation_path_other,
         overall_satisfaction,
         good_comment,
         bad_comment,
-        enrollment_year,
-        attendance_frequency,
-        reason_for_choosing,
-        staff_rating,
-        atmosphere_fit_rating,
-        credit_rating,
-        tuition_rating,
+        answers,
         created_at,
         schools!inner(slug, name)
       `)
@@ -85,6 +81,43 @@ export async function GET(
       ? (review as any).schools[0] 
       : (review as any).schools;
 
+    // answers JSONBから情報を取得
+    const answers = review.answers || {};
+
+    // 学校全体の外れ値（評価値6）の件数を取得
+    let outlierCounts = {
+      overall: 0,
+      staff: 0,
+      atmosphere: 0,
+      credit: 0,
+      tuition: 0,
+    };
+
+    if (review.school_id) {
+      const { data: allReviews } = await supabase
+        .from('survey_responses')
+        .select('overall_satisfaction, answers')
+        .eq('school_id', review.school_id)
+        .eq('is_public', true);
+
+      if (allReviews) {
+        outlierCounts.overall = allReviews.filter(r => r.overall_satisfaction === 6).length;
+        outlierCounts.staff = allReviews.filter(r => r.answers?.staff_rating === '6' || r.answers?.staff_rating === 6).length;
+        outlierCounts.atmosphere = allReviews.filter(r => r.answers?.atmosphere_fit_rating === '6' || r.answers?.atmosphere_fit_rating === 6).length;
+        outlierCounts.credit = allReviews.filter(r => r.answers?.credit_rating === '6' || r.answers?.credit_rating === 6).length;
+        outlierCounts.tuition = allReviews.filter(r => r.answers?.tuition_rating === '6' || r.answers?.tuition_rating === 6).length;
+      }
+    }
+
+    // 評価値を数値に変換（文字列の場合は数値に変換）
+    const parseRating = (rating: any): number | null => {
+      if (rating === null || rating === undefined || rating === '' || rating === '6' || rating === 6) {
+        return null;
+      }
+      const num = typeof rating === 'string' ? parseInt(rating, 10) : rating;
+      return !isNaN(num) && num >= 1 && num <= 5 ? num : null;
+    };
+
     return NextResponse.json({
       id: review.id,
       school_id: review.school_id,
@@ -92,19 +125,36 @@ export async function GET(
       school_slug: school?.slug || null,
       respondent_role: review.respondent_role,
       status: review.status,
+      graduation_path: review.graduation_path,
+      graduation_path_other: review.graduation_path_other,
       overall_satisfaction: review.overall_satisfaction,
       good_comment: review.good_comment,
       bad_comment: review.bad_comment,
-      enrollment_year: review.enrollment_year,
-      attendance_frequency: review.attendance_frequency,
-      reason_for_choosing: review.reason_for_choosing || [],
-      staff_rating: review.staff_rating,
-      atmosphere_fit_rating: review.atmosphere_fit_rating,
-      credit_rating: review.credit_rating,
-      tuition_rating: review.tuition_rating,
+      // Step1: 基本情報
+      reason_for_choosing: answers.reason_for_choosing || [],
+      course: answers.course || null,
+      enrollment_type: answers.enrollment_type || null,
+      enrollment_year: answers.enrollment_year || null,
+      // Step2: 学習/環境
+      attendance_frequency: answers.attendance_frequency || null,
+      campus_prefecture: answers.campus_prefecture || null,
+      teaching_style: answers.teaching_style || [],
+      student_atmosphere: answers.student_atmosphere || [],
+      atmosphere_other: answers.atmosphere_other || null,
+      // Step3: 評価
+      flexibility_rating: parseRating(answers.flexibility_rating),
+      staff_rating: parseRating(answers.staff_rating),
+      support_rating: parseRating(answers.support_rating),
+      atmosphere_fit_rating: parseRating(answers.atmosphere_fit_rating),
+      credit_rating: parseRating(answers.credit_rating),
+      unique_course_rating: parseRating(answers.unique_course_rating),
+      career_support_rating: parseRating(answers.career_support_rating),
+      campus_life_rating: parseRating(answers.campus_life_rating),
+      tuition_rating: parseRating(answers.tuition_rating),
       like_count: likeCount || 0,
       is_liked: (userLikeCount || 0) > 0,
       created_at: review.created_at,
+      outlier_counts: outlierCounts,
     });
   } catch (error) {
     console.error('APIエラー:', error);

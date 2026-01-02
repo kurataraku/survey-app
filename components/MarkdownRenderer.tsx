@@ -8,6 +8,24 @@ interface MarkdownRendererProps {
 }
 
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  // HTMLタグが含まれているかチェック（リッチテキストエディタで作成されたコンテンツ）
+  const hasHtmlTags = /<[a-z][\s\S]*>/i.test(content);
+
+  if (hasHtmlTags) {
+    // HTMLコンテンツとして表示
+    return (
+      <div
+        className="prose prose-lg max-w-none article-content"
+        dangerouslySetInnerHTML={{ __html: content }}
+        style={{
+          fontSize: '16px',
+          lineHeight: '1.6',
+        }}
+      />
+    );
+  }
+
+  // Markdownコンテンツとして表示（既存のコンテンツとの互換性）
   return (
     <div className="prose prose-lg max-w-none">
       <ReactMarkdown
@@ -67,6 +85,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     </div>
   );
 }
+
 
 
 

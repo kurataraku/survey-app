@@ -41,8 +41,10 @@ export default function SchoolReviewsPage() {
   const fetchReviews = async () => {
     setLoading(true);
     try {
+      // slugをエンコードして送信
+      const encodedSlug = encodeURIComponent(slug);
       const params = new URLSearchParams({
-        school_slug: slug,
+        school_slug: encodedSlug,
         sort: sort,
         page: page.toString(),
         limit: limit.toString(),
@@ -126,6 +128,7 @@ export default function SchoolReviewsPage() {
                   schoolSlug={review.school_slug}
                   overallSatisfaction={review.overall_satisfaction}
                   goodComment={review.good_comment}
+                  badComment={review.bad_comment}
                   enrollmentYear={review.enrollment_year}
                   attendanceFrequency={review.attendance_frequency}
                   likeCount={review.like_count}

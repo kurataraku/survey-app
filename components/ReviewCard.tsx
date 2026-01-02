@@ -10,6 +10,7 @@ interface ReviewCardProps {
   schoolSlug: string | null;
   overallSatisfaction: number;
   goodComment: string;
+  badComment?: string;
   enrollmentYear: number | null;
   attendanceFrequency: string | null;
   likeCount: number;
@@ -22,6 +23,7 @@ export default function ReviewCard({
   schoolSlug,
   overallSatisfaction,
   goodComment,
+  badComment,
   enrollmentYear,
   attendanceFrequency,
   likeCount,
@@ -39,9 +41,13 @@ export default function ReviewCard({
   };
 
   // コメントを100文字で切り詰め
-  const truncatedComment = goodComment.length > 100
+  const truncatedGoodComment = goodComment.length > 100
     ? goodComment.substring(0, 100) + '...'
     : goodComment;
+  
+  const truncatedBadComment = badComment && badComment.length > 100
+    ? badComment.substring(0, 100) + '...'
+    : badComment;
 
   const handleCardClick = () => {
     router.push(`/reviews/${id}`);
@@ -81,7 +87,20 @@ export default function ReviewCard({
         </div>
       </div>
 
-      <p className="text-gray-700 mb-4 line-clamp-3">{truncatedComment}</p>
+      <div className="space-y-3 mb-4">
+        {goodComment && (
+          <div>
+            <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
+            <p className="text-gray-700 line-clamp-2">{truncatedGoodComment}</p>
+          </div>
+        )}
+        {badComment && (
+          <div>
+            <p className="text-xs font-semibold text-orange-600 mb-1">改善してほしい点</p>
+            <p className="text-gray-700 line-clamp-2">{truncatedBadComment}</p>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <div className="flex items-center gap-1 text-sm text-gray-600">

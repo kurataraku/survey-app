@@ -32,6 +32,7 @@ interface HomeData {
     school_name: string;
     overall_satisfaction: number;
     good_comment: string;
+    bad_comment: string;
     created_at: string;
     like_count: number;
     schools: {
@@ -294,6 +295,29 @@ export default function Home() {
               </div>
             </form>
           </div>
+
+          {/* クチコミ投稿ボタン */}
+          <div className="text-center mt-8">
+            <Link
+              href="/survey"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white text-orange-600 border-2 border-orange-600 rounded-lg hover:bg-orange-50 transition-colors font-bold text-lg shadow-md hover:shadow-lg"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+              </svg>
+              学校の口コミをする
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -353,7 +377,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {data.popularSchools.slice(0, 6).map((school) => (
+              {data.popularSchools.slice(0, 3).map((school) => (
                 <SchoolCard
                   key={school.id}
                   id={school.id}
@@ -368,11 +392,11 @@ export default function Home() {
           </section>
         )}
 
-        {/* 最新口コミ */}
+        {/* 注目の口コミ */}
         {data.latestReviews.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">最新口コミ</h2>
+              <h2 className="text-2xl font-bold text-gray-900">注目の口コミ</h2>
               <Link
                 href="/reviews"
                 className="text-orange-600 hover:text-orange-700 font-medium"
@@ -389,6 +413,7 @@ export default function Home() {
                   schoolSlug={review.schools?.slug || null}
                   overallSatisfaction={review.overall_satisfaction}
                   goodComment={review.good_comment}
+                  badComment={review.bad_comment}
                   enrollmentYear={null}
                   attendanceFrequency={null}
                   likeCount={review.like_count}

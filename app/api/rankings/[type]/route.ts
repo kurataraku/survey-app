@@ -52,9 +52,13 @@ export async function GET(
           .not('overall_satisfaction', 'is', null);
 
         // 各評価項目の平均を計算
-        // 既に.not('overall_satisfaction', 'is', null)でフィルタリング済みなので、nullチェックは不要
-        const overallAvg = reviews && reviews.length > 0
-          ? reviews.reduce((sum, r) => sum + (r.overall_satisfaction || 0), 0) / reviews.length
+        // 評価値6（該当なし）を除外し、1-5の範囲のみで平均を計算
+        const validOverallRatings = reviews
+          ?.filter(r => r.overall_satisfaction !== null && r.overall_satisfaction !== 6 && r.overall_satisfaction >= 1 && r.overall_satisfaction <= 5)
+          .map(r => r.overall_satisfaction) || [];
+
+        const overallAvg = validOverallRatings.length > 0
+          ? validOverallRatings.reduce((sum, r) => sum + r, 0) / validOverallRatings.length
           : null;
 
         // answers JSONBから評価データを取得

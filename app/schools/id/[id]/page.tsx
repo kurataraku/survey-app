@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
+import { getQuestionLabel } from '@/lib/questionLabels';
+import { getQuestionLabel } from '@/lib/questionLabels';
 
 interface School {
   id: string;
@@ -20,10 +22,18 @@ interface School {
   atmosphere_fit_rating_avg: number | null;
   credit_rating_avg: number | null;
   tuition_rating_avg: number | null;
+  outlier_counts?: {
+    overall: number;
+    staff: number;
+    atmosphere: number;
+    credit: number;
+    tuition: number;
+  };
   latest_reviews: Array<{
     id: string;
     overall_satisfaction: number;
     good_comment: string;
+    bad_comment: string;
     created_at: string;
   }>;
 }
@@ -158,7 +168,163 @@ export default function SchoolDetailByIdPage() {
               atmosphereFitRating={school.atmosphere_fit_rating_avg}
               creditRating={school.credit_rating_avg}
               tuitionRating={school.tuition_rating_avg}
+              flexibilityRating={school.flexibility_rating_avg}
+              supportRating={school.support_rating_avg}
+              uniqueCourseRating={school.unique_course_rating_avg}
+              careerSupportRating={school.career_support_rating_avg}
+              campusLifeRating={school.campus_life_rating_avg}
+              outlierCounts={school.outlier_counts}
             />
+          </div>
+        )}
+
+        {/* 統計情報 */}
+        {school.statistics && school.review_count > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">口コミ統計</h2>
+            <div className="space-y-6">
+              {/* 投稿者の立場 */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">投稿者の立場</h3>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-600">本人</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {school.statistics.respondent_role.本人}件 ({Math.round((school.statistics.respondent_role.本人 / school.review_count) * 100)}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-orange-500 h-2 rounded-full"
+                        style={{ width: `${(school.statistics.respondent_role.本人 / school.review_count) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-600">保護者</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {school.statistics.respondent_role.保護者}件 ({Math.round((school.statistics.respondent_role.保護者 / school.review_count) * 100)}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-orange-500 h-2 rounded-full"
+                        style={{ width: `${(school.statistics.respondent_role.保護者 / school.review_count) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 現在の状況 */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">現在の状況</h3>
+                <div className="space-y-2">
+                  {Object.entries(school.statistics.status).map(([status, count]) => (
+                    <div key={status}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm text-gray-600">{status}</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {count}件 ({Math.round((count / school.review_count) * 100)}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-orange-500 h-2 rounded-full"
+                          style={{ width: `${(count / school.review_count) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 通信制を選んだ理由 */}
+              {Object.keys(school.statistics.reason_for_choosing).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">通信制を選んだ理由</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(school.statistics.reason_for_choosing)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([reason, count]) => (
+                        <span
+                          key={reason}
+                          className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-sm"
+                        >
+                          {reason} ({count})
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 通学頻度 */}
+              {Object.keys(school.statistics.attendance_frequency).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">主な通学頻度</h3>
+                  <div className="space-y-2">
+                    {Object.entries(school.statistics.attendance_frequency)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([frequency, count]) => (
+                        <div key={frequency}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-600">{frequency}</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {count}件 ({Math.round((count / school.review_count) * 100)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-orange-500 h-2 rounded-full"
+                              style={{ width: `${(count / school.review_count) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 授業スタイル */}
+              {Object.keys(school.statistics.teaching_style).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">授業のスタイル</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(school.statistics.teaching_style)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([style, count]) => (
+                        <span
+                          key={style}
+                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
+                        >
+                          {getQuestionLabel('teaching_style', style)} ({count})
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 生徒の雰囲気 */}
+              {Object.keys(school.statistics.student_atmosphere).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">生徒の雰囲気</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(school.statistics.student_atmosphere)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([atmosphere, count]) => (
+                        <span
+                          key={atmosphere}
+                          className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm"
+                        >
+                          {getQuestionLabel('student_atmosphere', atmosphere)} ({count})
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -198,13 +364,24 @@ export default function SchoolDetailByIdPage() {
                   href={`/reviews/${review.id}`}
                   className="block p-4 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors"
                 >
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
                     <span className="text-sm text-gray-500">
                       {formatDate(review.created_at)}
                     </span>
                   </div>
-                  <p className="text-gray-700 line-clamp-2">{review.good_comment}</p>
+                  {review.good_comment && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
+                      <p className="text-gray-700 line-clamp-2">{review.good_comment}</p>
+                    </div>
+                  )}
+                  {review.bad_comment && (
+                    <div>
+                      <p className="text-xs font-semibold text-orange-600 mb-1">改善してほしい点</p>
+                      <p className="text-gray-700 line-clamp-2">{review.bad_comment}</p>
+                    </div>
+                  )}
                 </Link>
               ))}
             </div>
@@ -214,6 +391,7 @@ export default function SchoolDetailByIdPage() {
     </div>
   );
 }
+
 
 
 

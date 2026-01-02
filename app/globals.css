@@ -6,3 +6,101 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-sans);
 }
+
+/* リッチテキストエディタのコンテンツ表示用スタイル */
+.article-content h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 0.67em 0;
+}
+
+.article-content h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.75em 0;
+}
+
+.article-content h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+  margin: 0.83em 0;
+}
+
+.article-content ul,
+.article-content ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.article-content li {
+  margin: 0.5em 0;
+}
+
+.article-content a {
+  color: #f97316;
+  text-decoration: underline;
+}
+
+.article-content a:hover {
+  color: #ea580c;
+}
+
+.article-content p {
+  margin: 1em 0;
+}
+
+.article-content strong {
+  font-weight: bold;
+}
+
+.article-content em {
+  font-style: italic;
+}
+
+.article-content u {
+  text-decoration: underline;
+}
+
+/* リッチテキストエディタのスタイル */
+.rich-text-editor [contenteditable][data-placeholder]:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.rich-text-editor [contenteditable] h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin: 0.67em 0;
+}
+
+.rich-text-editor [contenteditable] h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0.75em 0;
+}
+
+.rich-text-editor [contenteditable] h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+  margin: 0.83em 0;
+}
+
+.rich-text-editor [contenteditable] ul,
+.rich-text-editor [contenteditable] ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.rich-text-editor [contenteditable] li {
+  margin: 0.5em 0;
+}
+
+.rich-text-editor [contenteditable] a {
+  color: #f97316;
+  text-decoration: underline;
+}
+
+.rich-text-editor [contenteditable] a:hover {
+  color: #ea580c;
+}

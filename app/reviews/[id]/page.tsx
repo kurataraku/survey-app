@@ -6,6 +6,7 @@ import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import LikeButton from '@/components/LikeButton';
+import { getQuestionLabel, getQuestionLabels, getAttendanceFrequencyLabel, getEnrollmentYearLabel, getGraduationPathLabel } from '@/lib/questionLabels';
 
 interface Review {
   id: string;
@@ -14,19 +15,42 @@ interface Review {
   school_slug: string | null;
   respondent_role: string;
   status: string;
+  graduation_path?: string | null;
+  graduation_path_other?: string | null;
   overall_satisfaction: number;
   good_comment: string;
   bad_comment: string;
-  enrollment_year: number | null;
-  attendance_frequency: string | null;
+  // Step1: 基本情報
   reason_for_choosing: string[];
-  staff_rating: number | null;
-  atmosphere_fit_rating: number | null;
-  credit_rating: number | null;
-  tuition_rating: number | null;
+  course?: string | null;
+  enrollment_type?: string | null;
+  enrollment_year?: string | null;
+  // Step2: 学習/環境
+  attendance_frequency?: string | null;
+  campus_prefecture?: string | null;
+  teaching_style?: string[];
+  student_atmosphere?: string[];
+  atmosphere_other?: string | null;
+  // Step3: 評価
+  flexibility_rating?: number | null;
+  staff_rating?: number | null;
+  support_rating?: number | null;
+  atmosphere_fit_rating?: number | null;
+  credit_rating?: number | null;
+  unique_course_rating?: number | null;
+  career_support_rating?: number | null;
+  campus_life_rating?: number | null;
+  tuition_rating?: number | null;
   like_count: number;
   is_liked: boolean;
   created_at: string;
+  outlier_counts?: {
+    overall: number;
+    staff: number;
+    atmosphere: number;
+    credit: number;
+    tuition: number;
+  };
 }
 
 export default function ReviewDetailPage() {
@@ -131,38 +155,54 @@ export default function ReviewDetailPage() {
 
           {/* 基本情報 */}
           <div className="mb-6 pb-6 border-b border-gray-200">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">基本情報</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-600">投稿者:</span>
+                <span className="text-gray-600 font-medium">投稿者:</span>
                 <span className="ml-2 text-gray-900">{review.respondent_role}</span>
               </div>
               <div>
-                <span className="text-gray-600">状況:</span>
+                <span className="text-gray-600 font-medium">現在の状況:</span>
                 <span className="ml-2 text-gray-900">{review.status}</span>
               </div>
-              {review.enrollment_year && (
-                <div>
-                  <span className="text-gray-600">入学年:</span>
-                  <span className="ml-2 text-gray-900">{review.enrollment_year}年</span>
+              {review.status === '卒業した' && review.graduation_path && (
+                <div className="md:col-span-2">
+                  <span className="text-gray-600 font-medium">卒業後の進路:</span>
+                  <span className="ml-2 text-gray-900">
+                    {getGraduationPathLabel(review.graduation_path)}
+                    {review.graduation_path_other && `（${review.graduation_path_other}）`}
+                  </span>
                 </div>
               )}
-              {review.attendance_frequency && (
+              {review.enrollment_type && (
                 <div>
-                  <span className="text-gray-600">通学頻度:</span>
-                  <span className="ml-2 text-gray-900">{review.attendance_frequency}</span>
+                  <span className="text-gray-600 font-medium">入学タイミング:</span>
+                  <span className="ml-2 text-gray-900">{getQuestionLabel('enrollment_type', review.enrollment_type)}</span>
+                </div>
+              )}
+              {review.enrollment_year && (
+                <div>
+                  <span className="text-gray-600 font-medium">入学年:</span>
+                  <span className="ml-2 text-gray-900">{getEnrollmentYearLabel(review.enrollment_year)}</span>
+                </div>
+              )}
+              {review.course && (
+                <div>
+                  <span className="text-gray-600 font-medium">在籍コース:</span>
+                  <span className="ml-2 text-gray-900">{review.course}</span>
                 </div>
               )}
             </div>
             {review.reason_for_choosing.length > 0 && (
               <div className="mt-4">
-                <span className="text-gray-600 text-sm">通信制を選んだ理由:</span>
+                <span className="text-gray-600 text-sm font-medium">通信制を選んだ理由:</span>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {review.reason_for_choosing.map((reason, index) => (
                     <span
                       key={index}
                       className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-sm"
                     >
-                      {reason}
+                      {getQuestionLabel('reason_for_choosing', reason)}
                     </span>
                   ))}
                 </div>
@@ -170,15 +210,78 @@ export default function ReviewDetailPage() {
             )}
           </div>
 
+          {/* 学習・環境 */}
+          {(review.attendance_frequency || review.campus_prefecture || review.teaching_style?.length > 0 || review.student_atmosphere?.length > 0) && (
+            <div className="mb-6 pb-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">学習・環境</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                {review.attendance_frequency && (
+                  <div>
+                    <span className="text-gray-600 font-medium">主な通学頻度:</span>
+                    <span className="ml-2 text-gray-900">{getQuestionLabel('attendance_frequency', review.attendance_frequency)}</span>
+                  </div>
+                )}
+                {review.campus_prefecture && (
+                  <div>
+                    <span className="text-gray-600 font-medium">主に通っていたキャンパス都道府県:</span>
+                    <span className="ml-2 text-gray-900">{review.campus_prefecture}</span>
+                  </div>
+                )}
+              </div>
+              {review.teaching_style && review.teaching_style.length > 0 && (
+                <div className="mt-4">
+                  <span className="text-gray-600 text-sm font-medium">授業のスタイル:</span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {review.teaching_style.map((style, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
+                      >
+                        {getQuestionLabel('teaching_style', style)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {review.student_atmosphere && review.student_atmosphere.length > 0 && (
+                <div className="mt-4">
+                  <span className="text-gray-600 text-sm font-medium">生徒の雰囲気:</span>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {review.student_atmosphere.map((atmosphere, index) => (
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm"
+                      >
+                        {getQuestionLabel('student_atmosphere', atmosphere)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {review.atmosphere_other && (
+                <div className="mt-4">
+                  <span className="text-gray-600 text-sm font-medium">その他（生徒の雰囲気）:</span>
+                  <p className="mt-1 text-gray-900">{review.atmosphere_other}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 詳細評価 */}
-          {(review.staff_rating || review.atmosphere_fit_rating || review.credit_rating || review.tuition_rating) && (
+          {(review.flexibility_rating || review.staff_rating || review.support_rating || review.atmosphere_fit_rating || review.credit_rating || review.unique_course_rating || review.career_support_rating || review.campus_life_rating || review.tuition_rating) && (
             <div className="mb-6 pb-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">詳細評価</h2>
               <RatingDisplay
+                flexibilityRating={review.flexibility_rating}
                 staffRating={review.staff_rating}
+                supportRating={review.support_rating}
                 atmosphereFitRating={review.atmosphere_fit_rating}
                 creditRating={review.credit_rating}
+                uniqueCourseRating={review.unique_course_rating}
+                careerSupportRating={review.career_support_rating}
+                campusLifeRating={review.campus_life_rating}
                 tuitionRating={review.tuition_rating}
+                outlierCounts={review.outlier_counts}
               />
             </div>
           )}
