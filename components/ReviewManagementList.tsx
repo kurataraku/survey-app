@@ -102,7 +102,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
             }}
             className={`px-4 py-2 text-sm rounded-lg transition-colors ${
               filter === 'all'
-                ? 'bg-orange-500 text-white'
+                ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -116,7 +116,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
             }}
             className={`px-4 py-2 text-sm rounded-lg transition-colors ${
               filter === 'public'
-                ? 'bg-orange-500 text-white'
+                ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
@@ -130,7 +130,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
             }}
             className={`px-4 py-2 text-sm rounded-lg transition-colors ${
               filter === 'private'
-                ? 'bg-orange-500 text-white'
+                ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >

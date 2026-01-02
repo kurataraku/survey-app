@@ -61,7 +61,7 @@ function PrefectureSchoolsContent() {
         <div className="mb-8">
           <Link
             href="/schools"
-            className="text-orange-600 hover:text-orange-700 mb-4 inline-block"
+            className="text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 学校検索に戻る
           </Link>

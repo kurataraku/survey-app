@@ -121,7 +121,7 @@ function ArticlesPageContent() {
             <h1 className="text-3xl font-bold text-gray-900">記事管理</h1>
             <Link
               href="/admin/articles/new"
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               新規作成
             </Link>
@@ -134,7 +134,7 @@ function ArticlesPageContent() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="記事タイトルで検索"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="md:w-64">
@@ -144,7 +144,7 @@ function ArticlesPageContent() {
                   setCategoryFilter(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">すべてのカテゴリ</option>
                 <option value="interview">リアル体験談 クチコミ・インタビュー</option>
@@ -153,7 +153,7 @@ function ArticlesPageContent() {
             </div>
             <button
               type="submit"
-              className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               検索
             </button>
@@ -238,7 +238,7 @@ function ArticlesPageContent() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link
                           href={`/admin/articles/${article.id}/edit`}
-                          className="text-orange-600 hover:text-orange-900 mr-4"
+                          className="text-blue-600 hover:text-blue-900 mr-4"
                         >
                           編集
                         </Link>

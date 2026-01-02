@@ -50,7 +50,7 @@ export default function JsonObjectArrayEditor({
         <button
           type="button"
           onClick={handleAdd}
-          className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
           追加
         </button>
@@ -95,7 +95,7 @@ export default function JsonObjectArrayEditor({
                   type="text"
                   value={item.question}
                   onChange={(e) => handleChange(index, 'question', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="質問を入力"
                 />
               </div>
@@ -107,7 +107,7 @@ export default function JsonObjectArrayEditor({
                   value={item.answer}
                   onChange={(e) => handleChange(index, 'answer', e.target.value)}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="回答を入力"
                 />
               </div>

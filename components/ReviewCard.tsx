@@ -56,15 +56,15 @@ export default function ReviewCard({
   return (
     <div
       onClick={handleCardClick}
-      className="block p-6 bg-white border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all cursor-pointer"
+      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
     >
       <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {schoolSlug ? (
             <Link
               href={`/schools/${schoolSlug}`}
               onClick={(e) => e.stopPropagation()}
-              className="text-sm font-medium text-orange-600 hover:text-orange-700 mb-2 inline-block"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 mb-2 inline-block"
             >
               {schoolName}
             </Link>
@@ -87,17 +87,17 @@ export default function ReviewCard({
         </div>
       </div>
 
-      <div className="space-y-3 mb-4">
+      <div className="space-y-2.5 mb-4">
         {goodComment && (
           <div>
             <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
-            <p className="text-gray-700 line-clamp-2">{truncatedGoodComment}</p>
+            <p className="text-gray-700 line-clamp-2 text-sm">{truncatedGoodComment}</p>
           </div>
         )}
         {badComment && (
           <div>
-            <p className="text-xs font-semibold text-orange-600 mb-1">改善してほしい点</p>
-            <p className="text-gray-700 line-clamp-2">{truncatedBadComment}</p>
+            <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
+            <p className="text-gray-700 line-clamp-2 text-sm">{truncatedBadComment}</p>
           </div>
         )}
       </div>
@@ -119,7 +119,7 @@ export default function ReviewCard({
           </svg>
           <span>{likeCount}</span>
         </div>
-        <span className="text-sm text-orange-600 hover:text-orange-700">
+        <span className="text-sm text-blue-600 hover:text-blue-700 font-medium">
           続きを読む →
         </span>
       </div>

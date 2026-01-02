@@ -43,14 +43,14 @@ export default function SchoolSearchFilters({
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="学校名で検索"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div className="md:w-48">
           <select
             value={selectedPrefecture}
             onChange={(e) => onPrefectureChange(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">都道府県を選択</option>
             {prefectures.map((pref) => (
@@ -62,7 +62,7 @@ export default function SchoolSearchFilters({
         </div>
         <button
           type="submit"
-          className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           検索
         </button>
@@ -73,7 +73,7 @@ export default function SchoolSearchFilters({
         <button
           type="button"
           onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          className="text-sm text-orange-600 hover:text-orange-700 font-medium mb-4"
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-4"
         >
           {showAdvancedFilters ? '詳細フィルターを閉じる' : '詳細フィルターを開く'} {showAdvancedFilters ? '▲' : '▼'}
         </button>
@@ -88,7 +88,7 @@ export default function SchoolSearchFilters({
               <select
                 value={minRating || ''}
                 onChange={(e) => onMinRatingChange(e.target.value ? parseFloat(e.target.value) : null)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">指定なし</option>
                 <option value="4.5">4.5以上</option>
@@ -106,7 +106,7 @@ export default function SchoolSearchFilters({
               <select
                 value={minReviewCount || ''}
                 onChange={(e) => onMinReviewCountChange(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">指定なし</option>
                 <option value="10">10件以上</option>
@@ -124,7 +124,7 @@ export default function SchoolSearchFilters({
               <select
                 value={sortBy}
                 onChange={(e) => onSortByChange(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="name">学校名順</option>
                 <option value="rating_desc">評価が高い順</option>

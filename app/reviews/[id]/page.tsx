@@ -6,6 +6,7 @@ import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import LikeButton from '@/components/LikeButton';
+import Chip from '@/components/ui/Chip';
 import { getQuestionLabel, getQuestionLabels, getAttendanceFrequencyLabel, getEnrollmentYearLabel, getGraduationPathLabel } from '@/lib/questionLabels';
 
 interface Review {
@@ -21,15 +22,15 @@ interface Review {
   good_comment: string;
   bad_comment: string;
   // Step1: 基本情報
-  reason_for_choosing: string[];
+  reason_for_choosing: string[] | null | undefined;
   course?: string | null;
   enrollment_type?: string | null;
   enrollment_year?: string | null;
   // Step2: 学習/環境
   attendance_frequency?: string | null;
   campus_prefecture?: string | null;
-  teaching_style?: string[];
-  student_atmosphere?: string[];
+  teaching_style?: string[] | null | undefined;
+  student_atmosphere?: string[] | null | undefined;
   atmosphere_other?: string | null;
   // Step3: 評価
   flexibility_rating?: number | null;
@@ -120,16 +121,22 @@ export default function ReviewDetailPage() {
           {review.school_slug ? (
             <Link
               href={`/schools/${review.school_slug}`}
-              className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
+              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
             >
-              ← {review.school_name}の詳細に戻る
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {review.school_name}の詳細に戻る
             </Link>
           ) : (
             <Link
               href="/schools"
-              className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
+              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
             >
-              ← 学校一覧に戻る
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              学校一覧に戻る
             </Link>
           )}
         </div>
@@ -154,56 +161,35 @@ export default function ReviewDetailPage() {
           </div>
 
           {/* 基本情報 */}
-          <div className="mb-6 pb-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">基本情報</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600 font-medium">投稿者:</span>
-                <span className="ml-2 text-gray-900">{review.respondent_role}</span>
-              </div>
-              <div>
-                <span className="text-gray-600 font-medium">現在の状況:</span>
-                <span className="ml-2 text-gray-900">{review.status}</span>
-              </div>
-              {review.status === '卒業した' && review.graduation_path && (
-                <div className="md:col-span-2">
-                  <span className="text-gray-600 font-medium">卒業後の進路:</span>
-                  <span className="ml-2 text-gray-900">
-                    {getGraduationPathLabel(review.graduation_path)}
-                    {review.graduation_path_other && `（${review.graduation_path_other}）`}
-                  </span>
-                </div>
-              )}
+          <div className="mb-8 pb-8 border-b border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">基本情報</h2>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Chip variant="primary">{review.respondent_role}</Chip>
+              <Chip variant="accent">{review.status}</Chip>
               {review.enrollment_type && (
-                <div>
-                  <span className="text-gray-600 font-medium">入学タイミング:</span>
-                  <span className="ml-2 text-gray-900">{getQuestionLabel('enrollment_type', review.enrollment_type)}</span>
-                </div>
+                <Chip variant="outline">{getQuestionLabel('enrollment_type', review.enrollment_type)}</Chip>
               )}
               {review.enrollment_year && (
-                <div>
-                  <span className="text-gray-600 font-medium">入学年:</span>
-                  <span className="ml-2 text-gray-900">{getEnrollmentYearLabel(review.enrollment_year)}</span>
-                </div>
+                <Chip variant="outline">{getEnrollmentYearLabel(review.enrollment_year)}</Chip>
               )}
               {review.course && (
-                <div>
-                  <span className="text-gray-600 font-medium">在籍コース:</span>
-                  <span className="ml-2 text-gray-900">{review.course}</span>
-                </div>
+                <Chip variant="outline">{review.course}</Chip>
+              )}
+              {review.status === '卒業した' && review.graduation_path && (
+                <Chip variant="success">
+                  {getGraduationPathLabel(review.graduation_path)}
+                  {review.graduation_path_other && `（${review.graduation_path_other}）`}
+                </Chip>
               )}
             </div>
-            {review.reason_for_choosing.length > 0 && (
-              <div className="mt-4">
-                <span className="text-gray-600 text-sm font-medium">通信制を選んだ理由:</span>
-                <div className="flex flex-wrap gap-2 mt-2">
+            {Array.isArray(review.reason_for_choosing) && review.reason_for_choosing.length > 0 && (
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-2">通信制を選んだ理由</p>
+                <div className="flex flex-wrap gap-2">
                   {review.reason_for_choosing.map((reason, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-sm"
-                    >
+                    <Chip key={index} variant="primary">
                       {getQuestionLabel('reason_for_choosing', reason)}
-                    </span>
+                    </Chip>
                   ))}
                 </div>
               </div>
@@ -211,57 +197,45 @@ export default function ReviewDetailPage() {
           </div>
 
           {/* 学習・環境 */}
-          {(review.attendance_frequency || review.campus_prefecture || review.teaching_style?.length > 0 || review.student_atmosphere?.length > 0) && (
-            <div className="mb-6 pb-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">学習・環境</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          {(review.attendance_frequency || review.campus_prefecture || (Array.isArray(review.teaching_style) && review.teaching_style.length > 0) || (Array.isArray(review.student_atmosphere) && review.student_atmosphere.length > 0)) && (
+            <div className="mb-8 pb-8 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">学習・環境</h2>
+              <div className="flex flex-wrap gap-2 mb-4">
                 {review.attendance_frequency && (
-                  <div>
-                    <span className="text-gray-600 font-medium">主な通学頻度:</span>
-                    <span className="ml-2 text-gray-900">{getQuestionLabel('attendance_frequency', review.attendance_frequency)}</span>
-                  </div>
+                  <Chip variant="outline">{getQuestionLabel('attendance_frequency', review.attendance_frequency)}</Chip>
                 )}
                 {review.campus_prefecture && (
-                  <div>
-                    <span className="text-gray-600 font-medium">主に通っていたキャンパス都道府県:</span>
-                    <span className="ml-2 text-gray-900">{review.campus_prefecture}</span>
-                  </div>
+                  <Chip variant="outline">{review.campus_prefecture}</Chip>
                 )}
               </div>
-              {review.teaching_style && review.teaching_style.length > 0 && (
-                <div className="mt-4">
-                  <span className="text-gray-600 text-sm font-medium">授業のスタイル:</span>
-                  <div className="flex flex-wrap gap-2 mt-2">
+              {Array.isArray(review.teaching_style) && review.teaching_style.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">授業のスタイル</p>
+                  <div className="flex flex-wrap gap-2">
                     {review.teaching_style.map((style, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-                      >
+                      <Chip key={index} variant="primary">
                         {getQuestionLabel('teaching_style', style)}
-                      </span>
+                      </Chip>
                     ))}
                   </div>
                 </div>
               )}
-              {review.student_atmosphere && review.student_atmosphere.length > 0 && (
-                <div className="mt-4">
-                  <span className="text-gray-600 text-sm font-medium">生徒の雰囲気:</span>
-                  <div className="flex flex-wrap gap-2 mt-2">
+              {Array.isArray(review.student_atmosphere) && review.student_atmosphere.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">生徒の雰囲気</p>
+                  <div className="flex flex-wrap gap-2">
                     {review.student_atmosphere.map((atmosphere, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm"
-                      >
+                      <Chip key={index} variant="success">
                         {getQuestionLabel('student_atmosphere', atmosphere)}
-                      </span>
+                      </Chip>
                     ))}
                   </div>
                 </div>
               )}
               {review.atmosphere_other && (
-                <div className="mt-4">
-                  <span className="text-gray-600 text-sm font-medium">その他（生徒の雰囲気）:</span>
-                  <p className="mt-1 text-gray-900">{review.atmosphere_other}</p>
+                <div>
+                  <p className="text-sm font-semibold text-gray-700 mb-2">その他（生徒の雰囲気）</p>
+                  <p className="text-gray-700">{review.atmosphere_other}</p>
                 </div>
               )}
             </div>
@@ -269,8 +243,8 @@ export default function ReviewDetailPage() {
 
           {/* 詳細評価 */}
           {(review.flexibility_rating || review.staff_rating || review.support_rating || review.atmosphere_fit_rating || review.credit_rating || review.unique_course_rating || review.career_support_rating || review.campus_life_rating || review.tuition_rating) && (
-            <div className="mb-6 pb-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">詳細評価</h2>
+            <div className="mb-8 pb-8 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">詳細評価</h2>
               <RatingDisplay
                 flexibilityRating={review.flexibility_rating}
                 staffRating={review.staff_rating}
@@ -287,15 +261,15 @@ export default function ReviewDetailPage() {
           )}
 
           {/* 良かった点 */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">良かった点</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{review.good_comment}</p>
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">良かった点</h2>
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{review.good_comment}</p>
           </div>
 
           {/* 改善してほしい点 */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">改善してほしい点</h2>
-            <p className="text-gray-700 whitespace-pre-wrap">{review.bad_comment}</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">改善してほしい点</h2>
+            <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{review.bad_comment}</p>
           </div>
         </div>
       </div>

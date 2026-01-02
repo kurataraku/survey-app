@@ -10,7 +10,7 @@ export default function AdminPage() {
       href: '/admin/schools',
       icon: (
         <svg
-          className="w-12 h-12 text-orange-500"
+          className="w-12 h-12 text-blue-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -23,7 +23,7 @@ export default function AdminPage() {
           />
         </svg>
       ),
-      color: 'orange',
+      color: 'blue',
     },
     {
       title: '記事管理',
@@ -82,7 +82,7 @@ export default function AdminPage() {
             <Link
               key={item.href}
               href={item.href}
-              className="block bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow border border-gray-200 hover:border-orange-300"
+              className="block bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow border border-gray-200 hover:border-blue-300"
             >
               <div className="flex flex-col items-center text-center">
                 <div className="mb-4">{item.icon}</div>
@@ -90,7 +90,7 @@ export default function AdminPage() {
                   {item.title}
                 </h2>
                 <p className="text-gray-600 text-sm">{item.description}</p>
-                <div className="mt-4 flex items-center text-orange-600 text-sm font-medium">
+                <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
                   <span>管理画面へ</span>
                   <svg
                     className="w-4 h-4 ml-1"

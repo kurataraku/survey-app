@@ -101,7 +101,7 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
         onClick={handleClick}
         className={`
           relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-          ${isDragging ? 'border-orange-500 bg-orange-50' : 'border-gray-300 hover:border-orange-400'}
+          ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}
           ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
@@ -115,7 +115,7 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
         />
         {isUploading ? (
           <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mb-2"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
             <p className="text-sm text-gray-600">アップロード中...</p>
           </div>
         ) : previewUrl ? (
@@ -159,7 +159,7 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
               setPreviewUrl(url);
               onChange(url);
             }}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             placeholder="または画像URLを直接入力"
           />
           <button
@@ -261,7 +261,7 @@ export default function ArticleEditor({
           value={formData.title}
           onChange={handleChange}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -276,7 +276,7 @@ export default function ArticleEditor({
           value={formData.slug}
           onChange={handleChange}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <p className="mt-1 text-sm text-gray-500">
           URLに使用されるスラッグ（例: article-title）
@@ -293,7 +293,7 @@ export default function ArticleEditor({
           value={formData.category}
           onChange={handleChange}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="interview">リアル体験談 クチコミ・インタビュー</option>
           <option value="useful_info">通信制高校お役立ち情報</option>
@@ -310,7 +310,7 @@ export default function ArticleEditor({
           value={formData.excerpt}
           onChange={handleChange}
           rows={3}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="記事の抜粋文を入力してください（一覧表示で使用されます）"
         />
       </div>
@@ -350,7 +350,7 @@ export default function ArticleEditor({
           name="is_public"
           checked={formData.is_public}
           onChange={handleChange}
-          className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
         <label htmlFor="is_public" className="ml-2 text-sm font-medium text-gray-700">
           公開する
@@ -370,7 +370,7 @@ export default function ArticleEditor({
             name="meta_title"
             value={formData.meta_title}
             onChange={handleChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="SEO用のタイトル（未指定の場合はタイトルが使用されます）"
           />
         </div>
@@ -385,7 +385,7 @@ export default function ArticleEditor({
             value={formData.meta_description}
             onChange={handleChange}
             rows={3}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="SEO用の説明文（未指定の場合は抜粋が使用されます）"
           />
         </div>
@@ -395,7 +395,7 @@ export default function ArticleEditor({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? '保存中...' : '保存'}
         </button>

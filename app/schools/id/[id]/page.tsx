@@ -111,7 +111,7 @@ export default function SchoolDetailByIdPage() {
           <div className="mb-4">
             <Link
               href="/schools"
-              className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
+              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
             >
               ← 学校一覧に戻る
             </Link>
@@ -144,14 +144,14 @@ export default function SchoolDetailByIdPage() {
             {school.slug ? (
               <Link
                 href={`/schools/${school.slug}/reviews`}
-                className="ml-auto px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm"
+                className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 すべての口コミを見る
               </Link>
             ) : (
               <Link
                 href={`/schools/id/${id}/reviews`}
-                className="ml-auto px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm"
+                className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 すべての口コミを見る
               </Link>
@@ -196,7 +196,7 @@ export default function SchoolDetailByIdPage() {
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-orange-500 h-2 rounded-full"
+                        className="bg-blue-600 h-1.5 rounded-full transition-all"
                         style={{ width: `${(school.statistics.respondent_role.本人 / school.review_count) * 100}%` }}
                       />
                     </div>
@@ -210,7 +210,7 @@ export default function SchoolDetailByIdPage() {
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className="bg-orange-500 h-2 rounded-full"
+                        className="bg-blue-600 h-1.5 rounded-full transition-all"
                         style={{ width: `${(school.statistics.respondent_role.保護者 / school.review_count) * 100}%` }}
                       />
                     </div>
@@ -232,7 +232,7 @@ export default function SchoolDetailByIdPage() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-orange-500 h-2 rounded-full"
+                          className="bg-blue-600 h-1.5 rounded-full transition-all"
                           style={{ width: `${(count / school.review_count) * 100}%` }}
                         />
                       </div>
@@ -251,7 +251,7 @@ export default function SchoolDetailByIdPage() {
                       .map(([reason, count]) => (
                         <span
                           key={reason}
-                          className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-sm"
+                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
                         >
                           {reason} ({count})
                         </span>
@@ -277,7 +277,7 @@ export default function SchoolDetailByIdPage() {
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className="bg-orange-500 h-2 rounded-full"
+                              className="bg-blue-600 h-1.5 rounded-full transition-all"
                               style={{ width: `${(count / school.review_count) * 100}%` }}
                             />
                           </div>
@@ -344,14 +344,14 @@ export default function SchoolDetailByIdPage() {
               {school.slug ? (
                 <Link
                   href={`/schools/${school.slug}/reviews`}
-                  className="text-sm text-orange-600 hover:text-orange-700"
+                  className="text-sm text-blue-600 hover:text-blue-700"
                 >
                   すべて見る →
                 </Link>
               ) : (
                 <Link
                   href={`/schools/id/${id}/reviews`}
-                  className="text-sm text-orange-600 hover:text-orange-700"
+                  className="text-sm text-blue-600 hover:text-blue-700"
                 >
                   すべて見る →
                 </Link>
@@ -362,7 +362,7 @@ export default function SchoolDetailByIdPage() {
                 <Link
                   key={review.id}
                   href={`/reviews/${review.id}`}
-                  className="block p-4 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors"
+                  className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
                 >
                   <div className="flex items-center gap-2 mb-3">
                     <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
@@ -378,7 +378,7 @@ export default function SchoolDetailByIdPage() {
                   )}
                   {review.bad_comment && (
                     <div>
-                      <p className="text-xs font-semibold text-orange-600 mb-1">改善してほしい点</p>
+                      <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
                       <p className="text-gray-700 line-clamp-2">{review.bad_comment}</p>
                     </div>
                   )}

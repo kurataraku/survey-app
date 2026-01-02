@@ -7,6 +7,26 @@ body {
   font-family: var(--font-sans);
 }
 
+/* デザイントークン - カラーパレット */
+:root {
+  /* プライマリブルー系 */
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  
+  /* アクセントコーラル系 */
+  --color-accent-500: #fb7185;
+  --color-accent-600: #f87171;
+  
+  /* セマンティック */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+}
+
 /* リッチテキストエディタのコンテンツ表示用スタイル */
 .article-content h1 {
   font-size: 2em;
@@ -37,12 +57,12 @@ body {
 }
 
 .article-content a {
-  color: #f97316;
+  color: #2563eb;
   text-decoration: underline;
 }
 
 .article-content a:hover {
-  color: #ea580c;
+  color: #1d4ed8;
 }
 
 .article-content p {
@@ -97,10 +117,10 @@ body {
 }
 
 .rich-text-editor [contenteditable] a {
-  color: #f97316;
+  color: #2563eb;
   text-decoration: underline;
 }
 
 .rich-text-editor [contenteditable] a:hover {
-  color: #ea580c;
+  color: #1d4ed8;
 }

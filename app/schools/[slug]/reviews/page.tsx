@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ReviewCard from '@/components/ReviewCard';
+import Select from '@/components/ui/Select';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton from '@/components/ui/Skeleton';
 
 interface Review {
   id: string;
@@ -82,9 +85,12 @@ export default function SchoolReviewsPage() {
         <div className="mb-6">
           <Link
             href={`/schools/${slug}`}
-            className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
+            className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
           >
-            ← 学校詳細に戻る
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            学校詳細に戻る
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             {schoolName || '口コミ一覧'}
@@ -96,27 +102,40 @@ export default function SchoolReviewsPage() {
 
         {/* ソート */}
         <div className="mb-6 flex justify-end">
-          <select
-            value={sort}
-            onChange={handleSortChange}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-          >
-            <option value="newest">新着順</option>
-            <option value="oldest">古い順</option>
-            <option value="rating_desc">評価が高い順</option>
-            <option value="rating_asc">評価が低い順</option>
-          </select>
+          <div className="w-48">
+            <Select
+              options={[
+                { value: 'newest', label: '新着順' },
+                { value: 'oldest', label: '古い順' },
+                { value: 'rating_desc', label: '評価が高い順' },
+                { value: 'rating_asc', label: '評価が低い順' },
+              ]}
+              value={sort}
+              onChange={(value) => {
+                setSort(value);
+                setPage(1);
+              }}
+              placeholder="並び替え"
+            />
+          </div>
         </div>
 
         {/* 口コミ一覧 */}
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-lg p-5">
+                <Skeleton height={20} width="60%" className="mb-3" />
+                <Skeleton height={16} width="40%" className="mb-4" />
+                <Skeleton height={16} width="80%" />
+              </div>
+            ))}
           </div>
         ) : reviews.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">口コミが見つかりませんでした</p>
-          </div>
+          <EmptyState
+            title="口コミが見つかりませんでした"
+            description="この学校にはまだ口コミが投稿されていません。"
+          />
         ) : (
           <>
             <div className="space-y-4 mb-8">

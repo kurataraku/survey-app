@@ -52,8 +52,8 @@ export default function RatingDisplay({
   return (
     <div className="space-y-3">
       {ratings.map((rating) => (
-        <div key={rating.label} className="flex items-center justify-between">
-          <div className="flex-1">
+        <div key={rating.label} className="flex items-center justify-between py-1">
+          <div className="flex-1 min-w-0 pr-4">
             <span className="text-sm text-gray-700">{rating.label}</span>
             {rating.outlierCount > 0 && (
               <span className="text-xs text-gray-500 ml-2">
@@ -61,9 +61,9 @@ export default function RatingDisplay({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <StarRatingDisplay value={rating.value as number} size="sm" />
-            <span className="text-sm text-gray-600 w-10 text-right">
+            <span className="text-sm font-medium text-gray-900 w-10 text-right">
               {rating.value?.toFixed(1)}
             </span>
           </div>

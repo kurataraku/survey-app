@@ -3,6 +3,15 @@
  */
 
 /**
+ * クラス名をマージする関数（Tailwind用）
+ * @param classes - クラス名の配列または文字列
+ * @returns マージされたクラス名文字列
+ */
+export function cn(...classes: (string | undefined | null | false)[]): string {
+  return classes.filter(Boolean).join(' ');
+}
+
+/**
  * 全角英数字を半角に変換する関数
  * 検索クエリの正規化に使用
  * 

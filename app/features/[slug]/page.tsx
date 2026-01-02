@@ -84,7 +84,7 @@ export default function ArticleDetailPage() {
         <div className="mb-6">
           <Link
             href="/features"
-            className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
+            className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 特集ページ一覧に戻る
           </Link>
@@ -155,7 +155,7 @@ export default function ArticleDetailPage() {
           <h2 className="text-xl font-bold text-gray-900 mb-4">その他の特集ページ</h2>
           <Link
             href="/features"
-            className="text-orange-600 hover:text-orange-700 underline"
+            className="text-blue-600 hover:text-blue-700 underline"
           >
             特集ページ一覧を見る →
           </Link>

@@ -60,7 +60,7 @@ export default function RankingsPage() {
             <Link
               key={ranking.id}
               href={`/rankings/${ranking.id}`}
-              className="block bg-white border border-gray-200 rounded-lg p-6 hover:border-orange-300 hover:shadow-md transition-all"
+              className="block bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all"
             >
               <div className="flex items-start gap-4">
                 <div className="text-4xl">{ranking.icon}</div>
@@ -74,7 +74,7 @@ export default function RankingsPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <span className="text-sm text-orange-600 font-medium">
+                <span className="text-sm text-blue-600 font-medium">
                   詳細を見る →
                 </span>
               </div>

@@ -67,7 +67,7 @@ export default function SchoolEditor({
           value={formData.name}
           onChange={(e) => handleNameChange(e.target.value)}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
@@ -81,7 +81,7 @@ export default function SchoolEditor({
           value={formData.prefecture}
           onChange={(e) => setFormData((prev) => ({ ...prev, prefecture: e.target.value }))}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">選択してください</option>
           {prefectures.map((pref) => (
@@ -103,7 +103,7 @@ export default function SchoolEditor({
           value={formData.slug}
           onChange={(e) => handleSlugChange(e.target.value)}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <p className="mt-1 text-sm text-gray-500">
           URLに使用されるスラッグ（例: school-name）
@@ -120,7 +120,7 @@ export default function SchoolEditor({
           value={formData.intro}
           onChange={(e) => setFormData((prev) => ({ ...prev, intro: e.target.value }))}
           rows={6}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="学校の紹介文を入力してください"
         />
       </div>
@@ -153,7 +153,7 @@ export default function SchoolEditor({
           onChange={(e) =>
             setFormData((prev) => ({ ...prev, is_public: e.target.checked }))
           }
-          className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
         />
         <label htmlFor="is_public" className="ml-2 text-sm font-medium text-gray-700">
           公開する
@@ -164,7 +164,7 @@ export default function SchoolEditor({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? '保存中...' : '保存'}
         </button>

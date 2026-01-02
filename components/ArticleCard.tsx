@@ -44,7 +44,7 @@ export default function ArticleCard({
   return (
     <Link
       href={`/features/${encodeURIComponent(slug)}`}
-      className="block bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-orange-300 hover:shadow-md transition-all"
+      className="block bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-blue-300 hover:shadow-md transition-all"
     >
       {featured_image_url && (
         <div className="aspect-video w-full bg-gray-200 overflow-hidden">

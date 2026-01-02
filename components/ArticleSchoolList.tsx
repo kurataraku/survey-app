@@ -194,7 +194,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="学校名または都道府県で検索"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -206,7 +206,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                   type="button"
                   onClick={() => setSelectedSchoolId(school.id)}
                   className={`w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-200 ${
-                    selectedSchoolId === school.id ? 'bg-orange-50' : ''
+                    selectedSchoolId === school.id ? 'bg-blue-50' : ''
                   }`}
                 >
                   <div className="font-medium">{school.name}</div>
@@ -226,7 +226,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                   type="number"
                   value={displayOrder}
                   onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -238,7 +238,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="この学校についてのコメント（オプション）"
                 />
               </div>
@@ -247,7 +247,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                 type="button"
                 onClick={handleAddSchool}
                 disabled={isAdding}
-                className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50"
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
               >
                 {isAdding ? '追加中...' : '学校を追加'}
               </button>
@@ -327,7 +327,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                         )
                       }
                       rows={2}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="コメント（オプション）"
                     />
                   </div>

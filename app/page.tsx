@@ -192,8 +192,14 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <p className="text-gray-600">読み込み中...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-lg p-5">
+                <div className="h-4 bg-gray-200 rounded animate-pulse mb-3"></div>
+                <div className="h-3 bg-gray-200 rounded animate-pulse mb-4 w-2/3"></div>
+                <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -204,8 +210,22 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <p className="text-gray-600">データの読み込みに失敗しました</p>
+          <div className="text-center py-12">
+            <svg
+              className="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">データの読み込みに失敗しました</h3>
+            <p className="mt-2 text-sm text-gray-600">しばらくしてから再度お試しください</p>
           </div>
         </div>
       </div>
@@ -215,7 +235,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヒーローセクション */}
-      <section className="bg-gradient-to-br from-orange-50 to-orange-100 py-16">
+      <section className="bg-gradient-to-br from-blue-50 to-blue-100 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
@@ -229,9 +249,12 @@ export default function Home() {
             </p>
           </div>
 
-          {/* クイック検索 */}
-          <div className="max-w-3xl mx-auto">
-            <form onSubmit={handleSearch} className="bg-white rounded-lg shadow-lg p-6">
+          {/* 検索パネル - 1つの視覚的ユニットとして統合 */}
+          <div className="max-w-3xl mx-auto mb-8">
+            <form onSubmit={handleSearch} className="bg-white rounded-lg shadow-xl p-6 border border-gray-200">
+              <label className="block text-sm font-semibold text-gray-700 mb-4">
+                学校を探す
+              </label>
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative" ref={searchInputRef}>
                   <input
@@ -245,7 +268,7 @@ export default function Home() {
                       }
                     }}
                     placeholder="学校名で検索"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   {showSuggestions && (
                     <div
@@ -260,7 +283,7 @@ export default function Home() {
                             key={suggestion.id}
                             type="button"
                             onClick={() => handleSuggestionClick(suggestion)}
-                            className="w-full text-left px-4 py-3 hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-b-0"
+                            className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
                           >
                             <div className="font-medium text-gray-900">{suggestion.name}</div>
                             <div className="text-sm text-gray-500">{suggestion.prefecture}</div>
@@ -276,7 +299,7 @@ export default function Home() {
                   <select
                     value={selectedPrefecture}
                     onChange={(e) => setSelectedPrefecture(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">都道府県を選択</option>
                     {prefectures.map((pref) => (
@@ -288,7 +311,7 @@ export default function Home() {
                 </div>
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md hover:shadow-lg"
                 >
                   検索
                 </button>
@@ -296,14 +319,14 @@ export default function Home() {
             </form>
           </div>
 
-          {/* クチコミ投稿ボタン */}
-          <div className="text-center mt-8">
+          {/* 主CTA - より大きく目立つデザイン */}
+          <div className="text-center">
             <Link
               href="/survey"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-white text-orange-600 border-2 border-orange-600 rounded-lg hover:bg-orange-50 transition-colors font-bold text-lg shadow-md hover:shadow-lg"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               <svg
-                className="w-5 h-5"
+                className="w-6 h-6"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -326,18 +349,24 @@ export default function Home() {
         {data.topRankedSchools.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">総合評判ランキング TOP5</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">総合評判ランキング TOP5</h2>
+                <p className="text-sm text-gray-600">口コミ数と評価の高い学校</p>
+              </div>
               <Link
                 href="/rankings/overall"
-                className="text-orange-600 hover:text-orange-700 font-medium"
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
-                もっと見る →
+                もっと見る
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {data.topRankedSchools.slice(0, 3).map((school, index) => (
                 <div key={school.id} className="relative">
-                  <div className="absolute -top-2 -left-2 bg-orange-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm z-10">
+                  <div className="absolute -top-2 -left-2 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm z-10">
                     {index + 1}
                   </div>
                   <SchoolCard
@@ -355,7 +384,7 @@ export default function Home() {
               <div className="mt-4 text-center">
                 <Link
                   href="/rankings/overall"
-                  className="inline-block px-6 py-2 border border-orange-600 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors"
+                  className="inline-block px-6 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
                 >
                   ランキングTOP5を見る
                 </Link>
@@ -368,15 +397,21 @@ export default function Home() {
         {data.popularSchools.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">注目の学校</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">注目の学校</h2>
+                <p className="text-sm text-gray-600">多くの口コミが寄せられている学校</p>
+              </div>
               <Link
                 href="/schools"
-                className="text-orange-600 hover:text-orange-700 font-medium"
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
-                もっと見る →
+                もっと見る
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {data.popularSchools.slice(0, 3).map((school) => (
                 <SchoolCard
                   key={school.id}
@@ -396,15 +431,21 @@ export default function Home() {
         {data.latestReviews.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">注目の口コミ</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">注目の口コミ</h2>
+                <p className="text-sm text-gray-600">多くのいいねが寄せられている口コミ</p>
+              </div>
               <Link
                 href="/reviews"
-                className="text-orange-600 hover:text-orange-700 font-medium"
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
-                もっと見る →
+                もっと見る
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {data.latestReviews.map((review) => (
                 <ReviewCard
                   key={review.id}
@@ -428,15 +469,21 @@ export default function Home() {
         {data.latestArticles.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">特集記事</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">特集記事</h2>
+                <p className="text-sm text-gray-600">通信制高校に関する役立つ情報</p>
+              </div>
               <Link
                 href="/features"
-                className="text-orange-600 hover:text-orange-700 font-medium"
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
-                もっと見る →
+                もっと見る
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {data.latestArticles.map((article) => (
                 <ArticleCard
                   key={article.id}
@@ -463,7 +510,7 @@ export default function Home() {
               <Link
                 key={pref}
                 href={`/schools?prefecture=${encodeURIComponent(pref)}`}
-                className="px-4 py-2 bg-gray-50 hover:bg-orange-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-orange-600 hover:border-orange-300 transition-colors"
+                className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
               >
                 {pref.replace(/[都道府県]$/, '')}
               </Link>
@@ -472,9 +519,12 @@ export default function Home() {
           <div className="mt-6 text-center">
             <Link
               href="/schools"
-              className="text-orange-600 hover:text-orange-700 font-medium"
+              className="text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center gap-1"
             >
-              すべての都道府県を見る →
+              すべての都道府県を見る
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </Link>
           </div>
         </section>

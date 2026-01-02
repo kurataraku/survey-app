@@ -42,15 +42,13 @@ export async function GET(
     const { count: reviewCount } = await supabase
       .from('survey_responses')
       .select('*', { count: 'exact', head: true })
-      .eq('school_id', school.id)
-      .eq('is_public', true);
+      .eq('school_name', school.name);
 
     // 評価の平均値を計算
     const { data: reviews } = await supabase
       .from('survey_responses')
       .select('overall_satisfaction, answers')
-      .eq('school_id', school.id)
-      .eq('is_public', true);
+      .eq('school_name', school.name);
 
     // overall_satisfactionの平均と外れ値件数を計算
     const overallValues = reviews?.map(r => r.overall_satisfaction) || [];
@@ -131,8 +129,7 @@ export async function GET(
     const { data: allReviewsForStats } = await supabase
       .from('survey_responses')
       .select('respondent_role, status, graduation_path, answers')
-      .eq('school_id', school.id)
-      .eq('is_public', true);
+      .eq('school_name', school.name);
 
     // 基本情報の統計
     const respondentRoleStats = {
@@ -269,8 +266,7 @@ export async function GET(
     const { data: latestReviews } = await supabase
       .from('survey_responses')
       .select('id, overall_satisfaction, good_comment, bad_comment, created_at')
-      .eq('school_id', school.id)
-      .eq('is_public', true)
+      .eq('school_name', school.name)
       .order('created_at', { ascending: false })
       .limit(3);
 

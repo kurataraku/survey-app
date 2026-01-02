@@ -47,7 +47,7 @@ export default function ChipSelect({
                     }}
                     className={`px-4 py-3 rounded-lg border transition-all text-left flex items-center justify-between min-h-[56px] ${
                       isSelected
-                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        ? 'bg-blue-50 border-blue-300 text-blue-700'
                         : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
                     }`}
                     style={{ fontFamily: 'sans-serif' }}
@@ -55,7 +55,7 @@ export default function ChipSelect({
                     <span className="text-xs leading-relaxed pr-2 flex-1">{option.label}</span>
                     {isSelected && (
                       <svg
-                        className="w-4 h-4 text-orange-500 flex-shrink-0"
+                        className="w-4 h-4 text-blue-500 flex-shrink-0"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"

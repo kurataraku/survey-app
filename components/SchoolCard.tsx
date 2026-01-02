@@ -38,11 +38,11 @@ export default function SchoolCard({
     <Link
       href={href}
       onClick={handleClick}
-      className="block p-6 bg-white border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all"
+      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
     >
       <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
             {name}
           </h3>
           <p className="text-sm text-gray-600">{prefecture}</p>
@@ -50,11 +50,11 @@ export default function SchoolCard({
       </div>
 
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {overallAvg !== null ? (
             <>
               <StarRatingDisplay value={overallAvg} size="sm" showLabel />
-              <span className="text-sm text-gray-600">
+              <span className="text-sm font-medium text-gray-900">
                 {overallAvg.toFixed(1)}
               </span>
             </>
@@ -63,7 +63,7 @@ export default function SchoolCard({
           )}
         </div>
         <span className="text-sm text-gray-600">
-          {reviewCount}件の口コミ
+          {reviewCount}件
         </span>
       </div>
     </Link>

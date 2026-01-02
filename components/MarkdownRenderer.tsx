@@ -58,13 +58,13 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-orange-600 hover:text-orange-700 underline"
+              className="text-blue-600 hover:text-blue-700 underline"
             >
               {children}
             </a>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-orange-500 pl-4 italic text-gray-600 my-4">
+            <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 my-4">
               {children}
             </blockquote>
           ),

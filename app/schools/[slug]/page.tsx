@@ -6,6 +6,8 @@ import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import { getQuestionLabel } from '@/lib/questionLabels';
+import SchoolSummary from '@/components/SchoolSummary';
+import Tabs from '@/components/ui/Tabs';
 
 interface School {
   id: string;
@@ -120,75 +122,62 @@ export default function SchoolDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        {/* ヘッダー */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="mb-4">
-            <Link
-              href="/schools"
-              className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
-            >
-              ← 学校一覧に戻る
-            </Link>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {school.name}
-          </h1>
-          <p className="text-gray-600 mb-4">{school.prefecture}</p>
-
-          {/* 評価サマリー */}
-          <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
-            {school.overall_avg !== null ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <StarRatingDisplay value={school.overall_avg} size="lg" showLabel />
-                </div>
-                <div className="text-sm text-gray-600">
-                  <span className="text-2xl font-bold text-gray-900">
-                    {school.overall_avg.toFixed(1)}
-                  </span>
-                  <span className="ml-1">/ 5.0</span>
-                </div>
-              </>
-            ) : (
-              <span className="text-gray-400">評価なし</span>
-            )}
-            <div className="text-sm text-gray-600">
-              <span className="font-semibold">{school.review_count}</span>件の口コミ
-            </div>
-            <Link
-              href={`/schools/${encodedSlug}/reviews`}
-              className="ml-auto px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm"
-            >
-              すべての口コミを見る
-            </Link>
-          </div>
+        {/* 戻るリンク */}
+        <div className="mb-4">
+          <Link
+            href="/schools"
+            className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            学校一覧に戻る
+          </Link>
         </div>
 
-        {/* 詳細評価 */}
-        {school.overall_avg !== null && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">詳細評価</h2>
-            <RatingDisplay
-              staffRating={school.staff_rating_avg}
-              atmosphereFitRating={school.atmosphere_fit_rating_avg}
-              creditRating={school.credit_rating_avg}
-              tuitionRating={school.tuition_rating_avg}
-              flexibilityRating={school.flexibility_rating_avg}
-              supportRating={school.support_rating_avg}
-              uniqueCourseRating={school.unique_course_rating_avg}
-              careerSupportRating={school.career_support_rating_avg}
-              campusLifeRating={school.campus_life_rating_avg}
-              outlierCounts={school.outlier_counts}
-            />
-          </div>
-        )}
+        {/* 結論サマリー */}
+        <SchoolSummary
+          name={school.name}
+          prefecture={school.prefecture}
+          slug={encodedSlug}
+          overallAvg={school.overall_avg}
+          reviewCount={school.review_count}
+          staffRatingAvg={school.staff_rating_avg}
+          atmosphereFitRatingAvg={school.atmosphere_fit_rating_avg}
+          creditRatingAvg={school.credit_rating_avg}
+          latestReviews={school.latest_reviews}
+        />
 
-        {/* 統計情報 */}
-        {school.statistics && school.review_count > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">口コミ統計</h2>
-            <div className="space-y-6">
-              {/* 投稿者の立場 */}
+        {/* タブで情報を段階的に表示 */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <Tabs
+            tabs={[
+              {
+                id: 'ratings',
+                label: '詳細評価',
+                content: school.overall_avg !== null ? (
+                  <RatingDisplay
+                    staffRating={school.staff_rating_avg}
+                    atmosphereFitRating={school.atmosphere_fit_rating_avg}
+                    creditRating={school.credit_rating_avg}
+                    tuitionRating={school.tuition_rating_avg}
+                    flexibilityRating={school.flexibility_rating_avg}
+                    supportRating={school.support_rating_avg}
+                    uniqueCourseRating={school.unique_course_rating_avg}
+                    careerSupportRating={school.career_support_rating_avg}
+                    campusLifeRating={school.campus_life_rating_avg}
+                    outlierCounts={school.outlier_counts}
+                  />
+                ) : (
+                  <p className="text-gray-500 text-center py-8">評価データがありません</p>
+                ),
+              },
+              {
+                id: 'statistics',
+                label: '口コミ統計',
+                content: school.statistics && school.review_count > 0 ? (
+                  <div className="space-y-6">
+                    {/* 投稿者の立場 */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">投稿者の立場</h3>
                 <div className="flex gap-4">
@@ -199,9 +188,9 @@ export default function SchoolDetailPage() {
                         {school.statistics.respondent_role.本人}件 ({Math.round((school.statistics.respondent_role.本人 / school.review_count) * 100)}%)
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
                       <div
-                        className="bg-orange-500 h-2 rounded-full"
+                        className="bg-blue-600 h-1.5 rounded-full transition-all"
                         style={{ width: `${(school.statistics.respondent_role.本人 / school.review_count) * 100}%` }}
                       />
                     </div>
@@ -213,9 +202,9 @@ export default function SchoolDetailPage() {
                         {school.statistics.respondent_role.保護者}件 ({Math.round((school.statistics.respondent_role.保護者 / school.review_count) * 100)}%)
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
                       <div
-                        className="bg-orange-500 h-2 rounded-full"
+                        className="bg-blue-600 h-1.5 rounded-full transition-all"
                         style={{ width: `${(school.statistics.respondent_role.保護者 / school.review_count) * 100}%` }}
                       />
                     </div>
@@ -235,9 +224,9 @@ export default function SchoolDetailPage() {
                           {count}件 ({Math.round((count / school.review_count) * 100)}%)
                         </span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
                         <div
-                          className="bg-orange-500 h-2 rounded-full"
+                          className="bg-blue-600 h-1.5 rounded-full transition-all"
                           style={{ width: `${(count / school.review_count) * 100}%` }}
                         />
                       </div>
@@ -256,7 +245,7 @@ export default function SchoolDetailPage() {
                       .map(([reason, count]) => (
                         <span
                           key={reason}
-                          className="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-sm"
+                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
                         >
                           {reason} ({count})
                         </span>
@@ -280,9 +269,9 @@ export default function SchoolDetailPage() {
                               {count}件 ({Math.round((count / school.review_count) * 100)}%)
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
                             <div
-                              className="bg-orange-500 h-2 rounded-full"
+                              className="bg-blue-600 h-1.5 rounded-full transition-all"
                               style={{ width: `${(count / school.review_count) * 100}%` }}
                             />
                           </div>
@@ -329,9 +318,58 @@ export default function SchoolDetailPage() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">統計データがありません</p>
+                  ),
+                },
+              {
+                id: 'reviews',
+                label: '最新の口コミ',
+                content: school.latest_reviews.length > 0 ? (
+                  <div className="space-y-4">
+                    {school.latest_reviews.map((review) => (
+                      <Link
+                        key={review.id}
+                        href={`/reviews/${review.id}`}
+                        className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
+                          <span className="text-sm text-gray-500">
+                            {formatDate(review.created_at)}
+                          </span>
+                        </div>
+                        {review.good_comment && (
+                          <div className="mb-3">
+                            <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
+                            <p className="text-gray-700 line-clamp-2">{review.good_comment}</p>
+                          </div>
+                        )}
+                        {review.bad_comment && (
+                          <div>
+                            <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
+                            <p className="text-gray-700 line-clamp-2">{review.bad_comment}</p>
+                          </div>
+                        )}
+                      </Link>
+                    ))}
+                    <div className="pt-4 border-t border-gray-200">
+                      <Link
+                        href={`/schools/${encodedSlug}/reviews`}
+                        className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        すべての口コミを見る
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-500 text-center py-8">口コミがありません</p>
+                ),
+              },
+            ]}
+          />
+        </div>
 
         {/* 学校紹介 */}
         {school.intro && (
@@ -341,48 +379,6 @@ export default function SchoolDetailPage() {
           </div>
         )}
 
-        {/* 最新の口コミ */}
-        {school.latest_reviews.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">最新の口コミ</h2>
-              <Link
-                href={`/schools/${encodedSlug}/reviews`}
-                className="text-sm text-orange-600 hover:text-orange-700"
-              >
-                すべて見る →
-              </Link>
-            </div>
-            <div className="space-y-4">
-              {school.latest_reviews.map((review) => (
-                <Link
-                  key={review.id}
-                  href={`/reviews/${review.id}`}
-                  className="block p-4 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors"
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
-                    <span className="text-sm text-gray-500">
-                      {formatDate(review.created_at)}
-                    </span>
-                  </div>
-                  {review.good_comment && (
-                    <div className="mb-3">
-                      <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
-                      <p className="text-gray-700 line-clamp-2">{review.good_comment}</p>
-                    </div>
-                  )}
-                  {review.bad_comment && (
-                    <div>
-                      <p className="text-xs font-semibold text-orange-600 mb-1">改善してほしい点</p>
-                      <p className="text-gray-700 line-clamp-2">{review.bad_comment}</p>
-                    </div>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

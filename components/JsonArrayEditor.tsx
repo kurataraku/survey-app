@@ -48,7 +48,7 @@ export default function JsonArrayEditor({
         <button
           type="button"
           onClick={handleAdd}
-          className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
+          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
           追加
         </button>
@@ -61,7 +61,7 @@ export default function JsonArrayEditor({
               value={item}
               onChange={(e) => handleChange(index, e.target.value)}
               placeholder={placeholder}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex gap-1">
               <button

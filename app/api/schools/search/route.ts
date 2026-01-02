@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Supabase環境変数が設定されていません');
       return NextResponse.json(
         { error: 'Supabase環境変数が設定されていません' },
         { status: 500 }
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get('q') || '';
     const prefecture = searchParams.get('prefecture') || '';
+    
+    console.log('APIリクエスト:', { q, prefecture, url: request.nextUrl.toString() });
     const minRating = searchParams.get('min_rating');
     const minReviewCount = searchParams.get('min_review_count');
     const sortBy = searchParams.get('sort') || 'name';
@@ -59,11 +62,14 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('学校検索エラー:', error);
+      console.error('エラー詳細:', JSON.stringify(error, null, 2));
       return NextResponse.json(
-        { error: '学校検索に失敗しました', details: error.message },
+        { error: '学校検索に失敗しました', details: error.message, code: error.code },
         { status: 500 }
       );
     }
+
+    console.log('学校検索結果:', { count: schools?.length || 0, total: count });
 
     // 各学校の口コミ数と平均評価を取得
     const schoolsWithStats = await Promise.all(
@@ -72,15 +78,13 @@ export async function GET(request: NextRequest) {
         const { count: reviewCount } = await supabase
           .from('survey_responses')
           .select('*', { count: 'exact', head: true })
-          .eq('school_id', school.id)
-          .eq('is_public', true);
+          .eq('school_name', school.name);
 
         // 平均評価を取得
         const { data: reviews } = await supabase
           .from('survey_responses')
           .select('overall_satisfaction')
-          .eq('school_id', school.id)
-          .eq('is_public', true)
+          .eq('school_name', school.name)
           .not('overall_satisfaction', 'is', null);
 
         const overallAvg = reviews && reviews.length > 0
@@ -143,8 +147,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('APIエラー:', error);
+    const errorMessage = error instanceof Error ? error.message : '不明なエラーが発生しました';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
-      { error: 'サーバーエラーが発生しました' },
+      { 
+        error: 'サーバーエラーが発生しました',
+        details: errorMessage,
+        ...(process.env.NODE_ENV === 'development' && { stack: errorStack })
+      },
       { status: 500 }
     );
   }

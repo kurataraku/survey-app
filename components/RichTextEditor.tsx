@@ -83,7 +83,7 @@ export default function RichTextEditor({
       className={`
         px-3 py-2 text-sm font-medium rounded transition-colors
         ${active
-          ? 'bg-orange-100 text-orange-700'
+          ? 'bg-blue-100 text-blue-700'
           : 'text-gray-700 hover:bg-gray-100'
         }
       `}
@@ -93,7 +93,7 @@ export default function RichTextEditor({
   );
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-orange-500">
+    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
       {/* ツールバー */}
       <div className="border-b border-gray-300 bg-gray-50 p-2 flex flex-wrap gap-1">
         {/* 見出し */}

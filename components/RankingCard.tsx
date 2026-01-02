@@ -42,14 +42,14 @@ export default function RankingCard({
   const getRankColor = () => {
     if (rank === 1) return 'bg-yellow-500 text-white';
     if (rank === 2) return 'bg-gray-400 text-white';
-    if (rank === 3) return 'bg-orange-600 text-white';
+    if (rank === 3) return 'bg-rose-500 text-white';
     return 'bg-gray-200 text-gray-700';
   };
 
   return (
     <Link
       href={href}
-      className="block bg-white border border-gray-200 rounded-lg p-6 hover:border-orange-300 hover:shadow-md transition-all"
+      className="block bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all"
     >
       <div className="flex items-start gap-4">
         {/* ランク表示 */}
@@ -70,7 +70,7 @@ export default function RankingCard({
                   <StarRatingDisplay value={value} size="sm" showLabel />
                 )}
                 <span className={`text-lg font-semibold ${
-                  valueType === 'rating' ? 'text-gray-900' : 'text-orange-600'
+                  valueType === 'rating' ? 'text-gray-900' : 'text-blue-600'
                 }`}>
                   {formatValue()}
                 </span>

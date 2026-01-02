@@ -43,7 +43,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm hover:text-orange-400 transition-colors"
+                    className="text-sm hover:text-blue-400 transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -60,7 +60,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm hover:text-orange-400 transition-colors"
+                    className="text-sm hover:text-blue-400 transition-colors"
                   >
                     {link.label}
                   </Link>
@@ -70,7 +70,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm hover:text-orange-400 transition-colors"
+                    className="text-sm hover:text-blue-400 transition-colors"
                   >
                     {link.label}
                   </Link>

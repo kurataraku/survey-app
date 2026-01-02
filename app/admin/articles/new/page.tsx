@@ -43,7 +43,7 @@ export default function NewArticlePage() {
         <div className="mb-6">
           <Link
             href="/admin/articles"
-            className="text-sm text-orange-600 hover:text-orange-700 mb-4 inline-block"
+            className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 記事一覧に戻る
           </Link>

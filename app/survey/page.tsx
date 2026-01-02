@@ -7,6 +7,7 @@ import { surveySchema, SurveyFormData } from '@/lib/schema';
 import { questions } from '@/lib/questions';
 import Stepper from '@/components/Stepper';
 import QuestionRenderer from '@/components/QuestionRenderer';
+import Button from '@/components/ui/Button';
 
 export default function SurveyPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -136,7 +137,7 @@ export default function SurveyPage() {
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="mb-4">
             <svg
-              className="mx-auto h-16 w-16 text-green-500"
+              className="mx-auto h-16 w-16 text-blue-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -163,34 +164,24 @@ export default function SurveyPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--ce-bg)' }}>
+    <div className="min-h-screen bg-gray-50">
       <div className="py-12 px-4">
-        <div className="max-w-3xl mx-auto p-8" style={{ 
-          backgroundColor: 'var(--ce-surface)', 
-          borderRadius: 'var(--ce-radius-card)',
-          boxShadow: 'var(--ce-shadow-card)',
-          border: '1px solid var(--ce-border)'
-        }}>
-          <h1 className="text-3xl font-bold mb-2 text-center" style={{ 
-            fontFamily: 'var(--ce-font-heading)',
-            color: 'var(--ce-text)',
-            letterSpacing: '0.02em'
-          }}>
+        <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-lg border border-gray-200 p-8">
+          {/* 信頼感を高めるメッセージ */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-900 text-center">
+              <span className="font-semibold">匿名で回答できます</span> • 所要時間: 約3〜5分
+            </p>
+            <p className="text-xs text-blue-700 text-center mt-1">
+              ※個人が特定される内容は書かないでください
+            </p>
+          </div>
+
+          <h1 className="text-3xl font-bold mb-2 text-center text-gray-900">
             通信制高校リアルレビュー
           </h1>
-          <p className="text-center mb-2 leading-relaxed" style={{ 
-            fontFamily: 'var(--ce-font-body)',
-            color: 'var(--ce-text)'
-          }}>
+          <p className="text-center mb-8 leading-relaxed text-gray-700">
             あなたの経験のシェアが、次に悩む人の力になります。
-          </p>
-          <p className="text-center text-sm mb-8 leading-relaxed" style={{ 
-            fontFamily: 'var(--ce-font-body)',
-            color: 'var(--ce-muted)'
-          }}>
-            所要時間は約3〜5分、匿名で回答できます。
-            <br />
-            ※個人が特定される内容は書かないでください。
           </p>
 
         <Stepper currentStep={currentStep} totalSteps={3} />
@@ -230,15 +221,8 @@ export default function SurveyPage() {
           <div className="space-y-6">
             {/* Step 3冒頭メッセージ */}
             {currentStep === 3 && (
-              <div className="mb-4 p-4 rounded-lg border" style={{ 
-                backgroundColor: 'var(--ce-success-bg)',
-                borderRadius: 'var(--ce-radius-control)',
-                borderColor: 'var(--ce-border)'
-              }}>
-                <p className="text-sm font-medium" style={{ 
-                  fontFamily: 'var(--ce-font-body)',
-                  color: 'var(--ce-text)'
-                }}>
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm font-medium text-green-900">
                   ここまでで2/3完了。あと1〜2分
                 </p>
               </div>
@@ -518,59 +502,38 @@ export default function SurveyPage() {
               戻る
             </button>
 
-            {currentStep < 3 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="px-6 py-2 text-white transition-colors font-medium"
-                style={{
-                  backgroundColor: 'var(--ce-primary)',
-                  borderRadius: 'var(--ce-radius-control)',
-                  fontFamily: 'var(--ce-font-body)',
-                  boxShadow: 'var(--ce-shadow-card)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--ce-primary-hover)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--ce-primary)';
-                }}
-              >
-                次へ
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-6 py-2 text-white transition-colors font-medium"
-                style={{
-                  borderRadius: 'var(--ce-radius-control)',
-                  fontFamily: 'var(--ce-font-body)',
-                  boxShadow: 'var(--ce-shadow-card)',
-                  ...(isSubmitting
-                    ? {
-                        backgroundColor: 'var(--ce-muted)',
-                        cursor: 'not-allowed',
-                        opacity: 0.6
-                      }
-                    : {
-                        backgroundColor: 'var(--ce-primary)'
-                      })
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.backgroundColor = 'var(--ce-primary-hover)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.backgroundColor = 'var(--ce-primary)';
-                  }
-                }}
-              >
-                {isSubmitting ? '送信中...' : '回答終了'}
-              </button>
-            )}
+            <div className="flex gap-4 justify-end">
+              {currentStep > 1 && (
+                <Button
+                  type="button"
+                  onClick={handleBack}
+                  variant="outline"
+                  size="lg"
+                >
+                  戻る
+                </Button>
+              )}
+
+              {currentStep < 3 ? (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  variant="primary"
+                  size="lg"
+                >
+                  次へ
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  variant="accent"
+                  size="lg"
+                >
+                  {isSubmitting ? '送信中...' : '回答終了'}
+                </Button>
+              )}
+            </div>
           </div>
         </form>
         </div>
