@@ -45,7 +45,7 @@ ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO answer_schema (key, type, required, description) VALUES
   ('campus_prefecture', 'string', false, '主に通っていたキャンパス都道府県')
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (key) DO UPDATE SET type = 'string', description = '主に通っていたキャンパス都道府県';
 
 INSERT INTO answer_schema (key, type, required, description) VALUES
   ('teaching_style', 'string[]', false, '授業スタイル（複数選択可）')
@@ -99,6 +99,7 @@ ON CONFLICT (key) DO NOTHING;
 -- コメント: 将来的にキー名が変更された場合、aliasesを使用して過去のキー名から新しいキー名にマッピングできます
 -- 例: 将来 'enrollment_year' を 'enrollmentYear' に変更する場合
 -- UPDATE answer_schema SET aliases = ARRAY['enrollment_year'] WHERE key = 'enrollmentYear';
+
 
 
 

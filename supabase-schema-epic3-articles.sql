@@ -55,3 +55,5 @@ COMMENT ON COLUMN articles.meta_description IS 'SEO用メタ説明文';
 
 
 
+
+

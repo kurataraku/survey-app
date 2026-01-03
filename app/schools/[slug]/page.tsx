@@ -51,6 +51,7 @@ interface School {
     good_comment: string;
     bad_comment: string;
     created_at: string;
+    like_count?: number;
   }>;
 }
 
@@ -139,6 +140,7 @@ export default function SchoolDetailPage() {
         <SchoolSummary
           name={school.name}
           prefecture={school.prefecture}
+          prefectures={school.prefectures}
           slug={encodedSlug}
           overallAvg={school.overall_avg}
           reviewCount={school.review_count}
@@ -370,6 +372,70 @@ export default function SchoolDetailPage() {
             ]}
           />
         </div>
+
+        {/* 注目の口コミ（いいね数順） */}
+        {school.latest_reviews && school.latest_reviews.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">注目の口コミ</h2>
+            <div className="space-y-4">
+              {school.latest_reviews.slice(0, 3).map((review) => (
+                <Link
+                  key={review.id}
+                  href={`/reviews/${review.id}`}
+                  className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-gray-600">総合満足度</span>
+                      <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
+                      <span className="text-sm text-gray-500">
+                        {formatDate(review.created_at)}
+                      </span>
+                    </div>
+                    {review.like_count !== undefined && review.like_count > 0 && (
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                          />
+                        </svg>
+                        <span>{review.like_count}</span>
+                      </div>
+                    )}
+                  </div>
+                  {review.good_comment && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
+                      <p className="text-sm text-gray-700 line-clamp-2">{review.good_comment}</p>
+                    </div>
+                  )}
+                  {review.bad_comment && (
+                    <div>
+                      <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
+                      <p className="text-sm text-gray-700 line-clamp-2">{review.bad_comment}</p>
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <Link
+                href={`/schools/${encodedSlug}/reviews`}
+                className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                すべての口コミを見る
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* 学校紹介 */}
         {school.intro && (

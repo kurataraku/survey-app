@@ -4,15 +4,24 @@ import { createClient } from '@supabase/supabase-js';
 export async function GET(request: NextRequest) {
   try {
     console.log('[API] /api/home - リクエスト開始');
+    console.log('[API] /api/home - タイムスタンプ:', new Date().toISOString());
     
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('[API] /api/home - 環境変数が設定されていません');
+      console.error('[API] /api/home - supabaseUrl:', supabaseUrl ? '設定済み' : '未設定');
+      console.error('[API] /api/home - supabaseServiceKey:', supabaseServiceKey ? '設定済み' : '未設定');
       return NextResponse.json(
-        { error: 'Supabase環境変数が設定されていません' },
-        { status: 500 }
+        { 
+          topRankedSchools: [],
+          popularSchools: [],
+          latestReviews: [],
+          latestArticles: [],
+          error: 'Supabase環境変数が設定されていません' 
+        },
+        { status: 200 }
       );
     }
 
@@ -21,10 +30,44 @@ export async function GET(request: NextRequest) {
 
     // 1. ランキングTOP5を取得（総合満足度）
     console.log('[API] /api/home - 学校一覧を取得中');
-    const { data: allSchools, error: schoolsError } = await supabase
+    // prefectures配列も取得を試みる（マイグレーション未実行時はエラーになる可能性があるため、エラーハンドリングを追加）
+    let allSchools: any[] | null = null;
+    let schoolsError: any = null;
+    
+    // まずprefecturesを含めて取得を試みる
+    const resultWithPrefectures = await supabase
       .from('schools')
-      .select('id, name, prefecture, slug')
+      .select('id, name, prefecture, prefectures, slug')
       .eq('is_public', true);
+    
+    // prefecturesカラムが存在しない場合（エラーコード42703: undefined_column）は、prefectureのみで再試行
+    if (resultWithPrefectures.error) {
+      const errorCode = resultWithPrefectures.error.code;
+      const errorMessage = resultWithPrefectures.error.message || '';
+      
+      // カラムが存在しないエラーの場合（42703）または、エラーメッセージに"prefectures"が含まれる場合
+      const isColumnNotFoundError = errorCode === '42703' 
+        || errorMessage.includes('prefectures') 
+        || (errorMessage.includes('column') && errorMessage.includes('does not exist'));
+      
+      if (isColumnNotFoundError) {
+        console.warn('[API] /api/home - prefecturesカラムが存在しません。prefectureのみで再試行します。マイグレーションを実行してください。');
+        const resultWithoutPrefectures = await supabase
+          .from('schools')
+          .select('id, name, prefecture, slug')
+          .eq('is_public', true);
+        allSchools = resultWithoutPrefectures.data;
+        schoolsError = resultWithoutPrefectures.error;
+      } else {
+        // その他のエラーの場合
+        allSchools = resultWithPrefectures.data;
+        schoolsError = resultWithPrefectures.error;
+      }
+    } else {
+      // エラーがない場合
+      allSchools = resultWithPrefectures.data;
+      schoolsError = null;
+    }
 
     if (schoolsError) {
       console.error('[API] /api/home - 学校一覧取得エラー:', schoolsError);
@@ -88,10 +131,22 @@ export async function GET(request: NextRequest) {
           ? validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length
           : null;
 
+          const prefecturesArray = (school.prefectures && Array.isArray(school.prefectures) && school.prefectures.length > 0) 
+            ? school.prefectures 
+            : null;
+          
+          // デバッグログ（N高の場合のみ）
+          if (school.name === 'N高') {
+            console.log(`[API] /api/home - N高のprefectures:`, school.prefectures);
+            console.log(`[API] /api/home - N高のprefecturesArray:`, prefecturesArray);
+            console.log(`[API] /api/home - N高のprefecture:`, school.prefecture);
+          }
+          
           return {
             id: school.id,
             name: school.name,
             prefecture: school.prefecture,
+            prefectures: prefecturesArray,
             slug: school.slug,
             review_count: reviewCount || 0,
             overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
@@ -102,6 +157,7 @@ export async function GET(request: NextRequest) {
             id: school.id,
             name: school.name,
             prefecture: school.prefecture,
+            prefectures: (school.prefectures && Array.isArray(school.prefectures) && school.prefectures.length > 0) ? school.prefectures : null, // マイグレーション未実行時はnull
             slug: school.slug,
             review_count: 0,
             overall_avg: null,
@@ -133,10 +189,12 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         school_name,
+        status,
         overall_satisfaction,
         good_comment,
         bad_comment,
-        created_at
+        created_at,
+        answers
       `);
 
     if (reviewsDataError) {
@@ -195,16 +253,112 @@ export async function GET(request: NextRequest) {
         }
 
         const school = review.schools;
+        
+        // answers JSONBから情報を取得
+        let answers: any = {};
+        try {
+          if (review.answers) {
+            answers = typeof review.answers === 'string' ? JSON.parse(review.answers) : review.answers;
+          }
+        } catch (error) {
+          console.warn('answersパースエラー:', error);
+          answers = {};
+        }
+
+        // campus_prefectureを取得（配列または単一の値に対応、後方互換性のため）
+        let campusPrefecture: string | null = null;
+        
+        // まず、既知のキー名をチェック（優先順位順）
+        if (answers.campus_prefecture) {
+          if (Array.isArray(answers.campus_prefecture)) {
+            // 配列の場合は最初の要素を使用（後方互換性）
+            campusPrefecture = answers.campus_prefecture.length > 0 
+              ? String(answers.campus_prefecture[0]).trim() 
+              : null;
+          } else if (String(answers.campus_prefecture).trim() !== '') {
+            campusPrefecture = String(answers.campus_prefecture).trim();
+          }
+        } else if (answers.campusPrefecture) {
+          if (Array.isArray(answers.campusPrefecture)) {
+            campusPrefecture = answers.campusPrefecture.length > 0 
+              ? String(answers.campusPrefecture[0]).trim() 
+              : null;
+          } else if (String(answers.campusPrefecture).trim() !== '') {
+            campusPrefecture = String(answers.campusPrefecture).trim();
+          }
+        } else if (answers['主に通っていたキャンパス']) {
+          if (Array.isArray(answers['主に通っていたキャンパス'])) {
+            campusPrefecture = answers['主に通っていたキャンパス'].length > 0 
+              ? String(answers['主に通っていたキャンパス'][0]).trim() 
+              : null;
+          } else if (String(answers['主に通っていたキャンパス']).trim() !== '') {
+            campusPrefecture = String(answers['主に通っていたキャンパス']).trim();
+          }
+        } else if (answers['campus']) {
+          if (Array.isArray(answers['campus'])) {
+            campusPrefecture = answers['campus'].length > 0 
+              ? String(answers['campus'][0]).trim() 
+              : null;
+          } else if (String(answers['campus']).trim() !== '') {
+            campusPrefecture = String(answers['campus']).trim();
+          }
+        } else if (answers['prefecture']) {
+          if (Array.isArray(answers['prefecture'])) {
+            campusPrefecture = answers['prefecture'].length > 0 
+              ? String(answers['prefecture'][0]).trim() 
+              : null;
+          } else if (String(answers['prefecture']).trim() !== '') {
+            campusPrefecture = String(answers['prefecture']).trim();
+          }
+        } else {
+          // 上記で見つからなかった場合、すべてのキーをチェックして、都道府県らしい値を探す
+          const allKeys = Object.keys(answers);
+          for (const key of allKeys) {
+            const value = answers[key];
+            // 都道府県名のパターン（47都道府県）をチェック
+            if (typeof value === 'string' && value.length > 0) {
+              const prefecturePatterns = ['都', '道', '府', '県'];
+              if (prefecturePatterns.some(pattern => value.includes(pattern))) {
+                campusPrefecture = value.trim();
+                break;
+              }
+            } else if (Array.isArray(value) && value.length > 0) {
+              const prefecturePatterns = ['都', '道', '府', '県'];
+              const found = value.find((v: any) => 
+                typeof v === 'string' && prefecturePatterns.some(pattern => v.includes(pattern))
+              );
+              if (found) {
+                campusPrefecture = String(found).trim();
+                break;
+              }
+            }
+          }
+        }
+        
+        // デバッグ用ログ（学校名が'test'の場合のみ詳細ログ）
+        if (review.school_name === 'test') {
+          console.log(`[API] Review ${review.id} - 学校名: ${review.school_name}`);
+          console.log(`[API] Review ${review.id} - answers全体:`, JSON.stringify(answers, null, 2));
+          console.log(`[API] Review ${review.id} - answersのキー一覧:`, Object.keys(answers));
+          console.log(`[API] Review ${review.id} - answers.campus_prefecture:`, answers.campus_prefecture);
+          console.log(`[API] Review ${review.id} - 検出されたcampus_prefecture:`, campusPrefecture);
+          console.log(`[API] Review ${review.id} - reason_for_choosing:`, answers.reason_for_choosing);
+          console.log(`[API] Review ${review.id} - attendance_frequency:`, answers.attendance_frequency);
+        }
 
         return {
           id: review.id,
           school_id: review.school_id,
           school_name: review.school_name,
+          status: review.status,
           overall_satisfaction: review.overall_satisfaction,
           good_comment: review.good_comment,
           bad_comment: review.bad_comment,
           created_at: review.created_at,
           like_count: likeCount,
+          reason_for_choosing: Array.isArray(answers.reason_for_choosing) ? answers.reason_for_choosing : [],
+          attendance_frequency: answers.attendance_frequency || null,
+          campus_prefecture: campusPrefecture || null,
           schools: school ? {
             id: school.id,
             name: school.name,
@@ -220,7 +374,15 @@ export async function GET(request: NextRequest) {
       .slice(0, 3);
 
     // 3. 最新記事3件を取得
-    let latestArticles = [];
+    let latestArticles: Array<{
+      id: string;
+      title: string;
+      slug: string;
+      excerpt: string | null;
+      featured_image_url: string | null;
+      published_at: string | null;
+      category: 'interview' | 'useful_info';
+    }> = [];
     try {
       const { data: articlesData, error: articlesError } = await supabase
         .from('articles')
@@ -240,12 +402,22 @@ export async function GET(request: NextRequest) {
       latestArticles = [];
     }
 
-    return NextResponse.json({
-      topRankedSchools: rankedSchools,
-      popularSchools: popularSchools,
+    console.log('[API] /api/home - レスポンス準備完了');
+    const responseData = {
+      topRankedSchools: rankedSchools || [],
+      popularSchools: popularSchools || [],
       latestReviews: latestReviews || [],
       latestArticles: latestArticles || [],
+    };
+    
+    console.log('[API] /api/home - レスポンスデータ:', {
+      topRankedSchoolsCount: responseData.topRankedSchools.length,
+      popularSchoolsCount: responseData.popularSchools.length,
+      latestReviewsCount: responseData.latestReviews.length,
+      latestArticlesCount: responseData.latestArticles.length,
     });
+    
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('[API] /api/home - エラー発生:', error);
     const errorMessage = error instanceof Error ? error.message : '不明なエラーが発生しました';
@@ -259,17 +431,21 @@ export async function GET(request: NextRequest) {
       error: error
     });
     
+    // エラー時でも空のデータを返して、フロントエンドがクラッシュしないようにする
     return NextResponse.json(
       { 
+        topRankedSchools: [],
+        popularSchools: [],
+        latestReviews: [],
+        latestArticles: [],
         error: 'サーバーエラーが発生しました',
         message: errorMessage,
-        name: errorName,
         ...(process.env.NODE_ENV === 'development' && { 
+          name: errorName,
           stack: errorStack,
-          fullError: String(error)
         })
       },
-      { status: 500 }
+      { status: 200 } // エラーでも200を返して、フロントエンドが表示できるようにする
     );
   }
 }

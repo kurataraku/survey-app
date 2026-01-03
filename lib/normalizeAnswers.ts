@@ -77,8 +77,18 @@ export async function normalizeAnswers(
     
     if (!normalizedKey) {
       // スキーマに存在しないキーは破棄
-      console.warn(`スキーマに存在しないキーを破棄: ${inputKey}`);
+      console.warn(`[normalizeAnswers] スキーマに存在しないキーを破棄: ${inputKey}`);
       continue;
+    }
+    
+    // デバッグログ（campus_prefectureの場合）
+    if (inputKey === 'campus_prefecture') {
+      console.log(`[normalizeAnswers] campus_prefectureを処理中:`, {
+        inputKey,
+        value,
+        normalizedKey,
+        schemaExists: schemaMap.has(normalizedKey)
+      });
     }
 
     // スキーマを取得

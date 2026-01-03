@@ -65,11 +65,15 @@ export async function POST(request: NextRequest) {
     };
 
     // answersを正規化（キー名の統一、型変換、バリデーション）
+    console.log('[API] /api/submit - rawAnswers:', JSON.stringify(rawAnswers, null, 2));
+    console.log('[API] /api/submit - rawAnswers.campus_prefecture:', rawAnswers.campus_prefecture);
     const answers = await normalizeAnswers(
       rawAnswers,
       supabaseUrl,
       supabaseServiceKey
     );
+    console.log('[API] /api/submit - normalized answers:', JSON.stringify(answers, null, 2));
+    console.log('[API] /api/submit - normalized answers.campus_prefecture:', answers.campus_prefecture);
 
     // ============================================================================
     // schoolsテーブルからschool_idを取得または作成
@@ -90,6 +94,31 @@ export async function POST(request: NextRequest) {
 
       if (existingSchool) {
         schoolId = existingSchool.id;
+        
+        // 既存の学校のprefectures配列を更新
+        const campusPrefecture = data.campus_prefecture || '不明';
+        
+        // 現在のprefectures配列を取得
+        const { data: currentSchool } = await supabase
+          .from('schools')
+          .select('prefectures, prefecture')
+          .eq('id', schoolId)
+          .single();
+        
+        const currentPrefectures = currentSchool?.prefectures || [];
+        // 新しい都道府県が配列に含まれていない場合は追加
+        if (!currentPrefectures.includes(campusPrefecture)) {
+          const newPrefectures = [...currentPrefectures, campusPrefecture];
+          
+          // prefectures配列を更新（prefectureも最初の要素で更新）
+          await supabase
+            .from('schools')
+            .update({
+              prefectures: newPrefectures,
+              prefecture: newPrefectures[0] || currentSchool?.prefecture || '不明'
+            })
+            .eq('id', schoolId);
+        }
       } else {
         // 新規学校を作成
         const prefecture = data.campus_prefecture || '不明';
@@ -100,6 +129,7 @@ export async function POST(request: NextRequest) {
           .insert({
             name: data.school_name,
             prefecture: prefecture,
+            prefectures: [prefecture],
             slug: slug,
             is_public: true
           })

@@ -71,6 +71,7 @@ export async function PUT(
     const {
       name,
       prefecture,
+      prefectures,
       slug,
       intro,
       highlights,
@@ -85,6 +86,11 @@ export async function PUT(
         { status: 400 }
       );
     }
+
+    // prefectures配列を準備（prefecturesが指定されていない場合はprefectureから作成）
+    const prefecturesArray = prefectures && Array.isArray(prefectures) && prefectures.length > 0
+      ? prefectures
+      : [prefecture];
 
     // 学校名の重複チェック（自分自身を除く）
     const { data: nameConflict } = await supabase
@@ -120,6 +126,7 @@ export async function PUT(
     const updateData: any = {
       name,
       prefecture,
+      prefectures: prefecturesArray,
       slug,
       intro: intro || null,
       highlights: highlights || null,
@@ -151,6 +158,7 @@ export async function PUT(
     );
   }
 }
+
 
 
 

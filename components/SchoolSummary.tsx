@@ -8,6 +8,7 @@ import Badge from './ui/Badge';
 interface SchoolSummaryProps {
   name: string;
   prefecture: string;
+  prefectures?: string[]; // 複数の都道府県に対応
   slug: string;
   overallAvg: number | null;
   reviewCount: number;
@@ -23,6 +24,7 @@ interface SchoolSummaryProps {
 export default function SchoolSummary({
   name,
   prefecture,
+  prefectures,
   slug,
   overallAvg,
   reviewCount,
@@ -31,6 +33,8 @@ export default function SchoolSummary({
   creditRatingAvg,
   latestReviews,
 }: SchoolSummaryProps) {
+  // prefectures配列が存在する場合はそれを使用、なければprefectureを使用
+  const displayPrefectures = prefectures && prefectures.length > 0 ? prefectures : [prefecture];
   // 最新3件から代表的な良い点/悪い点を抽出
   const representativeGood = latestReviews
     .filter((r) => r.good_comment)
@@ -48,7 +52,11 @@ export default function SchoolSummary({
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{name}</h1>
-          <Badge variant="primary" size="md">{prefecture}</Badge>
+          <div className="flex flex-wrap gap-2">
+            {displayPrefectures.map((pref, index) => (
+              <Badge key={index} variant="primary" size="md">{pref}</Badge>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -73,7 +81,7 @@ export default function SchoolSummary({
       </div>
 
       {/* 主要3指標を横並びのスコアチップで表示 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4">
         <div className="text-center p-3 bg-blue-50 rounded-lg">
           <p className="text-xs text-gray-600 mb-1">先生・職員の対応</p>
           {staffRatingAvg !== null ? (
@@ -108,35 +116,8 @@ export default function SchoolSummary({
           )}
         </div>
       </div>
-
-      {/* 代表的な良い点/悪い点 */}
-      {(representativeGood || representativeBad) && (
-        <div className="space-y-3 pt-6 border-t border-gray-200">
-          {representativeGood && (
-            <div>
-              <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
-              <p className="text-sm text-gray-700">{representativeGood}</p>
-            </div>
-          )}
-          {representativeBad && (
-            <div>
-              <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
-              <p className="text-sm text-gray-700">{representativeBad}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 口コミを見るボタン */}
-      <div className="mt-6 pt-6 border-t border-gray-200">
-        <Link
-          href={`/schools/${slug}/reviews`}
-          className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          すべての口コミを見る
-        </Link>
-      </div>
     </div>
   );
 }
+
 

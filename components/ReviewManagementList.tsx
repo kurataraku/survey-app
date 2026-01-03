@@ -2,24 +2,30 @@
 
 import { useState, useEffect } from 'react';
 import { Review } from '@/lib/types/reviews';
+import { prefectures } from '@/lib/prefectures';
 
 interface ReviewManagementListProps {
   schoolId: string;
 }
 
+interface ReviewWithAnswers extends Review {
+  answers?: any;
+}
+
 export default function ReviewManagementList({ schoolId }: ReviewManagementListProps) {
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<ReviewWithAnswers[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [filter, setFilter] = useState<'all' | 'public' | 'private'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [editingReview, setEditingReview] = useState<ReviewWithAnswers | null>(null);
+  const [editFormData, setEditFormData] = useState<any>(null);
 
   const limit = 20;
 
   useEffect(() => {
     fetchReviews();
-  }, [schoolId, page, filter]);
+  }, [schoolId, page]);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -28,11 +34,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
         page: page.toString(),
         limit: limit.toString(),
       });
-      if (filter === 'public') {
-        params.append('is_public', 'true');
-      } else if (filter === 'private') {
-        params.append('is_public', 'false');
-      }
+      // is_publicフィルタリングは削除（テーブルにis_publicカラムが存在しない可能性があるため）
 
       const response = await fetch(`/api/admin/schools/${schoolId}/reviews?${params.toString()}`);
       if (!response.ok) {
@@ -81,6 +83,87 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
     }
   };
 
+  const handleEditClick = (review: ReviewWithAnswers) => {
+    setEditingReview(review);
+    // answersを編集用のフォームデータに変換
+    const answers = review.answers || {};
+    // campus_prefectureを配列として扱う（既存データが文字列の場合も配列に変換）
+    const campusPrefecture = answers.campus_prefecture;
+    const campusPrefectureArray = Array.isArray(campusPrefecture)
+      ? campusPrefecture
+      : campusPrefecture && String(campusPrefecture).trim() !== ''
+      ? [String(campusPrefecture).trim()]
+      : [];
+    
+    setEditFormData({
+      reason_for_choosing: Array.isArray(answers.reason_for_choosing) ? answers.reason_for_choosing : [],
+      attendance_frequency: answers.attendance_frequency || '',
+      campus_prefecture: campusPrefectureArray,
+    });
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingReview) return;
+
+    setUpdatingId(editingReview.id);
+    try {
+      const response = await fetch(`/api/admin/reviews/${editingReview.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          answers: {
+            reason_for_choosing: editFormData.reason_for_choosing,
+            attendance_frequency: editFormData.attendance_frequency,
+            campus_prefecture: editFormData.campus_prefecture,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('口コミの更新に失敗しました');
+      }
+
+      // リストを更新
+      await fetchReviews();
+      setEditingReview(null);
+      setEditFormData(null);
+      alert('口コミを更新しました');
+    } catch (error) {
+      console.error('口コミ更新エラー:', error);
+      alert('口コミの更新に失敗しました');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleDelete = async (reviewId: string) => {
+    if (!confirm('この口コミを削除してもよろしいですか？\nこの操作は取り消せません。')) {
+      return;
+    }
+
+    setUpdatingId(reviewId);
+    try {
+      const response = await fetch(`/api/admin/reviews/${reviewId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('口コミの削除に失敗しました');
+      }
+
+      // リストを更新
+      await fetchReviews();
+      alert('口コミを削除しました');
+    } catch (error) {
+      console.error('口コミ削除エラー:', error);
+      alert('口コミの削除に失敗しました');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('ja-JP');
   };
@@ -93,50 +176,6 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium text-gray-900">口コミ管理</h3>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setFilter('all');
-              setPage(1);
-            }}
-            className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            すべて
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFilter('public');
-              setPage(1);
-            }}
-            className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-              filter === 'public'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            採用中
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFilter('private');
-              setPage(1);
-            }}
-            className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-              filter === 'private'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            不採用
-          </button>
-        </div>
       </div>
 
       {reviews.length === 0 ? (
@@ -193,23 +232,40 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                       </div>
                     </div>
                   </div>
-                  <div className="ml-4">
+                  <div className="ml-4 flex gap-2">
                     <button
                       type="button"
-                      onClick={() => handleTogglePublic(review.id, review.is_public)}
-                      disabled={updatingId === review.id}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        review.is_public
-                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                      } disabled:opacity-50`}
+                      onClick={() => handleEditClick(review)}
+                      className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors"
                     >
-                      {updatingId === review.id
-                        ? '更新中...'
-                        : review.is_public
-                        ? '採用中'
-                        : '不採用'}
+                      編集
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(review.id)}
+                      disabled={updatingId === review.id}
+                      className="px-4 py-2 text-sm font-medium rounded-lg bg-red-100 text-red-800 hover:bg-red-200 transition-colors disabled:opacity-50"
+                    >
+                      {updatingId === review.id ? '削除中...' : '削除'}
+                    </button>
+                    {review.is_public !== undefined && (
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePublic(review.id, review.is_public || false)}
+                        disabled={updatingId === review.id}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                          review.is_public
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                      >
+                        {updatingId === review.id
+                          ? '更新中...'
+                          : review.is_public
+                          ? '採用中'
+                          : '不採用'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -238,6 +294,120 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
             </div>
           )}
         </>
+      )}
+
+      {/* 編集モーダル */}
+      {editingReview && editFormData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold mb-4">口コミ編集</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  通信制を選んだ理由
+                </label>
+                <input
+                  type="text"
+                  value={Array.isArray(editFormData.reason_for_choosing) 
+                    ? editFormData.reason_for_choosing.join(', ') 
+                    : editFormData.reason_for_choosing || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setEditFormData({
+                      ...editFormData,
+                      reason_for_choosing: value ? value.split(',').map(s => s.trim()) : [],
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="カンマ区切りで入力（例: 心の不調のため, 人間関係）"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  通学頻度
+                </label>
+                <select
+                  value={editFormData.attendance_frequency || ''}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      attendance_frequency: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">選択してください</option>
+                  <option value="週5">週5</option>
+                  <option value="週3〜4">週3〜4</option>
+                  <option value="週1〜2">週1〜2</option>
+                  <option value="月1〜数回">月1〜数回</option>
+                  <option value="ほぼオンライン/自宅">ほぼオンライン/自宅</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  都道府県（複数選択可）
+                </label>
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 rounded-lg p-3">
+                  {prefectures.map((pref) => {
+                    const isSelected = editFormData.campus_prefecture?.includes(pref) || false;
+                    return (
+                      <label key={pref} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const currentPrefectures = editFormData.campus_prefecture || [];
+                            if (e.target.checked) {
+                              setEditFormData({
+                                ...editFormData,
+                                campus_prefecture: [...currentPrefectures, pref],
+                              });
+                            } else {
+                              setEditFormData({
+                                ...editFormData,
+                                campus_prefecture: currentPrefectures.filter((p) => p !== pref),
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{pref}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  選択された都道府県: {editFormData.campus_prefecture?.length || 0}件
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingReview(null);
+                  setEditFormData(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleEditSubmit}
+                disabled={updatingId === editingReview.id}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {updatingId === editingReview.id ? '更新中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

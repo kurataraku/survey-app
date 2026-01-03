@@ -22,10 +22,10 @@ export async function GET(
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 学校の存在確認
+    // 学校の存在確認と名前を取得
     const { data: school } = await supabase
       .from('schools')
-      .select('id')
+      .select('id, name')
       .eq('id', schoolId)
       .single();
 
@@ -38,23 +38,15 @@ export async function GET(
 
     // クエリパラメータを取得
     const searchParams = request.nextUrl.searchParams;
-    const isPublicFilter = searchParams.get('is_public');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = (page - 1) * limit;
 
-    // 口コミ検索クエリを構築（公開/非公開すべて）
+    // 口コミ検索クエリを構築（school_nameで検索）
     let query = supabase
       .from('survey_responses')
       .select('*', { count: 'exact' })
-      .eq('school_id', schoolId);
-
-    // 公開フラグでのフィルタリング（オプション）
-    if (isPublicFilter === 'true') {
-      query = query.eq('is_public', true);
-    } else if (isPublicFilter === 'false') {
-      query = query.eq('is_public', false);
-    }
+      .eq('school_name', school.name);
 
     // ページネーションとソート
     query = query
@@ -86,6 +78,7 @@ export async function GET(
     );
   }
 }
+
 
 
 

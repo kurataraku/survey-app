@@ -7,6 +7,12 @@ import SchoolEditor from '@/components/SchoolEditor';
 import ReviewManagementList from '@/components/ReviewManagementList';
 import { SchoolFormData, School } from '@/lib/types/schools';
 
+interface PrefectureStat {
+  prefecture: string;
+  count: number;
+  percentage: number;
+}
+
 export default function EditSchoolPage() {
   const params = useParams();
   const router = useRouter();
@@ -15,9 +21,13 @@ export default function EditSchoolPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'basic' | 'reviews'>('basic');
+  const [prefectureStats, setPrefectureStats] = useState<PrefectureStat[]>([]);
+  const [totalResponses, setTotalResponses] = useState(0);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   useEffect(() => {
     fetchSchool();
+    fetchPrefectureStats();
   }, [id]);
 
   const fetchSchool = async () => {
@@ -35,6 +45,23 @@ export default function EditSchoolPage() {
       router.push('/admin/schools');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPrefectureStats = async () => {
+    setLoadingStats(true);
+    try {
+      const response = await fetch(`/api/admin/schools/${id}/prefecture-stats`);
+      if (!response.ok) {
+        throw new Error('都道府県統計の取得に失敗しました');
+      }
+      const data = await response.json();
+      setPrefectureStats(data.prefectureStats || []);
+      setTotalResponses(data.totalResponses || 0);
+    } catch (error) {
+      console.error('都道府県統計取得エラー:', error);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -121,19 +148,64 @@ export default function EditSchoolPage() {
 
         <div className="bg-white rounded-lg shadow-sm p-6">
           {activeTab === 'basic' ? (
-            <SchoolEditor
-              initialData={{
-                name: school.name,
-                prefecture: school.prefecture,
-                slug: school.slug || '',
-                intro: school.intro || '',
-                highlights: school.highlights || [],
-                faq: school.faq || [],
-                is_public: school.is_public,
-              }}
-              onSubmit={handleSubmit}
-              isSubmitting={isSubmitting}
-            />
+            <div className="space-y-6">
+              {/* 回答者の都道府県情報 */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                  回答者の都道府県情報
+                </h3>
+                {loadingStats ? (
+                  <p className="text-sm text-gray-600">読み込み中...</p>
+                ) : prefectureStats.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 mb-3">
+                      総回答数: {totalResponses}件
+                    </p>
+                    <div className="space-y-2">
+                      {prefectureStats.map((stat) => (
+                        <div key={stat.prefecture} className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-900">
+                                {stat.prefecture}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {stat.count}件 ({stat.percentage}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{ width: `${stat.percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    都道府県情報が登録されている回答がありません。
+                  </p>
+                )}
+              </div>
+
+              <SchoolEditor
+                initialData={{
+                  name: school.name,
+                  prefecture: school.prefecture,
+                  prefectures: school.prefectures || (school.prefecture ? [school.prefecture] : []),
+                  slug: school.slug || '',
+                  intro: school.intro || '',
+                  highlights: school.highlights || [],
+                  faq: school.faq || [],
+                  is_public: school.is_public,
+                }}
+                onSubmit={handleSubmit}
+                isSubmitting={isSubmitting}
+              />
+            </div>
           ) : (
             <ReviewManagementList schoolId={id} />
           )}

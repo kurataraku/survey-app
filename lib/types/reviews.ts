@@ -7,8 +7,9 @@ export interface Review {
   overall_satisfaction: number;
   good_comment: string;
   bad_comment: string;
-  is_public: boolean;
+  is_public?: boolean;
   created_at: string;
+  answers?: any;
 }
 
 export interface ReviewListResponse {
@@ -18,6 +19,7 @@ export interface ReviewListResponse {
   limit: number;
   total_pages: number;
 }
+
 
 
 

@@ -21,6 +21,7 @@ export default function SchoolEditor({
   const [formData, setFormData] = useState<SchoolFormData>({
     name: initialData?.name || '',
     prefecture: initialData?.prefecture || '',
+    prefectures: initialData?.prefectures || (initialData?.prefecture ? [initialData.prefecture] : []),
     slug: initialData?.slug || '',
     intro: initialData?.intro || '',
     highlights: initialData?.highlights || [],
@@ -73,13 +74,26 @@ export default function SchoolEditor({
 
       <div>
         <label htmlFor="prefecture" className="block text-sm font-medium text-gray-700 mb-1">
-          都道府県 <span className="text-red-500">*</span>
+          都道府県（メイン） <span className="text-red-500">*</span>
         </label>
         <select
           id="prefecture"
           name="prefecture"
           value={formData.prefecture}
-          onChange={(e) => setFormData((prev) => ({ ...prev, prefecture: e.target.value }))}
+          onChange={(e) => {
+            const newPrefecture = e.target.value;
+            const newPrefectures = formData.prefectures || [];
+            // メイン都道府県がprefectures配列に含まれていない場合は追加
+            if (newPrefecture && !newPrefectures.includes(newPrefecture)) {
+              setFormData((prev) => ({
+                ...prev,
+                prefecture: newPrefecture,
+                prefectures: [...newPrefectures, newPrefecture],
+              }));
+            } else {
+              setFormData((prev) => ({ ...prev, prefecture: newPrefecture }));
+            }
+          }}
           required
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
@@ -90,6 +104,54 @@ export default function SchoolEditor({
             </option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          都道府県（複数選択可）
+        </label>
+        <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 rounded-lg p-3">
+          {prefectures.map((pref) => {
+            const isSelected = formData.prefectures?.includes(pref) || false;
+            return (
+              <label key={pref} className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={(e) => {
+                    const currentPrefectures = formData.prefectures || [];
+                    if (e.target.checked) {
+                      // 追加
+                      const newPrefectures = [...currentPrefectures, pref];
+                      setFormData((prev) => ({
+                        ...prev,
+                        prefectures: newPrefectures,
+                        // 最初の都道府県をメインに設定（まだ設定されていない場合）
+                        prefecture: prev.prefecture || pref,
+                      }));
+                    } else {
+                      // 削除
+                      const newPrefectures = currentPrefectures.filter((p) => p !== pref);
+                      setFormData((prev) => ({
+                        ...prev,
+                        prefectures: newPrefectures,
+                        // メイン都道府県が削除された場合、最初の要素をメインに設定
+                        prefecture: prev.prefecture === pref && newPrefectures.length > 0
+                          ? newPrefectures[0]
+                          : prev.prefecture,
+                      }));
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">{pref}</span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-sm text-gray-500">
+          選択された都道府県: {formData.prefectures?.length || 0}件
+        </p>
       </div>
 
       <div>

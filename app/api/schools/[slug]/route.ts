@@ -329,18 +329,46 @@ export async function GET(
       ? parseFloat((campusLifeRatings.reduce((sum, r) => sum + r, 0) / campusLifeRatings.length).toFixed(2))
       : null;
 
-    // 最新の口コミを取得（3件）
-    const { data: latestReviews } = await supabase
+    // すべての口コミを取得して、いいね数でソート
+    const { data: allReviews } = await supabase
       .from('survey_responses')
       .select('id, overall_satisfaction, good_comment, bad_comment, created_at')
-      .eq('school_name', school.name)
-      .order('created_at', { ascending: false })
-      .limit(3);
+      .eq('school_name', school.name);
+
+    // 各口コミのいいね数を取得
+    const reviewsWithLikes = await Promise.all(
+      (allReviews || []).map(async (review) => {
+        let likeCount = 0;
+        try {
+          const { count, error: likesError } = await supabase
+            .from('review_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('review_id', review.id);
+          
+          if (!likesError) {
+            likeCount = count || 0;
+          }
+        } catch (error) {
+          // review_likesテーブルが存在しない場合は0を返す
+          console.warn('いいね数取得エラー:', error);
+        }
+        return {
+          ...review,
+          like_count: likeCount,
+        };
+      })
+    );
+
+    // いいね数順でソートして上位3件を取得
+    const latestReviews = reviewsWithLikes
+      .sort((a, b) => b.like_count - a.like_count)
+      .slice(0, 3);
 
     return NextResponse.json({
       id: school.id,
       name: school.name,
       prefecture: school.prefecture,
+      prefectures: school.prefectures || (school.prefecture ? [school.prefecture] : []),
       slug: school.slug,
       intro: school.intro,
       highlights: school.highlights,
@@ -364,6 +392,7 @@ export async function GET(
         good_comment: review.good_comment,
         bad_comment: review.bad_comment,
         created_at: review.created_at,
+        like_count: review.like_count || 0,
       })) || [],
       // 追加の評価項目
       flexibility_rating_avg: flexibilityRatingAvg,

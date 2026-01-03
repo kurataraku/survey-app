@@ -14,6 +14,7 @@ interface HomeData {
     id: string;
     name: string;
     prefecture: string;
+    prefectures?: string[] | null;
     slug: string | null;
     review_count: number;
     overall_avg: number | null;
@@ -22,6 +23,7 @@ interface HomeData {
     id: string;
     name: string;
     prefecture: string;
+    prefectures?: string[] | null;
     slug: string | null;
     review_count: number;
     overall_avg: number | null;
@@ -30,11 +32,15 @@ interface HomeData {
     id: string;
     school_id: string;
     school_name: string;
+    status?: string;
     overall_satisfaction: number;
     good_comment: string;
     bad_comment: string;
     created_at: string;
     like_count: number;
+    reason_for_choosing?: string[];
+    attendance_frequency?: string | null;
+    campus_prefecture?: string | null;
     schools: {
       id: string;
       name: string;
@@ -147,14 +153,32 @@ export default function Home() {
 
   const fetchHomeData = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/home');
+      
       if (!response.ok) {
-        throw new Error('データの取得に失敗しました');
+        const errorData = await response.json().catch(() => ({ error: 'データの取得に失敗しました' }));
+        console.error('APIエラー:', errorData);
+        throw new Error(errorData.error || errorData.message || 'データの取得に失敗しました');
       }
+      
       const homeData = await response.json();
+      
+      // データが正しい形式か確認
+      if (!homeData || typeof homeData !== 'object') {
+        throw new Error('無効なデータ形式です');
+      }
+      
       setData(homeData);
     } catch (error) {
       console.error('ホームデータ取得エラー:', error);
+      // エラー時でも空のデータを設定して、ページが表示されるようにする
+      setData({
+        topRankedSchools: [],
+        popularSchools: [],
+        latestReviews: [],
+        latestArticles: [],
+      });
     } finally {
       setLoading(false);
     }
@@ -253,7 +277,7 @@ export default function Home() {
           <div className="max-w-3xl mx-auto mb-8">
             <form onSubmit={handleSearch} className="bg-white rounded-lg shadow-xl p-6 border border-gray-200">
               <label className="block text-sm font-semibold text-gray-700 mb-4">
-                学校を探す
+                通信制高校を探す
               </label>
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1 relative" ref={searchInputRef}>
@@ -301,7 +325,7 @@ export default function Home() {
                     onChange={(e) => setSelectedPrefecture(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">都道府県を選択</option>
+                    <option value="">都道府県から探す</option>
                     {prefectures.map((pref) => (
                       <option key={pref} value={pref}>
                         {pref}
@@ -345,53 +369,6 @@ export default function Home() {
       </section>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* ランキングサマリー */}
-        {data.topRankedSchools.length > 0 && (
-          <section className="mb-12">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">総合評判ランキング TOP5</h2>
-                <p className="text-sm text-gray-600">口コミ数と評価の高い学校</p>
-              </div>
-              <Link
-                href="/rankings/overall"
-                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-              >
-                もっと見る
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {data.topRankedSchools.slice(0, 3).map((school, index) => (
-                <div key={school.id} className="relative">
-                  <div className="absolute -top-2 -left-2 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm z-10">
-                    {index + 1}
-                  </div>
-                  <SchoolCard
-                    id={school.id}
-                    name={school.name}
-                    prefecture={school.prefecture}
-                    slug={school.slug}
-                    reviewCount={school.review_count}
-                    overallAvg={school.overall_avg}
-                  />
-                </div>
-              ))}
-            </div>
-            {data.topRankedSchools.length > 3 && (
-              <div className="mt-4 text-center">
-                <Link
-                  href="/rankings/overall"
-                  className="inline-block px-6 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                >
-                  ランキングTOP5を見る
-                </Link>
-              </div>
-            )}
-          </section>
-        )}
 
         {/* 注目の学校（口コミ数順） */}
         {data.popularSchools.length > 0 && (
@@ -418,6 +395,7 @@ export default function Home() {
                   id={school.id}
                   name={school.name}
                   prefecture={school.prefecture}
+                  prefectures={school.prefectures || undefined}
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
@@ -446,21 +424,32 @@ export default function Home() {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {data.latestReviews.map((review) => (
-                <ReviewCard
-                  key={review.id}
-                  id={review.id}
-                  schoolName={review.schools?.name || review.school_name}
-                  schoolSlug={review.schools?.slug || null}
-                  overallSatisfaction={review.overall_satisfaction}
-                  goodComment={review.good_comment}
-                  badComment={review.bad_comment}
-                  enrollmentYear={null}
-                  attendanceFrequency={null}
-                  likeCount={review.like_count}
-                  createdAt={review.created_at}
-                />
-              ))}
+              {data.latestReviews.map((review, index) => {
+                // デバッグ用ログ（最初の3件のみ）
+                if (index < 3) {
+                  console.log(`[Frontend] Review ${review.id} - campus_prefecture:`, review.campus_prefecture);
+                  console.log(`[Frontend] Review ${review.id} - review全体:`, review);
+                }
+                return (
+                  <ReviewCard
+                    key={review.id}
+                    id={review.id}
+                    schoolName={review.schools?.name || review.school_name}
+                    schoolSlug={review.schools?.slug || null}
+                    overallSatisfaction={review.overall_satisfaction}
+                    goodComment={review.good_comment}
+                    badComment={review.bad_comment}
+                    enrollmentYear={null}
+                    attendanceFrequency={null}
+                    likeCount={review.like_count}
+                    createdAt={review.created_at}
+                    status={review.status}
+                    reasonForChoosing={review.reason_for_choosing}
+                    attendanceFrequencyProp={review.attendance_frequency}
+                    campusPrefecture={review.campus_prefecture}
+                  />
+                );
+              })}
             </div>
           </section>
         )}

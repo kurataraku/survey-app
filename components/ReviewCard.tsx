@@ -4,6 +4,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StarRatingDisplay from './StarRatingDisplay';
 
+// 通信制を選んだ理由の選択肢名マッピング
+const reasonForChoosingMap: Record<string, string> = {
+  '心の不調': '心の不調のため',
+  '心の不調のため': '心の不調のため',
+  '人間関係': '先生・友人などの人間関係に悩んだため',
+  '先生・友人などの人間関係に悩んだため': '先生・友人などの人間関係に悩んだため',
+  '全日制の学習スタイルが合わないため': '全日制の学習スタイルが合わないため',
+  '心や体の状態／発達障害・知的障害などのため': '心や体の状態／発達障害・知的障害などのため',
+  '働きながら学びたいため': '働きながら学びたいため',
+  'スポーツ/芸術/芸能活動との両立のため': 'スポーツ/芸術/芸能活動との両立のため',
+  '学費をおさえるため': '学費をおさえるため',
+  '学びなおしのため': '学びなおしのため',
+  'その他': 'その他',
+};
+
 interface ReviewCardProps {
   id: string;
   schoolName: string;
@@ -15,6 +30,10 @@ interface ReviewCardProps {
   attendanceFrequency: string | null;
   likeCount: number;
   createdAt: string;
+  status?: string;
+  reasonForChoosing?: string[];
+  attendanceFrequencyProp?: string | null;
+  campusPrefecture?: string | null;
 }
 
 export default function ReviewCard({
@@ -28,8 +47,22 @@ export default function ReviewCard({
   attendanceFrequency,
   likeCount,
   createdAt,
+  status,
+  reasonForChoosing,
+  attendanceFrequencyProp,
+  campusPrefecture,
 }: ReviewCardProps) {
   const router = useRouter();
+  
+  // デバッグ用ログ（最初の3件のみ）
+  if (typeof window !== 'undefined' && id) {
+    const debugKey = `review_debug_${id}`;
+    if (!sessionStorage.getItem(debugKey)) {
+      console.log(`[ReviewCard] ${id} - campusPrefecture:`, campusPrefecture);
+      console.log(`[ReviewCard] ${id} - campusPrefecture型:`, typeof campusPrefecture);
+      sessionStorage.setItem(debugKey, 'true');
+    }
+  }
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -60,18 +93,38 @@ export default function ReviewCard({
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">
-          {schoolSlug ? (
-            <Link
-              href={`/schools/${schoolSlug}`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700 mb-2 inline-block"
-            >
-              {schoolName}
-            </Link>
-          ) : (
-            <p className="text-sm text-gray-600 mb-2">{schoolName}</p>
-          )}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            {schoolSlug ? (
+              <Link
+                href={`/schools/${schoolSlug}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                {schoolName}
+              </Link>
+            ) : (
+              <span className="text-sm text-gray-600">{schoolName}</span>
+            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {reasonForChoosing && reasonForChoosing.length > 0 && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded">
+                  通信制を選んだ理由：{reasonForChoosingMap[reasonForChoosing[0]] || reasonForChoosing[0]}
+                </span>
+              )}
+              {attendanceFrequencyProp && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 rounded">
+                  通学頻度: {attendanceFrequencyProp}
+                </span>
+              )}
+              {campusPrefecture && String(campusPrefecture).trim() !== '' && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-purple-50 text-purple-700 rounded">
+                  都道府県: {String(campusPrefecture)}
+                </span>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-medium text-gray-600">総合満足度</span>
             <StarRatingDisplay value={overallSatisfaction} size="sm" />
             <span className="text-sm text-gray-500">
               {formatDate(createdAt)}

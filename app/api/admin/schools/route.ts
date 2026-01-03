@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
     const {
       name,
       prefecture,
+      prefectures,
       slug,
       intro,
       highlights,
@@ -95,6 +96,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // prefectures配列を準備（prefecturesが指定されていない場合はprefectureから作成）
+    const prefecturesArray = prefectures && Array.isArray(prefectures) && prefectures.length > 0
+      ? prefectures
+      : [prefecture];
 
     // 学校名の重複チェック
     const { data: nameConflict } = await supabase
@@ -128,6 +134,7 @@ export async function POST(request: NextRequest) {
     const insertData: any = {
       name,
       prefecture,
+      prefectures: prefecturesArray,
       slug,
       intro: intro || null,
       highlights: highlights || null,

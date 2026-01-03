@@ -7,6 +7,7 @@ interface SchoolCardProps {
   id: string;
   name: string;
   prefecture: string;
+  prefectures?: string[]; // 複数の都道府県に対応
   slug: string | null;
   reviewCount: number;
   overallAvg: number | null;
@@ -16,10 +17,37 @@ export default function SchoolCard({
   id,
   name,
   prefecture,
+  prefectures,
   slug,
   reviewCount,
   overallAvg,
 }: SchoolCardProps) {
+  // メイン都道府県を最初に、その後に他の都道府県を表示
+  let displayPrefectures: string[] = [];
+  
+  if (prefectures && prefectures.length > 0) {
+    // prefectures配列が存在する場合
+    if (prefecture && prefectures.includes(prefecture)) {
+      // メイン都道府県がprefectures配列に含まれている場合
+      // メイン都道府県を最初に、その他を続ける
+      const otherPrefectures = prefectures.filter(p => p !== prefecture);
+      displayPrefectures = [prefecture, ...otherPrefectures];
+    } else {
+      // メイン都道府県がprefectures配列に含まれていない場合
+      // メイン都道府県を最初に、prefectures配列を続ける
+      displayPrefectures = prefecture ? [prefecture, ...prefectures] : prefectures;
+    }
+  } else {
+    // prefectures配列が存在しない場合
+    displayPrefectures = prefecture ? [prefecture] : [];
+  }
+  
+  // デバッグログ（N高の場合のみ）
+  if (name === 'N高') {
+    console.log('[SchoolCard] N高 - prefectures:', prefectures);
+    console.log('[SchoolCard] N高 - prefecture:', prefecture);
+    console.log('[SchoolCard] N高 - displayPrefectures:', displayPrefectures);
+  }
   // slugがnullまたは空文字列の場合はidを使用（フォールバック）
   const href = slug && slug.trim() !== '' ? `/schools/${encodeURIComponent(slug)}` : `/schools/id/${id}`;
   
@@ -45,7 +73,13 @@ export default function SchoolCard({
           <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
             {name}
           </h3>
-          <p className="text-sm text-gray-600">{prefecture}</p>
+          <div className="flex flex-wrap gap-1">
+            {displayPrefectures.map((pref, index) => (
+              <span key={index} className="text-sm text-gray-600">
+                {pref}{index < displayPrefectures.length - 1 && '、'}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -53,10 +87,8 @@ export default function SchoolCard({
         <div className="flex items-center gap-2">
           {overallAvg !== null ? (
             <>
+              <span className="text-xs font-medium text-gray-600 whitespace-nowrap">総合満足度</span>
               <StarRatingDisplay value={overallAvg} size="sm" showLabel />
-              <span className="text-sm font-medium text-gray-900">
-                {overallAvg.toFixed(1)}
-              </span>
             </>
           ) : (
             <span className="text-sm text-gray-400">評価なし</span>
