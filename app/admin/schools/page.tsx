@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { prefectures } from '@/lib/prefectures';
 
 interface School {
   id: string;
@@ -10,6 +11,7 @@ interface School {
   prefecture: string;
   slug: string | null;
   is_public: boolean;
+  status?: string;
   review_count?: number;
   overall_avg?: number | null;
 }
@@ -23,12 +25,14 @@ function SchoolsPageContent() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [prefectureFilter, setPrefectureFilter] = useState(searchParams.get('prefecture') || '');
 
   const limit = 20;
 
   useEffect(() => {
     fetchSchools();
-  }, [page, searchQuery]);
+  }, [page, searchQuery, statusFilter, prefectureFilter]);
 
   const fetchSchools = async () => {
     setLoading(true);
@@ -39,6 +43,12 @@ function SchoolsPageContent() {
       });
       if (searchQuery) {
         params.append('q', searchQuery);
+      }
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
+      if (prefectureFilter) {
+        params.append('prefecture', prefectureFilter);
       }
 
       const response = await fetch(`/api/admin/schools?${params.toString()}`);
@@ -84,12 +94,26 @@ function SchoolsPageContent() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
+    updateURL();
+  };
+
+  const updateURL = () => {
     const params = new URLSearchParams();
     if (searchQuery) {
       params.append('q', searchQuery);
     }
+    if (statusFilter) {
+      params.append('status', statusFilter);
+    }
+    if (prefectureFilter) {
+      params.append('prefecture', prefectureFilter);
+    }
     router.push(`/admin/schools?${params.toString()}`);
-    fetchSchools();
+  };
+
+  const handleFilterChange = () => {
+    setPage(1);
+    updateURL();
   };
 
   return (
@@ -106,22 +130,64 @@ function SchoolsPageContent() {
             </Link>
           </div>
 
-          <form onSubmit={handleSearch} className="flex gap-4 mb-6">
-            <div className="flex-1">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="学校名で検索"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          <form onSubmit={handleSearch} className="space-y-4 mb-6">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="学校名で検索"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                検索
+              </button>
             </div>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              検索
-            </button>
+            <div className="flex gap-4">
+              <div className="w-48">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  状態
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    handleFilterChange();
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">すべて</option>
+                  <option value="active">active（正規）</option>
+                  <option value="pending">pending（仮登録）</option>
+                  <option value="merged">merged（統合済み）</option>
+                </select>
+              </div>
+              <div className="w-48">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  都道府県
+                </label>
+                <select
+                  value={prefectureFilter}
+                  onChange={(e) => {
+                    setPrefectureFilter(e.target.value);
+                    handleFilterChange();
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">すべて</option>
+                  {prefectures.map((pref) => (
+                    <option key={pref} value={pref}>
+                      {pref}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </form>
 
           {total > 0 && (
@@ -180,15 +246,36 @@ function SchoolsPageContent() {
                         {school.slug || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {school.is_public ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            公開中
-                          </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            非公開
-                          </span>
-                        )}
+                        <div className="space-y-1">
+                          {school.status && (
+                            <div>
+                              {school.status === 'active' && (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  active
+                                </span>
+                              )}
+                              {school.status === 'pending' && (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                  pending
+                                </span>
+                              )}
+                              {school.status === 'merged' && (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                  merged
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {school.is_public ? (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              公開中
+                            </span>
+                          ) : (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                              非公開
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {school.review_count || 0}件

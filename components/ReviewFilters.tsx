@@ -88,7 +88,6 @@ export default function ReviewFilters({
   onSortChange,
 }: ReviewFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const hasActiveFilters = Object.keys(filters).some(
     (key) => {
@@ -189,25 +188,25 @@ export default function ReviewFilters({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-4">
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-3">
       {/* 見出し行 */}
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-base font-semibold text-gray-900">絞り込み検索</h3>
+      <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-gray-900">自分の立場に近い口コミを探す</h3>
           {hasActiveFilters && (
-            <span className="text-sm text-gray-600">
+            <span className="text-xs text-gray-600">
               該当：<span className="font-bold text-blue-600">{filteredCount}</span>件
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {onSortChange && (
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">並び替え</label>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-gray-600">並び替え</label>
               <select
                 value={sort}
                 onChange={(e) => onSortChange(e.target.value)}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="newest">新着順</option>
                 <option value="oldest">古い順</option>
@@ -218,28 +217,28 @@ export default function ReviewFilters({
           )}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="px-4 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+            className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
           >
-            {isOpen ? '条件を閉じる' : '条件を開く'}
+            {isOpen ? '条件を閉じる' : '条件を設定して絞り込む'}
           </button>
         </div>
       </div>
 
       {/* 選択中条件のチップ表示 */}
       {hasActiveFilters && (
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-gray-600">選択中：</span>
-            <div className="flex flex-wrap gap-2 flex-1">
+        <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-600">選択中：</span>
+            <div className="flex flex-wrap gap-1.5 flex-1">
               {activeFilterChips.map((chip, index) => (
                 <button
                   key={`${chip.key}-${index}`}
                   onClick={() => handleRemoveFilter(chip.key, Array.isArray(chip.value) ? chip.value[0] : chip.value)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
                 >
                   <span>{chip.label}</span>
                   <svg
-                    className="w-3.5 h-3.5"
+                    className="w-3 h-3"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -256,185 +255,154 @@ export default function ReviewFilters({
             </div>
             <button
               onClick={handleReset}
-              className="text-sm text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
+              className="text-xs text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap"
             >
-              条件をクリア
+              クリア
             </button>
           </div>
         </div>
       )}
 
-      {/* フィルタ内容（折りたたみ） */}
+      {/* フィルタ内容（折りたたみ - 1段階） */}
       {isOpen && (
-        <div className="p-4 space-y-4">
-          {/* よく使う条件 */}
-          <div className="space-y-4">
-            {/* 投稿者の立場 */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                投稿者の立場
-              </label>
-              <p className="text-xs text-gray-500 mb-3">口コミを書いた方の立場です</p>
-              <div className="flex gap-2">
+        <div className="p-3 space-y-3">
+          {/* 通学頻度 */}
+          <div className="bg-gray-50 rounded p-3 border border-gray-200">
+            <label className="block text-xs font-semibold text-gray-900 mb-2">
+              主な通学頻度
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {attendanceFrequencyOptions.map((option) => (
                 <button
-                  onClick={() => handleRoleChange('本人')}
-                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    filters.role === '本人'
-                      ? 'bg-blue-600 text-white shadow-sm'
+                  key={option.value}
+                  onClick={() => handleAttendanceFrequencyChange(option.value)}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                    filters.attendance_frequency === option.value
+                      ? 'bg-blue-600 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
                   }`}
                 >
-                  本人
+                  {option.label}
                 </button>
-                <button
-                  onClick={() => handleRoleChange('保護者')}
-                  className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    filters.role === '保護者'
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
-                  }`}
-                >
-                  保護者
-                </button>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* 通学頻度 */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                主な通学頻度
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {attendanceFrequencyOptions.map((option) => (
+          {/* 都道府県 */}
+          <div className="bg-gray-50 rounded p-3 border border-gray-200">
+            <label className="block text-xs font-semibold text-gray-900 mb-2">
+              主に通っていたキャンパスの都道府県
+            </label>
+            <select
+              value={filters.campus_prefecture || ''}
+              onChange={(e) => handleCampusPrefectureChange(e.target.value)}
+              className="w-full sm:w-64 px-3 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value="">選択してください</option>
+              {prefectures.map((pref) => (
+                <option key={pref} value={pref}>
+                  {pref}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 通信制を選んだ理由 */}
+          <div className="bg-gray-50 rounded p-3 border border-gray-200">
+            <label className="block text-xs font-semibold text-gray-900 mb-2">
+              通信制を選んだ理由（複数選択可）
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {reasonForChoosingOptions.map((option) => {
+                const isChecked = filters.reason_for_choosing?.includes(option.value) || false;
+                return (
                   <button
                     key={option.value}
-                    onClick={() => handleAttendanceFrequencyChange(option.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      filters.attendance_frequency === option.value
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                    onClick={() => handleReasonForChoosingToggle(option.value)}
+                    className={`px-2 py-1.5 rounded text-xs font-medium text-left transition-all ${
+                      isChecked
+                        ? 'bg-blue-600 text-white border-2 border-blue-600'
+                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                     }`}
                   >
                     {option.label}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 都道府県 */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                主に通っていたキャンパスの都道府県
-              </label>
-              <select
-                value={filters.campus_prefecture || ''}
-                onChange={(e) => handleCampusPrefectureChange(e.target.value)}
-                className="w-full sm:w-80 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              >
-                <option value="">選択してください</option>
-                {prefectures.map((pref) => (
-                  <option key={pref} value={pref}>
-                    {pref}
-                  </option>
-                ))}
-              </select>
+                );
+              })}
             </div>
           </div>
 
-          {/* 詳細条件（Accordion） */}
-          <div className="border-t border-gray-200 pt-4">
-            <button
-              onClick={() => setIsDetailsOpen(!isDetailsOpen)}
-              className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors mb-4"
-            >
-              <span>詳細条件</span>
-              <svg
-                className={`w-5 h-5 transition-transform ${isDetailsOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          {/* 入学タイミング */}
+          <div className="bg-gray-50 rounded p-3 border border-gray-200">
+            <label className="block text-xs font-semibold text-gray-900 mb-2">
+              入学タイミング
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {enrollmentTypeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => handleEnrollmentTypeChange(option.value)}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                    filters.enrollment_type === option.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 卒業後の進路 */}
+          <div className="bg-gray-50 rounded p-3 border border-gray-200">
+            <label className="block text-xs font-semibold text-gray-900 mb-2">
+              卒業後の進路
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {graduationPathOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => handleGraduationPathChange(option.value)}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                    filters.graduation_path === option.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 投稿者の立場 */}
+          <div className="bg-gray-50 rounded p-3 border border-gray-200">
+            <label className="block text-xs font-semibold text-gray-900 mb-2">
+              投稿者の立場
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleRoleChange('本人')}
+                className={`flex-1 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  filters.role === '本人'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {isDetailsOpen && (
-              <div className="space-y-4 pl-2">
-                {/* 通信制を選んだ理由 */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <label className="block text-sm font-semibold text-gray-900 mb-3">
-                    通信制を選んだ理由（複数選択可）
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {reasonForChoosingOptions.map((option) => {
-                      const isChecked = filters.reason_for_choosing?.includes(option.value) || false;
-                      return (
-                        <button
-                          key={option.value}
-                          onClick={() => handleReasonForChoosingToggle(option.value)}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium text-left transition-all ${
-                            isChecked
-                              ? 'bg-blue-600 text-white border-2 border-blue-600'
-                              : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 入学タイミング */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <label className="block text-sm font-semibold text-gray-900 mb-3">
-                    入学タイミング
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {enrollmentTypeOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => handleEnrollmentTypeChange(option.value)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                          filters.enrollment_type === option.value
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 卒業後の進路 */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <label className="block text-sm font-semibold text-gray-900 mb-3">
-                    卒業後の進路
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {graduationPathOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => handleGraduationPathChange(option.value)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                          filters.graduation_path === option.value
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+                本人
+              </button>
+              <button
+                onClick={() => handleRoleChange('保護者')}
+                className={`flex-1 px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  filters.role === '保護者'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                }`}
+              >
+                保護者
+              </button>
+            </div>
           </div>
         </div>
       )}

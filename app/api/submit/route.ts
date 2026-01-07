@@ -79,11 +79,32 @@ export async function POST(request: NextRequest) {
     // schoolsテーブルからschool_idを取得または作成
     // ============================================================================
     let schoolId: string | null = null;
-    if (data.school_name) {
+    let schoolNameToSave: string = data.school_name;
+    let schoolNameInput: string | null = null;
+
+    // school_idが提供されている場合（オートコンプリートから選択された場合）
+    if (data.school_id) {
+      schoolId = data.school_id;
+      
+      // 学校名を取得
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('name')
+        .eq('id', schoolId)
+        .single();
+      
+      if (schoolData) {
+        schoolNameToSave = schoolData.name;
+      }
+      
+      // school_name_inputは「その他」入力時のみ保存
+      schoolNameInput = data.school_name_input || null;
+    } else if (data.school_name) {
+      // 後方互換: school_idが提供されていない場合は既存のロジックで処理
       // 既存の学校を検索
       const { data: existingSchool, error: searchError } = await supabase
         .from('schools')
-        .select('id')
+        .select('id, name')
         .eq('name', data.school_name)
         .single();
 
@@ -94,17 +115,48 @@ export async function POST(request: NextRequest) {
 
       if (existingSchool) {
         schoolId = existingSchool.id;
+        schoolNameToSave = existingSchool.name;
+      } else {
+        // 新規学校を作成（後方互換のため、このロジックは残す）
+        const prefecture = data.campus_prefecture || '不明';
+        const slug = generateSlug(data.school_name);
         
-        // 既存の学校のprefectures配列を更新
-        const campusPrefecture = data.campus_prefecture || '不明';
-        
-        // 現在のprefectures配列を取得
-        const { data: currentSchool } = await supabase
+        const { data: newSchool, error: createError } = await supabase
           .from('schools')
-          .select('prefectures, prefecture')
-          .eq('id', schoolId)
+          .insert({
+            name: data.school_name,
+            name_normalized: data.school_name, // 一時的にnameをそのまま使用（後で正規化関数で更新可能）
+            prefecture: prefecture,
+            prefectures: [prefecture],
+            slug: slug,
+            status: 'pending', // 後方互換のためpendingで作成
+            is_public: true
+          })
+          .select('id, name')
           .single();
-        
+
+        if (createError) {
+          console.error('学校作成エラー:', createError);
+          // エラーが発生しても続行（school_idはnullのまま）
+        } else if (newSchool) {
+          schoolId = newSchool.id;
+          schoolNameToSave = newSchool.name;
+        }
+      }
+    }
+
+    // 既存の学校のprefectures配列を更新（school_idが存在する場合）
+    if (schoolId) {
+      const campusPrefecture = data.campus_prefecture || '不明';
+      
+      // 現在のprefectures配列を取得
+      const { data: currentSchool } = await supabase
+        .from('schools')
+        .select('prefectures, prefecture')
+        .eq('id', schoolId)
+        .single();
+      
+      if (currentSchool) {
         const currentPrefectures = currentSchool?.prefectures || [];
         // 新しい都道府県が配列に含まれていない場合は追加
         if (!currentPrefectures.includes(campusPrefecture)) {
@@ -118,29 +170,6 @@ export async function POST(request: NextRequest) {
               prefecture: newPrefectures[0] || currentSchool?.prefecture || '不明'
             })
             .eq('id', schoolId);
-        }
-      } else {
-        // 新規学校を作成
-        const prefecture = data.campus_prefecture || '不明';
-        const slug = generateSlug(data.school_name);
-        
-        const { data: newSchool, error: createError } = await supabase
-          .from('schools')
-          .insert({
-            name: data.school_name,
-            prefecture: prefecture,
-            prefectures: [prefecture],
-            slug: slug,
-            is_public: true
-          })
-          .select('id')
-          .single();
-
-        if (createError) {
-          console.error('学校作成エラー:', createError);
-          // エラーが発生しても続行（school_idはnullのまま）
-        } else if (newSchool) {
-          schoolId = newSchool.id;
         }
       }
     }
@@ -163,7 +192,7 @@ export async function POST(request: NextRequest) {
     // ============================================================================
     const { error } = await supabase.from('survey_responses').insert({
       // 既存のフィールド（後方互換性のため維持）
-      school_name: data.school_name,
+      school_name: schoolNameToSave, // 選択された学校名を使用
       respondent_role: data.respondent_role,
       status: data.status,
       graduation_path: data.graduation_path || null,
@@ -173,8 +202,10 @@ export async function POST(request: NextRequest) {
       bad_comment: data.bad_comment,
       answers: answers,
       email: data.email || null,
-      // Epic1で追加した検索用カラム
+      // 新規追加フィールド
       school_id: schoolId,
+      school_name_input: schoolNameInput, // その他入力時の原文
+      // Epic1で追加した検索用カラム
       enrollment_year: enrollmentYear,
       attendance_frequency: attendanceFrequency,
       reason_for_choosing: reasonForChoosing.length > 0 ? reasonForChoosing : null,

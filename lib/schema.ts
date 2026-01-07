@@ -19,6 +19,8 @@ const getCommentMinLength = (overallSatisfaction: number | undefined, field: 'go
 // ベーススキーマ（条件分岐なし）
 const baseSchema = z.object({
   school_name: z.string().min(1, '学校名を入力してください'),
+  school_id: z.string().uuid().optional(), // 後方互換のためオプショナル
+  school_name_input: z.string().optional(), // その他入力時の原文
   respondent_role: z.enum(['本人', '保護者']),
   status: z.enum(['在籍中', '卒業した', '以前在籍していた（転校・退学など）']),
   graduation_path: z.string().optional(),

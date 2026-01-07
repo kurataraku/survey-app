@@ -20,6 +20,7 @@ export default function SurveyPage() {
     watch,
     formState: { errors },
     trigger,
+    setValue,
   } = useForm<SurveyFormData>({
     resolver: zodResolver(surveySchema),
     mode: 'onBlur', // Step3のエラー表示改善のためonBlurに変更
@@ -246,6 +247,7 @@ export default function SurveyPage() {
                       control={control}
                       watch={watch}
                       errors={errors}
+                      setValue={setValue}
                     />
                   ))}
                   
@@ -447,6 +449,7 @@ export default function SurveyPage() {
                       control={control}
                       watch={watch}
                       errors={errors}
+                      setValue={setValue}
                     />
                   ))}
                 </>

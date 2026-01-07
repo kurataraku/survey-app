@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
     // クエリパラメータを取得
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get('q') || '';
+    const status = searchParams.get('status') || '';
+    const prefecture = searchParams.get('prefecture') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = (page - 1) * limit;
@@ -30,6 +32,16 @@ export async function GET(request: NextRequest) {
     // 学校名での検索
     if (q) {
       query = query.ilike('name', `%${q}%`);
+    }
+
+    // statusフィルタ
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    // 都道府県フィルタ
+    if (prefecture) {
+      query = query.contains('prefectures', [prefecture]);
     }
 
     // ページネーションとソート

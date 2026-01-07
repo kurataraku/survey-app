@@ -1,16 +1,18 @@
 'use client';
 
-import { Control, Controller, FieldValues } from 'react-hook-form';
+import { Control, Controller, FieldValues, UseFormSetValue } from 'react-hook-form';
 import { Question } from '@/lib/questions';
 import StarRating from './StarRating';
 import ChipSelect from './ChipSelect';
 import TextAreaWithCounter from './TextAreaWithCounter';
+import SchoolAutocomplete from './SchoolAutocomplete';
 
 interface QuestionRendererProps {
   question: Question;
   control: Control<any>;
   watch: (name: string) => any;
   errors: any;
+  setValue?: UseFormSetValue<any>;
 }
 
 export default function QuestionRenderer({
@@ -18,6 +20,7 @@ export default function QuestionRenderer({
   control,
   watch,
   errors,
+  setValue,
 }: QuestionRendererProps) {
   // 条件分岐チェック
   const shouldShow = () => {
@@ -98,7 +101,16 @@ export default function QuestionRenderer({
         </p>
       )}
 
-      {question.type === 'text' && (
+      {question.type === 'text' && question.id === 'school_name' && setValue ? (
+        <SchoolAutocomplete
+          control={control}
+          name={fieldName}
+          setValue={setValue}
+          placeholder={question.placeholder}
+          error={error}
+          required={question.required}
+        />
+      ) : question.type === 'text' && (
         <Controller
           name={fieldName}
           control={control}

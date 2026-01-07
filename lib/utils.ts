@@ -47,6 +47,55 @@ export function normalizeSearchQuery(text: string): string {
 }
 
 /**
+ * テキストを正規化する関数（学校名の検索・比較用）
+ * NFKC正規化、空白除去、「高等学校」⇄「高校」の統一などを行う
+ * 
+ * @param text - 正規化する文字列
+ * @returns 正規化された文字列
+ * 
+ * @example
+ * normalizeText('Ｎ高等学校') // => 'N高等学校'
+ * normalizeText('飛鳥未来　高校') // => '飛鳥未来高校'
+ * normalizeText('通信制高等学校') // => '通信制高校'
+ */
+export function normalizeText(text: string): string {
+  if (!text) {
+    return '';
+  }
+
+  let normalized = text;
+
+  // 1. NFKC正規化（全角・半角の統一、合成文字の分解など）
+  // Node.js環境ではString.prototype.normalizeが使用可能
+  normalized = normalized.normalize('NFKC');
+
+  // 2. 前後空白をtrim
+  normalized = normalized.trim();
+
+  // 3. 全角/半角スペースを除去（連続するスペースも1つに）
+  normalized = normalized.replace(/[\s\u3000]+/g, '');
+
+  // 4. 「高等学校」を「高校」に統一
+  normalized = normalized.replace(/高等学校/g, '高校');
+
+  // 5. 全角英数字を半角に変換（既存のnormalizeSearchQueryのロジックを使用）
+  normalized = normalized
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char) => {
+      const code = char.charCodeAt(0);
+      if (code >= 0xFF21 && code <= 0xFF3A) {
+        return String.fromCharCode(code - 0xFEE0);
+      } else if (code >= 0xFF41 && code <= 0xFF5A) {
+        return String.fromCharCode(code - 0xFEE0);
+      } else if (code >= 0xFF10 && code <= 0xFF19) {
+        return String.fromCharCode(code - 0xFEE0);
+      }
+      return char;
+    });
+
+  return normalized;
+}
+
+/**
  * 文字列からslug（URL用のスラッグ）を生成する関数
  * 学校名や記事タイトルなどに使用可能
  * 

@@ -195,21 +195,21 @@ export default function SchoolReviewsPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* ヘッダー */}
-        <div className="mb-6">
+        <div className="mb-3">
           <Link
             href={`/schools/${slug}`}
-            className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
+            className="text-xs text-blue-600 hover:text-blue-700 mb-2 inline-flex items-center gap-1"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             学校詳細に戻る
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
             {schoolName || '口コミ一覧'}
           </h1>
           {total > 0 && (
-            <p className="text-gray-600">{total}件の口コミ</p>
+            <p className="text-sm text-gray-600">{total}件の口コミ</p>
           )}
         </div>
 
@@ -224,11 +224,11 @@ export default function SchoolReviewsPage() {
         />
 
         {/* 区切り線 */}
-        <div className="border-t border-gray-200 my-6"></div>
+        <div className="border-t border-gray-200 my-3"></div>
 
         {/* 口コミ一覧見出し */}
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">口コミ</h2>
+        <div className="mb-3">
+          <h2 className="text-base font-semibold text-gray-900">口コミ</h2>
         </div>
 
         {/* 口コミ一覧 */}
