@@ -28,3 +28,8 @@ COMMENT ON COLUMN article_schools.note IS '記事内で学校に対して追加�
 
 
 
+
+
+
+
+

@@ -34,21 +34,31 @@ export default function Header() {
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20">
           {/* ロゴ */}
           <div className="flex items-center">
-            <Link href="/" className="text-xl font-bold text-blue-600 hover:text-blue-700">
-              通信制高校リアルレビュー
+            <Link
+              href="/"
+              className="flex items-center focus:outline-none focus:ring-0"
+            >
+              {/* 視覚障害者向けのテキストラベル */}
+              <span className="sr-only">通信制高校リアルレビュー</span>
+              {/* ロゴ画像（publicフォルダ直下に配置してください: /public/logo-service.png など） */}
+              <img
+                src="/logo-service.png"
+                alt="通信制高校リアルレビュー"
+                className="h-16 md:h-18 lg:h-20 w-auto"
+              />
             </Link>
           </div>
 
           {/* デスクトップナビゲーション */}
-          <nav className="hidden md:flex items-center space-x-6">
+          <nav className="hidden md:flex items-center space-x-8">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                className={`px-3 py-2 text-base font-medium transition-colors ${
                   isActive(item.href)
                     ? 'text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-700 hover:text-blue-600'
@@ -58,38 +68,6 @@ export default function Header() {
               </Link>
             ))}
           </nav>
-
-          {/* 検索バー（デスクトップ） */}
-          <div className="hidden md:block flex-1 max-w-md ml-8">
-            <form onSubmit={handleSearch} className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="学校名で検索..."
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                type="submit"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
-                aria-label="検索"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </button>
-            </form>
-          </div>
 
           {/* モバイルメニューボタン */}
           <button
@@ -131,7 +109,7 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  className={`px-3 py-2 text-base font-medium rounded-md transition-colors ${
                     isActive(item.href)
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-700 hover:bg-gray-50'

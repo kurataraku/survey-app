@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ReviewCard from '@/components/ReviewCard';
 import Select from '@/components/ui/Select';
 import EmptyState from '@/components/ui/EmptyState';
 import Skeleton from '@/components/ui/Skeleton';
+import ReviewFilters, { ReviewFilters as ReviewFiltersType } from '@/components/ReviewFilters';
 
 interface Review {
   id: string;
@@ -25,21 +26,56 @@ interface Review {
 export default function SchoolReviewsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   // URLエンコードされたslugをデコード
   const slug = decodeURIComponent(params.slug as string);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [totalBeforeFilter, setTotalBeforeFilter] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [sort, setSort] = useState('newest');
   const [schoolName, setSchoolName] = useState('');
+  const [filters, setFilters] = useState<ReviewFiltersType>({});
 
   const limit = 20;
 
+  // URLクエリパラメータからフィルタを読み込む
+  useEffect(() => {
+    const role = searchParams.get('role') || undefined;
+    const graduationPath = searchParams.get('graduation_path') || undefined;
+    const enrollmentType = searchParams.get('enrollment_type') || undefined;
+    const attendanceFrequency = searchParams.get('attendance_frequency') || undefined;
+    const campusPrefecture = searchParams.get('campus_prefecture') || undefined;
+    const reasonForChoosing = searchParams.get('reason_for_choosing');
+    const reasonForChoosingArray = reasonForChoosing
+      ? reasonForChoosing.split(',').filter((r) => r.trim() !== '')
+      : undefined;
+
+    setFilters({
+      role,
+      graduation_path: graduationPath,
+      enrollment_type: enrollmentType,
+      attendance_frequency: attendanceFrequency,
+      campus_prefecture: campusPrefecture,
+      reason_for_choosing: reasonForChoosingArray,
+    });
+
+    const pageParam = searchParams.get('page');
+    if (pageParam) {
+      setPage(parseInt(pageParam, 10));
+    }
+
+    const sortParam = searchParams.get('sort');
+    if (sortParam) {
+      setSort(sortParam);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     fetchReviews();
-  }, [slug, page, sort]);
+  }, [slug, page, sort, filters]);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -53,6 +89,26 @@ export default function SchoolReviewsPage() {
         limit: limit.toString(),
       });
 
+      // フィルタパラメータを追加
+      if (filters.role) {
+        params.append('role', filters.role);
+      }
+      if (filters.graduation_path) {
+        params.append('graduation_path', filters.graduation_path);
+      }
+      if (filters.enrollment_type) {
+        params.append('enrollment_type', filters.enrollment_type);
+      }
+      if (filters.attendance_frequency) {
+        params.append('attendance_frequency', filters.attendance_frequency);
+      }
+      if (filters.campus_prefecture) {
+        params.append('campus_prefecture', filters.campus_prefecture);
+      }
+      if (filters.reason_for_choosing && filters.reason_for_choosing.length > 0) {
+        params.append('reason_for_choosing', filters.reason_for_choosing.join(','));
+      }
+
       const response = await fetch(`/api/reviews?${params.toString()}`);
       if (!response.ok) {
         throw new Error('口コミ取得に失敗しました');
@@ -61,6 +117,7 @@ export default function SchoolReviewsPage() {
       const data = await response.json();
       setReviews(data.reviews);
       setTotal(data.total);
+      setTotalBeforeFilter(data.total_before_filter || data.total);
       setTotalPages(data.total_pages);
       if (data.reviews.length > 0) {
         setSchoolName(data.reviews[0].school_name);
@@ -73,9 +130,65 @@ export default function SchoolReviewsPage() {
     }
   };
 
-  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSort(e.target.value);
+  const handleFiltersChange = (newFilters: ReviewFiltersType) => {
+    setFilters(newFilters);
+    setPage(1); // フィルタ変更時は1ページ目に戻す
+
+    // URLクエリパラメータを更新
+    const params = new URLSearchParams();
+    params.set('sort', sort);
+
+    if (newFilters.role) {
+      params.set('role', newFilters.role);
+    }
+    if (newFilters.graduation_path) {
+      params.set('graduation_path', newFilters.graduation_path);
+    }
+    if (newFilters.enrollment_type) {
+      params.set('enrollment_type', newFilters.enrollment_type);
+    }
+    if (newFilters.attendance_frequency) {
+      params.set('attendance_frequency', newFilters.attendance_frequency);
+    }
+    if (newFilters.campus_prefecture) {
+      params.set('campus_prefecture', newFilters.campus_prefecture);
+    }
+    if (newFilters.reason_for_choosing && newFilters.reason_for_choosing.length > 0) {
+      params.set('reason_for_choosing', newFilters.reason_for_choosing.join(','));
+    }
+
+    router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+  };
+
+  const handleSortChange = (value: string) => {
+    setSort(value);
     setPage(1);
+
+    // URLクエリパラメータを更新
+    const params = new URLSearchParams();
+    params.set('sort', value);
+
+    // フィルタパラメータも保持
+    if (filters.role) {
+      params.set('role', filters.role);
+    }
+    if (filters.graduation_path) {
+      params.set('graduation_path', filters.graduation_path);
+    }
+    if (filters.enrollment_type) {
+      params.set('enrollment_type', filters.enrollment_type);
+    }
+    if (filters.attendance_frequency) {
+      params.set('attendance_frequency', filters.attendance_frequency);
+    }
+    if (filters.campus_prefecture) {
+      params.set('campus_prefecture', filters.campus_prefecture);
+    }
+    if (filters.reason_for_choosing && filters.reason_for_choosing.length > 0) {
+      params.set('reason_for_choosing', filters.reason_for_choosing.join(','));
+    }
+
+    router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
   };
 
   return (
@@ -100,24 +213,22 @@ export default function SchoolReviewsPage() {
           )}
         </div>
 
-        {/* ソート */}
-        <div className="mb-6 flex justify-end">
-          <div className="w-48">
-            <Select
-              options={[
-                { value: 'newest', label: '新着順' },
-                { value: 'oldest', label: '古い順' },
-                { value: 'rating_desc', label: '評価が高い順' },
-                { value: 'rating_asc', label: '評価が低い順' },
-              ]}
-              value={sort}
-              onChange={(value) => {
-                setSort(value);
-                setPage(1);
-              }}
-              placeholder="並び替え"
-            />
-          </div>
+        {/* フィルタ（ソート統合） */}
+        <ReviewFilters
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          totalCount={totalBeforeFilter}
+          filteredCount={total}
+          sort={sort}
+          onSortChange={handleSortChange}
+        />
+
+        {/* 区切り線 */}
+        <div className="border-t border-gray-200 my-6"></div>
+
+        {/* 口コミ一覧見出し */}
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">口コミ</h2>
         </div>
 
         {/* 口コミ一覧 */}
@@ -159,23 +270,37 @@ export default function SchoolReviewsPage() {
             {/* ページネーション */}
             {totalPages > 1 && (
               <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  前へ
-                </button>
-                <span className="px-4 py-2 text-gray-600">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  次へ
-                </button>
+            <button
+              onClick={() => {
+                const newPage = page - 1;
+                setPage(newPage);
+                // URL更新
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('page', newPage.toString());
+                router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+              }}
+              disabled={page === 1}
+              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              前へ
+            </button>
+            <span className="px-4 py-2 text-gray-600">
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => {
+                const newPage = page + 1;
+                setPage(newPage);
+                // URL更新
+                const params = new URLSearchParams(searchParams.toString());
+                params.set('page', newPage.toString());
+                router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+              }}
+              disabled={page >= totalPages}
+              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              次へ
+            </button>
               </div>
             )}
           </>

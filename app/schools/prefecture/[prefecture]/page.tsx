@@ -9,6 +9,8 @@ interface School {
   id: string;
   name: string;
   prefecture: string;
+  prefectures?: string[] | null;
+  matched_prefecture?: string | null;
   slug: string | null;
   review_count: number;
   overall_avg: number | null;
@@ -94,6 +96,8 @@ function PrefectureSchoolsContent() {
                   id={school.id}
                   name={school.name}
                   prefecture={school.prefecture}
+                  prefectures={school.prefectures || undefined}
+                  matchedPrefecture={school.matched_prefecture || undefined}
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}

@@ -259,18 +259,23 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヒーローセクション */}
-      <section className="bg-gradient-to-br from-blue-50 to-blue-100 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              通信制高校リアルレビュー
+      <section className="relative bg-gradient-to-br from-blue-50 to-blue-100 py-16 overflow-hidden">
+        {/* 背景イラスト（透過を少し弱めて表示） */}
+        <div className="pointer-events-none absolute inset-0 opacity-30">
+          <img
+            src="/hero-visual.png" // public/hero-visual.png に配置してください
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
+              リアルな口コミで
+              <br />
+              通信制高校を選ぼう
             </h1>
-            <p className="text-xl text-gray-700 mb-2">
-              自分に合った通信制高校を選んで、
-            </p>
-            <p className="text-xl text-gray-700">
-              大学進学・就職への一歩を踏みだそう！
-            </p>
           </div>
 
           {/* 検索パネル - 1つの視覚的ユニットとして統合 */}

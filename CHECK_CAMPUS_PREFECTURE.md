@@ -125,3 +125,8 @@ ORDER BY created_at DESC;
 3. `ReviewCard`コンポーネントに正しく値が渡されているか確認
 
 
+
+
+
+
+

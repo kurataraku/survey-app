@@ -12,3 +12,8 @@ if exist .next (
 echo 開発サーバーを起動中...
 npm run dev
 
+
+
+
+
+

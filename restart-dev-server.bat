@@ -6,3 +6,8 @@ if exist .next rmdir /s /q .next
 echo 開発サーバーを起動中...
 npm run dev
 
+
+
+
+
+

@@ -104,3 +104,8 @@ WHERE key = 'campus_prefecture';
 - 口コミ回答で複数の都道府県を選択した場合、学校の`prefectures`配列に自動的に追加されます
 
 
+
+
+
+
+

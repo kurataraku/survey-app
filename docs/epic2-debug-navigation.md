@@ -82,3 +82,8 @@ SchoolCard href: /schools/id/[id] slug: null id: [idの値]
 
 
 
+
+
+
+
+

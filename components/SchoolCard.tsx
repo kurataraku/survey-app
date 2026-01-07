@@ -8,6 +8,7 @@ interface SchoolCardProps {
   name: string;
   prefecture: string;
   prefectures?: string[]; // 複数の都道府県に対応
+  matchedPrefecture?: string; // 検索で該当した都道府県
   slug: string | null;
   reviewCount: number;
   overallAvg: number | null;
@@ -18,35 +19,44 @@ export default function SchoolCard({
   name,
   prefecture,
   prefectures,
+  matchedPrefecture,
   slug,
   reviewCount,
   overallAvg,
 }: SchoolCardProps) {
-  // メイン都道府県を最初に、その後に他の都道府県を表示
+  // 検索で該当した都道府県を最初に、その後に他の都道府県を3〜4つ表示
   let displayPrefectures: string[] = [];
   
-  if (prefectures && prefectures.length > 0) {
-    // prefectures配列が存在する場合
-    if (prefecture && prefectures.includes(prefecture)) {
-      // メイン都道府県がprefectures配列に含まれている場合
-      // メイン都道府県を最初に、その他を続ける
-      const otherPrefectures = prefectures.filter(p => p !== prefecture);
-      displayPrefectures = [prefecture, ...otherPrefectures];
-    } else {
-      // メイン都道府県がprefectures配列に含まれていない場合
-      // メイン都道府県を最初に、prefectures配列を続ける
-      displayPrefectures = prefecture ? [prefecture, ...prefectures] : prefectures;
-    }
-  } else {
-    // prefectures配列が存在しない場合
-    displayPrefectures = prefecture ? [prefecture] : [];
+  // すべての都道府県を収集
+  const allPrefecturesSet = new Set<string>();
+  
+  // メイン都道府県を追加
+  if (prefecture) {
+    allPrefecturesSet.add(prefecture);
   }
   
-  // デバッグログ（N高の場合のみ）
-  if (name === 'N高') {
-    console.log('[SchoolCard] N高 - prefectures:', prefectures);
-    console.log('[SchoolCard] N高 - prefecture:', prefecture);
-    console.log('[SchoolCard] N高 - displayPrefectures:', displayPrefectures);
+  // prefectures配列があれば追加
+  if (prefectures && prefectures.length > 0) {
+    prefectures.forEach(p => allPrefecturesSet.add(p));
+  }
+  
+  const allPrefectures = Array.from(allPrefecturesSet);
+  
+  if (allPrefectures.length === 0) {
+    displayPrefectures = [];
+  } else if (matchedPrefecture && allPrefectures.includes(matchedPrefecture)) {
+    // 検索で該当した都道府県がある場合、それを最初に
+    const otherPrefectures = allPrefectures.filter(p => p !== matchedPrefecture);
+    // その他の都道府県を3〜4つに制限
+    const limitedOthers = otherPrefectures.slice(0, 4);
+    displayPrefectures = [matchedPrefecture, ...limitedOthers];
+  } else {
+    // 検索で該当した都道府県がない場合、メイン都道府県を最初に
+    const mainPrefecture = prefecture || allPrefectures[0];
+    const otherPrefectures = allPrefectures.filter(p => p !== mainPrefecture);
+    // その他の都道府県を3〜4つに制限
+    const limitedOthers = otherPrefectures.slice(0, 4);
+    displayPrefectures = [mainPrefecture, ...limitedOthers];
   }
   // slugがnullまたは空文字列の場合はidを使用（フォールバック）
   const href = slug && slug.trim() !== '' ? `/schools/${encodeURIComponent(slug)}` : `/schools/id/${id}`;

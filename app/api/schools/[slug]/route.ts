@@ -192,7 +192,83 @@ export async function GET(
       ? parseFloat((tuitionRatings.reduce((sum, r) => sum + r, 0) / tuitionRatings.length).toFixed(2))
       : null;
 
-    // 統計情報を取得するために全口コミを取得
+    // サイト全体の評価平均を計算するために全口コミを取得
+    const { data: allGlobalReviews } = await supabase
+      .from('survey_responses')
+      .select('overall_satisfaction, answers');
+
+    const toValidRatings = (rows: any[] | null | undefined, key: string) =>
+      rows && rows.length > 0
+        ? rows
+            .map((r) => r.answers?.[key])
+            .filter(
+              (rating: any): rating is string =>
+                rating !== null &&
+                rating !== undefined &&
+                rating !== '' &&
+                rating !== '6'
+            )
+            .map((r: string) => parseInt(r, 10))
+            .filter((r: number) => !isNaN(r) && r >= 1 && r <= 5)
+        : [];
+
+    const globalFlexibilityRatings = toValidRatings(
+      allGlobalReviews,
+      'flexibility_rating'
+    );
+    const globalStaffRatings = toValidRatings(allGlobalReviews, 'staff_rating');
+    const globalSupportRatings = toValidRatings(
+      allGlobalReviews,
+      'support_rating'
+    );
+    const globalAtmosphereRatings = toValidRatings(
+      allGlobalReviews,
+      'atmosphere_fit_rating'
+    );
+    const globalCreditRatings = toValidRatings(
+      allGlobalReviews,
+      'credit_rating'
+    );
+    const globalUniqueCourseRatings = toValidRatings(
+      allGlobalReviews,
+      'unique_course_rating'
+    );
+    const globalCareerSupportRatings = toValidRatings(
+      allGlobalReviews,
+      'career_support_rating'
+    );
+    const globalCampusLifeRatings = toValidRatings(
+      allGlobalReviews,
+      'campus_life_rating'
+    );
+    const globalTuitionRatings = toValidRatings(
+      allGlobalReviews,
+      'tuition_rating'
+    );
+
+    const averageOrNull = (values: number[]) =>
+      values.length > 0
+        ? parseFloat(
+            (
+              values.reduce((sum: number, v: number) => sum + v, 0) /
+              values.length
+            ).toFixed(2)
+          )
+        : null;
+
+    const globalFlexibilityRatingAvg = averageOrNull(globalFlexibilityRatings);
+    const globalStaffRatingAvg = averageOrNull(globalStaffRatings);
+    const globalSupportRatingAvg = averageOrNull(globalSupportRatings);
+    const globalAtmosphereFitRatingAvg = averageOrNull(globalAtmosphereRatings);
+    const globalCreditRatingAvg = averageOrNull(globalCreditRatings);
+    const globalUniqueCourseRatingAvg = averageOrNull(globalUniqueCourseRatings);
+    const globalCareerSupportRatingAvg = averageOrNull(
+      globalCareerSupportRatings
+    );
+    const globalCampusLifeRatingAvg = averageOrNull(globalCampusLifeRatings);
+    const globalTuitionRatingAvg = averageOrNull(globalTuitionRatings);
+
+    // 統計情報を取得するために全口コミを取得（この学校のみ）
     const { data: allReviewsForStats } = await supabase
       .from('survey_responses')
       .select('respondent_role, status, graduation_path, answers')
@@ -400,6 +476,18 @@ export async function GET(
       unique_course_rating_avg: uniqueCourseRatingAvg,
       career_support_rating_avg: careerSupportRatingAvg,
       campus_life_rating_avg: campusLifeRatingAvg,
+      // サイト全体の平均（レーダーチャート用）
+      global_averages: {
+        flexibility_rating_avg: globalFlexibilityRatingAvg,
+        staff_rating_avg: globalStaffRatingAvg,
+        support_rating_avg: globalSupportRatingAvg,
+        atmosphere_fit_rating_avg: globalAtmosphereFitRatingAvg,
+        credit_rating_avg: globalCreditRatingAvg,
+        unique_course_rating_avg: globalUniqueCourseRatingAvg,
+        career_support_rating_avg: globalCareerSupportRatingAvg,
+        campus_life_rating_avg: globalCampusLifeRatingAvg,
+        tuition_rating_avg: globalTuitionRatingAvg,
+      },
       // 統計情報
       statistics: {
         respondent_role: respondentRoleStats,

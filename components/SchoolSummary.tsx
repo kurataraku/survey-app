@@ -47,32 +47,30 @@ export default function SchoolSummary({
     .map((r) => r.bad_comment.substring(0, 60) + (r.bad_comment.length > 60 ? '...' : ''))[0];
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 mb-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 md:p-8 mb-6">
       {/* 学校名と都道府県 */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{name}</h1>
-          <div className="flex flex-wrap gap-2">
-            {displayPrefectures.map((pref, index) => (
-              <Badge key={index} variant="primary" size="md">{pref}</Badge>
-            ))}
-          </div>
+      <div className="mb-6">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{name}</h1>
+        <div className="flex flex-wrap gap-2">
+          {displayPrefectures.map((pref, index) => (
+            <Badge key={index} variant="primary" size="md">{pref}</Badge>
+          ))}
         </div>
       </div>
 
-      {/* 総合平均スコア */}
-      <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
+      {/* 総合平均スコアと口コミ数 */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-6 pb-6 border-b border-gray-200">
         {overallAvg !== null ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <StarRatingDisplay value={overallAvg} size="lg" showLabel />
+              <div className="text-3xl md:text-4xl font-bold text-gray-900">
+                {overallAvg.toFixed(1)}
+                <span className="text-lg md:text-xl font-normal text-gray-600 ml-1">/ 5.0</span>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-gray-900">
-              {overallAvg.toFixed(1)}
-              <span className="text-lg font-normal text-gray-600 ml-1">/ 5.0</span>
-            </div>
-            <div className="text-sm text-gray-600 ml-auto">
-              <span className="font-semibold">{reviewCount}</span>件の口コミ
+            <div className="text-sm md:text-base text-gray-600 sm:ml-auto">
+              <span className="font-semibold text-gray-900">{reviewCount}</span>件の口コミ
             </div>
           </>
         ) : (
@@ -80,36 +78,36 @@ export default function SchoolSummary({
         )}
       </div>
 
-      {/* 主要3指標を横並びのスコアチップで表示 */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="text-center p-3 bg-blue-50 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">先生・職員の対応</p>
+      {/* 主要3指標を横並びのスコアカードで表示 */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+          <p className="text-xs md:text-sm text-gray-600 mb-2">先生・職員の対応</p>
           {staffRatingAvg !== null ? (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex items-center justify-center gap-1.5">
               <StarRatingDisplay value={staffRatingAvg} size="sm" />
-              <span className="text-sm font-semibold text-gray-900">{staffRatingAvg.toFixed(1)}</span>
+              <span className="text-base md:text-lg font-semibold text-gray-900">{staffRatingAvg.toFixed(1)}</span>
             </div>
           ) : (
             <span className="text-xs text-gray-400">評価なし</span>
           )}
         </div>
-        <div className="text-center p-3 bg-green-50 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">在校生の雰囲気</p>
+        <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+          <p className="text-xs md:text-sm text-gray-600 mb-2">在校生の雰囲気</p>
           {atmosphereFitRatingAvg !== null ? (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex items-center justify-center gap-1.5">
               <StarRatingDisplay value={atmosphereFitRatingAvg} size="sm" />
-              <span className="text-sm font-semibold text-gray-900">{atmosphereFitRatingAvg.toFixed(1)}</span>
+              <span className="text-base md:text-lg font-semibold text-gray-900">{atmosphereFitRatingAvg.toFixed(1)}</span>
             </div>
           ) : (
             <span className="text-xs text-gray-400">評価なし</span>
           )}
         </div>
-        <div className="text-center p-3 bg-amber-50 rounded-lg">
-          <p className="text-xs text-gray-600 mb-1">単位取得のしやすさ</p>
+        <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-100">
+          <p className="text-xs md:text-sm text-gray-600 mb-2">単位取得のしやすさ</p>
           {creditRatingAvg !== null ? (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex items-center justify-center gap-1.5">
               <StarRatingDisplay value={creditRatingAvg} size="sm" />
-              <span className="text-sm font-semibold text-gray-900">{creditRatingAvg.toFixed(1)}</span>
+              <span className="text-base md:text-lg font-semibold text-gray-900">{creditRatingAvg.toFixed(1)}</span>
             </div>
           ) : (
             <span className="text-xs text-gray-400">評価なし</span>

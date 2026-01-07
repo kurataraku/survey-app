@@ -22,6 +22,17 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || 'newest';
     const offset = (page - 1) * limit;
 
+    // フィルタパラメータを取得
+    const role = searchParams.get('role') || undefined;
+    const graduationPath = searchParams.get('graduation_path') || undefined;
+    const enrollmentType = searchParams.get('enrollment_type') || undefined;
+    const attendanceFrequency = searchParams.get('attendance_frequency') || undefined;
+    const campusPrefecture = searchParams.get('campus_prefecture') || undefined;
+    const reasonForChoosing = searchParams.get('reason_for_choosing'); // カンマ区切り
+    const reasonForChoosingArray = reasonForChoosing
+      ? reasonForChoosing.split(',').filter((r) => r.trim() !== '')
+      : undefined;
+
     // 学校slugが指定されている場合、学校IDを取得
     let schoolId: string | null = null;
     if (schoolSlug) {
@@ -65,15 +76,54 @@ export async function GET(request: NextRequest) {
         created_at,
         enrollment_year,
         attendance_frequency,
+        respondent_role,
+        graduation_path,
+        answers,
         schools(id, name, slug)
       `)
       .eq('is_public', true);
 
-    // 学校IDでフィルタリング
+    // 学校でフィルタリング（school_nameを使用、school_idカラムが存在しない可能性があるため）
     if (schoolId) {
-      countQuery = countQuery.eq('school_id', schoolId);
-      reviewsQuery = reviewsQuery.eq('school_id', schoolId);
+      // school_nameを取得
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('name')
+        .eq('id', schoolId)
+        .single();
+      
+      if (schoolData?.name) {
+        // school_nameでフィルタリング
+        countQuery = countQuery.eq('school_name', schoolData.name);
+        reviewsQuery = reviewsQuery.eq('school_name', schoolData.name);
+      }
     }
+
+    // フィルタリング: 通常カラム
+    if (role) {
+      countQuery = countQuery.eq('respondent_role', role);
+      reviewsQuery = reviewsQuery.eq('respondent_role', role);
+    }
+
+    if (graduationPath) {
+      countQuery = countQuery.eq('graduation_path', graduationPath);
+      reviewsQuery = reviewsQuery.eq('graduation_path', graduationPath);
+    }
+
+    // フィルタリング: JSONBカラム（answers）
+    // 入学タイミング
+    if (enrollmentType) {
+      countQuery = countQuery.eq('answers->>enrollment_type', enrollmentType);
+      reviewsQuery = reviewsQuery.eq('answers->>enrollment_type', enrollmentType);
+    }
+
+    // 通学頻度
+    if (attendanceFrequency) {
+      countQuery = countQuery.eq('answers->>attendance_frequency', attendanceFrequency);
+      reviewsQuery = reviewsQuery.eq('answers->>attendance_frequency', attendanceFrequency);
+    }
+
+    // 都道府県のフィルタリングはアプリ側で行う（配列対応のため）
 
     // ソート順を設定
     let orderColumn = 'created_at';
@@ -89,25 +139,66 @@ export async function GET(request: NextRequest) {
       orderAscending = true;
     }
 
-    // 総件数を取得
-    const { count: totalCount } = await countQuery;
+    // 総件数を取得（フィルタ適用前）
+    const { count: totalCountBeforeFilter } = await countQuery;
 
-    // レビュー一覧を取得
-    const { data: reviewsData, error } = await reviewsQuery
-      .order(orderColumn, { ascending: orderAscending })
-      .range(offset, offset + limit - 1);
+    // レビュー一覧を取得（フィルタ適用前、全件取得してアプリ側でフィルタリング）
+    // 理由: JSONB配列の複雑なフィルタリング（reason_for_choosing）を確実に処理するため
+    const { data: allReviewsData, error: allReviewsError } = await reviewsQuery
+      .order(orderColumn, { ascending: orderAscending });
 
-    if (error) {
-      console.error('レビュー取得エラー:', error);
+    if (allReviewsError) {
+      console.error('レビュー取得エラー:', allReviewsError);
       return NextResponse.json(
         { error: 'レビューの取得に失敗しました' },
         { status: 500 }
       );
     }
 
+    // アプリ側でフィルタリング（reason_for_choosingのOR条件、都道府県の配列対応など）
+    let filteredReviews = (allReviewsData || []).filter((review: any) => {
+      // reason_for_choosingのフィルタリング（OR条件）
+      if (reasonForChoosingArray && reasonForChoosingArray.length > 0) {
+        const answers = review.answers || {};
+        const reviewReasons = Array.isArray(answers.reason_for_choosing)
+          ? answers.reason_for_choosing
+          : [];
+        
+        // 選択された理由のいずれかが含まれているかチェック（OR条件）
+        const hasMatchingReason = reasonForChoosingArray.some((filterReason) =>
+          reviewReasons.includes(filterReason)
+        );
+        
+        if (!hasMatchingReason) {
+          return false;
+        }
+      }
+
+      // 都道府県のフィルタリング（配列対応）
+      if (campusPrefecture) {
+        const answers = review.answers || {};
+        const reviewPrefecture = answers.campus_prefecture;
+        if (Array.isArray(reviewPrefecture)) {
+          if (!reviewPrefecture.includes(campusPrefecture)) {
+            return false;
+          }
+        } else if (String(reviewPrefecture).trim() !== campusPrefecture) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // フィルタ後の総件数
+    const totalCount = filteredReviews.length;
+
+    // ページネーション
+    const paginatedReviews = filteredReviews.slice(offset, offset + limit);
+
     // 各口コミのいいね数を取得
     const reviews = await Promise.all(
-      (reviewsData || []).map(async (review: any) => {
+      (paginatedReviews || []).map(async (review: any) => {
         const { count: likeCount } = await supabase
           .from('review_likes')
           .select('*', { count: 'exact', head: true })
@@ -141,6 +232,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       reviews,
       total: totalCount || 0,
+      total_before_filter: totalCountBeforeFilter || 0, // フィルタ前の総件数
       page,
       total_pages: totalPages,
       limit,

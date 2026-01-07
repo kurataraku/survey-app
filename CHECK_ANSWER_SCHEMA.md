@@ -43,3 +43,8 @@ ON CONFLICT (key) DO NOTHING;
 3. `normalizeAnswers`関数のログで`campus_prefecture`が正しく処理されているか確認
 
 
+
+
+
+
+

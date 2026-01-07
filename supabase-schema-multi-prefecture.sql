@@ -24,3 +24,8 @@ COMMENT ON COLUMN schools.prefectures IS '都道府県の配列（複数の都�
 COMMENT ON COLUMN schools.prefecture IS '都道府県（後方互換性のため保持、prefectures[0]と同期）';
 
 
+
+
+
+
+

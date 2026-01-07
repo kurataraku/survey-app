@@ -43,3 +43,8 @@ COMMENT ON COLUMN survey_responses.is_public IS '公開フラグ';
 
 
 
+
+
+
+
+
