@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { surveySchema, SurveyFormData } from '@/lib/schema';
@@ -13,6 +13,7 @@ export default function SurveyPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const submittedMessageRef = useRef<HTMLDivElement>(null);
 
   const {
     control,
@@ -33,6 +34,27 @@ export default function SurveyPage() {
   });
 
   const currentStepQuestions = questions.filter((q) => q.step === currentStep);
+
+  // フィールド名からステップ番号を取得する関数
+  const getStepForField = (fieldName: string): number => {
+    const question = questions.find((q) => q.id === fieldName);
+    if (question) {
+      return question.step;
+    }
+    // school_idはschool_nameと同じStep1に属する
+    if (fieldName === 'school_id') {
+      return 1;
+    }
+    // その他の条件付きフィールドのステップを判定
+    if (fieldName === 'graduation_path_other') {
+      return 1; // graduation_pathと同じStep1
+    }
+    if (fieldName === 'atmosphere_other') {
+      return 2; // student_atmosphereと同じStep2
+    }
+    // デフォルトは現在のステップ
+    return currentStep;
+  };
 
   // 条件付きフィールドが表示されているかどうかをチェック
   const shouldShowQuestion = (question: typeof questions[0]): boolean => {
@@ -73,6 +95,12 @@ export default function SurveyPage() {
       fieldsToValidate.push('atmosphere_other');
     }
 
+    // school_nameが入力されている場合、school_idもバリデーション対象に追加
+    const schoolName = watch('school_name');
+    if (schoolName && schoolName.trim().length > 0) {
+      fieldsToValidate.push('school_id');
+    }
+
     // バリデーション実行
     const isValid = await trigger(fieldsToValidate as any);
     
@@ -81,13 +109,70 @@ export default function SurveyPage() {
       // スクロールをトップに
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (!isValid) {
-      // バリデーションエラーがある場合、最初のエラーフィールドにスクロール＆フォーカス
+      // バリデーションエラーがある場合、最初のエラーフィールドが属するステップに戻る
       const firstErrorField = Object.keys(errors)[0];
       if (firstErrorField) {
-        const errorElement = document.querySelector(`[name="${firstErrorField}"]`) as HTMLElement;
-        if (errorElement) {
-          errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          errorElement.focus();
+        const errorStep = getStepForField(firstErrorField);
+        
+        // エラーフィールドが属するステップに戻る
+        if (errorStep !== currentStep) {
+          setCurrentStep(errorStep);
+          // ステップ変更後にフィールドにスクロール＆フォーカス（複数回試行して確実に）
+          setTimeout(() => {
+            const scrollToErrorField = () => {
+              // school_idエラーの場合はschool_nameフィールドを探す
+              const fieldNameToFind = firstErrorField === 'school_id' ? 'school_name' : firstErrorField;
+              const errorElement = document.querySelector(`[name="${fieldNameToFind}"]`) as HTMLElement;
+              const errorContainer = document.querySelector(`[data-question-id="${fieldNameToFind}"]`) as HTMLElement;
+              
+              if (errorElement || errorContainer) {
+                const targetElement = errorContainer || errorElement;
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (errorElement) {
+                  // 少し遅延を入れてフォーカス（スクロール完了後）
+                  setTimeout(() => {
+                    errorElement.focus();
+                    // エラー表示をハイライト
+                    if (errorContainer) {
+                      errorContainer.style.transition = 'all 0.3s ease';
+                      errorContainer.style.backgroundColor = 'rgba(239, 68, 68, 0.05)';
+                      setTimeout(() => {
+                        errorContainer.style.backgroundColor = '';
+                      }, 2000);
+                    }
+                  }, 300);
+                }
+              }
+            };
+            
+            // 複数回試行して確実にスクロール（レンダリング完了を待つ）
+            scrollToErrorField();
+            setTimeout(scrollToErrorField, 200);
+            setTimeout(scrollToErrorField, 500);
+          }, 100);
+        } else {
+          // 同じステップ内の場合は、そのフィールドにスクロール＆フォーカス
+          const fieldNameToFind = firstErrorField === 'school_id' ? 'school_name' : firstErrorField;
+          const errorElement = document.querySelector(`[name="${fieldNameToFind}"]`) as HTMLElement;
+          const errorContainer = document.querySelector(`[data-question-id="${fieldNameToFind}"]`) as HTMLElement;
+          
+          if (errorElement || errorContainer) {
+            const targetElement = errorContainer || errorElement;
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (errorElement) {
+              setTimeout(() => {
+                errorElement.focus();
+                // エラー表示をハイライト
+                if (errorContainer) {
+                  errorContainer.style.transition = 'all 0.3s ease';
+                  errorContainer.style.backgroundColor = 'rgba(239, 68, 68, 0.05)';
+                  setTimeout(() => {
+                    errorContainer.style.backgroundColor = '';
+                  }, 2000);
+                }
+              }, 300);
+            }
+          }
         }
       }
     }
@@ -126,6 +211,7 @@ export default function SurveyPage() {
       }
 
       setIsSubmitted(true);
+      // 送信完了後、完了メッセージまでスクロール（useEffectで処理されるため、ここでは最小限の処理）
     } catch (error) {
       console.error('送信エラー:', error);
       alert(error instanceof Error ? error.message : '送信に失敗しました。もう一度お試しください。');
@@ -133,10 +219,40 @@ export default function SurveyPage() {
     }
   };
 
+  // isSubmittedがtrueになったときにスクロール（useEffectで確実に実行）
+  useEffect(() => {
+    if (isSubmitted) {
+      // 複数回試行して確実にスクロール（レンダリング完了を待つ）
+      const scrollToMessage = () => {
+        // まずrefで試行
+        if (submittedMessageRef.current) {
+          submittedMessageRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return true;
+        }
+        // refが取得できない場合は、IDで検索
+        const messageElement = document.getElementById('submitted-message');
+        if (messageElement) {
+          messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return true;
+        }
+        // フォールバック: ページトップにスクロール
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return false;
+      };
+      
+      // レンダリング完了を待つために、より長い遅延で複数回試行
+      scrollToMessage();
+      setTimeout(() => scrollToMessage(), 100);
+      setTimeout(() => scrollToMessage(), 300);
+      setTimeout(() => scrollToMessage(), 600);
+      setTimeout(() => scrollToMessage(), 1000);
+    }
+  }, [isSubmitted]);
+
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-8 text-center">
+        <div id="submitted-message" ref={submittedMessageRef} className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="mb-4">
             <svg
               className="mx-auto h-16 w-16 text-blue-600"
@@ -180,7 +296,7 @@ export default function SurveyPage() {
           </div>
 
           <h1 className="text-3xl font-bold mb-2 text-center text-gray-900">
-            通信制高校リアルレビュー
+            口コミアンケートにご協力ください
           </h1>
           <p className="text-center mb-8 leading-relaxed text-gray-700">
             あなたの経験のシェアが、次に悩む人の力になります。

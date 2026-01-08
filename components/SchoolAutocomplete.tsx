@@ -76,7 +76,7 @@ export default function SchoolAutocomplete({
       console.log('[SchoolAutocomplete] APIレスポンス:', data);
       console.log('[SchoolAutocomplete] 学校数:', data.schools?.length || 0);
       
-      const schools = data.schools || [];
+      const schools = (data.schools || []).filter((school: School) => school.status === 'active'); // 念のため、activeのみをフィルタリング
       setSuggestions(schools);
       
       // 候補がある場合のみ表示
@@ -230,9 +230,13 @@ export default function SchoolAutocomplete({
             className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
             style={{
               borderRadius: 'var(--ce-radius-control)',
-              borderColor: error ? 'var(--ce-warning)' : 'var(--ce-border)',
+              borderColor: error ? '#ef4444' : 'var(--ce-border)',
+              borderWidth: error ? '2px' : '1px',
               fontFamily: 'var(--ce-font-body)',
-              ...(error ? {} : {
+              ...(error ? {
+                backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                '--tw-ring-color': '#ef4444'
+              } : {
                 '--tw-ring-color': 'var(--ce-primary)'
               } as React.CSSProperties)
             }}
@@ -270,11 +274,6 @@ export default function SchoolAutocomplete({
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-gray-900">{school.name}</span>
-                        {school.prefecture && school.prefecture !== '不明' && (
-                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                            {school.prefecture}
-                          </span>
-                        )}
                       </div>
                       {school.status === 'pending' && (
                         <div className="text-xs text-gray-500 mt-1">（仮登録）</div>

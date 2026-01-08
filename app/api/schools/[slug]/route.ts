@@ -51,13 +51,18 @@ export async function GET(
     console.log('[API] /api/schools/[slug] - Slug type:', typeof slug);
     console.log('[API] /api/schools/[slug] - Slug length:', slug?.length);
 
-    // 学校情報を取得
+    // 学校情報を取得（status='active'のみ）
     const { data: school, error: schoolError } = await supabase
       .from('schools')
       .select('*')
       .eq('slug', slug)
       .eq('is_public', true)
+      .eq('status', 'active') // 承認済み（active）のみ
       .single();
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/[slug]/route.ts:60',message:'学校詳細取得:ステータス確認',data:{slug,schoolId:school?.id,schoolStatus:school?.status,found:!!school},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
     if (schoolError || !school) {
       console.log('[API] /api/schools/[slug] - School not found. Error:', schoolError);
@@ -105,17 +110,17 @@ export async function GET(
       );
     }
 
-    // 口コミ数を取得
+    // 口コミ数を取得（school_idでフィルタリング、pending状態の学校の口コミを除外）
     const { count: reviewCount } = await supabase
       .from('survey_responses')
       .select('*', { count: 'exact', head: true })
-      .eq('school_name', school.name);
+      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
 
-    // 評価の平均値を計算
+    // 評価の平均値を計算（school_idでフィルタリング、pending状態の学校の口コミを除外）
     const { data: reviews } = await supabase
       .from('survey_responses')
       .select('overall_satisfaction, answers')
-      .eq('school_name', school.name);
+      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
 
     // overall_satisfactionの平均と外れ値件数を計算
     const overallValues = reviews?.map(r => r.overall_satisfaction) || [];
@@ -268,11 +273,11 @@ export async function GET(
     const globalCampusLifeRatingAvg = averageOrNull(globalCampusLifeRatings);
     const globalTuitionRatingAvg = averageOrNull(globalTuitionRatings);
 
-    // 統計情報を取得するために全口コミを取得（この学校のみ）
+    // 統計情報を取得するために全口コミを取得（この学校のみ、school_idでフィルタリング）
     const { data: allReviewsForStats } = await supabase
       .from('survey_responses')
       .select('respondent_role, status, graduation_path, answers')
-      .eq('school_name', school.name);
+      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
 
     // 基本情報の統計
     const respondentRoleStats = {
@@ -405,11 +410,11 @@ export async function GET(
       ? parseFloat((campusLifeRatings.reduce((sum, r) => sum + r, 0) / campusLifeRatings.length).toFixed(2))
       : null;
 
-    // すべての口コミを取得して、いいね数でソート
+    // すべての口コミを取得して、いいね数でソート（school_idでフィルタリング）
     const { data: allReviews } = await supabase
       .from('survey_responses')
       .select('id, overall_satisfaction, good_comment, bad_comment, created_at')
-      .eq('school_name', school.name);
+      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
 
     // 各口コミのいいね数を取得
     const reviewsWithLikes = await Promise.all(

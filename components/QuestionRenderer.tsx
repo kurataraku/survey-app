@@ -53,6 +53,8 @@ export default function QuestionRenderer({
   }
 
   const error = errors[question.id];
+  // school_nameの場合、school_idのエラーも取得
+  const schoolIdError = question.id === 'school_name' ? errors['school_id'] : null;
   const fieldName = question.id;
 
   return (
@@ -73,9 +75,13 @@ export default function QuestionRenderer({
       </label>
       {/* エラー表示（入力欄の直下に1行だけ表示） */}
       {error && (
-        <p className="mb-2 text-sm" data-error-field={question.id} style={{ 
+        <p className="mb-2 text-sm font-semibold animate-pulse" data-error-field={question.id} style={{ 
           fontFamily: 'var(--ce-font-body)',
-          color: 'var(--ce-warning)'
+          color: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          padding: '8px 12px',
+          borderRadius: '4px',
+          border: '1px solid #ef4444'
         }}>
           {(() => {
             const errorMessage = error.message || '';
@@ -118,7 +124,7 @@ export default function QuestionRenderer({
                 name={fieldName}
                 setValue={setValue}
                 placeholder={question.placeholder}
-                error={error}
+                error={error || schoolIdError}
                 required={question.required}
               />
             );

@@ -86,15 +86,22 @@ export async function POST(request: NextRequest) {
     if (data.school_id) {
       schoolId = data.school_id;
       
-      // 学校名を取得
+      // 学校名とステータスを取得
       const { data: schoolData } = await supabase
         .from('schools')
-        .select('name')
+        .select('name, status')
         .eq('id', schoolId)
         .single();
       
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/submit/route.ts:90',message:'口コミ投稿:学校情報取得',data:{schoolId,schoolName:schoolData?.name,schoolStatus:schoolData?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
       if (schoolData) {
         schoolNameToSave = schoolData.name;
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/submit/route.ts:97',message:'口コミ投稿:学校ステータス確認',data:{schoolId,schoolStatus:schoolData.status,isPending:schoolData.status==='pending',willBeHidden:schoolData.status==='pending'},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
       }
       
       // school_name_inputは「その他」入力時のみ保存

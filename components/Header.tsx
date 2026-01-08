@@ -34,12 +34,12 @@ export default function Header() {
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-24 md:h-28 lg:h-32">
           {/* ロゴ */}
-          <div className="flex items-center">
+          <div className="flex items-start self-start">
             <Link
               href="/"
-              className="flex items-center focus:outline-none focus:ring-0"
+              className="flex items-start focus:outline-none focus:ring-0"
             >
               {/* 視覚障害者向けのテキストラベル */}
               <span className="sr-only">通信制高校リアルレビュー</span>
@@ -47,7 +47,7 @@ export default function Header() {
               <img
                 src="/logo-service.png"
                 alt="通信制高校リアルレビュー"
-                className="h-16 md:h-18 lg:h-20 w-auto"
+                className="h-24 md:h-28 lg:h-32 w-auto block"
               />
             </Link>
           </div>

@@ -6,7 +6,6 @@ import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import { getQuestionLabel } from '@/lib/questionLabels';
-import { getQuestionLabel } from '@/lib/questionLabels';
 
 interface School {
   id: string;

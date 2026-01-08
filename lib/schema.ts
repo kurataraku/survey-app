@@ -19,7 +19,7 @@ const getCommentMinLength = (overallSatisfaction: number | undefined, field: 'go
 // ベーススキーマ（条件分岐なし）
 const baseSchema = z.object({
   school_name: z.string().min(1, '学校名を入力してください'),
-  school_id: z.string().uuid().optional(), // 後方互換のためオプショナル
+  school_id: z.string().uuid().optional(), // 後方互換のためオプショナル（ただし、school_nameが入力されている場合は必須）
   school_name_input: z.string().optional(), // その他入力時の原文
   respondent_role: z.enum(['本人', '保護者']),
   status: z.enum(['在籍中', '卒業した', '以前在籍していた（転校・退学など）']),
@@ -94,6 +94,19 @@ export const surveySchema = baseSchema
     {
       message: 'その他（生徒の雰囲気）を入力してください',
       path: ['atmosphere_other'],
+    }
+  )
+  .refine(
+    (data) => {
+      // school_nameが入力されている場合、school_idは必須（候補から選択するか、追加ボタンを押す必要がある）
+      if (data.school_name && data.school_name.trim().length > 0) {
+        return !!data.school_id && data.school_id.trim().length > 0;
+      }
+      return true;
+    },
+    {
+      message: '候補から学校を選択するか、「追加して続ける」をクリックしてください',
+      path: ['school_id'],
     }
   )
   .superRefine((data, ctx) => {

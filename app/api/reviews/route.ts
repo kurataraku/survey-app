@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       ? reasonForChoosing.split(',').filter((r) => r.trim() !== '')
       : undefined;
 
-    // 学校slugが指定されている場合、学校IDを取得
+    // 学校slugが指定されている場合、学校IDを取得（status='active'のみ）
     let schoolId: string | null = null;
     if (schoolSlug) {
       const decodedSlug = decodeURIComponent(schoolSlug);
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         .select('id')
         .eq('slug', decodedSlug)
         .eq('is_public', true)
+        .eq('status', 'active') // 承認済み（active）のみ
         .single();
       
       if (school) {
@@ -59,10 +60,12 @@ export async function GET(request: NextRequest) {
     }
 
     // クエリビルダーを作成
+    // pending状態の学校の口コミを除外するため、school_idが存在し、かつschoolsテーブルでstatus='active'の学校のみを対象とする
     let countQuery = supabase
       .from('survey_responses')
       .select('*', { count: 'exact', head: true })
-      .eq('is_public', true);
+      .eq('is_public', true)
+      .not('school_id', 'is', null); // school_idがnullの口コミは除外
 
     let reviewsQuery = supabase
       .from('survey_responses')
@@ -79,24 +82,16 @@ export async function GET(request: NextRequest) {
         respondent_role,
         graduation_path,
         answers,
-        schools(id, name, slug)
+        schools(id, name, slug, status)
       `)
-      .eq('is_public', true);
+      .eq('is_public', true)
+      .not('school_id', 'is', null); // school_idがnullの口コミは除外
 
-    // 学校でフィルタリング（school_nameを使用、school_idカラムが存在しない可能性があるため）
+    // 学校でフィルタリング（school_idを使用）
     if (schoolId) {
-      // school_nameを取得
-      const { data: schoolData } = await supabase
-        .from('schools')
-        .select('name')
-        .eq('id', schoolId)
-        .single();
-      
-      if (schoolData?.name) {
-        // school_nameでフィルタリング
-        countQuery = countQuery.eq('school_name', schoolData.name);
-        reviewsQuery = reviewsQuery.eq('school_name', schoolData.name);
-      }
+      // school_idでフィルタリング
+      countQuery = countQuery.eq('school_id', schoolId);
+      reviewsQuery = reviewsQuery.eq('school_id', schoolId);
     }
 
     // フィルタリング: 通常カラム
@@ -155,8 +150,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // アプリ側でフィルタリング（reason_for_choosingのOR条件、都道府県の配列対応など）
+    // アプリ側でフィルタリング（reason_for_choosingのOR条件、都道府県の配列対応、pending状態の学校の口コミ除外など）
     let filteredReviews = (allReviewsData || []).filter((review: any) => {
+      // pending状態の学校の口コミを除外
+      const school = Array.isArray(review.schools) ? review.schools[0] : review.schools;
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/reviews/route.ts:159',message:'口コミフィルタリング:学校ステータス確認',data:{reviewId:review.id,schoolId:review.school_id,schoolStatus:school?.status,willInclude:school?.status==='active'},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      if (!school || school.status !== 'active') {
+        return false; // 学校が存在しない、またはstatusが'active'でない場合は除外
+      }
+
       // reason_for_choosingのフィルタリング（OR条件）
       if (reasonForChoosingArray && reasonForChoosingArray.length > 0) {
         const answers = review.answers || {};

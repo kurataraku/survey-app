@@ -28,14 +28,19 @@ export async function GET(request: NextRequest) {
     const normalizedQuery = normalizeSearchQuery(q);
 
     // 学校名での部分一致検索（最大10件）
-    // 正規化されたクエリで検索
+    // 正規化されたクエリで検索（status='active'のみ）
     const { data: schools, error } = await supabase
       .from('schools')
-      .select('id, name, prefecture, slug')
+      .select('id, name, prefecture, slug, status')
       .eq('is_public', true)
+      .eq('status', 'active') // 承認済み（active）のみ
       .ilike('name', `%${normalizedQuery}%`)
       .order('name', { ascending: true })
       .limit(10);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:36',message:'オートコンプリート:学校検索結果',data:{query:normalizedQuery,schoolsCount:schools?.length||0,allActive:schools?.every(s=>s.status==='active')},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
 
     if (error) {
       console.error('学校検索エラー:', error);
@@ -45,12 +50,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const suggestions = (schools || []).map((school) => ({
-      id: school.id,
-      name: school.name,
-      prefecture: school.prefecture,
-      slug: school.slug,
-    }));
+    // 念のため、activeのみをフィルタリング（クエリで既にフィルタリング済みだが、二重チェック）
+    const suggestions = (schools || [])
+      .filter((school) => school.status === 'active')
+      .map((school) => ({
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        slug: school.slug,
+      }));
 
     return NextResponse.json({ suggestions });
   } catch (error) {

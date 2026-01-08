@@ -54,3 +54,4 @@ COMMENT ON COLUMN aggregates.updated_at IS '最終更新日時';
 
 
 
+

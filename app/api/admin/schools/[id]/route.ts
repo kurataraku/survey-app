@@ -77,7 +77,12 @@ export async function PUT(
       highlights,
       faq,
       is_public,
+      status,
     } = body;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/[id]/route.ts:70',message:'学校更新API:リクエスト受信',data:{id,status,hasStatus:!!status},timestamp:Date.now(),sessionId:'debug-session',runId:'status-update',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     // バリデーション
     if (!name || !prefecture || !slug) {
@@ -133,6 +138,49 @@ export async function PUT(
       faq: faq || null,
       is_public: is_public !== undefined ? is_public : true,
     };
+    
+    // statusが指定されている場合は更新に含める
+    if (status !== undefined) {
+      updateData.status = status;
+    }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/[id]/route.ts:135',message:'学校更新API:更新データ準備',data:{id,updateData,hasStatus:!!updateData.status,status:updateData.status},timestamp:Date.now(),sessionId:'debug-session',runId:'status-update',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    // statusが'pending'から'active'に変更される場合、school_nameで紐づいている口コミのschool_idを更新
+    if (status === 'active') {
+      // 現在の学校情報を取得（更新前）
+      const { data: currentSchool } = await supabase
+        .from('schools')
+        .select('name, status')
+        .eq('id', id)
+        .single();
+      
+      // 現在のstatusが'pending'の場合、school_nameで紐づいている口コミのschool_idを更新
+      if (currentSchool && currentSchool.status === 'pending') {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/[id]/route.ts:143',message:'学校更新API:口コミ紐づけ開始',data:{id,schoolName:currentSchool.name},timestamp:Date.now(),sessionId:'debug-session',runId:'status-update',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        // school_nameで紐づいているが、school_idがnullの口コミを更新
+        const { data: updatedReviews, error: updateReviewsError } = await supabase
+          .from('survey_responses')
+          .update({ school_id: id })
+          .eq('school_name', currentSchool.name)
+          .is('school_id', null)
+          .select('id');
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/[id]/route.ts:151',message:'学校更新API:口コミ紐づけ完了',data:{id,updatedReviewsCount:updatedReviews?.length||0,error:updateReviewsError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'status-update',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        if (updateReviewsError) {
+          console.error('口コミ紐づけエラー:', updateReviewsError);
+          // エラーが発生しても続行（学校の更新は実行される）
+        }
+      }
+    }
 
     const { data: school, error: updateError } = await supabase
       .from('schools')
@@ -142,12 +190,19 @@ export async function PUT(
       .single();
 
     if (updateError) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/[id]/route.ts:145',message:'学校更新API:更新エラー',data:{id,updateError:updateError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'status-update',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       console.error('学校更新エラー:', updateError);
       return NextResponse.json(
         { error: '学校情報の更新に失敗しました', details: updateError.message },
         { status: 500 }
       );
     }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/[id]/route.ts:152',message:'学校更新API:更新成功',data:{id,schoolId:school?.id,schoolStatus:school?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'status-update',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     return NextResponse.json(school);
   } catch (error) {

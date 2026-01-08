@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:5',message:'ホームページAPI開始',data:{timestamp:startTime},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     console.log('[API] /api/home - リクエスト開始');
     console.log('[API] /api/home - タイムスタンプ:', new Date().toISOString());
     
@@ -32,13 +37,18 @@ export async function GET(request: NextRequest) {
     console.log('[API] /api/home - 学校一覧を取得中');
     // prefectures配列も取得を試みる（マイグレーション未実行時はエラーになる可能性があるため、エラーハンドリングを追加）
     let allSchools: any[] | null = null;
-    let schoolsError: any = null;
+    let schoolsFetchError: any | null = null;
     
-    // まずprefecturesを含めて取得を試みる
+    // まずprefecturesを含めて取得を試みる（status='active'のみ）
     const resultWithPrefectures = await supabase
       .from('schools')
-      .select('id, name, prefecture, prefectures, slug')
-      .eq('is_public', true);
+      .select('id, name, prefecture, prefectures, slug, status')
+      .eq('is_public', true)
+      .eq('status', 'active'); // 承認済み（active）のみ
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:42',message:'ホームページ:学校一覧取得',data:{schoolsCount:resultWithPrefectures.data?.length||0,allActive:resultWithPrefectures.data?.every(s=>s.status==='active')},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
     
     // prefecturesカラムが存在しない場合（エラーコード42703: undefined_column）は、prefectureのみで再試行
     if (resultWithPrefectures.error) {
@@ -55,28 +65,29 @@ export async function GET(request: NextRequest) {
         const resultWithoutPrefectures = await supabase
           .from('schools')
           .select('id, name, prefecture, slug')
-          .eq('is_public', true);
+          .eq('is_public', true)
+          .eq('status', 'active'); // 承認済み（active）のみ
         allSchools = resultWithoutPrefectures.data;
-        schoolsError = resultWithoutPrefectures.error;
+        schoolsFetchError = resultWithoutPrefectures.error;
       } else {
         // その他のエラーの場合
         allSchools = resultWithPrefectures.data;
-        schoolsError = resultWithPrefectures.error;
+        schoolsFetchError = resultWithPrefectures.error;
       }
     } else {
       // エラーがない場合
       allSchools = resultWithPrefectures.data;
-      schoolsError = null;
+      schoolsFetchError = null;
     }
 
-    if (schoolsError) {
-      console.error('[API] /api/home - 学校一覧取得エラー:', schoolsError);
-      console.error('[API] /api/home - エラーコード:', schoolsError.code);
-      console.error('[API] /api/home - エラーメッセージ:', schoolsError.message);
-      console.error('[API] /api/home - エラー詳細:', JSON.stringify(schoolsError, null, 2));
+    if (schoolsFetchError) {
+      console.error('[API] /api/home - 学校一覧取得エラー:', schoolsFetchError);
+      console.error('[API] /api/home - エラーコード:', schoolsFetchError.code);
+      console.error('[API] /api/home - エラーメッセージ:', schoolsFetchError.message);
+      console.error('[API] /api/home - エラー詳細:', JSON.stringify(schoolsFetchError, null, 2));
       
       // テーブルが存在しない場合は空配列を返す
-      if (schoolsError.code === '42P01' || schoolsError.message?.includes('does not exist') || schoolsError.message?.includes('relation') || schoolsError.message?.includes('table')) {
+      if (schoolsFetchError.code === '42P01' || schoolsFetchError.message?.includes('does not exist') || schoolsFetchError.message?.includes('relation') || schoolsFetchError.message?.includes('table')) {
         console.warn('[API] /api/home - schoolsテーブルが存在しないようです。空の結果を返します。');
         return NextResponse.json({
           topRankedSchools: [],
@@ -89,9 +100,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           error: '学校一覧の取得に失敗しました', 
-          details: schoolsError.message, 
-          code: schoolsError.code,
-          hint: schoolsError.code === '42P01' ? 'schoolsテーブルが存在しない可能性があります。Supabaseでテーブルを作成してください。' : undefined
+          details: schoolsFetchError.message, 
+          code: schoolsFetchError.code,
+          hint: schoolsFetchError.code === '42P01' ? 'schoolsテーブルが存在しない可能性があります。Supabaseでテーブルを作成してください。' : undefined
         },
         { status: 500 }
       );
@@ -99,72 +110,77 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] /api/home - 学校数:', allSchools?.length || 0);
 
-    console.log('[API] /api/home - 学校統計を計算中');
-    const schoolsWithStats = await Promise.all(
-      (allSchools || []).map(async (school) => {
-        try {
-          const { count: reviewCount, error: countError } = await supabase
-            .from('survey_responses')
-            .select('*', { count: 'exact', head: true })
-            .eq('school_name', school.name);
-
-          if (countError) {
-            console.warn(`[API] /api/home - 口コミ数取得エラー (${school.name}):`, countError);
-          }
-
-          const { data: reviews, error: reviewsError } = await supabase
-            .from('survey_responses')
-            .select('overall_satisfaction')
-            .eq('school_name', school.name)
-            .not('overall_satisfaction', 'is', null);
-
-          if (reviewsError) {
-            console.warn(`[API] /api/home - 評価取得エラー (${school.name}):`, reviewsError);
-          }
-
-        // 評価値6（該当なし）を除外し、1-5の範囲のみで平均を計算
-        const validRatings = reviews
-          ?.filter(r => r.overall_satisfaction !== null && r.overall_satisfaction !== 6 && r.overall_satisfaction >= 1 && r.overall_satisfaction <= 5)
-          .map(r => r.overall_satisfaction) || [];
-
-        const overallAvg = validRatings.length > 0
-          ? validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length
-          : null;
-
-          const prefecturesArray = (school.prefectures && Array.isArray(school.prefectures) && school.prefectures.length > 0) 
-            ? school.prefectures 
-            : null;
-          
-          // デバッグログ（N高の場合のみ）
-          if (school.name === 'N高') {
-            console.log(`[API] /api/home - N高のprefectures:`, school.prefectures);
-            console.log(`[API] /api/home - N高のprefecturesArray:`, prefecturesArray);
-            console.log(`[API] /api/home - N高のprefecture:`, school.prefecture);
-          }
-          
-          return {
-            id: school.id,
-            name: school.name,
-            prefecture: school.prefecture,
-            prefectures: prefecturesArray,
-            slug: school.slug,
-            review_count: reviewCount || 0,
-            overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
-          };
-        } catch (error) {
-          console.error(`[API] /api/home - 学校統計計算エラー (${school.name}):`, error);
-          return {
-            id: school.id,
-            name: school.name,
-            prefecture: school.prefecture,
-            prefectures: (school.prefectures && Array.isArray(school.prefectures) && school.prefectures.length > 0) ? school.prefectures : null, // マイグレーション未実行時はnull
-            slug: school.slug,
-            review_count: 0,
-            overall_avg: null,
-          };
-        }
-      })
-    );
+    const schoolsStatsStartTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:108',message:'学校統計計算開始',data:{schoolsCount:allSchools?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    console.log('[API] /api/home - 学校統計を計算中（最適化版）');
+    
+    // 最適化: 1回のクエリで全学校の統計を取得
+    const schoolIds = (allSchools || []).map(s => s.id);
+    
+    // 口コミ数と評価を1回のクエリで取得
+    const { data: allReviewsStats, error: reviewsStatsError } = await supabase
+      .from('survey_responses')
+      .select('school_id, overall_satisfaction')
+      .in('school_id', schoolIds)
+      .eq('is_public', true)
+      .not('school_id', 'is', null);
+    
+    if (reviewsStatsError) {
+      console.warn('[API] /api/home - 口コミ統計取得エラー:', reviewsStatsError);
+    }
+    
+    // 学校IDごとに集計
+    const statsMap = new Map<string, { count: number; ratings: number[] }>();
+    
+    (allReviewsStats || []).forEach((review: any) => {
+      if (!review.school_id) return;
+      
+      const schoolId = review.school_id;
+      if (!statsMap.has(schoolId)) {
+        statsMap.set(schoolId, { count: 0, ratings: [] });
+      }
+      
+      const stats = statsMap.get(schoolId)!;
+      stats.count++;
+      
+      // 評価値6（該当なし）を除外し、1-5の範囲のみを集計
+      if (review.overall_satisfaction !== null && 
+          review.overall_satisfaction !== 6 && 
+          review.overall_satisfaction >= 1 && 
+          review.overall_satisfaction <= 5) {
+        stats.ratings.push(review.overall_satisfaction);
+      }
+    });
+    
+    // 学校データと統計を結合
+    const schoolsWithStats = (allSchools || []).map((school) => {
+      const prefecturesArray = (school.prefectures && Array.isArray(school.prefectures) && school.prefectures.length > 0) 
+        ? school.prefectures 
+        : null;
+      
+      const stats = statsMap.get(school.id) || { count: 0, ratings: [] };
+      const overallAvg = stats.ratings.length > 0
+        ? stats.ratings.reduce((sum, r) => sum + r, 0) / stats.ratings.length
+        : null;
+      
+      return {
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        prefectures: prefecturesArray,
+        slug: school.slug,
+        review_count: stats.count,
+        overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
+      };
+    });
+    
+    const schoolsStatsEndTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:175',message:'学校統計計算全体完了',data:{schoolsCount:allSchools?.length||0,totalDuration:schoolsStatsEndTime-schoolsStatsStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     // 評価順でソート（評価あり、口コミ数3件以上）
     const rankedSchools = schoolsWithStats
@@ -184,10 +200,12 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] /api/home - 口コミ一覧を取得中');
     // 2. 注目の口コミ（いいね数順）3件を取得
+    // pending状態の学校の口コミを除外するため、school_idが存在する口コミのみを取得
     const { data: allReviewsData, error: reviewsDataError } = await supabase
       .from('survey_responses')
       .select(`
         id,
+        school_id,
         school_name,
         status,
         overall_satisfaction,
@@ -195,7 +213,9 @@ export async function GET(request: NextRequest) {
         bad_comment,
         created_at,
         answers
-      `);
+      `)
+      .eq('is_public', true)
+      .not('school_id', 'is', null); // school_idがnullの口コミは除外
 
     if (reviewsDataError) {
       console.error('[API] /api/home - 口コミ一覧取得エラー:', reviewsDataError);
@@ -204,53 +224,76 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] /api/home - 口コミ数:', allReviewsData?.length || 0);
     
-    // 学校情報を取得するために、school_nameでschoolsテーブルと結合
-    const reviewsWithSchools = await Promise.all(
-      (allReviewsData || []).map(async (review: any) => {
-        let school = null;
-        if (review.school_name) {
-          const { data: schoolData, error: schoolError } = await supabase
-            .from('schools')
-            .select('id, name, slug')
-            .eq('name', review.school_name)
-            .eq('is_public', true)
-            .maybeSingle();
-          
-          // エラーが発生した場合（PGRST116は「行が見つからない」エラーで正常）
-          if (schoolError && schoolError.code !== 'PGRST116') {
-            console.warn('学校検索エラー:', schoolError);
-          } else {
-            school = schoolData;
-          }
-        }
-        return {
-          ...review,
-          school_id: school?.id || null,
-          schools: school,
-        };
-      })
-    );
+    const reviewsWithSchoolsStartTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:220',message:'口コミ学校情報取得開始',data:{reviewsCount:allReviewsData?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    // 最適化: school_idを使用して学校情報を一括取得
+    const reviewSchoolIds = [...new Set((allReviewsData || [])
+      .map((r: any) => r.school_id)
+      .filter((id: any) => id !== null))];
+    
+    // 学校情報を一括取得
+    const { data: schoolsData, error: schoolsError } = await supabase
+      .from('schools')
+      .select('id, name, slug, status')
+      .in('id', reviewSchoolIds)
+      .eq('is_public', true)
+      .eq('status', 'active');
+    
+    if (schoolsError) {
+      console.warn('[API] /api/home - 学校情報一括取得エラー:', schoolsError);
+    }
+    
+    // 学校IDをキーとするマップを作成
+    const schoolsMap = new Map<string, any>();
+    (schoolsData || []).forEach((school: any) => {
+      schoolsMap.set(school.id, school);
+    });
+    
+    // 口コミデータに学校情報を結合
+    const reviewsWithSchools = (allReviewsData || []).map((review: any) => {
+      const school = review.school_id ? schoolsMap.get(review.school_id) || null : null;
+      return {
+        ...review,
+        school_id: school?.id || review.school_id || null,
+        schools: school,
+      };
+    });
+    
+    const reviewsWithSchoolsEndTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:250',message:'口コミ学校情報取得全体完了',data:{reviewsCount:allReviewsData?.length||0,totalDuration:reviewsWithSchoolsEndTime-reviewsWithSchoolsStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
 
+    const reviewsWithLikesStartTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:252',message:'口コミいいね数取得開始',data:{reviewsCount:reviewsWithSchools?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
+    // 最適化: 全口コミのいいね数を1回のクエリで取得
+    const reviewIds = (reviewsWithSchools || []).map((r: any) => r.id);
+    
+    const { data: allLikes, error: likesError } = await supabase
+      .from('review_likes')
+      .select('review_id')
+      .in('review_id', reviewIds);
+    
+    if (likesError) {
+      console.warn('[API] /api/home - いいね数一括取得エラー（テーブルが存在しない可能性があります）:', likesError);
+    }
+    
+    // 口コミIDごとによいね数を集計
+    const likesMap = new Map<string, number>();
+    (allLikes || []).forEach((like: any) => {
+      const reviewId = like.review_id;
+      likesMap.set(reviewId, (likesMap.get(reviewId) || 0) + 1);
+    });
+    
     // 各口コミのいいね数を取得
-    const reviewsWithLikes = await Promise.all(
-      (reviewsWithSchools || []).map(async (review: any) => {
-        let likeCount = 0;
-        try {
-          const { count, error: likesError } = await supabase
-            .from('review_likes')
-            .select('*', { count: 'exact', head: true })
-            .eq('review_id', review.id);
-          
-          if (likesError) {
-            console.warn('いいね数取得エラー（テーブルが存在しない可能性があります）:', likesError);
-            likeCount = 0;
-          } else {
-            likeCount = count || 0;
-          }
-        } catch (error) {
-          console.warn('いいね数取得でエラーが発生しました:', error);
-          likeCount = 0;
-        }
+    const reviewsWithLikes = (reviewsWithSchools || []).map((review: any) => {
+        const likeCount = likesMap.get(review.id) || 0;
 
         const school = review.schools;
         
@@ -365,11 +408,24 @@ export async function GET(request: NextRequest) {
             slug: school.slug,
           } : null,
         };
-      })
-    );
+      });
+    
+    const reviewsWithLikesEndTime = Date.now();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:386',message:'口コミいいね数取得全体完了',data:{reviewsCount:reviewsWithSchools?.length||0,totalDuration:reviewsWithLikesEndTime-reviewsWithLikesStartTime},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
-    // いいね数順でソートして上位3件を取得
+    // いいね数順でソートして上位3件を取得（pending状態の学校の口コミを除外）
     const latestReviews = reviewsWithLikes
+      .filter((review) => {
+        // 学校が見つからない（pending状態の学校）またはstatusが'active'でない口コミを除外
+        const school = review.schools;
+        const shouldInclude = school && school.status === 'active';
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:373',message:'ホームページ:口コミフィルタリング',data:{reviewId:review.id,schoolName:review.school_name,schoolStatus:school?.status,shouldInclude},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        return shouldInclude;
+      })
       .sort((a, b) => b.like_count - a.like_count)
       .slice(0, 3);
 
@@ -402,7 +458,14 @@ export async function GET(request: NextRequest) {
       latestArticles = [];
     }
 
+    const endTime = Date.now();
+    const totalDuration = endTime - startTime;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/home/route.ts:431',message:'ホームページAPI完了',data:{totalDuration},timestamp:Date.now(),sessionId:'debug-session',runId:'performance-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     console.log('[API] /api/home - レスポンス準備完了');
+    console.log('[API] /api/home - 総実行時間:', totalDuration, 'ms');
     const responseData = {
       topRankedSchools: rankedSchools || [],
       popularSchools: popularSchools || [],
