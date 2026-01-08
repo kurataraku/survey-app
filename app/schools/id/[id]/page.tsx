@@ -227,22 +227,25 @@ export default function SchoolDetailByIdPage() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">現在の状況</h3>
                 <div className="space-y-2">
-                  {Object.entries(school.statistics.status).map(([status, count]) => (
-                    <div key={status}>
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm text-gray-600">{status}</span>
-                        <span className="text-sm font-medium text-gray-900">
-                          {count}件 ({Math.round((count / school.review_count) * 100)}%)
-                        </span>
+                  {Object.entries(school.statistics.status).map(([status, count]) => {
+                    const countNum = typeof count === 'number' ? count : 0;
+                    return (
+                      <div key={status}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm text-gray-600">{status}</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {countNum}件 ({Math.round((countNum / school.review_count) * 100)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-1.5 rounded-full transition-all"
+                            style={{ width: `${(countNum / school.review_count) * 100}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-1.5 rounded-full transition-all"
-                          style={{ width: `${(count / school.review_count) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -252,13 +255,13 @@ export default function SchoolDetailByIdPage() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">通信制を選んだ理由</h3>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(school.statistics.reason_for_choosing)
-                      .sort(([, a], [, b]) => b - a)
+                      .sort(([, a], [, b]) => (typeof b === 'number' ? b : 0) - (typeof a === 'number' ? a : 0))
                       .map(([reason, count]) => (
                         <span
                           key={reason}
                           className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
                         >
-                          {reason} ({count})
+                          {reason} ({typeof count === 'number' ? count : 0})
                         </span>
                       ))}
                   </div>
@@ -271,23 +274,26 @@ export default function SchoolDetailByIdPage() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">主な通学頻度</h3>
                   <div className="space-y-2">
                     {Object.entries(school.statistics.attendance_frequency)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([frequency, count]) => (
-                        <div key={frequency}>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm text-gray-600">{frequency}</span>
-                            <span className="text-sm font-medium text-gray-900">
-                              {count}件 ({Math.round((count / school.review_count) * 100)}%)
-                            </span>
+                      .sort(([, a], [, b]) => (typeof b === 'number' ? b : 0) - (typeof a === 'number' ? a : 0))
+                      .map(([frequency, count]) => {
+                        const countNum = typeof count === 'number' ? count : 0;
+                        return (
+                          <div key={frequency}>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm text-gray-600">{frequency}</span>
+                              <span className="text-sm font-medium text-gray-900">
+                                {countNum}件 ({Math.round((countNum / school.review_count) * 100)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-1.5 rounded-full transition-all"
+                                style={{ width: `${(countNum / school.review_count) * 100}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-1.5 rounded-full transition-all"
-                              style={{ width: `${(count / school.review_count) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               )}
@@ -298,13 +304,13 @@ export default function SchoolDetailByIdPage() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">授業のスタイル</h3>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(school.statistics.teaching_style)
-                      .sort(([, a], [, b]) => b - a)
+                      .sort(([, a], [, b]) => (typeof b === 'number' ? b : 0) - (typeof a === 'number' ? a : 0))
                       .map(([style, count]) => (
                         <span
                           key={style}
                           className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
                         >
-                          {getQuestionLabel('teaching_style', style)} ({count})
+                          {getQuestionLabel('teaching_style', style)} ({typeof count === 'number' ? count : 0})
                         </span>
                       ))}
                   </div>
@@ -317,13 +323,13 @@ export default function SchoolDetailByIdPage() {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">生徒の雰囲気</h3>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(school.statistics.student_atmosphere)
-                      .sort(([, a], [, b]) => b - a)
+                      .sort(([, a], [, b]) => (typeof b === 'number' ? b : 0) - (typeof a === 'number' ? a : 0))
                       .map(([atmosphere, count]) => (
                         <span
                           key={atmosphere}
                           className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm"
                         >
-                          {getQuestionLabel('student_atmosphere', atmosphere)} ({count})
+                          {getQuestionLabel('student_atmosphere', atmosphere)} ({typeof count === 'number' ? count : 0})
                         </span>
                       ))}
                   </div>

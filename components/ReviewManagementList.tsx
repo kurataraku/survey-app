@@ -369,7 +369,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                             } else {
                               setEditFormData({
                                 ...editFormData,
-                                campus_prefecture: currentPrefectures.filter((p) => p !== pref),
+                                campus_prefecture: currentPrefectures.filter((p: string) => p !== pref),
                               });
                             }
                           }}
