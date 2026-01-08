@@ -4,7 +4,7 @@ import { normalizeText } from '@/lib/utils';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,7 +18,7 @@ export async function GET(
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const schoolId = params.id;
+    const { id: schoolId } = await params;
 
     const { data: aliases, error } = await supabase
       .from('school_aliases')
@@ -46,7 +46,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,7 +60,7 @@ export async function POST(
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const schoolId = params.id;
+    const { id: schoolId } = await params;
 
     const body = await request.json();
     const { alias } = body;
@@ -118,7 +118,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -132,7 +132,7 @@ export async function DELETE(
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const schoolId = params.id;
+    const { id: schoolId } = await params;
 
     const searchParams = request.nextUrl.searchParams;
     const aliasId = searchParams.get('alias_id');

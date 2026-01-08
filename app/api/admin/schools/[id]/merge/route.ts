@@ -4,7 +4,7 @@ import { normalizeText } from '@/lib/utils';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -18,7 +18,7 @@ export async function POST(
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const sourceSchoolId = params.id;
+    const { id: sourceSchoolId } = await params;
 
     const body = await request.json();
     const { target_school_id } = body;
