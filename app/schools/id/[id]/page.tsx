@@ -21,6 +21,11 @@ interface School {
   atmosphere_fit_rating_avg: number | null;
   credit_rating_avg: number | null;
   tuition_rating_avg: number | null;
+  flexibility_rating_avg: number | null;
+  support_rating_avg: number | null;
+  unique_course_rating_avg: number | null;
+  career_support_rating_avg: number | null;
+  campus_life_rating_avg: number | null;
   outlier_counts?: {
     overall: number;
     staff: number;
@@ -28,6 +33,7 @@ interface School {
     credit: number;
     tuition: number;
   };
+  statistics?: any;
   latest_reviews: Array<{
     id: string;
     overall_satisfaction: number;
