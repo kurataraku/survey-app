@@ -8,6 +8,7 @@ export interface School {
   highlights: string[] | null; // JSONB配列
   faq: Array<{ question: string; answer: string }> | null; // JSONB配列
   is_public: boolean;
+  status?: string; // 'active' | 'pending' | 'merged'
   created_at: string;
   updated_at: string;
 }
