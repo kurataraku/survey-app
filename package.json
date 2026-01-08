@@ -10,7 +10,8 @@
     "seed:schools": "tsx scripts/seedSchoolsFromCsv.ts",
     "migrate:schools": "tsx scripts/migrateExistingSchoolNames.ts",
     "recalculate-aggregates": "tsx scripts/recalculate-aggregates.ts",
-    "check-env": "tsx scripts/check-env.ts"
+    "check-env": "tsx scripts/check-env.ts",
+    "delete-dummy-data": "tsx scripts/delete-dummy-data.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

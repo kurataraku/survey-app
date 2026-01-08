@@ -65,25 +65,28 @@ async function recalculateAggregates() {
 
       // 学校テーブルを更新
       // 注意: review_count, overall_avgカラムが存在する場合のみ更新
-      const { error: updateError } = await supabase
-        .from('schools')
-        .update({
-          review_count: reviewCount,
-          overall_avg: avgRating ? parseFloat(avgRating.toFixed(2)) : null,
-        })
-        .eq('id', school.id);
-
-      if (updateError) {
-        // カラムが存在しない場合は無視（後方互換性）
-        if (updateError.code === '42703') {
-          console.warn(`学校 ${school.name} (${school.id}): review_count/overall_avgカラムが存在しません`);
-        } else {
-          console.error(`学校 ${school.name} (${school.id}) の更新エラー:`, updateError.message);
-          errorCount++;
-          continue;
+      // 現在のテーブル構造ではこれらのカラムは存在しないため、集計値は動的に計算されます
+      // このスクリプトは集計値の確認のみを行います
+      
+      // カラムの存在チェック（最初の1回のみ）
+      if (school === schools[0]) {
+        const { data: testData, error: testError } = await supabase
+          .from('schools')
+          .select('review_count, overall_avg')
+          .limit(1);
+        
+        if (testError && testError.code === '42703') {
+          console.log('注意: schoolsテーブルにreview_count/overall_avgカラムが存在しません。');
+          console.log('集計値は動的に計算されるため、このスクリプトは集計値の確認のみを行います。\n');
         }
-      } else {
+      }
+      
+      // 集計値の確認のみ（ログ出力）
+      if (reviewCount > 0) {
         console.log(`✓ 学校 ${school.name}: 口コミ数=${reviewCount}, 平均評価=${avgRating?.toFixed(2) || 'N/A'}`);
+        successCount++;
+      } else {
+        // 口コミがない学校はスキップ（エラーではない）
         successCount++;
       }
     } catch (error) {
