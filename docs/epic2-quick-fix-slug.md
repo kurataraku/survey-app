@@ -96,3 +96,4 @@ SELECT id, name, slug FROM schools LIMIT 10;
 
 
 
+

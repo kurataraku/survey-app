@@ -57,15 +57,17 @@ export default function QuestionRenderer({
 
   return (
     <div className="mb-6" data-question-id={question.id}>
-      <label className={`block font-medium mb-2 ${
-        question.id === 'overall_satisfaction' || question.id === 'good_comment' || question.id === 'bad_comment'
-          ? 'text-lg font-semibold' 
-          : 'text-sm'
-      }`}
-      style={{ 
-        fontFamily: 'var(--ce-font-body)',
-        color: 'var(--ce-text)'
-      }}>
+      <label 
+        htmlFor={fieldName}
+        className={`block font-medium mb-2 ${
+          question.id === 'overall_satisfaction' || question.id === 'good_comment' || question.id === 'bad_comment'
+            ? 'text-lg font-semibold' 
+            : 'text-sm'
+        }`}
+        style={{ 
+          fontFamily: 'var(--ce-font-body)',
+          color: 'var(--ce-text)'
+        }}>
         {question.label}
         {question.required && <span style={{ color: 'var(--ce-warning)' }} className="ml-1">*</span>}
       </label>
@@ -101,15 +103,52 @@ export default function QuestionRenderer({
         </p>
       )}
 
-      {question.type === 'text' && question.id === 'school_name' && setValue ? (
-        <SchoolAutocomplete
-          control={control}
-          name={fieldName}
-          setValue={setValue}
-          placeholder={question.placeholder}
-          error={error}
-          required={question.required}
-        />
+      {question.type === 'text' && question.id === 'school_name' ? (
+        (() => {
+          console.log('[QuestionRenderer] school_name条件チェック:', {
+            'question.type': question.type,
+            'question.id': question.id,
+            'setValue存在': !!setValue,
+            'fieldName': fieldName
+          });
+          if (setValue) {
+            return (
+              <SchoolAutocomplete
+                control={control}
+                name={fieldName}
+                setValue={setValue}
+                placeholder={question.placeholder}
+                error={error}
+                required={question.required}
+              />
+            );
+          } else {
+            console.warn('[QuestionRenderer] setValueが提供されていません。通常のinputを使用します。');
+            return (
+              <Controller
+                name={fieldName}
+                control={control}
+                rules={{ required: question.required }}
+                render={({ field }) => (
+                  <input
+                    type="text"
+                    {...field}
+                    placeholder={question.placeholder}
+                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
+                    style={{
+                      borderRadius: 'var(--ce-radius-control)',
+                      borderColor: error ? 'var(--ce-warning)' : 'var(--ce-border)',
+                      fontFamily: 'var(--ce-font-body)',
+                      ...(error ? {} : {
+                        '--tw-ring-color': 'var(--ce-primary)'
+                      } as React.CSSProperties)
+                    }}
+                  />
+                )}
+              />
+            );
+          }
+        })()
       ) : question.type === 'text' && (
         <Controller
           name={fieldName}

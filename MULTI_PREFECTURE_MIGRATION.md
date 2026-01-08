@@ -109,3 +109,4 @@ WHERE key = 'campus_prefecture';
 
 
 
+

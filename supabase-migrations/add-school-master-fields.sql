@@ -32,3 +32,4 @@ CREATE INDEX IF NOT EXISTS idx_schools_status ON schools(status);
 COMMENT ON COLUMN schools.name_normalized IS '検索用正規化名（全角半角・空白・記号などを統一）';
 COMMENT ON COLUMN schools.status IS '状態: active（正規に使う）/ pending（仮登録）/ merged（統合済みで非表示）';
 
+

@@ -156,13 +156,43 @@ export default function Home() {
       setLoading(true);
       const response = await fetch('/api/home');
       
+      // レスポンスのContent-Typeを確認
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'データの取得に失敗しました' }));
+        let errorData: any = { error: 'データの取得に失敗しました' };
+        if (isJson) {
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            console.error('JSON解析エラー:', e);
+            const text = await response.text();
+            console.error('レスポンステキスト:', text);
+            errorData = { error: `サーバーエラー (${response.status}): ${text.substring(0, 100)}` };
+          }
+        } else {
+          const text = await response.text();
+          console.error('非JSONレスポンス:', text);
+          errorData = { error: `サーバーエラー (${response.status}): ${text.substring(0, 100)}` };
+        }
         console.error('APIエラー:', errorData);
-        throw new Error(errorData.error || errorData.message || 'データの取得に失敗しました');
+        throw new Error(errorData.error || errorData.message || `データの取得に失敗しました (${response.status})`);
       }
       
-      const homeData = await response.json();
+      let homeData: any;
+      if (isJson) {
+        try {
+          homeData = await response.json();
+        } catch (e) {
+          console.error('JSON解析エラー:', e);
+          throw new Error('レスポンスの解析に失敗しました');
+        }
+      } else {
+        const text = await response.text();
+        console.error('非JSONレスポンス:', text);
+        throw new Error('予期しないレスポンス形式です');
+      }
       
       // データが正しい形式か確認
       if (!homeData || typeof homeData !== 'object') {
@@ -172,6 +202,10 @@ export default function Home() {
       setData(homeData);
     } catch (error) {
       console.error('ホームデータ取得エラー:', error);
+      console.error('エラー詳細:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       // エラー時でも空のデータを設定して、ページが表示されるようにする
       setData({
         topRankedSchools: [],

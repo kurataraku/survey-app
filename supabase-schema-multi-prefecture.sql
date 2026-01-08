@@ -29,3 +29,4 @@ COMMENT ON COLUMN schools.prefecture IS '都道府県（後方互換性のため
 
 
 
+

@@ -62,3 +62,4 @@ COMMENT ON COLUMN schools.is_public IS '公開フラグ';
 
 
 
+

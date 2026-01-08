@@ -15,3 +15,4 @@ ON school_aliases USING GIN (alias_normalized gin_trgm_ops);
 -- コメント
 COMMENT ON EXTENSION pg_trgm IS 'PostgreSQLのtrigram拡張（文字列の類似検索を高速化）';
 
+

@@ -27,3 +27,4 @@ WHERE sr.school_name = s.name
 COMMENT ON COLUMN survey_responses.school_id IS '選択された学校のID（schoolsテーブルへの外部キー）';
 COMMENT ON COLUMN survey_responses.school_name_input IS 'ユーザーが入力した原文（その他入力時のみ保存）';
 
+

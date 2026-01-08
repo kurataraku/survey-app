@@ -25,6 +25,7 @@ export default function SurveyPage() {
     resolver: zodResolver(surveySchema),
     mode: 'onBlur', // Step3のエラー表示改善のためonBlurに変更
     defaultValues: {
+      school_name: '', // オートコンプリート用の初期値を設定
       reason_for_choosing: [],
       teaching_style: [],
       student_atmosphere: [],
@@ -259,6 +260,7 @@ export default function SurveyPage() {
                         control={control}
                         watch={watch}
                         errors={errors}
+                        setValue={setValue}
                       />
                     </div>
                   )}
@@ -271,6 +273,7 @@ export default function SurveyPage() {
                         control={control}
                         watch={watch}
                         errors={errors}
+                        setValue={setValue}
                       />
                       {atmosphereOtherQuestion && shouldShowQuestion(atmosphereOtherQuestion) && (
                         <div className="mt-4">
@@ -279,6 +282,7 @@ export default function SurveyPage() {
                             control={control}
                             watch={watch}
                             errors={errors}
+                            setValue={setValue}
                           />
                         </div>
                       )}
@@ -381,6 +385,7 @@ export default function SurveyPage() {
                             control={control}
                             watch={watch}
                             errors={errors}
+                            setValue={setValue}
                           />
                         ))}
                       </div>
@@ -408,6 +413,7 @@ export default function SurveyPage() {
                             control={control}
                             watch={watch}
                             errors={errors}
+                            setValue={setValue}
                           />
                         ))}
                       </div>
@@ -435,6 +441,7 @@ export default function SurveyPage() {
                             control={control}
                             watch={watch}
                             errors={errors}
+                            setValue={setValue}
                           />
                         ))}
                       </div>
@@ -464,6 +471,7 @@ export default function SurveyPage() {
                 control={control}
                 watch={watch}
                 errors={errors}
+                setValue={setValue}
               />
             ))}
           </div>

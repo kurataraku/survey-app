@@ -3,9 +3,14 @@
  * 実行方法: npm run seed:schools
  */
 
+// 環境変数を読み込む（.env.localファイルから）
+import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
+
+// .env.localファイルを明示的に読み込む
+config({ path: resolve(process.cwd(), '.env.local') });
 import { normalizeText, generateSlug } from '../lib/utils';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -21,10 +26,29 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function seedSchools() {
   try {
-    // CSVファイルを読み込み
-    const csvPath = join(process.cwd(), '..', 'Career Essence', '通信制メディア', '20260108_通信制高校一覧（加工版）.csv');
-    console.log(`CSVファイルを読み込み中: ${csvPath}`);
+    // CSVファイルのパスを取得（環境変数 > プロジェクトルート > デフォルトパス）
+    const csvFileName = '20260108_通信制高校一覧（加工版）.csv';
+    let csvPath: string;
     
+    if (process.env.CSV_FILE_PATH) {
+      // 環境変数で指定されたパス
+      csvPath = process.env.CSV_FILE_PATH;
+    } else {
+      // プロジェクトルートを優先、なければデフォルトパス
+      const rootPath = join(process.cwd(), csvFileName);
+      const defaultPath = join(process.cwd(), '..', 'Career Essence', '通信制メディア', csvFileName);
+      
+      try {
+        // プロジェクトルートに存在するか確認
+        readFileSync(rootPath, 'utf-8');
+        csvPath = rootPath;
+      } catch {
+        // プロジェクトルートにない場合はデフォルトパスを使用
+        csvPath = defaultPath;
+      }
+    }
+    
+    console.log(`CSVファイルを読み込み中: ${csvPath}`);
     const csvContent = readFileSync(csvPath, 'utf-8');
     const lines = csvContent.split('\n').filter(line => line.trim().length > 0);
     
@@ -99,4 +123,5 @@ async function seedSchools() {
 }
 
 seedSchools();
+
 

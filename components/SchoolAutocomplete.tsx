@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Control, Controller, UseFormSetValue } from 'react-hook-form';
+import { Control, Controller, UseFormSetValue, useWatch } from 'react-hook-form';
 
 interface School {
   id: string;
@@ -27,7 +27,8 @@ export default function SchoolAutocomplete({
   error,
   required = false,
 }: SchoolAutocompleteProps) {
-  const [inputValue, setInputValue] = useState('');
+  console.log('[SchoolAutocomplete] コンポーネントマウント:', { name, placeholder });
+  
   const [suggestions, setSuggestions] = useState<School[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -37,52 +38,91 @@ export default function SchoolAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  // field.valueを監視（useWatchを使ってReact Hook Formの値を監視）
+  const fieldValue = useWatch({
+    control,
+    name: name,
+    defaultValue: '',
+  }) || ''; // undefinedの場合は空文字列に変換
+  
+  console.log('[SchoolAutocomplete] fieldValue:', fieldValue);
+
   // 検索API呼び出し（debounce付き）
   const searchSchools = useCallback(async (query: string) => {
+    console.log('[SchoolAutocomplete] searchSchools呼び出し:', query);
+    
     if (!query || query.length < 1) {
+      console.log('[SchoolAutocomplete] クエリが空のため検索をスキップ');
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
+    console.log('[SchoolAutocomplete] APIリクエスト送信:', `/api/schools/search?q=${encodeURIComponent(query)}`);
     setIsLoading(true);
     try {
       const response = await fetch(`/api/schools/search?q=${encodeURIComponent(query)}`);
+      console.log('[SchoolAutocomplete] APIレスポンス受信:', response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error('学校検索に失敗しました');
+        const errorData = await response.json().catch(() => ({ error: 'レスポンス解析エラー' }));
+        console.error('学校検索APIエラー:', errorData);
+        throw new Error(errorData.error || `学校検索に失敗しました (${response.status})`);
       }
+      
       const data = await response.json();
-      setSuggestions(data.schools || []);
-      setShowSuggestions(true);
+      
+      // デバッグ用ログ
+      console.log('[SchoolAutocomplete] APIレスポンス:', data);
+      console.log('[SchoolAutocomplete] 学校数:', data.schools?.length || 0);
+      
+      const schools = data.schools || [];
+      setSuggestions(schools);
+      
+      // 候補がある場合のみ表示
+      if (schools.length > 0) {
+        setShowSuggestions(true);
+      } else {
+        // 候補がなくても、入力値があれば「追加」オプションを表示するために開く
+        setShowSuggestions(true);
+      }
     } catch (error) {
       console.error('学校検索エラー:', error);
       setSuggestions([]);
+      // エラー時でも、入力値があれば「追加」オプションを表示できるようにする
+      setShowSuggestions(true);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // 入力値変更時のdebounce処理
+  // 入力値変更時のdebounce処理（fieldValueが変更されたときに実行）
   useEffect(() => {
+    console.log('[SchoolAutocomplete] useEffect実行:', { fieldValue, selectedSchool: !!selectedSchool });
+    
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
-    if (inputValue && !selectedSchool) {
+    if (fieldValue && !selectedSchool) {
+      console.log('[SchoolAutocomplete] デバウンスタイマー開始 (200ms):', fieldValue);
       debounceTimerRef.current = setTimeout(() => {
-        searchSchools(inputValue);
-      }, 250);
+        console.log('[SchoolAutocomplete] デバウンスタイマー発火、検索実行:', fieldValue);
+        searchSchools(fieldValue);
+      }, 200);
     } else {
+      console.log('[SchoolAutocomplete] 検索条件を満たさないため、候補をクリア');
       setSuggestions([]);
       setShowSuggestions(false);
     }
 
     return () => {
       if (debounceTimerRef.current) {
+        console.log('[SchoolAutocomplete] デバウンスタイマークリア');
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [inputValue, selectedSchool, searchSchools]);
+  }, [fieldValue, selectedSchool, searchSchools]);
 
   // クリックアウトサイドで候補を閉じる
   useEffect(() => {
@@ -129,7 +169,6 @@ export default function SchoolAutocomplete({
       };
 
       setSelectedSchool(newSchool);
-      setInputValue(newSchool.name);
       setShowSuggestions(false);
       setSuggestions([]);
       // React Hook Formのフィールドを更新
@@ -149,26 +188,44 @@ export default function SchoolAutocomplete({
       name={name}
       control={control}
       rules={{ required: required ? '学校名を選択してください' : false }}
-      render={({ field }) => (
-        <div className="relative">
-          <input
-            ref={inputRef}
-            type="text"
-            value={selectedSchool ? selectedSchool.name : inputValue}
-            onChange={(e) => {
-              const value = e.target.value;
-              setInputValue(value);
-              setSelectedSchool(null);
-              // React Hook Formのフィールドをクリア
-              setValue(name, '');
-              setValue('school_id', '');
-              setValue('school_name_input', '');
-            }}
-            onFocus={() => {
-              if (suggestions.length > 0) {
-                setShowSuggestions(true);
-              }
-            }}
+      defaultValue=""
+      render={({ field }) => {
+        // fieldValueはuseWatchで監視している値を使用
+        // field.valueとfieldValueの両方を確認し、常に文字列にする
+        const currentValue = field.value || fieldValue || '';
+        const displayValue = selectedSchool ? (selectedSchool.name || '') : (currentValue || '');
+        
+        console.log('[SchoolAutocomplete] render:', { 
+          fieldValue, 
+          'field.value': field.value, 
+          currentValue, 
+          displayValue,
+          selectedSchool: selectedSchool?.name 
+        });
+
+        return (
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              name={name}
+              id={name}
+              value={displayValue || ''} // 念のため空文字列を保証
+              onChange={(e) => {
+                const value = e.target.value;
+                console.log('[SchoolAutocomplete] input onChange 発火:', value);
+                setSelectedSchool(null);
+                // React Hook Formのフィールドを更新
+                field.onChange(value);
+                setValue('school_id', '');
+                setValue('school_name_input', '');
+              }}
+              onFocus={() => {
+                console.log('[SchoolAutocomplete] input onFocus 発火');
+                if (suggestions.length > 0 || fieldValue) {
+                  setShowSuggestions(true);
+                }
+              }}
             placeholder={placeholder}
             className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
             style={{
@@ -183,7 +240,7 @@ export default function SchoolAutocomplete({
           />
           
           {/* 候補リスト */}
-          {showSuggestions && (suggestions.length > 0 || (inputValue && !selectedSchool)) && (
+          {showSuggestions && (suggestions.length > 0 || (fieldValue && !selectedSchool)) && (
             <div
               ref={suggestionsRef}
               className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto"
@@ -203,10 +260,9 @@ export default function SchoolAutocomplete({
                       type="button"
                       onClick={() => {
                         setSelectedSchool(school);
-                        setInputValue(school.name);
                         setShowSuggestions(false);
                         // React Hook Formのフィールドを更新
-                        setValue(name, school.name);
+                        field.onChange(school.name);
                         setValue('school_id', school.id);
                         setValue('school_name_input', '');
                       }}
@@ -229,13 +285,13 @@ export default function SchoolAutocomplete({
               )}
               
               {/* 候補が見つからない場合の「追加」オプション */}
-              {!isLoading && suggestions.length === 0 && inputValue && !selectedSchool && (
+              {!isLoading && suggestions.length === 0 && fieldValue && !selectedSchool && (
                 <button
                   type="button"
                   onClick={() => {
-                    createSchool(inputValue);
+                    createSchool(fieldValue);
                   }}
-                  disabled={isCreating || inputValue.trim().length < 2 || inputValue.trim().length > 40}
+                  disabled={isCreating || fieldValue.trim().length < 2 || fieldValue.trim().length > 40}
                   className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-t border-gray-200"
                   style={{
                     backgroundColor: isCreating ? '#f3f4f6' : undefined,
@@ -245,7 +301,7 @@ export default function SchoolAutocomplete({
                     候補が見つかりませんでした
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
-                    「{inputValue}」を追加して続ける
+                    「{fieldValue}」を追加して続ける
                   </div>
                   {isCreating && (
                     <div className="text-xs text-gray-500 mt-1">追加中...</div>
@@ -255,8 +311,9 @@ export default function SchoolAutocomplete({
             </div>
           )}
           
-        </div>
-      )}
+          </div>
+        );
+      }}
     />
   );
 }

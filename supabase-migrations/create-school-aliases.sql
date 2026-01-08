@@ -28,3 +28,4 @@ COMMENT ON COLUMN school_aliases.school_id IS '参照先の学校ID';
 COMMENT ON COLUMN school_aliases.alias IS '別名（表示名）';
 COMMENT ON COLUMN school_aliases.alias_normalized IS '別名の正規化名（検索用）';
 
+

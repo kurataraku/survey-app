@@ -5,6 +5,13 @@
  * 注意: このスクリプトは既存データがある場合のみ実行してください。
  */
 
+// 環境変数を読み込む（.env.localファイルから）
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// .env.localファイルを明示的に読み込む
+config({ path: resolve(process.cwd(), '.env.local') });
+
 import { createClient } from '@supabase/supabase-js';
 import { normalizeText, generateSlug } from '../lib/utils';
 
@@ -146,4 +153,5 @@ async function migrateSchoolNames() {
 }
 
 migrateSchoolNames();
+
 
