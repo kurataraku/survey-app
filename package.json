@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "seed:schools": "tsx scripts/seedSchoolsFromCsv.ts",
-    "migrate:schools": "tsx scripts/migrateExistingSchoolNames.ts"
+    "migrate:schools": "tsx scripts/migrateExistingSchoolNames.ts",
+    "recalculate-aggregates": "tsx scripts/recalculate-aggregates.ts",
+    "check-env": "tsx scripts/check-env.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

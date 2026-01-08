@@ -13,7 +13,6 @@ export default function Footer() {
     ],
     about: [
       { href: '/about', label: 'サイトについて' },
-      { href: '/guide', label: '通信制高校ガイド' },
     ],
     legal: [
       { href: '/terms', label: '利用規約' },
@@ -30,8 +29,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <h3 className="text-white text-lg font-bold mb-4">通信制高校リアルレビュー</h3>
             <p className="text-sm text-gray-400 mb-4">
-              通信制高校に関するリアルな口コミ・レビューを集めたメディアサイトです。
-              あなたの経験が、次に悩む人の力になります。
+              リアルな口コミ・評判で、あなたに本当に合う通信制高校を見つけよう
             </p>
           </div>
 
