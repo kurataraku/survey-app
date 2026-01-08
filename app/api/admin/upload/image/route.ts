@@ -100,19 +100,23 @@ export async function POST(request: NextRequest) {
       
       // より詳細なエラーメッセージ
       let errorMessage = '画像のアップロードに失敗しました';
-      if (error.message) {
-        errorMessage = error.message;
-      } else if (error.statusCode === '404') {
-        errorMessage = `バケット '${bucketName}' が見つかりません。Supabaseダッシュボードでバケットを作成してください。`;
-      } else if (error.statusCode === '403') {
-        errorMessage = `バケット '${bucketName}' へのアクセス権限がありません。バケットが公開設定になっているか確認してください。`;
+      const errorMessageStr = error.message || '';
+      
+      if (errorMessageStr) {
+        errorMessage = errorMessageStr;
+        // エラーメッセージから404や403を判定
+        if (errorMessageStr.includes('404') || errorMessageStr.includes('not found') || errorMessageStr.includes('見つかりません')) {
+          errorMessage = `バケット '${bucketName}' が見つかりません。Supabaseダッシュボードでバケットを作成してください。`;
+        } else if (errorMessageStr.includes('403') || errorMessageStr.includes('Forbidden') || errorMessageStr.includes('アクセス権限')) {
+          errorMessage = `バケット '${bucketName}' へのアクセス権限がありません。バケットが公開設定になっているか確認してください。`;
+        }
       }
 
       return NextResponse.json(
         { 
           error: errorMessage,
-          details: error.message || '不明なエラー',
-          code: error.statusCode || error.error || 'UNKNOWN_ERROR'
+          details: errorMessageStr || '不明なエラー',
+          code: (error as any).statusCode || (error as any).error || 'UNKNOWN_ERROR'
         },
         { status: 500 }
       );
