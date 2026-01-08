@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
           contactId: contactMessage.id,
           name: name?.trim() || '（未入力）',
           email: email.trim(),
-          subject: subject.trim(),
+          contactSubject: subject.trim(),
           message: message.trim(),
           pageUrl: page_url?.trim() || '（未入力）',
           createdAt: new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
@@ -182,7 +182,7 @@ async function sendNotificationEmail({
   contactId,
   name,
   email,
-  subject: contactSubject,
+  contactSubject,
   message,
   pageUrl,
   createdAt,
@@ -193,7 +193,7 @@ async function sendNotificationEmail({
   contactId: string;
   name: string;
   email: string;
-  subject: string;
+  contactSubject: string;
   message: string;
   pageUrl: string;
   createdAt: string;
