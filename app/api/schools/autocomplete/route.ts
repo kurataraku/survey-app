@@ -32,10 +32,15 @@ export async function GET(request: NextRequest) {
     // #endregion
 
     const maxResults = 10;
-    const allSchools: Array<{ id: string; name: string; prefecture: string; slug: string | null; status: string }> = [];
-    const prioritySchoolIds = new Set<string>(); // 優先表示する学校のID
+    
+    // 3つのカテゴリに分けて管理
+    const prioritySchools: Array<{ id: string; name: string; prefecture: string; slug: string | null; status: string }> = []; // ①人気高（N高、S高）
+    const prefixMatchSchools: Array<{ id: string; name: string; prefecture: string; slug: string | null; status: string }> = []; // ②先頭一致
+    const partialMatchSchools: Array<{ id: string; name: string; prefecture: string; slug: string | null; status: string }> = []; // ③部分一致
+    
+    const allSchoolIds = new Set<string>(); // 重複チェック用
 
-    // ステップ0: 「N高」「S高」を特別扱い（クエリが「N」または「S」の場合）
+    // ステップ1: 「N高」「S高」を特別扱い（クエリが「N」または「S」の場合）
     const isNSearch = normalizedQuery === 'N' || normalizedQuery === 'n';
     const isSSearch = normalizedQuery === 'S' || normalizedQuery === 's';
     
@@ -43,64 +48,82 @@ export async function GET(request: NextRequest) {
       const priorityPattern = isNSearch ? 'N高' : 'S高';
       const priorityPatternFull = isNSearch ? 'N高等学校' : 'S高等学校';
       
-      // 「N高」または「S高」を含む学校名を明示的に検索（最優先）
-      // Supabaseの.or()メソッドを使用（条件をカンマ区切りで指定）
-      const { data: prioritySchools, error: priorityError } = await supabase
+      // 「N高」を含む学校名を検索
+      const { data: prioritySchools1, error: error1 } = await supabase
         .from('schools')
         .select('id, name, prefecture, slug, status')
         .eq('is_public', true)
         .eq('status', 'active')
-        .or(`name.ilike.%${priorityPattern}%,name.ilike.%${priorityPatternFull}%`)
+        .ilike('name', `%${priorityPattern}%`)
         .order('name', { ascending: true })
-        .limit(5); // 優先校は最大5件まで
+        .limit(10);
+
+      // 「N高等学校」を含む学校名を検索（重複を避けるため）
+      const { data: prioritySchools2, error: error2 } = await supabase
+        .from('schools')
+        .select('id, name, prefecture, slug, status')
+        .eq('is_public', true)
+        .eq('status', 'active')
+        .ilike('name', `%${priorityPatternFull}%`)
+        .order('name', { ascending: true })
+        .limit(10);
+
+      // 結果をマージ（重複を排除）
+      const mergedPriority = [...(prioritySchools1 || []), ...(prioritySchools2 || [])];
+      const uniquePriority = mergedPriority.filter((school, index, self) => 
+        index === self.findIndex(s => s.id === school.id)
+      );
+
+      // 優先校を追加
+      for (const school of uniquePriority) {
+        if (!allSchoolIds.has(school.id)) {
+          prioritySchools.push(school);
+          allSchoolIds.add(school.id);
+        }
+      }
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:42',message:'優先校検索結果',data:{priorityPattern,resultCount:prioritySchools?.length||0,hasError:!!priorityError,errorMessage:priorityError?.message,allSchoolNames:prioritySchools?.map(s=>s.name)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-priority',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:45',message:'優先校検索結果',data:{priorityPattern,resultCount:prioritySchools.length,allSchoolNames:prioritySchools.map(s=>s.name)},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix-v2',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
-
-      if (!priorityError && prioritySchools) {
-        // 優先校を先頭に追加
-        allSchools.push(...prioritySchools);
-        prioritySchools.forEach(school => prioritySchoolIds.add(school.id));
-      }
     }
 
-    // ステップ1: 先頭一致の検索を優先実行（最大10件）
-    const { data: prefixMatchSchools, error: prefixError } = await supabase
+    // ステップ2: 先頭一致の検索（優先校を除外）
+    const excludeIdsForPrefix = Array.from(allSchoolIds);
+    let prefixQuery = supabase
       .from('schools')
       .select('id, name, prefecture, slug, status')
       .eq('is_public', true)
       .eq('status', 'active')
-      .ilike('name', `${normalizedQuery}%`) // 先頭一致（%を先頭に付けない）
+      .ilike('name', `${normalizedQuery}%`); // 先頭一致
+
+    // 優先校を除外
+    for (const excludeId of excludeIdsForPrefix) {
+      prefixQuery = prefixQuery.neq('id', excludeId);
+    }
+
+    const { data: prefixMatchData, error: prefixError } = await prefixQuery
       .order('name', { ascending: true })
       .limit(maxResults);
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:38',message:'先頭一致検索結果',data:{resultCount:prefixMatchSchools?.length||0,hasError:!!prefixError,errorMessage:prefixError?.message,allSchoolNames:prefixMatchSchools?.map(s=>s.name)||[],includesNHigh:prefixMatchSchools?.some(s=>s.name.includes('N高')||s.name.includes('N高等学校'))||false,includesSHigh:prefixMatchSchools?.some(s=>s.name.includes('S高')||s.name.includes('S高等学校'))||false},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'B'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:75',message:'先頭一致検索結果',data:{resultCount:prefixMatchData?.length||0,hasError:!!prefixError,errorMessage:prefixError?.message,allSchoolNames:prefixMatchData?.map(s=>s.name)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix-v2',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
 
-    if (prefixError) {
-      console.error('学校検索エラー（先頭一致）:', prefixError);
-      return NextResponse.json(
-        { error: '学校検索に失敗しました', details: prefixError.message, code: prefixError.code },
-        { status: 500 }
-      );
+    if (!prefixError && prefixMatchData) {
+      for (const school of prefixMatchData) {
+        if (!allSchoolIds.has(school.id)) {
+          prefixMatchSchools.push(school);
+          allSchoolIds.add(school.id);
+        }
+      }
     }
 
-    // 先頭一致の結果を追加（優先校は除外）
-    if (prefixMatchSchools) {
-      const nonPriorityPrefixSchools = prefixMatchSchools.filter(
-        school => !prioritySchoolIds.has(school.id)
-      );
-      allSchools.push(...nonPriorityPrefixSchools);
-    }
+    // ステップ3: 部分一致の検索（優先校と先頭一致を除外、10件に満たない場合のみ）
+    const currentTotal = prioritySchools.length + prefixMatchSchools.length;
+    if (currentTotal < maxResults) {
+      const excludeIdsForPartial = Array.from(allSchoolIds);
+      const remainingCount = maxResults - currentTotal;
 
-    // ステップ2: 先頭一致の結果が10件未満の場合、部分一致の検索を追加実行
-    if (allSchools.length < maxResults) {
-      const excludeIds = allSchools.map((s) => s.id);
-      const remainingCount = maxResults - allSchools.length;
-
-      // 部分一致検索（先頭一致で取得したIDは除外）
       let partialQuery = supabase
         .from('schools')
         .select('id, name, prefecture, slug, status')
@@ -108,69 +131,71 @@ export async function GET(request: NextRequest) {
         .eq('status', 'active')
         .ilike('name', `%${normalizedQuery}%`); // 部分一致
 
-      // 先頭一致で取得したIDと優先校のIDを除外
-      if (excludeIds.length > 0) {
-        // Supabaseの.not()メソッドで配列を除外
-        // excludeIdsの各IDに対して.not()を適用（Supabaseでは複数の.not()をチェーンできる）
-        for (const excludeId of excludeIds) {
-          partialQuery = partialQuery.neq('id', excludeId);
-        }
-      }
-      // 優先校のIDも除外
-      for (const priorityId of prioritySchoolIds) {
-        partialQuery = partialQuery.neq('id', priorityId);
+      // 優先校と先頭一致を除外
+      for (const excludeId of excludeIdsForPartial) {
+        partialQuery = partialQuery.neq('id', excludeId);
       }
 
-      const { data: partialMatchSchools, error: partialError } = await partialQuery
+      const { data: partialMatchData, error: partialError } = await partialQuery
         .order('name', { ascending: true })
         .limit(remainingCount);
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:63',message:'部分一致検索結果',data:{resultCount:partialMatchSchools?.length||0,hasError:!!partialError,errorMessage:partialError?.message,remainingCount,excludeIdsCount:excludeIds.length,allSchoolNames:partialMatchSchools?.map(s=>s.name)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'C'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:103',message:'部分一致検索結果',data:{resultCount:partialMatchData?.length||0,hasError:!!partialError,errorMessage:partialError?.message,remainingCount,allSchoolNames:partialMatchData?.map(s=>s.name)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix-v2',hypothesisId:'D'})}).catch(()=>{});
       // #endregion
 
-      if (partialError) {
-        console.error('学校検索エラー（部分一致）:', partialError);
-        // 部分一致のエラーは無視して、先頭一致の結果のみを返す
-      } else if (partialMatchSchools) {
-        // 部分一致の結果を追加
-        allSchools.push(...partialMatchSchools);
+      if (!partialError && partialMatchData) {
+        for (const school of partialMatchData) {
+          if (!allSchoolIds.has(school.id)) {
+            partialMatchSchools.push(school);
+            allSchoolIds.add(school.id);
+          }
+        }
       }
     }
 
-    // 念のため、activeのみをフィルタリング（クエリで既にフィルタリング済みだが、二重チェック）
-    // また、重複を排除
-    const uniqueSchoolsMap = new Map<string, { id: string; name: string; prefecture: string; slug: string | null }>();
-    for (const school of allSchools) {
-      if (school.status === 'active' && !uniqueSchoolsMap.has(school.id)) {
-        uniqueSchoolsMap.set(school.id, {
-          id: school.id,
-          name: school.name,
-          prefecture: school.prefecture,
-          slug: school.slug,
-        });
-      }
+    // ステップ4: 3つのカテゴリを順序通りにマージ
+    // ①人気高（N高、S高）→ ②先頭一致 → ③部分一致
+    const suggestions: Array<{ id: string; name: string; prefecture: string; slug: string | null }> = [];
+    
+    // 各カテゴリ内で名前順にソート
+    prioritySchools.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    prefixMatchSchools.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    partialMatchSchools.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+
+    // 順序通りにマージ（最大10件）
+    for (const school of prioritySchools) {
+      if (suggestions.length >= maxResults) break;
+      suggestions.push({
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        slug: school.slug,
+      });
     }
-
-    let suggestions = Array.from(uniqueSchoolsMap.values());
-
-    // 最終ソート: 優先校（N高、S高）を先頭に配置
-    suggestions.sort((a, b) => {
-      const aIsPriority = prioritySchoolIds.has(a.id);
-      const bIsPriority = prioritySchoolIds.has(b.id);
-      
-      if (aIsPriority && !bIsPriority) return -1; // aを先に
-      if (!aIsPriority && bIsPriority) return 1;  // bを先に
-      
-      // 両方とも優先校、または両方とも通常校の場合は名前順
-      return a.name.localeCompare(b.name, 'ja');
-    });
-
-    // 最大10件に制限
-    suggestions = suggestions.slice(0, maxResults);
+    
+    for (const school of prefixMatchSchools) {
+      if (suggestions.length >= maxResults) break;
+      suggestions.push({
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        slug: school.slug,
+      });
+    }
+    
+    for (const school of partialMatchSchools) {
+      if (suggestions.length >= maxResults) break;
+      suggestions.push({
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        slug: school.slug,
+      });
+    }
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:145',message:'最終検索結果',data:{totalResultCount:suggestions.length,allSchoolNames:suggestions.map(s=>s.name),prioritySchoolCount:prioritySchoolIds.size,firstSchoolName:suggestions[0]?.name||null,includesNHigh:suggestions.some(s=>s.name.includes('N高')||s.name.includes('N高等学校')),includesSHigh:suggestions.some(s=>s.name.includes('S高')||s.name.includes('S高等学校'))},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-priority',hypothesisId:'D'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:145',message:'最終検索結果',data:{totalResultCount:suggestions.length,priorityCount:prioritySchools.length,prefixCount:prefixMatchSchools.length,partialCount:partialMatchSchools.length,allSchoolNames:suggestions.map(s=>s.name),firstSchoolName:suggestions[0]?.name||null,includesNHigh:suggestions.some(s=>s.name.includes('N高')||s.name.includes('N高等学校')),includesSHigh:suggestions.some(s=>s.name.includes('S高')||s.name.includes('S高等学校'))},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix-v2',hypothesisId:'E'})}).catch(()=>{});
     // #endregion
 
     return NextResponse.json({ suggestions });
