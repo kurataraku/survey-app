@@ -27,22 +27,32 @@ export default function SchoolCard({
   // 検索で該当した都道府県を最初に、その後に他の都道府県を3〜4つ表示
   let displayPrefectures: string[] = [];
   
-  // すべての都道府県を収集
+  // 「不明」を除外する関数
+  const isValidPrefecture = (pref: string | null | undefined): boolean => {
+    return pref !== null && pref !== undefined && pref.trim() !== '' && pref !== '不明';
+  };
+  
+  // すべての都道府県を収集（「不明」は除外）
   const allPrefecturesSet = new Set<string>();
   
-  // メイン都道府県を追加
-  if (prefecture) {
+  // メイン都道府県を追加（「不明」でない場合のみ）
+  if (isValidPrefecture(prefecture)) {
     allPrefecturesSet.add(prefecture);
   }
   
-  // prefectures配列があれば追加
+  // prefectures配列があれば追加（「不明」は除外）
   if (prefectures && prefectures.length > 0) {
-    prefectures.forEach(p => allPrefecturesSet.add(p));
+    prefectures.forEach(p => {
+      if (isValidPrefecture(p)) {
+        allPrefecturesSet.add(p);
+      }
+    });
   }
   
   const allPrefectures = Array.from(allPrefecturesSet);
   
   if (allPrefectures.length === 0) {
+    // 有効な都道府県が1つもない場合のみ空配列
     displayPrefectures = [];
   } else if (matchedPrefecture && allPrefectures.includes(matchedPrefecture)) {
     // 検索で該当した都道府県がある場合、それを最初に
@@ -52,7 +62,8 @@ export default function SchoolCard({
     displayPrefectures = [matchedPrefecture, ...limitedOthers];
   } else {
     // 検索で該当した都道府県がない場合、メイン都道府県を最初に
-    const mainPrefecture = prefecture || allPrefectures[0];
+    // メイン都道府県が「不明」の場合は、最初の有効な都道府県を使用
+    const mainPrefecture = isValidPrefecture(prefecture) ? prefecture : allPrefectures[0];
     const otherPrefectures = allPrefectures.filter(p => p !== mainPrefecture);
     // その他の都道府県を3〜4つに制限
     const limitedOthers = otherPrefectures.slice(0, 4);
