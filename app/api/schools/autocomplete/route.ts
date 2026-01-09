@@ -48,34 +48,37 @@ export async function GET(request: NextRequest) {
       const priorityPattern = isNSearch ? 'N高' : 'S高';
       const priorityPatternFull = isNSearch ? 'N高等学校' : 'S高等学校';
       
-      // 「N高」を含む学校名を検索
-      const { data: prioritySchools1, error: error1 } = await supabase
-        .from('schools')
-        .select('id, name, prefecture, slug, status')
-        .eq('is_public', true)
-        .eq('status', 'active')
-        .ilike('name', `%${priorityPattern}%`)
-        .order('name', { ascending: true })
-        .limit(10);
-
-      // 「N高等学校」を含む学校名を検索（重複を避けるため）
-      const { data: prioritySchools2, error: error2 } = await supabase
-        .from('schools')
-        .select('id, name, prefecture, slug, status')
-        .eq('is_public', true)
-        .eq('status', 'active')
-        .ilike('name', `%${priorityPatternFull}%`)
-        .order('name', { ascending: true })
-        .limit(10);
-
-      // 結果をマージ（重複を排除）
-      const mergedPriority = [...(prioritySchools1 || []), ...(prioritySchools2 || [])];
-      const uniquePriority = mergedPriority.filter((school, index, self) => 
-        index === self.findIndex(s => s.id === school.id)
-      );
+      // 優先校の検索パターン（複数のパターンで検索）
+      const priorityPatterns = [
+        priorityPatternFull, // 「N高等学校」「S高等学校」を最優先
+        priorityPattern,     // 「N高」「S高」
+      ];
+      
+      // 各パターンで検索してマージ
+      const allPriorityResults: Array<{ id: string; name: string; prefecture: string; slug: string | null; status: string }> = [];
+      
+      for (const pattern of priorityPatterns) {
+        const { data: patternResults, error: patternError } = await supabase
+          .from('schools')
+          .select('id, name, prefecture, slug, status')
+          .eq('is_public', true)
+          .eq('status', 'active')
+          .ilike('name', `%${pattern}%`)
+          .order('name', { ascending: true })
+          .limit(10);
+        
+        if (!patternError && patternResults) {
+          for (const school of patternResults) {
+            // 重複チェック
+            if (!allPriorityResults.find(s => s.id === school.id)) {
+              allPriorityResults.push(school);
+            }
+          }
+        }
+      }
 
       // 優先校を追加
-      for (const school of uniquePriority) {
+      for (const school of allPriorityResults) {
         if (!allSchoolIds.has(school.id)) {
           prioritySchools.push(school);
           allSchoolIds.add(school.id);
@@ -83,7 +86,7 @@ export async function GET(request: NextRequest) {
       }
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:45',message:'優先校検索結果',data:{priorityPattern,resultCount:prioritySchools.length,allSchoolNames:prioritySchools.map(s=>s.name)},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix-v2',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/autocomplete/route.ts:45',message:'優先校検索結果',data:{priorityPattern,priorityPatternFull,resultCount:prioritySchools.length,allSchoolNames:prioritySchools.map(s=>s.name)},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix-v3',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
     }
 
@@ -110,6 +113,21 @@ export async function GET(request: NextRequest) {
     // #endregion
 
     if (!prefixError && prefixMatchData) {
+      // 先頭一致の結果から、優先校（N高、S高）を抽出して優先校リストに追加
+      if (isNSearch || isSSearch) {
+        const priorityPattern = isNSearch ? 'N高' : 'S高';
+        const priorityPatternFull = isNSearch ? 'N高等学校' : 'S高等学校';
+        
+        for (const school of prefixMatchData) {
+          // 優先校パターンにマッチする場合は優先校リストに追加
+          if ((school.name.includes(priorityPattern) || school.name.includes(priorityPatternFull)) && !allSchoolIds.has(school.id)) {
+            prioritySchools.push(school);
+            allSchoolIds.add(school.id);
+          }
+        }
+      }
+      
+      // 先頭一致の結果を追加（優先校は除外）
       for (const school of prefixMatchData) {
         if (!allSchoolIds.has(school.id)) {
           prefixMatchSchools.push(school);
