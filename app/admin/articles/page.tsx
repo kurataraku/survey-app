@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -32,16 +32,7 @@ function ArticlesPageContent() {
 
   const limit = 20;
 
-  useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:35',message:'useEffect実行:fetchArticles呼び出し',data:{page,searchQuery,categoryFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    console.log('[ArticlesPage] useEffect実行:', { page, searchQuery, categoryFilter });
-    fetchArticles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, searchQuery, categoryFilter]);
-
-  const fetchArticles = async () => {
+  const fetchArticles = useCallback(async () => {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:40',message:'fetchArticles開始',data:{page,searchQuery,categoryFilter,limit},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
@@ -104,7 +95,25 @@ function ArticlesPageContent() {
       setLoading(false);
       console.log('[ArticlesPage] fetchArticles完了');
     }
-  };
+  }, [page, searchQuery, categoryFilter, limit]);
+
+  useEffect(() => {
+    console.log('[ArticlesPage] useEffect実行:', { page, searchQuery, categoryFilter });
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:118',message:'useEffect実行:fetchArticles呼び出し',data:{page,searchQuery,categoryFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    fetchArticles();
+  }, [fetchArticles]);
+
+  // 記事一覧レンダリング時のログ（副作用としてuseEffectで記録）
+  useEffect(() => {
+    if (articles.length > 0) {
+      console.log('[ArticlesPage] 記事一覧レンダリング:', { articlesCount: articles.length, total, loading, error });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:125',message:'記事一覧レンダリング開始',data:{articlesCount:articles.length,total,loading,error:error||null},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+    }
+  }, [articles.length, total, loading, error]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,12 +236,6 @@ function ArticlesPageContent() {
           </div>
         ) : (
           <>
-            {/* #region agent log */}
-            {console.log('[ArticlesPage] 記事一覧レンダリング:', { articlesCount: articles.length, total, loading, error })}
-            {/* #endregion */}
-            {/* #region agent log */}
-            {fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:195',message:'記事一覧レンダリング開始',data:{articlesCount:articles.length,total,loading,error:error||null},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'E'})}).catch(()=>{})}
-            {/* #endregion */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -258,18 +261,14 @@ function ArticlesPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {articles.map((article) => {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:223',message:'記事行レンダリング',data:{articleId:article.id,articleTitle:article.title,hasEditButton:true},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'F'})}).catch(()=>{});
-                    // #endregion
-                    return (
+                  {articles.map((article) => (
                       <tr 
                         key={article.id} 
                         className="hover:bg-gray-50 cursor-pointer"
                         onClick={() => {
                           console.log('[ArticlesPage] 記事行クリック:', article.id);
                           // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:227',message:'記事行クリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'G'})}).catch(()=>{});
+                          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:265',message:'記事行クリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'G'})}).catch(()=>{});
                           // #endregion
                           router.push(`/admin/articles/${article.id}/edit`);
                         }}
@@ -333,8 +332,7 @@ function ArticlesPageContent() {
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
+                    ))}
                 </tbody>
               </table>
             </div>
