@@ -2,19 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:4',message:'API開始:環境変数チェック',data:{hasSupabaseUrl:!!process.env.NEXT_PUBLIC_SUPABASE_URL,hasServiceKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now(),sessionId:'debug-session',runId:'production-check',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceKey) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:11',message:'エラー:環境変数未設定',data:{supabaseUrl:supabaseUrl||'未設定',serviceKey:supabaseServiceKey?'設定済み':'未設定'},timestamp:Date.now(),sessionId:'debug-session',runId:'production-check',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-
       return NextResponse.json(
         { error: 'Supabase環境変数が設定されていません' },
         { status: 500 }
@@ -31,10 +23,6 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = (page - 1) * limit;
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:30',message:'クエリパラメータ取得完了',data:{q,status,prefecture,page,limit,offset},timestamp:Date.now(),sessionId:'debug-session',runId:'production-check',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
 
     // 学校検索クエリを構築（非公開含む）
     let query = supabase
@@ -65,21 +53,9 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
       .range(offset, offset + limit - 1);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:52',message:'Supabaseクエリ実行前',data:{hasQuery:true},timestamp:Date.now(),sessionId:'debug-session',runId:'production-check',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-
     const { data: schools, error, count } = await query;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:54',message:'Supabaseクエリ実行後',data:{hasError:!!error,errorMessage:error?.message,errorCode:error?.code,dataCount:schools?.length||0,totalCount:count},timestamp:Date.now(),sessionId:'debug-session',runId:'production-check',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-
     if (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:56',message:'Supabaseエラー検出',data:{errorMessage:error.message,errorCode:error.code,errorDetails:error.details,errorHint:error.hint},timestamp:Date.now(),sessionId:'debug-session',runId:'production-check',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-
       console.error('学校検索エラー:', error);
       return NextResponse.json(
         { error: '学校検索に失敗しました', details: error.message, code: error.code },

@@ -58,28 +58,15 @@ export default function SchoolAutocomplete({
       return;
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/SchoolAutocomplete.tsx:51',message:'オートコンプリート:検索開始',data:{query},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-
     console.log('[SchoolAutocomplete] APIリクエスト送信:', `/api/schools/autocomplete?q=${encodeURIComponent(query)}`);
     setIsLoading(true);
     try {
       const response = await fetch(`/api/schools/autocomplete?q=${encodeURIComponent(query)}`);
       console.log('[SchoolAutocomplete] APIレスポンス受信:', response.status, response.statusText);
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/SchoolAutocomplete.tsx:64',message:'オートコンプリート:APIレスポンス受信',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'レスポンス解析エラー' }));
         console.error('学校検索APIエラー:', errorData);
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/SchoolAutocomplete.tsx:70',message:'オートコンプリート:APIエラー',data:{errorData,status:response.status},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-
         throw new Error(errorData.error || `学校検索に失敗しました (${response.status})`);
       }
       
@@ -88,10 +75,6 @@ export default function SchoolAutocomplete({
       // デバッグ用ログ
       console.log('[SchoolAutocomplete] APIレスポンス:', data);
       console.log('[SchoolAutocomplete] 学校数:', data.suggestions?.length || 0);
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/SchoolAutocomplete.tsx:78',message:'オートコンプリート:検索結果処理',data:{suggestionsCount:data.suggestions?.length||0,hasSuggestions:!!data.suggestions},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
 
       // /api/schools/autocomplete は suggestions プロパティを返す
       const schools = (data.suggestions || []).map((suggestion: { id: string; name: string; prefecture: string; slug: string | null }) => ({
@@ -112,11 +95,6 @@ export default function SchoolAutocomplete({
       }
     } catch (error) {
       console.error('学校検索エラー:', error);
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/SchoolAutocomplete.tsx:96',message:'オートコンプリート:検索エラー発生',data:{errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'autocomplete-fix',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
-
       setSuggestions([]);
       // エラー時でも、入力値があれば「追加」オプションを表示できるようにする
       setShowSuggestions(true);
