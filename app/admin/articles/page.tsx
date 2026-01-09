@@ -33,10 +33,19 @@ function ArticlesPageContent() {
   const limit = 20;
 
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:35',message:'useEffect実行:fetchArticles呼び出し',data:{page,searchQuery,categoryFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    console.log('[ArticlesPage] useEffect実行:', { page, searchQuery, categoryFilter });
     fetchArticles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, searchQuery, categoryFilter]);
 
   const fetchArticles = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:40',message:'fetchArticles開始',data:{page,searchQuery,categoryFilter,limit},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    console.log('[ArticlesPage] fetchArticles開始');
     setLoading(true);
     setError(null);
     try {
@@ -51,25 +60,49 @@ function ArticlesPageContent() {
         params.append('category', categoryFilter);
       }
 
-      const response = await fetch(`/api/admin/articles?${params.toString()}`);
+      const apiUrl = `/api/admin/articles?${params.toString()}`;
+      console.log('[ArticlesPage] APIリクエスト:', apiUrl);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:55',message:'APIリクエスト送信前',data:{apiUrl,params:params.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+
+      const response = await fetch(apiUrl);
+      
+      console.log('[ArticlesPage] APIレスポンス:', response.status, response.statusText);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:62',message:'APIレスポンス受信',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '記事一覧の取得に失敗しました' }));
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:66',message:'APIエラー検出',data:{status:response.status,errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         throw new Error(errorData.error || `記事一覧の取得に失敗しました (${response.status})`);
       }
 
       const data = await response.json();
+      console.log('[ArticlesPage] APIデータ:', { articlesCount: data.articles?.length || 0, total: data.total, totalPages: data.total_pages });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:72',message:'APIデータ処理',data:{articlesCount:data.articles?.length||0,total:data.total||0,totalPages:data.total_pages||1,hasArticles:!!data.articles},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+
       setArticles(data.articles || []);
       setTotal(data.total || 0);
       setTotalPages(data.total_pages || 1);
     } catch (error) {
-      console.error('記事一覧取得エラー:', error);
+      console.error('[ArticlesPage] 記事一覧取得エラー:', error);
       const errorMessage = error instanceof Error ? error.message : '記事一覧の取得に失敗しました';
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:79',message:'エラー発生',data:{errorMessage},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       setError(errorMessage);
       setArticles([]);
       setTotal(0);
       setTotalPages(1);
     } finally {
       setLoading(false);
+      console.log('[ArticlesPage] fetchArticles完了');
     }
   };
 
@@ -194,6 +227,12 @@ function ArticlesPageContent() {
           </div>
         ) : (
           <>
+            {/* #region agent log */}
+            {console.log('[ArticlesPage] 記事一覧レンダリング:', { articlesCount: articles.length, total, loading, error })}
+            {/* #endregion */}
+            {/* #region agent log */}
+            {fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:195',message:'記事一覧レンダリング開始',data:{articlesCount:articles.length,total,loading,error:error||null},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'E'})}).catch(()=>{})}
+            {/* #endregion */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -219,58 +258,83 @@ function ArticlesPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {articles.map((article) => (
-                    <tr key={article.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {article.title}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {article.slug}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {getCategoryLabel(article.category)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {article.is_public ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            公開中
+                  {articles.map((article) => {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:223',message:'記事行レンダリング',data:{articleId:article.id,articleTitle:article.title,hasEditButton:true},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'F'})}).catch(()=>{});
+                    // #endregion
+                    return (
+                      <tr 
+                        key={article.id} 
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => {
+                          console.log('[ArticlesPage] 記事行クリック:', article.id);
+                          // #region agent log
+                          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:227',message:'記事行クリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'G'})}).catch(()=>{});
+                          // #endregion
+                          router.push(`/admin/articles/${article.id}/edit`);
+                        }}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {article.title}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {article.slug}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {getCategoryLabel(article.category)}
                           </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            非公開
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {article.published_at
-                          ? new Date(article.published_at).toLocaleDateString('ja-JP')
-                          : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(article.updated_at).toLocaleDateString('ja-JP')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => router.push(`/admin/articles/${article.id}/edit`)}
-                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
-                          >
-                            編集
-                          </button>
-                          <button
-                            onClick={() => handleDelete(article.id, article.title)}
-                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                          >
-                            削除
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {article.is_public ? (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              公開中
+                            </span>
+                          ) : (
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                              非公開
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {article.published_at
+                            ? new Date(article.published_at).toLocaleDateString('ja-JP')
+                            : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(article.updated_at).toLocaleDateString('ja-JP')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('[ArticlesPage] 編集ボタンクリック:', article.id);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:265',message:'編集ボタンクリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'H'})}).catch(()=>{});
+                                // #endregion
+                                router.push(`/admin/articles/${article.id}/edit`);
+                              }}
+                              className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
+                            >
+                              編集
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(article.id, article.title);
+                              }}
+                              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            >
+                              削除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
