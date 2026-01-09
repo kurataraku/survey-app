@@ -102,7 +102,8 @@
    - 値が「••••••」のように隠されている場合は、「Reveal」ボタンをクリックして表示
 
 3. **「Copy」ボタンをクリックしてコピー**
-   - 値の例: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0Mjg5NzYwMCwiZXhwIjoxOTU4NDczNjAwfQ.abcdefghijklmnopqrstuvwxyz1234567890`
+   - 値は長い文字列です（`eyJ...` で始まる形式）
+   - **注意**: この例は実際のキーではありません。Supabaseダッシュボードで実際のキーをコピーしてください
 
 4. **メモ帳などに一時的に保存**
 
@@ -116,7 +117,8 @@
    - 「Reveal」ボタンをクリックして表示
 
 3. **「Copy」ボタンをクリックしてコピー**
-   - 値の例: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoic2VydmljZV9yb2xlIiwiaWF0IjoxNjQyODk3NjAwLCJleHAiOjE5NTg0NzM2MDB9.abcdefghijklmnopqrstuvwxyz1234567890`
+   - 値は長い文字列です（`eyJ...` で始まる形式）
+   - **注意**: この例は実際のキーではありません。Supabaseダッシュボードで実際のキーをコピーしてください
 
 4. **メモ帳などに一時的に保存**
    - ⚠️ このキーは機密情報です。他人に共有しないでください
