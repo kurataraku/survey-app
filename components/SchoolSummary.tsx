@@ -33,8 +33,30 @@ export default function SchoolSummary({
   creditRatingAvg,
   latestReviews,
 }: SchoolSummaryProps) {
-  // prefectures配列が存在する場合はそれを使用、なければprefectureを使用
-  const displayPrefectures = prefectures && prefectures.length > 0 ? prefectures : [prefecture];
+  // 「不明」を除外する関数
+  const isValidPrefecture = (pref: string | null | undefined): boolean => {
+    return pref !== null && pref !== undefined && pref.trim() !== '' && pref !== '不明';
+  };
+  
+  // すべての都道府県を収集（「不明」は除外）
+  const allPrefecturesSet = new Set<string>();
+  
+  // メイン都道府県を追加（「不明」でない場合のみ）
+  if (isValidPrefecture(prefecture)) {
+    allPrefecturesSet.add(prefecture);
+  }
+  
+  // prefectures配列があれば追加（「不明」は除外）
+  if (prefectures && prefectures.length > 0) {
+    prefectures.forEach(p => {
+      if (isValidPrefecture(p)) {
+        allPrefecturesSet.add(p);
+      }
+    });
+  }
+  
+  // 有効な都道府県のみを表示
+  const displayPrefectures = Array.from(allPrefecturesSet);
   // 最新3件から代表的な良い点/悪い点を抽出
   const representativeGood = latestReviews
     .filter((r) => r.good_comment)
