@@ -21,6 +21,7 @@ function ArticlesPageContent() {
   const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -37,6 +38,7 @@ function ArticlesPageContent() {
 
   const fetchArticles = async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -51,16 +53,21 @@ function ArticlesPageContent() {
 
       const response = await fetch(`/api/admin/articles?${params.toString()}`);
       if (!response.ok) {
-        throw new Error('記事一覧の取得に失敗しました');
+        const errorData = await response.json().catch(() => ({ error: '記事一覧の取得に失敗しました' }));
+        throw new Error(errorData.error || `記事一覧の取得に失敗しました (${response.status})`);
       }
 
       const data = await response.json();
-      setArticles(data.articles);
-      setTotal(data.total);
-      setTotalPages(data.total_pages);
+      setArticles(data.articles || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.total_pages || 1);
     } catch (error) {
       console.error('記事一覧取得エラー:', error);
-      alert('記事一覧の取得に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : '記事一覧の取得に失敗しました';
+      setError(errorMessage);
+      setArticles([]);
+      setTotal(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -170,6 +177,17 @@ function ArticlesPageContent() {
           <div className="text-center py-12">
             <p className="text-gray-600">読み込み中...</p>
           </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800 font-medium">エラーが発生しました</p>
+            <p className="text-red-600 text-sm mt-1">{error}</p>
+            <button
+              onClick={() => fetchArticles()}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              再試行
+            </button>
+          </div>
         ) : articles.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600">記事が見つかりませんでした</p>
@@ -236,18 +254,20 @@ function ArticlesPageContent() {
                         {new Date(article.updated_at).toLocaleDateString('ja-JP')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link
-                          href={`/admin/articles/${article.id}/edit`}
-                          className="text-blue-600 hover:text-blue-900 mr-4"
-                        >
-                          編集
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(article.id, article.title)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          削除
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => router.push(`/admin/articles/${article.id}/edit`)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
+                          >
+                            編集
+                          </button>
+                          <button
+                            onClick={() => handleDelete(article.id, article.title)}
+                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                          >
+                            削除
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
