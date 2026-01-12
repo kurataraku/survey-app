@@ -377,11 +377,17 @@ export default function EditSchoolPage() {
                       <p className="text-sm text-gray-500">別名が登録されていません</p>
                     )}
                     <div className="flex gap-2">
+                      <label htmlFor="new-alias" className="sr-only">
+                        新しい別名を入力
+                      </label>
                       <input
+                        id="new-alias"
+                        name="new-alias"
                         type="text"
                         value={newAlias}
                         onChange={(e) => setNewAlias(e.target.value)}
                         placeholder="新しい別名を入力"
+                        autoComplete="off"
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter') {
@@ -411,9 +417,15 @@ export default function EditSchoolPage() {
                     この学校を他の学校に統合します。統合後、この学校のstatusは「merged」に変更され、すべての口コミデータが統合先の学校に移動します。この操作は取り消せません。
                   </p>
                   <div className="flex gap-2">
+                    <label htmlFor="merge-target" className="sr-only">
+                      統合先の学校を選択
+                    </label>
                     <select
+                      id="merge-target"
+                      name="merge-target"
                       value={mergeTargetId}
                       onChange={(e) => setMergeTargetId(e.target.value)}
+                      autoComplete="off"
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
                     >
                       <option value="">統合先の学校を選択</option>

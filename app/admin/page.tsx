@@ -1,8 +1,23 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { checkAdminAccess } from '@/lib/auth/client';
+import type { AdminUser } from '@/lib/auth/client';
 
 export default function AdminPage() {
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAdminAccess().then((user) => {
+      setAdminUser(user);
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
+  }, []);
+
   const menuItems = [
     {
       title: '学校管理',
@@ -89,6 +104,43 @@ export default function AdminPage() {
       color: 'purple',
     },
   ];
+
+  // ownerのみ管理者管理メニューを追加
+  if (adminUser?.role === 'owner') {
+    menuItems.push({
+      title: '管理者管理',
+      description: '管理者アカウントの追加・編集・削除を行います（ownerのみ）',
+      href: '/admin/admin-users',
+      icon: (
+        <svg
+          className="w-12 h-12 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+          />
+        </svg>
+      ),
+      color: 'red',
+    });
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <p className="text-gray-600">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

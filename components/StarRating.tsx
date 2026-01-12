@@ -6,6 +6,7 @@ interface StarRatingProps {
   maxStars?: number;
   hasNotApplicable?: boolean;
   notApplicableLabel?: string;
+  id?: string;
 }
 
 export default function StarRating({
@@ -14,6 +15,7 @@ export default function StarRating({
   maxStars = 5,
   hasNotApplicable = false,
   notApplicableLabel = '該当なし',
+  id,
 }: StarRatingProps) {
   const currentValue = value ? parseInt(value) : 0;
   const isNotApplicable = currentValue === 6;
@@ -27,7 +29,7 @@ export default function StarRating({
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div id={id} className="flex flex-col gap-3" role="group" aria-labelledby={`${id}-label`}>
       <div className="flex items-center gap-2">
         {Array.from({ length: maxStars }, (_, index) => {
           const starValue = index + 1;

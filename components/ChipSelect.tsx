@@ -8,6 +8,7 @@ interface ChipSelectProps {
   options: { label: string; value: string }[];
   error?: string;
   columns?: number; // PCでの列数（デフォルト2-3列）
+  id?: string;
 }
 
 export default function ChipSelect({
@@ -16,6 +17,7 @@ export default function ChipSelect({
   options,
   error,
   columns = 2,
+  id,
 }: ChipSelectProps) {
   return (
     <Controller
@@ -25,7 +27,7 @@ export default function ChipSelect({
         const selectedValues = field.value || [];
         
         return (
-          <div>
+          <div id={id || name} role="group" aria-labelledby={`${id || name}-label`}>
             <div
               className={`grid gap-3 ${
                 columns === 2

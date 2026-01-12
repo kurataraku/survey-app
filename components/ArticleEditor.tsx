@@ -8,9 +8,10 @@ import RichTextEditor from './RichTextEditor';
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
+  id?: string;
 }
 
-function ImageUpload({ value, onChange }: ImageUploadProps) {
+function ImageUpload({ value, onChange, id }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
@@ -93,7 +94,7 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
   };
 
   return (
-    <div className="space-y-2">
+    <div id={id} className="space-y-2">
       <div
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -107,6 +108,8 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
       >
         <input
           ref={fileInputRef}
+          id="article-image-upload"
+          name="article-image-upload"
           type="file"
           accept="image/*"
           onChange={handleFileInputChange}
@@ -151,7 +154,12 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
       </div>
       {previewUrl && (
         <div className="flex items-center gap-2">
+          <label htmlFor="article-image-url" className="sr-only">
+            画像URL
+          </label>
           <input
+            id="article-image-url"
+            name="article-image-url"
             type="url"
             value={previewUrl}
             onChange={(e) => {
@@ -159,11 +167,14 @@ function ImageUpload({ value, onChange }: ImageUploadProps) {
               setPreviewUrl(url);
               onChange(url);
             }}
+            autoComplete="off"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             placeholder="または画像URLを直接入力"
           />
           <button
             type="button"
+            id="article-image-delete"
+            name="article-image-delete"
             onClick={() => {
               onChange('');
               setPreviewUrl(null);
@@ -316,10 +327,11 @@ export default function ArticleEditor({
       </div>
 
       <div>
-        <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="block text-sm font-medium text-gray-700 mb-1">
           本文
-        </label>
+        </div>
         <RichTextEditor
+          id="content"
           value={formData.content}
           onChange={(html) => {
             setFormData((prev) => ({ ...prev, content: html }));
@@ -332,10 +344,11 @@ export default function ArticleEditor({
       </div>
 
       <div>
-        <label htmlFor="featured_image_url" className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="block text-sm font-medium text-gray-700 mb-1">
           アイキャッチ画像
-        </label>
+        </div>
         <ImageUpload
+          id="featured_image_url"
           value={formData.featured_image_url}
           onChange={(url) => {
             setFormData((prev) => ({ ...prev, featured_image_url: url }));
@@ -394,6 +407,8 @@ export default function ArticleEditor({
       <div className="flex justify-end gap-4 pt-4">
         <button
           type="submit"
+          id="article-submit"
+          name="article-submit"
           disabled={isSubmitting}
           className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

@@ -57,22 +57,58 @@ export default function QuestionRenderer({
   const schoolIdError = question.id === 'school_name' ? errors['school_id'] : null;
   const fieldName = question.id;
 
+  // ChipSelect、StarRating、ラジオボタンは実際の単一フォームフィールドを持たないため、htmlForを設定しない
+  // singleSelectでselect要素を使用する場合（campus_prefecture、enrollment_year）のみhtmlForを設定
+  // singleSelectでラジオボタンを使用する場合（respondent_role、status、graduation_pathなど）はhtmlForを設定しない
+  const usesRadioButtons = question.type === 'radio' || 
+    (question.type === 'singleSelect' && 
+     question.id !== 'campus_prefecture' && 
+     question.id !== 'enrollment_year');
+  
+  const hasFormField = !usesRadioButtons && 
+    question.type !== 'multiSelect' &&
+    (question.type === 'text' || 
+     question.type === 'email' || 
+     question.type === 'textarea' ||
+     (question.type === 'singleSelect' && 
+      (question.id === 'campus_prefecture' || question.id === 'enrollment_year')));
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/QuestionRenderer.tsx:75',message:'hasFormField check',data:{questionId:question.id,questionType:question.type,usesRadioButtons,hasFormField,fieldName},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
   return (
     <div className="mb-6" data-question-id={question.id}>
-      <label 
-        htmlFor={fieldName}
-        className={`block font-medium mb-2 ${
-          question.id === 'overall_satisfaction' || question.id === 'good_comment' || question.id === 'bad_comment'
-            ? 'text-lg font-semibold' 
-            : 'text-sm'
-        }`}
-        style={{ 
-          fontFamily: 'var(--ce-font-body)',
-          color: 'var(--ce-text)'
-        }}>
-        {question.label}
-        {question.required && <span style={{ color: 'var(--ce-warning)' }} className="ml-1">*</span>}
-      </label>
+      {hasFormField ? (
+        <label 
+          htmlFor={fieldName}
+          className={`block font-medium mb-2 ${
+            question.id === 'overall_satisfaction' || question.id === 'good_comment' || question.id === 'bad_comment'
+              ? 'text-lg font-semibold' 
+              : 'text-sm'
+          }`}
+          style={{ 
+            fontFamily: 'var(--ce-font-body)',
+            color: 'var(--ce-text)'
+          }}>
+          {question.label}
+          {question.required && <span style={{ color: 'var(--ce-warning)' }} className="ml-1">*</span>}
+        </label>
+      ) : (
+        <div 
+          className={`block font-medium mb-2 ${
+            question.id === 'overall_satisfaction' || question.id === 'good_comment' || question.id === 'bad_comment'
+              ? 'text-lg font-semibold' 
+              : 'text-sm'
+          }`}
+          style={{ 
+            fontFamily: 'var(--ce-font-body)',
+            color: 'var(--ce-text)'
+          }}>
+          {question.label}
+          {question.required && <span style={{ color: 'var(--ce-warning)' }} className="ml-1">*</span>}
+        </div>
+      )}
       {/* エラー表示（入力欄の直下に1行だけ表示） */}
       {error && (
         <p className="mb-2 text-sm font-semibold animate-pulse" data-error-field={question.id} style={{ 
@@ -135,10 +171,18 @@ export default function QuestionRenderer({
                 name={fieldName}
                 control={control}
                 rules={{ required: question.required }}
-                render={({ field }) => (
+                defaultValue=""
+                render={({ field }) => {
+                  const inputValue = field.value ?? '';
+                  return (
                   <input
+                    id={fieldName}
+                    name={fieldName}
                     type="text"
-                    {...field}
+                    autoComplete="off"
+                    value={inputValue}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
                     placeholder={question.placeholder}
                     className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
                     style={{
@@ -150,7 +194,8 @@ export default function QuestionRenderer({
                       } as React.CSSProperties)
                     }}
                   />
-                )}
+                  );
+                }}
               />
             );
           }
@@ -160,10 +205,21 @@ export default function QuestionRenderer({
           name={fieldName}
           control={control}
           rules={{ required: question.required }}
-          render={({ field }) => (
+          defaultValue=""
+          render={({ field }) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/QuestionRenderer.tsx:203',message:'text input render',data:{fieldName,fieldValue:field.value,fieldValueType:typeof field.value,isUndefined:field.value===undefined,isNull:field.value===null},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+            const inputValue = field.value ?? '';
+            return (
             <input
+              id={fieldName}
+              name={fieldName}
               type="text"
-              {...field}
+              autoComplete="off"
+              value={inputValue}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
               placeholder={question.placeholder}
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
               style={{
@@ -180,14 +236,9 @@ export default function QuestionRenderer({
                   e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0, 191, 99, 0.2)';
                 }
               }}
-              onBlur={(e) => {
-                if (!error) {
-                  e.currentTarget.style.borderColor = 'var(--ce-border)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }
-              }}
             />
-          )}
+            );
+          }}
         />
       )}
 
@@ -196,10 +247,18 @@ export default function QuestionRenderer({
           name={fieldName}
           control={control}
           rules={{ required: question.required }}
-          render={({ field }) => (
+          defaultValue=""
+          render={({ field }) => {
+            const inputValue = field.value ?? '';
+            return (
             <input
+              id={fieldName}
+              name={fieldName}
               type="email"
-              {...field}
+              autoComplete="email"
+              value={inputValue}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
               placeholder={question.placeholder}
               className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
               style={{
@@ -216,14 +275,9 @@ export default function QuestionRenderer({
                   e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0, 191, 99, 0.2)';
                 }
               }}
-              onBlur={(e) => {
-                if (!error) {
-                  e.currentTarget.style.borderColor = 'var(--ce-border)';
-                  e.currentTarget.style.boxShadow = 'none';
-                }
-              }}
             />
-          )}
+            );
+          }}
         />
       )}
 
@@ -246,6 +300,7 @@ export default function QuestionRenderer({
           
           return (
             <TextAreaWithCounter
+              id={fieldName}
               name={fieldName}
               control={control}
               placeholder={question.placeholder}
@@ -266,6 +321,7 @@ export default function QuestionRenderer({
             rules={{ required: question.required }}
             render={({ field }) => (
               <select
+                id={fieldName}
                 {...field}
                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
                 style={{
@@ -307,38 +363,44 @@ export default function QuestionRenderer({
                 ? 'flex gap-2' 
                 : 'grid grid-cols-1 md:grid-cols-2 gap-2'
               }>
-                {question.options?.map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex items-center p-3 border rounded-md cursor-pointer ${
-                      question.id === 'respondent_role' ? 'flex-1' : ''
-                    }`}
-                    style={{
-                      borderRadius: 'var(--ce-radius-control)',
-                      borderColor: 'var(--ce-border)',
-                      fontFamily: 'var(--ce-font-body)',
-                      color: 'var(--ce-text)',
-                      backgroundColor: 'var(--ce-surface)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--ce-bg)';
-                      e.currentTarget.style.borderColor = 'var(--ce-muted)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--ce-surface)';
-                      e.currentTarget.style.borderColor = 'var(--ce-border)';
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      {...field}
-                      value={option.value}
-                      checked={field.value === option.value}
-                      className="mr-3"
-                    />
-                    <span className="text-xs">{option.label}</span>
-                  </label>
-                ))}
+                {question.options?.map((option) => {
+                  const radioId = `radio-${fieldName}-${option.value}`;
+                  return (
+                    <label
+                      key={option.value}
+                      htmlFor={radioId}
+                      className={`flex items-center p-3 border rounded-md cursor-pointer ${
+                        question.id === 'respondent_role' ? 'flex-1' : ''
+                      }`}
+                      style={{
+                        borderRadius: 'var(--ce-radius-control)',
+                        borderColor: 'var(--ce-border)',
+                        fontFamily: 'var(--ce-font-body)',
+                        color: 'var(--ce-text)',
+                        backgroundColor: 'var(--ce-surface)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--ce-bg)';
+                        e.currentTarget.style.borderColor = 'var(--ce-muted)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--ce-surface)';
+                        e.currentTarget.style.borderColor = 'var(--ce-border)';
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        id={radioId}
+                        name={fieldName}
+                        {...field}
+                        value={option.value}
+                        checked={field.value === option.value}
+                        className="mr-3"
+                      />
+                      <span className="text-xs">{option.label}</span>
+                    </label>
+                  );
+                })}
               </div>
             )}
           />
@@ -349,6 +411,7 @@ export default function QuestionRenderer({
         <div>
           <p className="text-xs text-gray-500 mb-3">※複数選択可能</p>
           <ChipSelect
+            id={fieldName}
             name={fieldName}
             control={control}
             options={question.options}
@@ -357,20 +420,35 @@ export default function QuestionRenderer({
           />
           {shouldShowOtherInput() && (
             <div className="mt-4">
+              <label htmlFor="atmosphere_other" className="block text-sm font-medium mb-2" style={{ 
+                fontFamily: 'var(--ce-font-body)',
+                color: 'var(--ce-text)'
+              }}>
+                その他（生徒の雰囲気）
+              </label>
               <Controller
                 name="atmosphere_other"
                 control={control}
                 rules={{ required: true }}
-                render={({ field: otherField }) => (
+                defaultValue=""
+                render={({ field: otherField }) => {
+                  const inputValue = otherField.value ?? '';
+                  return (
                   <input
+                    id="atmosphere_other"
+                    name="atmosphere_other"
                     type="text"
-                    {...otherField}
+                    autoComplete="off"
+                    value={inputValue}
+                    onChange={otherField.onChange}
+                    onBlur={otherField.onBlur}
                     placeholder="その他（生徒の雰囲気）を入力してください"
                     className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                       errors.atmosphere_other ? 'border-red-400' : 'border-gray-200'
                     }`}
                   />
-                )}
+                  );
+                }}
               />
             </div>
           )}
@@ -403,6 +481,7 @@ export default function QuestionRenderer({
               return (
                 <div>
                   <StarRating
+                    id={fieldName}
                     value={field.value}
                     onChange={field.onChange}
                     maxStars={5}
@@ -421,36 +500,42 @@ export default function QuestionRenderer({
             rules={{ required: question.required }}
             render={({ field }) => (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {question.options?.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex items-center p-3 border rounded-md cursor-pointer"
-                    style={{
-                      borderRadius: 'var(--ce-radius-control)',
-                      borderColor: 'var(--ce-border)',
-                      fontFamily: 'var(--ce-font-body)',
-                      color: 'var(--ce-text)',
-                      backgroundColor: 'var(--ce-surface)'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--ce-bg)';
-                      e.currentTarget.style.borderColor = 'var(--ce-muted)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--ce-surface)';
-                      e.currentTarget.style.borderColor = 'var(--ce-border)';
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      {...field}
-                      value={option.value}
-                      checked={field.value === option.value}
-                      className="mr-3"
-                    />
-                    <span className="text-xs">{option.label}</span>
-                  </label>
-                ))}
+                {question.options?.map((option) => {
+                  const radioId = `radio-${fieldName}-${option.value}`;
+                  return (
+                    <label
+                      key={option.value}
+                      htmlFor={radioId}
+                      className="flex items-center p-3 border rounded-md cursor-pointer"
+                      style={{
+                        borderRadius: 'var(--ce-radius-control)',
+                        borderColor: 'var(--ce-border)',
+                        fontFamily: 'var(--ce-font-body)',
+                        color: 'var(--ce-text)',
+                        backgroundColor: 'var(--ce-surface)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--ce-bg)';
+                        e.currentTarget.style.borderColor = 'var(--ce-muted)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--ce-surface)';
+                        e.currentTarget.style.borderColor = 'var(--ce-border)';
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        id={radioId}
+                        name={fieldName}
+                        {...field}
+                        value={option.value}
+                        checked={field.value === option.value}
+                        className="mr-3"
+                      />
+                      <span className="text-xs">{option.label}</span>
+                    </label>
+                  );
+                })}
               </div>
             )}
           />
@@ -462,14 +547,28 @@ export default function QuestionRenderer({
       {/* 「その他」入力欄（graduation_path_other用） */}
       {shouldShowOtherInput() && question.id === 'graduation_path' && (
         <div className="mt-3">
+          <label htmlFor="graduation_path_other" className="block text-sm font-medium mb-2" style={{ 
+            fontFamily: 'var(--ce-font-body)',
+            color: 'var(--ce-text)'
+          }}>
+            その他（卒業後の進路）
+          </label>
           <Controller
             name="graduation_path_other"
             control={control}
             rules={{ required: true }}
-            render={({ field: otherField }) => (
+            defaultValue=""
+            render={({ field: otherField }) => {
+              const inputValue = otherField.value ?? '';
+              return (
               <input
+                id="graduation_path_other"
+                name="graduation_path_other"
                 type="text"
-                {...otherField}
+                autoComplete="off"
+                value={inputValue}
+                onChange={otherField.onChange}
+                onBlur={otherField.onBlur}
                 placeholder="その他（卒業後の進路）を入力してください"
                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
                 style={{
@@ -490,7 +589,8 @@ export default function QuestionRenderer({
                   }
                 }}
               />
-            )}
+              );
+            }}
           />
         </div>
       )}

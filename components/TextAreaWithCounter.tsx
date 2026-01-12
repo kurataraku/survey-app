@@ -9,6 +9,7 @@ interface TextAreaWithCounterProps {
   minLength: number;
   currentLength: number;
   error?: string;
+  id?: string;
 }
 
 export default function TextAreaWithCounter({
@@ -18,6 +19,7 @@ export default function TextAreaWithCounter({
   minLength,
   currentLength,
   error,
+  id,
 }: TextAreaWithCounterProps) {
   const remaining = minLength - currentLength;
   const isInsufficient = currentLength < minLength;
@@ -29,6 +31,7 @@ export default function TextAreaWithCounter({
       render={({ field }) => (
         <div>
           <textarea
+            id={id || name}
             {...field}
             rows={5}
             placeholder={placeholder}

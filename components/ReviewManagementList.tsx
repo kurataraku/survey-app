@@ -304,10 +304,12 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="reason-for-choosing" className="block text-sm font-medium text-gray-700 mb-1">
                   通信制を選んだ理由
                 </label>
                 <input
+                  id="reason-for-choosing"
+                  name="reason-for-choosing"
                   type="text"
                   value={Array.isArray(editFormData.reason_for_choosing) 
                     ? editFormData.reason_for_choosing.join(', ') 
@@ -319,16 +321,19 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                       reason_for_choosing: value ? value.split(',').map(s => s.trim()) : [],
                     });
                   }}
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="カンマ区切りで入力（例: 心の不調のため, 人間関係）"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="attendance-frequency" className="block text-sm font-medium text-gray-700 mb-1">
                   通学頻度
                 </label>
                 <select
+                  id="attendance-frequency"
+                  name="attendance-frequency"
                   value={editFormData.attendance_frequency || ''}
                   onChange={(e) =>
                     setEditFormData({
@@ -336,6 +341,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                       attendance_frequency: e.target.value,
                     })
                   }
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">選択してください</option>
@@ -355,8 +361,10 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                   {prefectures.map((pref) => {
                     const isSelected = editFormData.campus_prefecture?.includes(pref) || false;
                     return (
-                      <label key={pref} className="flex items-center">
+                      <label key={pref} htmlFor={`campus-prefecture-${pref}`} className="flex items-center">
                         <input
+                          id={`campus-prefecture-${pref}`}
+                          name={`campus-prefecture-${pref}`}
                           type="checkbox"
                           checked={isSelected}
                           onChange={(e) => {

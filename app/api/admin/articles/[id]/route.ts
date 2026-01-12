@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/auth/admin';
 
 export async function GET(
   request: NextRequest,
@@ -72,6 +73,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     // Next.js 16ではparamsがPromiseの可能性がある
     const resolvedParams = params instanceof Promise ? await params : params;
@@ -189,6 +195,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     // Next.js 16ではparamsがPromiseの可能性がある
     const resolvedParams = params instanceof Promise ? await params : params;

@@ -44,9 +44,9 @@ export default function JsonObjectArrayEditor({
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-2">
-        <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <fieldset>
+      <legend className="block text-sm font-medium text-gray-700 mb-2">{label}</legend>
+      <div className="flex justify-end mb-2">
         <button
           type="button"
           onClick={handleAdd}
@@ -88,25 +88,31 @@ export default function JsonObjectArrayEditor({
             </div>
             <div className="space-y-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor={`${label}-${index}-question`} className="block text-sm font-medium text-gray-700 mb-1">
                   {keyLabel}
                 </label>
                 <input
+                  id={`${label}-${index}-question`}
+                  name={`${label}-${index}-question`}
                   type="text"
                   value={item.question}
                   onChange={(e) => handleChange(index, 'question', e.target.value)}
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="質問を入力"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor={`${label}-${index}-answer`} className="block text-sm font-medium text-gray-700 mb-1">
                   {valueLabel}
                 </label>
                 <textarea
+                  id={`${label}-${index}-answer`}
+                  name={`${label}-${index}-answer`}
                   value={item.answer}
                   onChange={(e) => handleChange(index, 'answer', e.target.value)}
                   rows={3}
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="回答を入力"
                 />
@@ -118,7 +124,7 @@ export default function JsonObjectArrayEditor({
           <p className="text-sm text-gray-500">項目がありません。追加ボタンで追加してください。</p>
         )}
       </div>
-    </div>
+    </fieldset>
   );
 }
 

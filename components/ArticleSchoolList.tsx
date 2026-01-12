@@ -190,10 +190,13 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
               学校を検索
             </label>
             <input
+              id="article-school-search"
+              name="article-school-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="学校名または都道府県で検索"
+              autoComplete="off"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -219,25 +222,31 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
           {selectedSchoolId && (
             <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="article-school-display-order" className="block text-sm font-medium text-gray-700 mb-1">
                   表示順
                 </label>
                 <input
+                  id="article-school-display-order"
+                  name="article-school-display-order"
                   type="number"
                   value={displayOrder}
                   onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 0)}
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="article-school-note" className="block text-sm font-medium text-gray-700 mb-1">
                   コメント
                 </label>
                 <textarea
+                  id="article-school-note"
+                  name="article-school-note"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   rows={2}
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="この学校についてのコメント（オプション）"
                 />
@@ -312,13 +321,19 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                     </div>
                   </div>
                   <div className="mt-2">
+                    <label htmlFor={`article-school-note-${index}`} className="sr-only">
+                      コメント
+                    </label>
                     <textarea
+                      id={`article-school-note-${index}`}
+                      name={`article-school-note-${index}`}
                       value={articleSchool.note || ''}
                       onChange={(e) => {
                         const newSchools = [...schools];
                         newSchools[index].note = e.target.value;
                         setSchools(newSchools);
                       }}
+                      autoComplete="off"
                       onBlur={() =>
                         handleUpdateSchool(
                           articleSchool.school_id,

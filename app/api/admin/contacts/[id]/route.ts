@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '@/lib/auth/admin';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/contacts/[id]/route.ts:4',message:'GET request entry',data:{paramsType:typeof params,isPromise:params instanceof Promise},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
@@ -105,6 +111,11 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     // Next.js 16では params が Promise になる可能性がある
     const resolvedParams = params instanceof Promise ? await params : params;
@@ -121,9 +132,6 @@ export async function PATCH(
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // 認証チェック（簡易版 - 実際の実装では適切な認証を実装してください）
-    // TODO: 実際の認証チェックを実装
 
     const body = await request.json();
     const { is_read } = body;

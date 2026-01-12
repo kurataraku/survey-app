@@ -51,12 +51,37 @@ function SchoolsPageContent() {
         params.append('prefecture', prefectureFilter);
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/schools/page.tsx:54',message:'fetchSchools: API request start',data:{url:`/api/admin/schools?${params.toString()}`,page,limit,searchQuery,statusFilter,prefectureFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+
       const response = await fetch(`/api/admin/schools?${params.toString()}`);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/schools/page.tsx:56',message:'fetchSchools: API response received',data:{status:response.status,statusText:response.statusText,ok:response.ok,headers:Object.fromEntries(response.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+
       if (!response.ok) {
-        throw new Error('学校一覧の取得に失敗しました');
+        let errorMessage = '学校一覧の取得に失敗しました';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/schools/page.tsx:61',message:'fetchSchools: API error response',data:{status:response.status,errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+        } catch (parseError) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/schools/page.tsx:66',message:'fetchSchools: Failed to parse error response',data:{status:response.status,parseError:parseError instanceof Error ? parseError.message : String(parseError)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/schools/page.tsx:72',message:'fetchSchools: API success',data:{schoolsCount:data.schools?.length||0,total:data.total||0,totalPages:data.total_pages||1},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       
       // 各学校の口コミ数を取得
       const schoolsWithStats = await Promise.all(
@@ -85,7 +110,10 @@ function SchoolsPageContent() {
       setTotalPages(data.total_pages);
     } catch (error) {
       console.error('学校一覧取得エラー:', error);
-      alert('学校一覧の取得に失敗しました');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/schools/page.tsx:86',message:'fetchSchools: Exception caught',data:{errorMessage:error instanceof Error ? error.message : String(error),errorStack:error instanceof Error ? error.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      alert(error instanceof Error ? error.message : '学校一覧の取得に失敗しました');
     } finally {
       setLoading(false);
     }
@@ -133,11 +161,17 @@ function SchoolsPageContent() {
           <form onSubmit={handleSearch} className="space-y-4 mb-6">
             <div className="flex gap-4">
               <div className="flex-1">
+                <label htmlFor="school-search-query" className="sr-only">
+                  学校名で検索
+                </label>
                 <input
+                  id="school-search-query"
+                  name="school-search-query"
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="学校名で検索"
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -150,15 +184,18 @@ function SchoolsPageContent() {
             </div>
             <div className="flex gap-4">
               <div className="w-48">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
                   状態
                 </label>
                 <select
+                  id="status-filter"
+                  name="status-filter"
                   value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value);
                     handleFilterChange();
                   }}
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">すべて</option>
@@ -168,15 +205,18 @@ function SchoolsPageContent() {
                 </select>
               </div>
               <div className="w-48">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="prefecture-filter" className="block text-sm font-medium text-gray-700 mb-1">
                   都道府県
                 </label>
                 <select
+                  id="prefecture-filter"
+                  name="prefecture-filter"
                   value={prefectureFilter}
                   onChange={(e) => {
                     setPrefectureFilter(e.target.value);
                     handleFilterChange();
                   }}
+                  autoComplete="off"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">すべて</option>

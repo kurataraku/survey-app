@@ -217,6 +217,7 @@ export default function SchoolAutocomplete({
               type="text"
               name={name}
               id={name}
+              autoComplete="organization"
               value={displayValue || ''} // 念のため空文字列を保証
               onChange={(e) => {
                 const value = e.target.value;

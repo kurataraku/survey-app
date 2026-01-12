@@ -67,6 +67,7 @@ export default function SchoolEditor({
           name="name"
           value={formData.name}
           onChange={(e) => handleNameChange(e.target.value)}
+          autoComplete="organization"
           required
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -94,6 +95,7 @@ export default function SchoolEditor({
               setFormData((prev) => ({ ...prev, prefecture: newPrefecture }));
             }
           }}
+          autoComplete="address-level1"
           required
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
@@ -106,16 +108,18 @@ export default function SchoolEditor({
         </select>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+      <fieldset>
+        <legend className="block text-sm font-medium text-gray-700 mb-1">
           都道府県（複数選択可）
-        </label>
+        </legend>
         <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 rounded-lg p-3">
           {prefectures.map((pref) => {
             const isSelected = formData.prefectures?.includes(pref) || false;
             return (
-              <label key={pref} className="flex items-center">
+              <label key={pref} htmlFor={`prefecture-${pref}`} className="flex items-center">
                 <input
+                  id={`prefecture-${pref}`}
+                  name={`prefecture-${pref}`}
                   type="checkbox"
                   checked={isSelected}
                   onChange={(e) => {
@@ -152,7 +156,7 @@ export default function SchoolEditor({
         <p className="mt-1 text-sm text-gray-500">
           選択された都道府県: {formData.prefectures?.length || 0}件
         </p>
-      </div>
+      </fieldset>
 
       <div>
         <label htmlFor="slug" className="block text-sm font-medium text-gray-700 mb-1">
@@ -164,6 +168,7 @@ export default function SchoolEditor({
           name="slug"
           value={formData.slug}
           onChange={(e) => handleSlugChange(e.target.value)}
+          autoComplete="off"
           required
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -182,6 +187,7 @@ export default function SchoolEditor({
           value={formData.intro}
           onChange={(e) => setFormData((prev) => ({ ...prev, intro: e.target.value }))}
           rows={6}
+          autoComplete="off"
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="学校の紹介文を入力してください"
         />

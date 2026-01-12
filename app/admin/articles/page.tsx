@@ -178,21 +178,33 @@ function ArticlesPageContent() {
 
           <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="flex-1">
+              <label htmlFor="search-query" className="sr-only">
+                記事タイトルで検索
+              </label>
               <input
+                id="search-query"
+                name="search-query"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="記事タイトルで検索"
+                autoComplete="off"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="md:w-64">
+              <label htmlFor="category-filter" className="sr-only">
+                カテゴリでフィルター
+              </label>
               <select
+                id="category-filter"
+                name="category-filter"
                 value={categoryFilter}
                 onChange={(e) => {
                   setCategoryFilter(e.target.value);
                   setPage(1);
                 }}
+                autoComplete="off"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">すべてのカテゴリ</option>

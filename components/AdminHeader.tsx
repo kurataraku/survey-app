@@ -1,0 +1,114 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { getClient } from '@/lib/supabase/client';
+import { checkAdminAccess } from '@/lib/auth/client';
+import type { AdminUser } from '@/lib/auth/client';
+
+export default function AdminHeader() {
+  const router = useRouter();
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/AdminHeader.tsx:15',message:'checkAdminAccess called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    checkAdminAccess().then((user) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/AdminHeader.tsx:19',message:'checkAdminAccess result',data:{hasUser:!!user,userRole:user?.role||null,userEmail:user?.email||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
+      setAdminUser(user);
+      setLoading(false);
+    }).catch((error) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/AdminHeader.tsx:22',message:'checkAdminAccess error',data:{errorMessage:error?.message||String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
+      console.error('[AdminHeader] checkAdminAccess error:', error);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    if (!confirm('ログアウトしますか？')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const supabase = getClient();
+        await supabase.auth.signOut();
+        router.push('/admin/login');
+        router.refresh();
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('ログアウトに失敗しました');
+    }
+  };
+
+  if (loading) {
+    return null;
+  }
+
+  return (
+    <header className="bg-white shadow-sm border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center space-x-8">
+            <Link href="/admin" className="text-xl font-bold text-gray-900">
+              管理画面
+            </Link>
+            <nav className="flex space-x-4">
+              <Link
+                href="/admin/schools"
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                学校管理
+              </Link>
+              <Link
+                href="/admin/articles"
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                記事管理
+              </Link>
+              <Link
+                href="/admin/contacts"
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                お問い合わせ
+              </Link>
+              {adminUser?.role === 'owner' && (
+                <Link
+                  href="/admin/admin-users"
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  管理者管理
+                </Link>
+              )}
+            </nav>
+          </div>
+          <div className="flex items-center space-x-4">
+            {adminUser && (
+              <span className="text-sm text-gray-600">
+                {adminUser.email} ({adminUser.role === 'owner' ? 'オーナー' : '管理者'})
+              </span>
+            )}
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              ログアウト
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
