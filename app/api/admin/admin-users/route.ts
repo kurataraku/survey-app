@@ -267,23 +267,57 @@ export async function POST(request: NextRequest) {
     // Supabase Authでユーザーを招待
     // 注意: auth.admin.inviteUserByEmail()はSupabase Admin APIを使用
     // @supabase/supabase-jsのバージョンによっては異なる方法が必要な場合があります
-    // サイトURLを取得: 環境変数 > リクエストヘッダー > リクエストのオリジン > localhost
+    // サイトURLを取得: 環境変数 > Vercel環境変数 > リクエストヘッダー > リクエストのオリジン > localhost
+    // Vercelでは、VERCEL_URLが自動的に設定される（例: real-review.vercel.app）
+    // また、x-forwarded-hostとx-forwarded-protoからも本番URLを取得できる
+    const vercelUrl = process.env.VERCEL_URL; // Vercelが自動設定（例: real-review.vercel.app）
     const hostHeader = request.headers.get('host');
     const forwardedHostHeader = request.headers.get('x-forwarded-host');
     const forwardedProtoHeader = request.headers.get('x-forwarded-proto');
-    const host = hostHeader || forwardedHostHeader;
-    const protocol = forwardedProtoHeader || (request.nextUrl.protocol === 'https:' ? 'https' : 'http');
+    
+    // 優先順位: x-forwarded-host > host > VERCEL_URL
+    const host = forwardedHostHeader || hostHeader || (vercelUrl ? vercelUrl : null);
+    // 優先順位: x-forwarded-proto > https (Vercelは常にhttps) > http
+    const protocol = forwardedProtoHeader || (vercelUrl ? 'https' : (request.nextUrl.protocol === 'https:' ? 'https' : 'http'));
+    
+    // ヘッダーから取得したURLを構築
     const originFromHeaders = host ? `${protocol}://${host}` : null;
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || originFromHeaders || request.nextUrl.origin || 'http://localhost:3000';
+    
+    // 最終的なsiteUrlの決定（優先順位: NEXT_PUBLIC_SITE_URL > ヘッダーから取得 > VERCEL_URL > request.nextUrl.origin > localhost）
+    let siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!siteUrl) {
+      if (originFromHeaders) {
+        siteUrl = originFromHeaders;
+      } else if (vercelUrl) {
+        siteUrl = `https://${vercelUrl}`;
+      } else {
+        siteUrl = request.nextUrl.origin || 'http://localhost:3000';
+      }
+    }
+    
+    // localhostが含まれている場合は警告（本番環境では発生すべきでない）
+    if (siteUrl.includes('localhost')) {
+      console.warn('[Admin Users API] WARNING: siteUrl contains localhost in production!', {
+        siteUrl,
+        NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+        VERCEL_URL: vercelUrl,
+        hostHeader,
+        forwardedHostHeader,
+        forwardedProtoHeader,
+        requestOrigin: request.nextUrl.origin,
+      });
+    }
+    
     const redirectTo = `${siteUrl}/admin/reset-password`;
     
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:270',message:'Site URL determination - Hypothesis 1,2,3',data:{NEXT_PUBLIC_SITE_URL:process.env.NEXT_PUBLIC_SITE_URL||'not set',hostHeader,forwardedHostHeader,forwardedProtoHeader,host,protocol,originFromHeaders,requestOrigin:request.nextUrl.origin,requestUrl:request.nextUrl.toString(),finalSiteUrl:siteUrl,redirectTo,allHeaders:Object.fromEntries(request.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:270',message:'Site URL determination - Hypothesis 1,2,3',data:{NEXT_PUBLIC_SITE_URL:process.env.NEXT_PUBLIC_SITE_URL||'not set',VERCEL_URL:vercelUrl||'not set',hostHeader,forwardedHostHeader,forwardedProtoHeader,host,protocol,originFromHeaders,requestOrigin:request.nextUrl.origin,requestUrl:request.nextUrl.toString(),finalSiteUrl:siteUrl,redirectTo,containsLocalhost:siteUrl.includes('localhost'),allHeaders:Object.fromEntries(request.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
     // デバッグログ（本番環境でも確認できるように）
     console.log('[Admin Users API] Site URL determination:', {
       NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'not set',
+      VERCEL_URL: vercelUrl || 'not set',
       hostHeader,
       forwardedHostHeader,
       forwardedProtoHeader,
@@ -294,6 +328,7 @@ export async function POST(request: NextRequest) {
       requestUrl: request.nextUrl.toString(),
       finalSiteUrl: siteUrl,
       redirectTo,
+      containsLocalhost: siteUrl.includes('localhost'),
     });
     
     // #region agent log
