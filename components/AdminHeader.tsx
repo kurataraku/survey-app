@@ -70,7 +70,7 @@ export default function AdminHeader() {
                 href="/admin/schools"
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
-                学校管理
+                高校管理
               </Link>
               <Link
                 href="/admin/articles"
