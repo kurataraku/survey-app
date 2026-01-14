@@ -566,7 +566,6 @@ export default function QuestionRenderer({
                 autoComplete="off"
                 value={inputValue}
                 onChange={otherField.onChange}
-                onBlur={otherField.onBlur}
                 placeholder="その他（卒業後の進路）を入力してください"
                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2"
                 style={{
@@ -581,6 +580,7 @@ export default function QuestionRenderer({
                   }
                 }}
                 onBlur={(e) => {
+                  otherField.onBlur();
                   if (!errors.graduation_path_other) {
                     e.currentTarget.style.borderColor = 'var(--ce-border)';
                     e.currentTarget.style.boxShadow = 'none';

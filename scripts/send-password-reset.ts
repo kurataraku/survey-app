@@ -40,7 +40,7 @@ async function sendPasswordReset() {
   console.log(`   メールアドレス: ${normalizedEmail}`);
   console.log(`   リダイレクト先: ${redirectTo}`);
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
   try {
     // パスワードリセットメールを送信

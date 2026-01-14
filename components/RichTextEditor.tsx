@@ -231,7 +231,6 @@ export default function RichTextEditor({
         <div
           ref={editorRef}
           id={id}
-          name={id}
           role="textbox"
           aria-label="本文エディタ"
           contentEditable

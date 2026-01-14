@@ -39,7 +39,7 @@ async function setupInitialOwner() {
   console.log('🚀 初期オーナー作成を開始します...');
   console.log(`   メールアドレス: ${normalizedEmail}`);
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
   try {
     // 1. 既存のadmin_usersをチェック

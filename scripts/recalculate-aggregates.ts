@@ -17,7 +17,7 @@ async function recalculateAggregates() {
     throw new Error('環境変数が設定されていません');
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
   console.log('集計データの再計算を開始...');
 

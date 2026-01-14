@@ -26,7 +26,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
 // バッチサイズ（環境変数で指定可能、デフォルト: 100）
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '100', 10);

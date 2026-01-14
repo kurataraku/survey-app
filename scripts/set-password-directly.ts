@@ -62,7 +62,7 @@ async function setPasswordDirectly() {
     }
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
   try {
     // 1. ユーザーを取得

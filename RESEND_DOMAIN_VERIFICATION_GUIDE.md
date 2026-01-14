@@ -399,34 +399,20 @@ EMAIL_FROM=noreply@example.com  # 検証済みドメインのメールアドレ�
 
 **設定例:**
 
-あなたが`careeressence.jp`を検証した場合：
+あなたが`example.com`を検証した場合：
 
 ```env
-# 検証済みドメイン: careeressence.jp
-EMAIL_FROM=noreply@careeressence.jp  # ✅ 正しい
-EMAIL_FROM=hello@careeressence.jp    # ✅ 正しい（ローカル部分は自由）
-EMAIL_FROM=info@careeressence.jp     # ✅ 正しい（ローカル部分は自由）
-EMAIL_FROM=admin@careeressence.jp    # ✅ 正しい（ローカル部分は自由）
-EMAIL_FROM=no-reply@careeressence.jp # ✅ 正しい（ハイフンも使用可能）
+# 検証済みドメイン: example.com
+EMAIL_FROM=noreply@example.com  # ✅ 正しい
+EMAIL_FROM=hello@example.com    # ✅ 正しい（ローカル部分は自由）
+EMAIL_FROM=info@example.com     # ✅ 正しい（ローカル部分は自由）
 ```
 
 ```env
-# 検証済みドメイン: careeressence.jp
+# 検証済みドメイン: example.com
 EMAIL_FROM=noreply@otherdomain.com  # ❌ 間違い（otherdomain.comは検証されていない）
 EMAIL_FROM=onboarding@resend.dev     # ⚠️ テスト用（制限あり）
-EMAIL_FROM=user@careeressence.com    # ❌ 間違い（careeressence.comは検証されていない、.jpではない）
 ```
-
-**よくある質問:**
-
-**Q: `careeressence.jp`が検証済みの場合、`@careeressence.jp`の前は何でもいいですか？**
-
-A: はい、基本的には何でも構いません。ただし、以下の点に注意してください：
-
-- ✅ **使用可能な文字**: 英数字、ハイフン（-）、アンダースコア（_）、ドット（.）
-- ✅ **例**: `noreply@careeressence.jp`、`hello@careeressence.jp`、`admin@careeressence.jp`など
-- ⚠️ **推奨**: わかりやすく、用途に応じた名前にする（例: `noreply`、`hello`、`info`、`admin`など）
-- ❌ **避けるべき**: 特殊文字、日本語、スペースなど
 
 ### 確認方法
 
