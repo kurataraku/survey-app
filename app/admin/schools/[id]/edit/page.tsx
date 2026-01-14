@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SchoolEditor from '@/components/SchoolEditor';
 import ReviewManagementList from '@/components/ReviewManagementList';
+import AISummaryEditor from '@/components/AISummaryEditor';
 import { SchoolFormData, School } from '@/lib/types/schools';
 
 interface PrefectureStat {
@@ -20,7 +21,7 @@ export default function EditSchoolPage() {
   const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'reviews'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'reviews' | 'ai-summary'>('basic');
   const [prefectureStats, setPrefectureStats] = useState<PrefectureStat[]>([]);
   const [totalResponses, setTotalResponses] = useState(0);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -300,6 +301,16 @@ export default function EditSchoolPage() {
             >
               口コミ管理
             </button>
+            <button
+              onClick={() => setActiveTab('ai-summary')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'ai-summary'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              AI要約
+            </button>
           </nav>
         </div>
 
@@ -503,8 +514,10 @@ export default function EditSchoolPage() {
                 isSubmitting={isSubmitting}
               />
             </div>
-          ) : (
+          ) : activeTab === 'reviews' ? (
             <ReviewManagementList schoolId={id} />
+          ) : (
+            <AISummaryEditor schoolId={id} />
           )}
         </div>
       </div>
