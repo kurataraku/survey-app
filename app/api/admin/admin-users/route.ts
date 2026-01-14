@@ -268,25 +268,36 @@ export async function POST(request: NextRequest) {
     // 注意: auth.admin.inviteUserByEmail()はSupabase Admin APIを使用
     // @supabase/supabase-jsのバージョンによっては異なる方法が必要な場合があります
     // サイトURLを取得: 環境変数 > リクエストヘッダー > リクエストのオリジン > localhost
-    const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
-    const protocol = request.headers.get('x-forwarded-proto') || (request.nextUrl.protocol === 'https:' ? 'https' : 'http');
+    const hostHeader = request.headers.get('host');
+    const forwardedHostHeader = request.headers.get('x-forwarded-host');
+    const forwardedProtoHeader = request.headers.get('x-forwarded-proto');
+    const host = hostHeader || forwardedHostHeader;
+    const protocol = forwardedProtoHeader || (request.nextUrl.protocol === 'https:' ? 'https' : 'http');
     const originFromHeaders = host ? `${protocol}://${host}` : null;
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || originFromHeaders || request.nextUrl.origin || 'http://localhost:3000';
     const redirectTo = `${siteUrl}/admin/reset-password`;
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:270',message:'Site URL determination - Hypothesis 1,2,3',data:{NEXT_PUBLIC_SITE_URL:process.env.NEXT_PUBLIC_SITE_URL||'not set',hostHeader,forwardedHostHeader,forwardedProtoHeader,host,protocol,originFromHeaders,requestOrigin:request.nextUrl.origin,requestUrl:request.nextUrl.toString(),finalSiteUrl:siteUrl,redirectTo,allHeaders:Object.fromEntries(request.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     // デバッグログ（本番環境でも確認できるように）
     console.log('[Admin Users API] Site URL determination:', {
       NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'not set',
+      hostHeader,
+      forwardedHostHeader,
+      forwardedProtoHeader,
       host,
       protocol,
       originFromHeaders,
       requestOrigin: request.nextUrl.origin,
+      requestUrl: request.nextUrl.toString(),
       finalSiteUrl: siteUrl,
       redirectTo,
     });
     
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:99',message:'Before checking existing user',data:{email:normalizedEmail,role,redirectTo,hasServiceKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now(),sessionId:'debug-session',runId:'run9',hypothesisId:'I'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:289',message:'Before checking existing user',data:{email:normalizedEmail,role,redirectTo,hasServiceKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
     // まず、既存ユーザーかどうかを確認
@@ -324,6 +335,9 @@ export async function POST(request: NextRequest) {
       // #endregion
       
       // 既存ユーザーの場合、パスワードリセットリンクを生成
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:327',message:'Before generateLink for existing user - Hypothesis 4,5',data:{email:normalizedEmail,type:'recovery',redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       const { data: resetData, error: resetError } = await adminSupabase.auth.admin.generateLink({
         type: 'recovery',
         email: normalizedEmail,
@@ -333,7 +347,8 @@ export async function POST(request: NextRequest) {
       });
       
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:140',message:'After generateLink for existing user',data:{email:normalizedEmail,hasResetData:!!resetData,hasResetError:!!resetError,resetErrorCode:resetError?.code||null,resetErrorMessage:resetError?.message||null,resetDataProperties:resetData?.properties||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run10',hypothesisId:'J'})}).catch(()=>{});
+      const actionLink = resetData?.properties?.action_link || null;
+      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:337',message:'After generateLink for existing user - Hypothesis 4,5',data:{email:normalizedEmail,hasResetData:!!resetData,hasResetError:!!resetError,resetErrorCode:resetError?.code||null,resetErrorMessage:resetError?.message||null,actionLink,actionLinkLength:actionLink?.length||0,actionLinkContainsRedirectTo:actionLink?.includes(redirectTo)||false,actionLinkContainsLocalhost:actionLink?.includes('localhost')||false,actionLinkContainsResetPassword:actionLink?.includes('/admin/reset-password')||false,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
       
       if (resetError) {
@@ -408,7 +423,10 @@ export async function POST(request: NextRequest) {
           // 既存ユーザーの場合、パスワードリセットリンクを生成
           console.log(`既存ユーザーとして判定されました（userExists: ${userExists}, isEmailExistsError: ${isEmailExistsError}）。パスワードリセットリンクを生成します。`);
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:380',message:'Treating as existing user, generating recovery link',data:{email:normalizedEmail,userExists,isEmailExistsError,createUserErrorCode},timestamp:Date.now(),sessionId:'debug-session',runId:'run23',hypothesisId:'W'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:380',message:'Treating as existing user, generating recovery link',data:{email:normalizedEmail,userExists,isEmailExistsError,createUserErrorCode},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:425',message:'Before generateLink (recovery) for existing user fallback - Hypothesis 4,5',data:{email:normalizedEmail,type:'recovery',redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
           // #endregion
           const { data: fallbackLinkData, error: fallbackLinkError } = await adminSupabase.auth.admin.generateLink({
             type: 'recovery',
@@ -417,6 +435,10 @@ export async function POST(request: NextRequest) {
               redirectTo: redirectTo,
             },
           });
+          // #region agent log
+          const fallbackActionLink = fallbackLinkData?.properties?.action_link || null;
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:433',message:'After generateLink (recovery) for existing user fallback - Hypothesis 4,5',data:{email:normalizedEmail,hasFallbackLinkData:!!fallbackLinkData,hasFallbackLinkError:!!fallbackLinkError,fallbackLinkErrorCode:(fallbackLinkError as any)?.code||null,fallbackActionLink,fallbackActionLinkLength:fallbackActionLink?.length||0,fallbackActionLinkContainsRedirectTo:fallbackActionLink?.includes(redirectTo)||false,fallbackActionLinkContainsLocalhost:fallbackActionLink?.includes('localhost')||false,fallbackActionLinkContainsResetPassword:fallbackActionLink?.includes('/admin/reset-password')||false,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:375',message:'After generateLink (recovery) for existing user fallback',data:{email:normalizedEmail,hasFallbackLinkData:!!fallbackLinkData,hasFallbackLinkError:!!fallbackLinkError,fallbackLinkErrorCode:(fallbackLinkError as any)?.code||null,fallbackLinkProperties:fallbackLinkData?.properties||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run22',hypothesisId:'V'})}).catch(()=>{});
@@ -453,6 +475,9 @@ export async function POST(request: NextRequest) {
           // 新規ユーザーの可能性があるが、createUserが失敗した場合
           // inviteUserByEmailを使用（新規ユーザーに対してrecoveryは使えない）
           console.log('新規ユーザーの可能性があります。inviteUserByEmailを使用します（recoveryは使用しません）。');
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:478',message:'Before inviteUserByEmail for new user (createUser failed) - Hypothesis 4,5',data:{email:normalizedEmail,redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           const { data: inviteResult, error: inviteErr } = await adminSupabase.auth.admin.inviteUserByEmail(
             normalizedEmail,
             {
@@ -464,7 +489,7 @@ export async function POST(request: NextRequest) {
           );
           
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:415',message:'After inviteUserByEmail for new user (createUser failed)',data:{email:normalizedEmail,hasInviteResult:!!inviteResult,hasInviteError:!!inviteErr,inviteErrorCode:(inviteErr as any)?.code||null,inviteErrorMessage:inviteErr?.message||null,hasUser:!!inviteResult?.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run22',hypothesisId:'V'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:489',message:'After inviteUserByEmail for new user (createUser failed)',data:{email:normalizedEmail,hasInviteResult:!!inviteResult,hasInviteError:!!inviteErr,inviteErrorCode:(inviteErr as any)?.code||null,inviteErrorMessage:inviteErr?.message||null,hasUser:!!inviteResult?.user,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
           // #endregion
           
           if (inviteErr) {
@@ -475,6 +500,9 @@ export async function POST(request: NextRequest) {
             // inviteUserByEmailは成功したが、action_linkは取得できない
             // 再度magiclinkを生成して、Resendで送信する
             console.log('inviteUserByEmailは成功しました。再度magiclinkを生成してResendで送信します。');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:493',message:'Before generateLink (magiclink) retry after inviteUserByEmail (createUser failed) - Hypothesis 4,5',data:{email:normalizedEmail,type:'magiclink',redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             const { data: retryLinkData, error: retryLinkError } = await adminSupabase.auth.admin.generateLink({
               type: 'magiclink',
               email: normalizedEmail,
@@ -484,7 +512,8 @@ export async function POST(request: NextRequest) {
             });
             
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:430',message:'After retry generateLink (magiclink) after inviteUserByEmail (createUser failed)',data:{email:normalizedEmail,hasRetryLinkData:!!retryLinkData,hasRetryLinkError:!!retryLinkError,retryLinkErrorCode:(retryLinkError as any)?.code||null,retryLinkErrorMessage:retryLinkError?.message||null,hasActionLink:!!(retryLinkData as any)?.properties?.action_link},timestamp:Date.now(),sessionId:'debug-session',runId:'run22',hypothesisId:'V'})}).catch(()=>{});
+            const retryActionLink = retryLinkData?.properties?.action_link || null;
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:501',message:'After generateLink (magiclink) retry after inviteUserByEmail (createUser failed) - Hypothesis 4,5',data:{email:normalizedEmail,hasRetryLinkData:!!retryLinkData,hasRetryLinkError:!!retryLinkError,retryLinkErrorCode:(retryLinkError as any)?.code||null,retryLinkErrorMessage:retryLinkError?.message||null,retryActionLink,retryActionLinkLength:retryActionLink?.length||0,retryActionLinkContainsRedirectTo:retryActionLink?.includes(redirectTo)||false,retryActionLinkContainsLocalhost:retryActionLink?.includes('localhost')||false,retryActionLinkContainsResetPassword:retryActionLink?.includes('/admin/reset-password')||false,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
             // #endregion
             
             if (retryLinkError || !(retryLinkData as any)?.properties?.action_link) {
@@ -522,6 +551,9 @@ export async function POST(request: NextRequest) {
         // ユーザー作成が成功した場合、パスワード設定リンクを生成
         // 新規ユーザーの場合、type: 'magiclink' を使用（パスワード設定用）
         // 注意: magiclinkはパスワード設定画面にリダイレクトし、そこでパスワードを設定できる
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:540',message:'Before generateLink (magiclink) for new user - Hypothesis 4,5',data:{email:normalizedEmail,type:'magiclink',redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         const { data: resetLinkData, error: resetLinkError } = await adminSupabase.auth.admin.generateLink({
           type: 'magiclink',
           email: normalizedEmail,
@@ -531,7 +563,8 @@ export async function POST(request: NextRequest) {
         });
         
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:417',message:'After generateLink (magiclink) for new user',data:{email:normalizedEmail,hasResetLinkData:!!resetLinkData,hasResetLinkError:!!resetLinkError,resetLinkErrorCode:resetLinkError?.code||null,resetLinkErrorMessage:resetLinkError?.message||null,resetLinkProperties:resetLinkData?.properties||null,actionLinkPreview:resetLinkData?.properties?.action_link?.substring(0,100)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run19',hypothesisId:'S'})}).catch(()=>{});
+        const resetActionLink = resetLinkData?.properties?.action_link || null;
+        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:549',message:'After generateLink (magiclink) for new user - Hypothesis 4,5',data:{email:normalizedEmail,hasResetLinkData:!!resetLinkData,hasResetLinkError:!!resetLinkError,resetLinkErrorCode:resetLinkError?.code||null,resetLinkErrorMessage:resetLinkError?.message||null,resetActionLink,resetActionLinkLength:resetActionLink?.length||0,resetActionLinkContainsRedirectTo:resetActionLink?.includes(redirectTo)||false,resetActionLinkContainsLocalhost:resetActionLink?.includes('localhost')||false,resetActionLinkContainsResetPassword:resetActionLink?.includes('/admin/reset-password')||false,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
         // #endregion
         
         if (resetLinkError) {
@@ -543,6 +576,9 @@ export async function POST(request: NextRequest) {
           // 新規ユーザーに対してrecoveryは使えない（otp_expiredエラーが発生する）
           // 代わりに、inviteUserByEmailを使用して、Supabaseが自動的にメールを送信する
           console.log('magiclinkの生成に失敗しました。inviteUserByEmailを使用します。');
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:576',message:'Before inviteUserByEmail fallback - Hypothesis 4,5',data:{email:normalizedEmail,redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           const { data: inviteResult, error: inviteErr } = await adminSupabase.auth.admin.inviteUserByEmail(
             normalizedEmail,
             {
@@ -554,7 +590,7 @@ export async function POST(request: NextRequest) {
           );
           
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:444',message:'After inviteUserByEmail fallback',data:{email:normalizedEmail,hasInviteResult:!!inviteResult,hasInviteError:!!inviteErr,inviteErrorCode:(inviteErr as any)?.code||null,inviteErrorMessage:inviteErr?.message||null,hasUser:!!inviteResult?.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run20',hypothesisId:'T'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:587',message:'After inviteUserByEmail fallback',data:{email:normalizedEmail,hasInviteResult:!!inviteResult,hasInviteError:!!inviteErr,inviteErrorCode:(inviteErr as any)?.code||null,inviteErrorMessage:inviteErr?.message||null,hasUser:!!inviteResult?.user,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
           // #endregion
           
           if (inviteErr) {
@@ -566,6 +602,9 @@ export async function POST(request: NextRequest) {
             // Supabaseが自動的にメールを送信するが、redirectToが正しく設定されない可能性がある
             // そのため、再度generateLinkでmagiclinkを生成して、Resendで送信する
             console.log('inviteUserByEmailは成功しました。再度magiclinkを生成してResendで送信します。');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:584',message:'Before generateLink (magiclink) retry after inviteUserByEmail - Hypothesis 4,5',data:{email:normalizedEmail,type:'magiclink',redirectTo,redirectToLength:redirectTo.length,redirectToStartsWith:redirectTo.startsWith('http'),redirectToEndsWith:redirectTo.endsWith('/admin/reset-password')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             const { data: retryLinkData, error: retryLinkError } = await adminSupabase.auth.admin.generateLink({
               type: 'magiclink',
               email: normalizedEmail,
@@ -575,7 +614,8 @@ export async function POST(request: NextRequest) {
             });
             
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:450',message:'After retry generateLink (magiclink) after inviteUserByEmail',data:{email:normalizedEmail,hasRetryLinkData:!!retryLinkData,hasRetryLinkError:!!retryLinkError,retryLinkErrorCode:(retryLinkError as any)?.code||null,retryLinkErrorMessage:retryLinkError?.message||null,hasActionLink:!!(retryLinkData as any)?.properties?.action_link},timestamp:Date.now(),sessionId:'debug-session',runId:'run20',hypothesisId:'T'})}).catch(()=>{});
+            const retryActionLink2 = retryLinkData?.properties?.action_link || null;
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:592',message:'After generateLink (magiclink) retry after inviteUserByEmail - Hypothesis 4,5',data:{email:normalizedEmail,hasRetryLinkData:!!retryLinkData,hasRetryLinkError:!!retryLinkError,retryLinkErrorCode:(retryLinkError as any)?.code||null,retryLinkErrorMessage:retryLinkError?.message||null,retryActionLink2,retryActionLink2Length:retryActionLink2?.length||0,retryActionLink2ContainsRedirectTo:retryActionLink2?.includes(redirectTo)||false,retryActionLink2ContainsLocalhost:retryActionLink2?.includes('localhost')||false,retryActionLink2ContainsResetPassword:retryActionLink2?.includes('/admin/reset-password')||false,redirectToPassed:redirectTo},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
             // #endregion
             
             if (retryLinkError || !(retryLinkData as any)?.properties?.action_link) {
@@ -740,12 +780,18 @@ export async function POST(request: NextRequest) {
     fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:295',message:'Admin user added successfully',data:{email:normalizedEmail,emailSent:finalEmailSent,userExists,hasInviteError:!!inviteError,isExistingUserError},timestamp:Date.now(),sessionId:'debug-session',runId:'run9',hypothesisId:'I'})}).catch(()=>{});
     // #endregion
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:783',message:'Final response - redirectTo value',data:{redirectTo,siteUrl,finalSiteUrl:siteUrl,emailSent:finalEmailSent,userExists,hasInviteError:!!inviteError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     return NextResponse.json(
       {
         message: message,
         adminUser: newAdminUser,
         emailSent: finalEmailSent,
         userExists: userExists,
+        redirectTo: redirectTo, // デバッグ用：実際に使用されたredirectToを返す
+        siteUrl: siteUrl, // デバッグ用：実際に使用されたsiteUrlを返す
         inviteError: inviteError ? {
           code: (inviteError as any).code || null,
           message: inviteError.message || String(inviteError),
