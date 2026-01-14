@@ -3,10 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function middleware(request: NextRequest) {
-  // /admin/* パスを保護（/admin/loginは除外）
+  // /admin/* パスを保護（/admin/loginと/admin/reset-passwordは除外）
   if (request.nextUrl.pathname.startsWith('/admin')) {
-    // ログインページは除外
-    if (request.nextUrl.pathname === '/admin/login') {
+    // ログインページとパスワードリセットページは除外
+    if (request.nextUrl.pathname === '/admin/login' || request.nextUrl.pathname === '/admin/reset-password') {
       return NextResponse.next();
     }
 

@@ -94,103 +94,106 @@ export default function ResetPasswordPage() {
         fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:87',message:'Token param detected, verifying token',data:{hasTokenParam:!!tokenParam,tokenParamLength:tokenParam.length,typeParam,hasRedirectToParam:!!redirectToParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
         // #endregion
         
-        // Supabaseのverifyエンドポイントを直接呼び出してトークンを検証
-        const supabase = getClient();
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        
-        if (!supabaseUrl) {
-          setError('Supabase URLが設定されていません。');
-          return;
-        }
-        
-        // verifyエンドポイントを呼び出してトークンを検証
-        try {
-          const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(tokenParam)}&type=${typeParam}&redirect_to=${encodeURIComponent(window.location.origin + '/admin/reset-password')}`;
+        // useEffect内でawaitを使用するため、async関数を定義して呼び出す
+        (async () => {
+          // Supabaseのverifyエンドポイントを直接呼び出してトークンを検証
+          const supabase = getClient();
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
           
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:100',message:'Calling verify endpoint',data:{verifyUrl:verifyUrl.substring(0,200),typeParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
-          // #endregion
+          if (!supabaseUrl) {
+            setError('Supabase URLが設定されていません。');
+            return;
+          }
           
-          // verifyエンドポイントを呼び出すと、リダイレクトが発生するため、
-          // 代わりに、トークンから直接セッションを確立する方法を使用
-          // SupabaseのverifyOtpメソッドを使用できないため、別の方法を試す
-          // 実際には、verifyエンドポイントがリダイレクトする際にフラグメントを付与するはずだが、
-          // それが機能していない場合は、トークンを直接使用してセッションを確立する必要がある
-          
-          // 一時的な解決策: verifyエンドポイントを呼び出して、リダイレクト後のURLからフラグメントを取得
-          // しかし、これはCORSの問題がある可能性があるため、別の方法を試す
-          
-          // 実際には、Supabaseのverifyエンドポイントは、トークンを検証した後、
-          // redirect_toにリダイレクトする際に、URLフラグメント（#access_token=...）を付与するはずです。
-          // しかし、それが機能していない場合は、トークンを直接使用してセッションを確立する必要があります。
-          
-          // 代替案: verifyエンドポイントを呼び出して、レスポンスからセッショントークンを取得
-          const response = await fetch(verifyUrl, {
-            method: 'GET',
-            redirect: 'manual', // リダイレクトを手動で処理
-          });
-          
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:120',message:'Verify endpoint response',data:{status:response.status,statusText:response.statusText,type:response.type,hasLocation:!!response.headers.get('location')},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
-          // #endregion
-          
-          if (response.status === 302 || response.status === 301) {
-            // リダイレクトが発生した場合、LocationヘッダーからURLを取得
-            const location = response.headers.get('location');
-            if (location) {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:128',message:'Redirect location from verify endpoint',data:{location:location.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
-              // #endregion
-              
-              // LocationヘッダーからURLフラグメントを抽出
-              const url = new URL(location, window.location.origin);
-              const hash = url.hash;
-              
-              if (hash) {
-                const params = new URLSearchParams(hash.substring(1));
-                const accessToken = params.get('access_token');
-                const refreshToken = params.get('refresh_token');
-                const type = params.get('type');
+          // verifyエンドポイントを呼び出してトークンを検証
+          try {
+            const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(tokenParam!)}&type=${typeParam}&redirect_to=${encodeURIComponent(window.location.origin + '/admin/reset-password')}`;
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:100',message:'Calling verify endpoint',data:{verifyUrl:verifyUrl.substring(0,200),typeParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
+            // #endregion
+            
+            // verifyエンドポイントを呼び出すと、リダイレクトが発生するため、
+            // 代わりに、トークンから直接セッションを確立する方法を使用
+            // SupabaseのverifyOtpメソッドを使用できないため、別の方法を試す
+            // 実際には、verifyエンドポイントがリダイレクトする際にフラグメントを付与するはずだが、
+            // それが機能していない場合は、トークンを直接使用してセッションを確立する必要がある
+            
+            // 一時的な解決策: verifyエンドポイントを呼び出して、リダイレクト後のURLからフラグメントを取得
+            // しかし、これはCORSの問題がある可能性があるため、別の方法を試す
+            
+            // 実際には、Supabaseのverifyエンドポイントは、トークンを検証した後、
+            // redirect_toにリダイレクトする際に、URLフラグメント（#access_token=...）を付与するはずです。
+            // しかし、それが機能していない場合は、トークンを直接使用してセッションを確立する必要があります。
+            
+            // 代替案: verifyエンドポイントを呼び出して、レスポンスからセッショントークンを取得
+            const response = await fetch(verifyUrl, {
+              method: 'GET',
+              redirect: 'manual', // リダイレクトを手動で処理
+            });
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:120',message:'Verify endpoint response',data:{status:response.status,statusText:response.statusText,type:response.type,hasLocation:!!response.headers.get('location')},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
+            // #endregion
+            
+            if (response.status === 302 || response.status === 301) {
+              // リダイレクトが発生した場合、LocationヘッダーからURLを取得
+              const location = response.headers.get('location');
+              if (location) {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:128',message:'Redirect location from verify endpoint',data:{location:location.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
+                // #endregion
                 
-                if (accessToken && (type === 'recovery' || type === 'magiclink')) {
-                  // セッションを確立
-                  const { data, error }: { data: { session: any; user: any } | null; error: { message?: string } | null } = await supabase.auth.setSession({
-                    access_token: accessToken,
-                    refresh_token: refreshToken || '',
-                  });
+                // LocationヘッダーからURLフラグメントを抽出
+                const url = new URL(location, window.location.origin);
+                const hash = url.hash;
+                
+                if (hash) {
+                  const params = new URLSearchParams(hash.substring(1));
+                  const accessToken = params.get('access_token');
+                  const refreshToken = params.get('refresh_token');
+                  const type = params.get('type');
                   
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:142',message:'Session set from verify endpoint redirect',data:{hasSession:!!data?.session,hasUser:!!data?.user,userEmail:data?.user?.email||null,error:error?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
-                  // #endregion
-                  
-                  if (error) {
-                    console.error('セッション確立エラー:', error);
-                    setError('セッションの確立に失敗しました。パスワードリセットリンクが無効の可能性があります。');
-                  } else if (data?.session) {
-                    console.log('セッションが確立されました。パスワードを設定できます。');
-                    // URLパラメータをクリア
-                    window.history.replaceState(null, '', window.location.pathname);
+                  if (accessToken && (type === 'recovery' || type === 'magiclink')) {
+                    // セッションを確立
+                    const { data, error }: { data: { session: any; user: any } | null; error: { message?: string } | null } = await supabase.auth.setSession({
+                      access_token: accessToken,
+                      refresh_token: refreshToken || '',
+                    });
+                    
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:142',message:'Session set from verify endpoint redirect',data:{hasSession:!!data?.session,hasUser:!!data?.user,userEmail:data?.user?.email||null,error:error?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
+                    // #endregion
+                    
+                    if (error) {
+                      console.error('セッション確立エラー:', error);
+                      setError('セッションの確立に失敗しました。パスワードリセットリンクが無効の可能性があります。');
+                    } else if (data?.session) {
+                      console.log('セッションが確立されました。パスワードを設定できます。');
+                      // URLパラメータをクリア
+                      window.history.replaceState(null, '', window.location.pathname);
+                    }
+                  } else {
+                    setError('トークンの検証に失敗しました。');
                   }
                 } else {
-                  setError('トークンの検証に失敗しました。');
+                  // フラグメントがない場合、リダイレクト先のURLをそのまま使用
+                  window.location.href = location;
                 }
               } else {
-                // フラグメントがない場合、リダイレクト先のURLをそのまま使用
-                window.location.href = location;
+                setError('リダイレクト先が取得できませんでした。');
               }
             } else {
-              setError('リダイレクト先が取得できませんでした。');
+              setError('トークンの検証に失敗しました。');
             }
-          } else {
-            setError('トークンの検証に失敗しました。');
+          } catch (verifyError) {
+            console.error('トークン検証エラー:', verifyError);
+            setError('トークンの検証中にエラーが発生しました。');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:165',message:'Token verification error',data:{error:verifyError instanceof Error ? verifyError.message : String(verifyError)},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
+            // #endregion
           }
-        } catch (verifyError) {
-          console.error('トークン検証エラー:', verifyError);
-          setError('トークンの検証中にエラーが発生しました。');
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:165',message:'Token verification error',data:{error:verifyError instanceof Error ? verifyError.message : String(verifyError)},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
-          // #endregion
-        }
+        })();
       } else {
         // フラグメントもURLパラメータもない場合、既存のセッションを確認
         const supabase = getClient();
