@@ -267,7 +267,9 @@ export async function POST(request: NextRequest) {
     // Supabase Authでユーザーを招待
     // 注意: auth.admin.inviteUserByEmail()はSupabase Admin APIを使用
     // @supabase/supabase-jsのバージョンによっては異なる方法が必要な場合があります
-    const redirectTo = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin/reset-password`;
+    // サイトURLを取得: 環境変数 > リクエストのオリジン > localhost
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin || 'http://localhost:3000';
+    const redirectTo = `${siteUrl}/admin/reset-password`;
     
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:99',message:'Before checking existing user',data:{email:normalizedEmail,role,redirectTo,hasServiceKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now(),sessionId:'debug-session',runId:'run9',hypothesisId:'I'})}).catch(()=>{});
