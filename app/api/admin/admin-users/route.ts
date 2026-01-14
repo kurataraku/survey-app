@@ -3,6 +3,23 @@ import { requireOwner } from '@/lib/auth/admin';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 /**
+ * デバッグログを送信（開発環境のみ）
+ */
+function debugLog(data: { location: string; message: string; data?: any; timestamp?: number; sessionId?: string; runId?: string; hypothesisId?: string }) {
+  if (process.env.NODE_ENV === 'development') {
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        timestamp: data.timestamp || Date.now(),
+        sessionId: data.sessionId || 'debug-session',
+      }),
+    }).catch(() => {});
+  }
+}
+
+/**
  * パスワードリセットメールを送信（既存ユーザー用）
  */
 async function sendPasswordResetEmail({
@@ -244,8 +261,8 @@ export async function POST(request: NextRequest) {
       .eq('email', normalizedEmail)
       .maybeSingle();
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:72',message:'Existing admin check',data:{email:normalizedEmail,hasExistingAdmin:!!existingAdmin,existingAdminId:existingAdmin?.id||null,existingAdminIsActive:existingAdmin?.is_active,checkError:checkError?.message||null,checkErrorCode:checkError?.code||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'E'})}).catch(()=>{});
+    // #region agent log (開発環境のみ)
+    debugLog({ location: 'app/api/admin/admin-users/route.ts:72', message: 'Existing admin check', data: { email: normalizedEmail, hasExistingAdmin: !!existingAdmin, existingAdminId: existingAdmin?.id || null, existingAdminIsActive: existingAdmin?.is_active, checkError: checkError?.message || null, checkErrorCode: checkError?.code || null }, runId: 'run5', hypothesisId: 'E' });
     // #endregion
 
     if (checkError && checkError.code !== 'PGRST116') {
@@ -310,8 +327,8 @@ export async function POST(request: NextRequest) {
     
     const redirectTo = `${siteUrl}/admin/reset-password`;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:270',message:'Site URL determination - Hypothesis 1,2,3',data:{NEXT_PUBLIC_SITE_URL:process.env.NEXT_PUBLIC_SITE_URL||'not set',VERCEL_URL:vercelUrl||'not set',hostHeader,forwardedHostHeader,forwardedProtoHeader,host,protocol,originFromHeaders,requestOrigin:request.nextUrl.origin,requestUrl:request.nextUrl.toString(),finalSiteUrl:siteUrl,redirectTo,containsLocalhost:siteUrl.includes('localhost'),allHeaders:Object.fromEntries(request.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #region agent log (開発環境のみ)
+    debugLog({ location: 'app/api/admin/admin-users/route.ts:270', message: 'Site URL determination - Hypothesis 1,2,3', data: { NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'not set', VERCEL_URL: vercelUrl || 'not set', hostHeader, forwardedHostHeader, forwardedProtoHeader, host, protocol, originFromHeaders, requestOrigin: request.nextUrl.origin, requestUrl: request.nextUrl.toString(), finalSiteUrl: siteUrl, redirectTo, containsLocalhost: siteUrl.includes('localhost'), allHeaders: Object.fromEntries(request.headers.entries()) }, runId: 'run1', hypothesisId: 'A' });
     // #endregion
     
     // デバッグログ（本番環境でも確認できるように）
@@ -331,8 +348,8 @@ export async function POST(request: NextRequest) {
       containsLocalhost: siteUrl.includes('localhost'),
     });
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/admin-users/route.ts:289',message:'Before checking existing user',data:{email:normalizedEmail,role,redirectTo,hasServiceKey:!!process.env.SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #region agent log (開発環境のみ)
+    debugLog({ location: 'app/api/admin/admin-users/route.ts:289', message: 'Before checking existing user', data: { email: normalizedEmail, role, redirectTo, hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY }, runId: 'run1', hypothesisId: 'A' });
     // #endregion
     
     // まず、既存ユーザーかどうかを確認
