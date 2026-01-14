@@ -391,7 +391,6 @@ export default function QuestionRenderer({
                       <input
                         type="radio"
                         id={radioId}
-                        name={fieldName}
                         {...field}
                         value={option.value}
                         checked={field.value === option.value}
@@ -526,7 +525,6 @@ export default function QuestionRenderer({
                       <input
                         type="radio"
                         id={radioId}
-                        name={fieldName}
                         {...field}
                         value={option.value}
                         checked={field.value === option.value}
