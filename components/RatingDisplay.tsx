@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import StarRatingDisplay from './StarRatingDisplay';
 
 interface RatingDisplayProps {
@@ -183,7 +184,7 @@ export default function RatingDisplay({
       )}
 
       <div className="space-y-3">
-        {ratings.map((rating) => {
+        {ratings.map((rating, index) => {
           const value = rating.value as number;
           const percentage = (value / 5) * 100;
           const globalAvg = rating.globalAvg;
@@ -201,7 +202,10 @@ export default function RatingDisplay({
           return (
             <div
               key={rating.label}
-              className="py-1.5 border-b border-gray-100 last:border-b-0"
+              className={cn(
+                "py-3 px-3 rounded-lg border-b border-transparent last:border-b-0 transition-colors",
+                index % 2 === 0 ? "bg-blue-50/30" : "bg-transparent"
+              )}
             >
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <div className="flex-1 min-w-0">

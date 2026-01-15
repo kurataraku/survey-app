@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Sparkles, CheckCircle2, XCircle, User } from 'lucide-react';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import SchoolRadarChart from '@/components/SchoolRadarChart';
@@ -44,8 +45,99 @@ export default function SchoolDetailClient({
         latestReviews={school.latest_reviews}
       />
 
+      {/* AIによる口コミ要約 */}
+      {school.ai_summary && (
+        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 relative overflow-hidden border border-gray-200">
+          {/* 上部薄い青のバー帯 */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
+          
+          {/* ヘッダー */}
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">
+              AIによる口コミ要約
+            </h2>
+          </div>
+          
+          {/* 本文 */}
+          <div className="prose prose-sm max-w-prose">
+            <div className="text-gray-700 leading-relaxed space-y-4">
+              {(() => {
+                const lines = school.ai_summary.summary_text.split('\n');
+                let currentSection: 'good' | 'bad' | null = null;
+                
+                return lines.map((line, index) => {
+                  const trimmedLine = line.trim();
+                  
+                  // 「この学校が合う人」セクション
+                  if (trimmedLine === '## この学校が合う人' || trimmedLine.startsWith('## この学校が合う人')) {
+                    currentSection = 'good';
+                    return (
+                      <div key={index} className="flex items-start gap-2 mt-6 mb-4">
+                        <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                        <h3 className="font-semibold text-gray-900 text-lg">この学校が合う人</h3>
+                      </div>
+                    );
+                  }
+                  
+                  // 「この学校が合わない人」セクション
+                  if (trimmedLine === '## この学校が合わない人' || trimmedLine.startsWith('## この学校が合わない人')) {
+                    currentSection = 'bad';
+                    return (
+                      <div key={index} className="flex items-start gap-2 mt-6 mb-4">
+                        <XCircle className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" />
+                        <h3 className="font-semibold text-gray-900 text-lg">この学校が合わない人</h3>
+                      </div>
+                    );
+                  }
+                  
+                  // 箇条書きアイテム（「-」または「・」で始まる行）
+                  if (/^[-・]\s/.test(trimmedLine)) {
+                    const content = trimmedLine.replace(/^[-・]\s/, '');
+                    if (currentSection === 'good') {
+                      return (
+                        <div key={index} className="flex items-start gap-3 ml-7 mb-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <span className="flex-1 leading-relaxed">{content}</span>
+                        </div>
+                      );
+                    } else if (currentSection === 'bad') {
+                      return (
+                        <div key={index} className="flex items-start gap-3 ml-7 mb-2">
+                          <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
+                          <span className="flex-1 leading-relaxed">{content}</span>
+                        </div>
+                      );
+                    }
+                  }
+                  
+                  // 通常のテキスト行
+                  if (trimmedLine && !trimmedLine.startsWith('##') && !/^[-・]\s/.test(trimmedLine)) {
+                    // セクション判定をリセット（見出し以外の行では維持）
+                    return (
+                      <p key={index} className="mb-3 last:mb-0 leading-relaxed">
+                        {line}
+                      </p>
+                    );
+                  }
+                  
+                  // 空行
+                  if (!trimmedLine) {
+                    return <br key={index} />;
+                  }
+                  
+                  return null;
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* タブで情報を段階的に表示 */}
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
         <Tabs
           tabs={[
             {
@@ -268,10 +360,13 @@ export default function SchoolDetailClient({
                     <Link
                       key={review.id}
                       href={`/reviews/${review.id}`}
-                      className="block p-5 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 hover:shadow-md transition-all"
+                      className="block p-6 bg-white border border-gray-200 rounded-xl shadow-md hover:border-blue-400 hover:shadow-lg transition-all duration-200"
                     >
                       {/* 上段：★/日付/属性チップ */}
-                      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+                      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-100">
+                        <div className="p-2 bg-blue-50 rounded-full">
+                          <User className="w-4 h-4 text-blue-600" />
+                        </div>
                         <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
                         <span className="text-sm text-gray-500">
                           {formatDate(review.created_at)}
@@ -279,21 +374,21 @@ export default function SchoolDetailClient({
                       </div>
 
                       {/* 本文：良い点/改善点を1行ずつ */}
-                      <div className="space-y-2.5 mb-4">
+                      <div className="space-y-4 mb-5">
                         {review.good_comment && (
-                          <div>
-                            <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
-                            <p className="text-sm text-gray-700 line-clamp-1">
+                          <div className="p-3 bg-green-50/50 rounded-lg border-l-4 border-green-500">
+                            <p className="text-xs font-semibold text-green-700 mb-2">良い点</p>
+                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-1">
                               {review.good_comment}
                             </p>
                           </div>
                         )}
                         {review.bad_comment && (
-                          <div>
-                            <p className="text-xs font-semibold text-rose-600 mb-1">
+                          <div className="p-3 bg-rose-50/50 rounded-lg border-l-4 border-rose-500">
+                            <p className="text-xs font-semibold text-rose-700 mb-2">
                               改善してほしい点
                             </p>
-                            <p className="text-sm text-gray-700 line-clamp-1">
+                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-1">
                               {review.bad_comment}
                             </p>
                           </div>
@@ -324,10 +419,10 @@ export default function SchoolDetailClient({
                       </div>
                     </Link>
                   ))}
-                  <div className="pt-4 border-t border-gray-200">
+                  <div className="pt-6 border-t border-gray-200">
                     <Link
                       href={`/schools/${encodedSlug}/reviews`}
-                      className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
+                      className="inline-block w-full text-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 active:from-blue-800 active:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg active:shadow-sm active:translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300"
                     >
                       自分に近い口コミを探す/全ての口コミを見る
                     </Link>
@@ -342,18 +437,30 @@ export default function SchoolDetailClient({
       </div>
 
       {/* 注目の口コミ（いいね数順） */}
-      {school.latest_reviews && school.latest_reviews.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">注目の口コミ</h2>
-          <div className="space-y-4">
-            {school.latest_reviews.slice(0, 3).map((review) => (
+      {school.latest_reviews && school.latest_reviews.length > 0 && (() => {
+        const featuredReviews = [...school.latest_reviews]
+          .sort((a, b) => {
+            const aLikes = a.like_count || 0;
+            const bLikes = b.like_count || 0;
+            return bLikes - aLikes; // 降順
+          })
+          .slice(0, 3); // 最大3件
+
+        return featuredReviews.length > 0 ? (
+          <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">注目の口コミ</h2>
+            <div className="space-y-4">
+              {featuredReviews.map((review) => (
               <Link
                 key={review.id}
                 href={`/reviews/${review.id}`}
-                className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                className="block p-6 border border-gray-200 rounded-xl shadow-md hover:border-blue-400 hover:shadow-lg transition-all duration-200"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 rounded-full">
+                      <User className="w-4 h-4 text-blue-600" />
+                    </div>
                     <span className="text-xs font-medium text-gray-600">総合満足度</span>
                     <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
                     <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
@@ -378,36 +485,41 @@ export default function SchoolDetailClient({
                   )}
                 </div>
                 {review.good_comment && (
-                  <div className="mb-3">
-                    <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
-                    <p className="text-sm text-gray-700 line-clamp-2">{review.good_comment}</p>
+                  <div className="mb-4 p-3 bg-green-50/50 rounded-lg border-l-4 border-green-500">
+                    <p className="text-xs font-semibold text-green-700 mb-2">良い点</p>
+                    <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">{review.good_comment}</p>
                   </div>
                 )}
                 {review.bad_comment && (
-                  <div>
-                    <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
-                    <p className="text-sm text-gray-700 line-clamp-2">{review.bad_comment}</p>
+                  <div className="p-3 bg-rose-50/50 rounded-lg border-l-4 border-rose-500">
+                    <p className="text-xs font-semibold text-rose-700 mb-2">改善してほしい点</p>
+                    <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">{review.bad_comment}</p>
                   </div>
                 )}
               </Link>
-            ))}
+              ))}
+            </div>
           </div>
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <Link
-              href={`/schools/${encodedSlug}/reviews`}
-              className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              自分に近い口コミを探す/全ての口コミを見る
-            </Link>
-          </div>
+        ) : null;
+      })()}
+
+      {/* 口コミ一覧への導線 */}
+      {school.latest_reviews && school.latest_reviews.length > 0 && (
+        <div className="mb-8">
+          <Link
+            href={`/schools/${encodedSlug}/reviews`}
+            className="inline-block w-full text-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 active:from-blue-800 active:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg active:shadow-sm active:translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300"
+          >
+            自分に近い口コミを探す/全ての口コミを見る
+          </Link>
         </div>
       )}
 
       {/* 学校紹介 */}
       {school.intro && (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
           <h2 className="text-xl font-bold text-gray-900 mb-4">学校紹介</h2>
-          <p className="text-gray-700 whitespace-pre-wrap">{school.intro}</p>
+          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{school.intro}</p>
         </div>
       )}
     </>

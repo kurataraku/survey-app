@@ -34,9 +34,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     school.ai_summary?.meta_description ||
     `${school.name}の口コミ・評判をまとめました。在校生・卒業生・保護者の生の声を掲載しています。`;
 
+  // keywordsメタタグを追加（学校名を含む）
+  const keywords = [
+    `${school.name} 口コミ`,
+    `${school.name} 評判`,
+    '通信制高校 口コミ',
+    '通信制 口コミ',
+  ];
+
   return {
     title,
     description,
+    keywords,
     openGraph: {
       title,
       description,
@@ -69,8 +78,8 @@ export default async function SchoolDetailPage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-blue-50/30 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 戻るリンク */}
         <div className="mb-4">
           <Link
@@ -88,20 +97,6 @@ export default async function SchoolDetailPage({ params }: PageProps) {
             学校一覧に戻る
           </Link>
         </div>
-
-        {/* AIによる口コミ要約 */}
-        {school.ai_summary && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border-l-4 border-blue-500">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              AIによる口コミ要約
-            </h2>
-            <div className="prose prose-sm max-w-none">
-              <div className="whitespace-pre-wrap text-gray-700">
-                {school.ai_summary.summary_text}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* クライアントコンポーネント（タブUIなど） */}
         <SchoolDetailClient school={school} encodedSlug={encodedSlug} />
