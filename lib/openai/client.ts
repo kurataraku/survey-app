@@ -141,17 +141,25 @@ function generateMetaDescriptionFromSummary(
       // 最初の文が長すぎる場合は、文の途中で自然に切れる位置を探す
       // 読点（、）や助詞で切れる位置を探す
       const firstSentence = sentences[0];
-      let cutPoint = availableLength;
-      for (let i = availableLength - 1; i >= availableLength - 20 && i >= 20; i--) {
-        const char = firstSentence.charAt(i);
-        if (char === '、' || char === 'の' || char === 'が' || char === 'を' || char === 'に') {
-          cutPoint = i + 1;
-          break;
+      if (firstSentence) {
+        let cutPoint = availableLength;
+        for (let i = availableLength - 1; i >= availableLength - 20 && i >= 20; i--) {
+          const char = firstSentence.charAt(i);
+          if (char === '、' || char === 'の' || char === 'が' || char === 'を' || char === 'に') {
+            cutPoint = i + 1;
+            break;
+          }
         }
-      }
-      summaryShort = firstSentence.substring(0, cutPoint);
-      if (!summaryShort.match(/[。！？]$/)) {
-        summaryShort += '。';
+        summaryShort = firstSentence.substring(0, cutPoint);
+        if (!summaryShort.match(/[。！？]$/)) {
+          summaryShort += '。';
+        }
+      } else {
+        // sentencesが空の場合は文字数で切る
+        summaryShort = summaryShort.substring(0, availableLength - 3) + '...';
+        if (!summaryShort.match(/[。！？]$/)) {
+          summaryShort += '。';
+        }
       }
     }
   } else {
