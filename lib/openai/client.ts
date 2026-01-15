@@ -199,11 +199,13 @@ function generateMetaDescriptionFromSummary(
       
       if (nextSentences.length > 0) {
         const nextSentence = nextSentences[0];
-        const candidateLength = metaDesc.length - 1 + nextSentence.length; // 既存の句点を削除して追加
-        
-        if (candidateLength <= maxLength + 10) { // 10文字オーバーまで許容
-          metaDesc = metaDesc.replace(/[。！？]$/, '');
-          metaDesc += nextSentence;
+        if (nextSentence) {
+          const candidateLength = metaDesc.length - 1 + nextSentence.length; // 既存の句点を削除して追加
+          
+          if (candidateLength <= maxLength + 10) { // 10文字オーバーまで許容
+            metaDesc = metaDesc.replace(/[。！？]$/, '');
+            metaDesc += nextSentence;
+          }
         }
       }
     }
