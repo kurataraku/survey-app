@@ -163,18 +163,15 @@ export default function SchoolRadarChart({ metrics }: SchoolRadarChartProps) {
           {validMetrics.map((metric, i) => {
             const school = getXY(metric.schoolValue as number, i);
             const global = getXY(metric.globalValue as number, i);
+            const globalTitle = `サイト全体平均: ${metric.label} ${metric.globalValue?.toFixed(1)}`;
+            const schoolTitle = `この学校: ${metric.label} ${metric.schoolValue?.toFixed(1)}`;
             return (
               <g key={`points-${i}`}>
                 <circle cx={global.x} cy={global.y} r={3} fill="#64748B">
-                  <title>
-                    サイト全体平均: {metric.label}{' '}
-                    {metric.globalValue?.toFixed(1)}
-                  </title>
+                  <title>{globalTitle}</title>
                 </circle>
                 <circle cx={school.x} cy={school.y} r={3} fill="#2563EB">
-                  <title>
-                    この学校: {metric.label} {metric.schoolValue?.toFixed(1)}
-                  </title>
+                  <title>{schoolTitle}</title>
                 </circle>
               </g>
             );

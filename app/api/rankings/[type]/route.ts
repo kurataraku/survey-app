@@ -28,103 +28,151 @@ export async function GET(
       .select('id, name, prefecture, slug')
       .eq('is_public', true);
 
-    if (!allSchools) {
-      return NextResponse.json({ schools: [], total: 0, page, limit, total_pages: 0 });
+    if (!allSchools || allSchools.length === 0) {
+      return NextResponse.json({ schools: [], total: 0, page, limit, total_pages: 0, type });
     }
 
-    // 各学校の統計を取得
-    const schoolsWithStats = await Promise.all(
-      allSchools.map(async (school) => {
-        // ホームページAPIと同じロジックを使用
-        // school_idとis_publicで検索（カラムが存在する場合）
-        const { count: reviewCount } = await supabase
-          .from('survey_responses')
-          .select('*', { count: 'exact', head: true })
-          .eq('school_id', school.id)
-          .eq('is_public', true);
+    // パフォーマンス最適化: 全ての学校の統計情報を一括取得
+    const schoolIds = allSchools.map(s => s.id);
+    
+    // 全ての口コミデータを一度に取得
+    const { data: allReviews, error: reviewsError } = await supabase
+      .from('survey_responses')
+      .select('school_id, overall_satisfaction, answers')
+      .in('school_id', schoolIds)
+      .eq('is_public', true)
+      .not('school_id', 'is', null);
 
-        // 評価データを取得
-        const { data: reviews } = await supabase
-          .from('survey_responses')
-          .select('overall_satisfaction, answers')
-          .eq('school_id', school.id)
-          .eq('is_public', true)
-          .not('overall_satisfaction', 'is', null);
+    if (reviewsError) {
+      console.error('[API] /api/rankings/[type] - 口コミデータ取得エラー:', reviewsError);
+    }
 
-        // 各評価項目の平均を計算
-        // 評価値6（該当なし）を除外し、1-5の範囲のみで平均を計算
-        const validOverallRatings = reviews
-          ?.filter(r => r.overall_satisfaction !== null && r.overall_satisfaction !== 6 && r.overall_satisfaction >= 1 && r.overall_satisfaction <= 5)
-          .map(r => r.overall_satisfaction) || [];
+    // 学校IDごとに統計情報を集計
+    const statsMap = new Map<string, {
+      review_count: number;
+      overall_ratings: number[];
+      staff_ratings: number[];
+      atmosphere_ratings: number[];
+      credit_ratings: number[];
+      tuition_ratings: number[];
+    }>();
 
-        const overallAvg = validOverallRatings.length > 0
-          ? validOverallRatings.reduce((sum, r) => sum + r, 0) / validOverallRatings.length
-          : null;
+    // 初期化（全ての学校を0件で初期化）
+    schoolIds.forEach(id => {
+      statsMap.set(id, {
+        review_count: 0,
+        overall_ratings: [],
+        staff_ratings: [],
+        atmosphere_ratings: [],
+        credit_ratings: [],
+        tuition_ratings: [],
+      });
+    });
+
+    // 統計情報を集計
+    if (allReviews) {
+      allReviews.forEach((review) => {
+        const schoolId = review.school_id;
+        if (!schoolId) return;
+
+        const stats = statsMap.get(schoolId);
+        if (!stats) return;
+
+        stats.review_count++;
+
+        // overall_satisfactionの処理
+        if (review.overall_satisfaction !== null && 
+            review.overall_satisfaction !== 6 && 
+            review.overall_satisfaction >= 1 && 
+            review.overall_satisfaction <= 5) {
+          stats.overall_ratings.push(review.overall_satisfaction);
+        }
 
         // answers JSONBから評価データを取得
-        // 評価値は1-5の範囲で、6は「評価できない」を意味するため除外
-        const staffRatings = reviews && reviews.length > 0
-          ? reviews
-              .map(r => r.answers?.staff_rating)
-              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
-              .map(r => parseInt(r, 10))
-              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
-          : [];
+        if (review.answers) {
+          const answers = typeof review.answers === 'string' 
+            ? JSON.parse(review.answers) 
+            : review.answers;
 
-        const atmosphereRatings = reviews && reviews.length > 0
-          ? reviews
-              .map(r => r.answers?.atmosphere_fit_rating)
-              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
-              .map(r => parseInt(r, 10))
-              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
-          : [];
+          // staff_rating
+          if (answers.staff_rating) {
+            const rating = parseInt(answers.staff_rating, 10);
+            if (!isNaN(rating) && rating >= 1 && rating <= 5 && rating !== 6) {
+              stats.staff_ratings.push(rating);
+            }
+          }
 
-        const creditRatings = reviews && reviews.length > 0
-          ? reviews
-              .map(r => r.answers?.credit_rating)
-              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
-              .map(r => parseInt(r, 10))
-              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
-          : [];
+          // atmosphere_fit_rating
+          if (answers.atmosphere_fit_rating) {
+            const rating = parseInt(answers.atmosphere_fit_rating, 10);
+            if (!isNaN(rating) && rating >= 1 && rating <= 5 && rating !== 6) {
+              stats.atmosphere_ratings.push(rating);
+            }
+          }
 
-        const tuitionRatings = reviews && reviews.length > 0
-          ? reviews
-              .map(r => r.answers?.tuition_rating)
-              .filter((rating): rating is string => rating !== null && rating !== undefined && rating !== '' && rating !== '6')
-              .map(r => parseInt(r, 10))
-              .filter(r => !isNaN(r) && r >= 1 && r <= 5)
-          : [];
+          // credit_rating
+          if (answers.credit_rating) {
+            const rating = parseInt(answers.credit_rating, 10);
+            if (!isNaN(rating) && rating >= 1 && rating <= 5 && rating !== 6) {
+              stats.credit_ratings.push(rating);
+            }
+          }
 
-        const staffAvg = staffRatings.length > 0
-          ? staffRatings.reduce((sum, r) => sum + r, 0) / staffRatings.length
-          : null;
+          // tuition_rating
+          if (answers.tuition_rating) {
+            const rating = parseInt(answers.tuition_rating, 10);
+            if (!isNaN(rating) && rating >= 1 && rating <= 5 && rating !== 6) {
+              stats.tuition_ratings.push(rating);
+            }
+          }
+        }
+      });
+    }
 
-        const atmosphereAvg = atmosphereRatings.length > 0
-          ? atmosphereRatings.reduce((sum, r) => sum + r, 0) / atmosphereRatings.length
-          : null;
+    // 学校データと統計情報を結合
+    const schoolsWithStats = allSchools.map((school) => {
+      const stats = statsMap.get(school.id) || {
+        review_count: 0,
+        overall_ratings: [],
+        staff_ratings: [],
+        atmosphere_ratings: [],
+        credit_ratings: [],
+        tuition_ratings: [],
+      };
 
-        const creditAvg = creditRatings.length > 0
-          ? creditRatings.reduce((sum, r) => sum + r, 0) / creditRatings.length
-          : null;
+      const overallAvg = stats.overall_ratings.length > 0
+        ? stats.overall_ratings.reduce((sum, r) => sum + r, 0) / stats.overall_ratings.length
+        : null;
 
-        const tuitionAvg = tuitionRatings.length > 0
-          ? tuitionRatings.reduce((sum, r) => sum + r, 0) / tuitionRatings.length
-          : null;
+      const staffAvg = stats.staff_ratings.length > 0
+        ? stats.staff_ratings.reduce((sum, r) => sum + r, 0) / stats.staff_ratings.length
+        : null;
 
-        return {
-          id: school.id,
-          name: school.name,
-          prefecture: school.prefecture,
-          slug: school.slug,
-          review_count: reviewCount || 0,
-          overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
-          staff_avg: staffAvg ? parseFloat(staffAvg.toFixed(2)) : null,
-          atmosphere_avg: atmosphereAvg ? parseFloat(atmosphereAvg.toFixed(2)) : null,
-          credit_avg: creditAvg ? parseFloat(creditAvg.toFixed(2)) : null,
-          tuition_avg: tuitionAvg ? parseFloat(tuitionAvg.toFixed(2)) : null,
-        };
-      })
-    );
+      const atmosphereAvg = stats.atmosphere_ratings.length > 0
+        ? stats.atmosphere_ratings.reduce((sum, r) => sum + r, 0) / stats.atmosphere_ratings.length
+        : null;
+
+      const creditAvg = stats.credit_ratings.length > 0
+        ? stats.credit_ratings.reduce((sum, r) => sum + r, 0) / stats.credit_ratings.length
+        : null;
+
+      const tuitionAvg = stats.tuition_ratings.length > 0
+        ? stats.tuition_ratings.reduce((sum, r) => sum + r, 0) / stats.tuition_ratings.length
+        : null;
+
+      return {
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        slug: school.slug,
+        review_count: stats.review_count,
+        overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
+        staff_avg: staffAvg ? parseFloat(staffAvg.toFixed(2)) : null,
+        atmosphere_avg: atmosphereAvg ? parseFloat(atmosphereAvg.toFixed(2)) : null,
+        credit_avg: creditAvg ? parseFloat(creditAvg.toFixed(2)) : null,
+        tuition_avg: tuitionAvg ? parseFloat(tuitionAvg.toFixed(2)) : null,
+      };
+    });
 
     // ランキングタイプに応じてソート
     // 注意: 進学実績ランキングは削除されました。追加しないでください。
@@ -190,6 +238,10 @@ export async function GET(
       limit,
       total_pages: totalPages,
       type,
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
     });
   } catch (error) {
     console.error('ランキングAPIエラー:', error);

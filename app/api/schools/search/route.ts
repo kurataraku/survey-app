@@ -149,73 +149,87 @@ export async function GET(request: NextRequest) {
     let schoolsList = Array.from(schoolMap.values())
       .filter((school) => school.status === 'active'); // 念のため、activeのみをフィルタリング
 
-    // 5. 各学校の総合満足度と口コミ数を計算
-    const schoolsWithStatsRaw = await Promise.all(
-      schoolsList.map(async (school) => {
-        try {
-          // school_idでフィルタリング（pending状態の学校の口コミを除外）
-          const { count: reviewCount, error: countError } = await supabase
-            .from('survey_responses')
-            .select('*', { count: 'exact', head: true })
-            .eq('school_id', school.id)
-            .eq('is_public', true);
+    if (schoolsList.length === 0) {
+      return NextResponse.json({ 
+        schools: [],
+        total: 0,
+        total_pages: 0,
+        page: 1,
+        limit,
+      });
+    }
 
-          if (countError) {
-            console.warn(`[API] /api/schools/search - 口コミ数取得エラー (${school.name}):`, countError);
-          }
+    // 5. 統計情報を一括で取得（パフォーマンス改善）
+    const schoolIds = schoolsList.map(s => s.id);
+    
+    // 口コミ数と平均評価を一括で取得
+    const { data: statsData, error: statsError } = await supabase
+      .from('survey_responses')
+      .select('school_id, overall_satisfaction')
+      .in('school_id', schoolIds)
+      .eq('is_public', true);
 
-          // school_idでフィルタリング（pending状態の学校の口コミを除外）
-          const { data: reviews, error: reviewsError } = await supabase
-            .from('survey_responses')
-            .select('overall_satisfaction')
-            .eq('school_id', school.id)
-            .eq('is_public', true)
-            .not('overall_satisfaction', 'is', null);
+    if (statsError) {
+      console.error('[API] /api/schools/search - 統計情報取得エラー:', statsError);
+    }
 
-          if (reviewsError) {
-            console.warn(`[API] /api/schools/search - 評価取得エラー (${school.name}):`, reviewsError);
-          }
+    // 学校IDごとに統計情報を集計
+    const statsMap = new Map<string, { review_count: number; overall_avg: number | null }>();
+    
+    // 初期化（全ての学校を0件で初期化）
+    schoolIds.forEach(id => {
+      statsMap.set(id, { review_count: 0, overall_avg: null });
+    });
 
-          // 評価値6（該当なし）を除外し、1-5の範囲のみで平均を計算
-          const validRatings = reviews
-            ?.filter(r => r.overall_satisfaction !== null && r.overall_satisfaction !== 6 && r.overall_satisfaction >= 1 && r.overall_satisfaction <= 5)
-            .map(r => r.overall_satisfaction) || [];
-
-          const overallAvg = validRatings.length > 0
-            ? validRatings.reduce((sum, r) => sum + r, 0) / validRatings.length
-            : null;
-
-          // 学校のslugを取得
-          const { data: schoolData } = await supabase
-            .from('schools')
-            .select('slug')
-            .eq('id', school.id)
-            .single();
-
-          return {
-            id: school.id,
-            name: school.name,
-            prefecture: school.prefecture,
-            slug: school.slug || schoolData?.slug || null,
-            review_count: reviewCount || 0,
-            overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
-          };
-        } catch (error) {
-          console.error(`[API] /api/schools/search - 学校統計計算エラー (${school.name}):`, error);
-          // エラーが発生した場合でも、基本的な情報を返す
-          return {
-            id: school.id,
-            name: school.name,
-            prefecture: school.prefecture,
-            slug: school.slug || null,
-            review_count: 0,
-            overall_avg: null,
-          };
+    // 統計情報を集計
+    if (statsData) {
+      const schoolStats = new Map<string, { ratings: number[]; count: number }>();
+      
+      statsData.forEach((response) => {
+        const schoolId = response.school_id;
+        if (!schoolStats.has(schoolId)) {
+          schoolStats.set(schoolId, { ratings: [], count: 0 });
         }
-      })
-    );
+        const stats = schoolStats.get(schoolId)!;
+        stats.count++;
+        
+        // 評価値6（該当なし）を除外し、1-5の範囲のみを集計
+        if (response.overall_satisfaction !== null && 
+            response.overall_satisfaction !== 6 && 
+            response.overall_satisfaction >= 1 && 
+            response.overall_satisfaction <= 5) {
+          stats.ratings.push(response.overall_satisfaction);
+        }
+      });
 
-    // 6. フィルタリング（最小評価、最小口コミ数）
+      // 平均値を計算
+      schoolStats.forEach((stats, schoolId) => {
+        const overallAvg = stats.ratings.length > 0
+          ? stats.ratings.reduce((sum, r) => sum + r, 0) / stats.ratings.length
+          : null;
+        
+        statsMap.set(schoolId, {
+          review_count: stats.count,
+          overall_avg: overallAvg ? parseFloat(overallAvg.toFixed(2)) : null,
+        });
+      });
+    }
+
+    // 6. 学校情報と統計情報を結合
+    const schoolsWithStatsRaw = schoolsList.map((school) => {
+      const stats = statsMap.get(school.id) || { review_count: 0, overall_avg: null };
+      
+      return {
+        id: school.id,
+        name: school.name,
+        prefecture: school.prefecture,
+        slug: school.slug,
+        review_count: stats.review_count,
+        overall_avg: stats.overall_avg,
+      };
+    });
+
+    // 7. フィルタリング（最小評価、最小口コミ数）
     let filteredSchools = schoolsWithStatsRaw;
     
     if (minRating !== null) {
@@ -230,7 +244,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 7. ソート
+    // 8. ソート
     let sortedSchools = [...filteredSchools];
     if (sort === 'rating_desc') {
       sortedSchools.sort((a, b) => {
@@ -253,7 +267,7 @@ export async function GET(request: NextRequest) {
       sortedSchools.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
     }
 
-    // 8. ページネーション
+    // 9. ページネーション
     const total = sortedSchools.length;
     const totalPages = Math.ceil(total / limit);
     const paginatedSchools = sortedSchools.slice(offset, offset + limit);

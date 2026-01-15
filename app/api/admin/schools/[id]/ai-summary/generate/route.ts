@@ -108,14 +108,45 @@ export async function POST(
     );
 
     // 4. OpenAI APIで要約生成
-    const openAIResult = await callOpenAIForSummary(
-      school.name,
-      reviews.map((r) => ({
-        good_comment: r.good_comment || '',
-        bad_comment: r.bad_comment || '',
-        overall_satisfaction: r.overall_satisfaction || 0,
-      }))
-    );
+    let openAIResult;
+    try {
+      openAIResult = await callOpenAIForSummary(
+        school.name,
+        reviews.map((r) => ({
+          good_comment: r.good_comment || '',
+          bad_comment: r.bad_comment || '',
+          overall_satisfaction: r.overall_satisfaction || 0,
+        }))
+      );
+    } catch (openAIError) {
+      // エラーの詳細情報を取得
+      const errorMessage = openAIError instanceof Error ? openAIError.message : String(openAIError);
+      const errorDetails = (openAIError as any)?.errorDetails || {};
+      const originalError = (openAIError as any)?.originalError;
+      
+      // 429エラー（クォータ超過）の場合、より分かりやすいエラーメッセージを返す
+      if (errorDetails.status === 429 || errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('billing')) {
+        let detailedMsg = 'OpenAI APIの利用制限に達しました。';
+        
+        // エラーの詳細情報に基づいて追加情報を提供
+        if (errorDetails.responseData) {
+          detailedMsg += ` エラー詳細: ${JSON.stringify(errorDetails.responseData)}`;
+        } else {
+          detailedMsg += ` エラーメッセージ: ${errorMessage}`;
+        }
+        
+        detailedMsg += '\n\n以下を確認してください:\n';
+        detailedMsg += '1. OpenAIダッシュボード (https://platform.openai.com) でプランと請求設定を確認\n';
+        detailedMsg += '2. クレジットカードが正常に登録されているか確認\n';
+        detailedMsg += '3. 利用制限（Rate Limits）を確認\n';
+        detailedMsg += '4. gpt-4oモデルは有料プランが必要です。プランを確認してください\n';
+        detailedMsg += '5. アカウントが一時的に制限されていないか確認';
+        
+        throw new Error(detailedMsg);
+      }
+      
+      throw openAIError;
+    }
 
     // 5. school_ai_summariesにdraftとして保存
     // 既存のdraftがあるか確認
@@ -127,6 +158,10 @@ export async function POST(
       .is('topic', null)
       .eq('status', 'draft')
       .single();
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:162',message:'Saving meta title to database',data:{metaTitle:openAIResult.metaTitle,metaTitleLength:openAIResult.metaTitle.length,hasKuchikomi:openAIResult.metaTitle.includes('口コミ'),hasHyoban:openAIResult.metaTitle.includes('評判')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
 
     const summaryData = {
       school_id: schoolId,
@@ -184,10 +219,23 @@ export async function POST(
     });
   } catch (error) {
     console.error('要約生成APIエラー:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // OpenAI API関連のエラーの場合、より具体的なメッセージを返す
+    let userFriendlyMessage = '要約の生成に失敗しました';
+    if (errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('環境変数')) {
+      userFriendlyMessage = 'OpenAI APIキーが設定されていません。環境変数を確認してください。';
+    } else if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('billing')) {
+      userFriendlyMessage = 'OpenAI APIの利用制限に達しました。プランと請求設定（クレジットカードの登録状況や残高）を確認してください。';
+    } else if (errorMessage.includes('401') || errorMessage.includes('Invalid API key')) {
+      userFriendlyMessage = 'OpenAI APIキーが無効です。APIキーを確認してください。';
+    }
+    
     return NextResponse.json(
       {
-        error: '要約の生成に失敗しました',
-        message: error instanceof Error ? error.message : String(error),
+        error: userFriendlyMessage,
+        message: errorMessage,
       },
       { status: 500 }
     );

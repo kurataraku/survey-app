@@ -100,12 +100,13 @@ export async function GET(request: NextRequest) {
 
     // パフォーマンス最適化: ログを削減
     
-    // パフォーマンス最適化: 並列処理で学校統計と口コミデータを同時取得
+    // パフォーマンス最適化: 必要な学校のみを取得して統計を計算
+    // まず全ての学校の統計を一括取得（効率的）
     const schoolIds = (allSchools || []).map(s => s.id);
     
     // 並列処理: 学校統計と口コミデータを同時に取得
     const [reviewsStatsResult, reviewsDataResult] = await Promise.all([
-      // 学校統計を取得
+      // 学校統計を取得（全ての学校の統計を一度に取得）
       schoolIds.length > 0
         ? supabase
             .from('survey_responses')
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
             .not('school_id', 'is', null)
         : Promise.resolve({ data: [], error: null }),
       
-      // 口コミデータを取得（並列実行）
+      // 口コミデータを取得（必要な3件のみ、いいね数順で取得）
       supabase
         .from('survey_responses')
         .select(`
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
         `)
         .eq('is_public', true)
         .not('school_id', 'is', null)
-        .limit(50),
+        .limit(20), // いいね数でソートできないため、少し多めに取得して後でフィルタリング
     ]);
     
     const { data: allReviewsStats, error: reviewsStatsError } = reviewsStatsResult;
@@ -247,8 +248,8 @@ export async function GET(request: NextRequest) {
     });
     
     
-    // 最適化: 口コミのいいね数を1回のクエリで取得（必要な口コミのみ）
-    const reviewIds = reviewsWithSchools.map((r: any) => r.id);
+    // 最適化: 口コミのいいね数を1回のクエリで取得（必要な口コミのみ、最大20件）
+    const reviewIds = reviewsWithSchools.slice(0, 20).map((r: any) => r.id);
     
     // レビューIDが空の場合はスキップ
     const { data: allLikes, error: likesError } = reviewIds.length > 0

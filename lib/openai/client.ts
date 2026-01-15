@@ -44,7 +44,7 @@ ${reviewsText}
 以下の形式で要約を生成してください：
 
 ## 概要（250〜400字）
-口コミ・評判から見える学校の特徴を、傾向として要約してください。「口コミ」「評判」という言葉を必ず含めてください。断定ではなく、傾向として表現してください。
+口コミ・評判から見える学校の特徴を、傾向として要約してください。ただし、「口コミ」「評判」という言葉は使わず、特徴そのものを直接説明してください。断定ではなく、傾向として表現してください。
 
 ## この学校が合う人
 - 項目1（簡潔に）
@@ -55,8 +55,8 @@ ${reviewsText}
 - 項目2（簡潔に）
 
 ## SEO用メタ情報
-- meta_title: 学校名を含む28〜35文字のタイトル（「口コミ」「評判」を含む）
-- meta_description: 要約である旨を含む100〜120文字の説明文
+- meta_title: 学校名を含む28〜35文字のタイトル。「口コミ」「評判」という言葉を必ず含めてください（例：「○○高等学校の口コミ・評判を徹底分析」など）。
+- meta_description: 学校名と主要な特徴を簡潔にまとめた説明文（105〜115文字）。「○○高等学校の口コミ・評判から見える特徴として、」から始まり、特徴のみを自然な文章で説明してください。文末は必ず句点（。）で終わり、途中で切れないようにしてください。合う人・合わない人の情報は含めません。「口コミ・評判」という言葉は接頭語に1度のみ使用するため、本文では使わないでください。
 
 注意事項:
 - 個人名、具体的な校舎名、誹謗中傷、過度な断定表現は避けてください
@@ -65,9 +65,182 @@ ${reviewsText}
 }
 
 /**
+ * 要約テキストからMeta Descriptionを生成（100文字程度、特徴のみ）
+ */
+function generateMetaDescriptionFromSummary(
+  schoolName: string,
+  summaryText: string
+): string {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:70',message:'generateMetaDescriptionFromSummary entry',data:{schoolName,summaryTextLength:summaryText.length,summaryTextPreview:summaryText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
+  // 要約テキストから概要部分のみを抽出（「## この学校が合う人」の前まで）
+  let summary = '';
+  if (summaryText.includes('## この学校が合う人')) {
+    const summaryMatch = summaryText.match(/^([\s\S]*?)(?=\n\n## この学校が合う人|\n## この学校が合う人)/);
+    summary = summaryMatch?.[1]?.trim() || '';
+  } else {
+    // 「## この学校が合う人」がない場合は全体から免責文を除いたものを使用
+    summary = summaryText.replace(/\n\n※.*$/, '').trim();
+  }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:85',message:'Extracted summary',data:{summaryLength:summary.length,summaryPreview:summary.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
+  // 概要から不要な接頭語を削除
+  const prefixPatterns = [
+    new RegExp(`^${schoolName}の口コミ・評判から見える特徴として、`),
+    new RegExp(`^${schoolName}の口コミ・評判からは、`),
+    new RegExp(`^${schoolName}に関する口コミ・評判からは、`),
+    /^口コミ・評判から見える特徴として、/,
+    /^口コミ・評判からは、/,
+    /^口コミ・評判によれば、/,
+    /^口コミ・評判では、/,
+  ];
+  
+  let cleanedSummary = summary;
+  for (const pattern of prefixPatterns) {
+    cleanedSummary = cleanedSummary.replace(pattern, '').trim();
+  }
+  
+  // 「口コミ・評判」「口コミ」「評判」という表現を除去（接頭語に含まれるため重複を避ける）
+  cleanedSummary = cleanedSummary
+    .replace(/口コミ・評判/g, '')
+    .replace(/口コミ/g, '')
+    .replace(/評判/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 105〜115文字程度に調整（接頭語「○○高等学校の口コミ・評判から見える特徴として、」を含めて）
+  const prefix = `${schoolName}の口コミ・評判から見える特徴として、`;
+  const targetLength = 110; // 中間値
+  const minLength = 105;
+  const maxLength = 115;
+  const availableLength = maxLength - prefix.length; // 約70文字程度（余裕を持たせる）
+
+  // 文の区切りで自然に切る（必ず句点で終わるようにする）
+  let summaryShort = cleanedSummary;
+  const sentences = summaryShort.match(/[^。！？]+[。！？]/g) || [];
+  
+  if (sentences.length > 0) {
+    let accumulated = '';
+    for (const sentence of sentences) {
+      const candidate = accumulated + sentence;
+      if (candidate.length <= availableLength) {
+        accumulated = candidate;
+      } else {
+        break;
+      }
+    }
+    
+    if (accumulated) {
+      summaryShort = accumulated;
+    } else {
+      // 最初の文が長すぎる場合は、文の途中で自然に切れる位置を探す
+      // 読点（、）や助詞で切れる位置を探す
+      const firstSentence = sentences[0];
+      let cutPoint = availableLength;
+      for (let i = availableLength - 1; i >= availableLength - 20 && i >= 20; i--) {
+        const char = firstSentence.charAt(i);
+        if (char === '、' || char === 'の' || char === 'が' || char === 'を' || char === 'に') {
+          cutPoint = i + 1;
+          break;
+        }
+      }
+      summaryShort = firstSentence.substring(0, cutPoint);
+      if (!summaryShort.match(/[。！？]$/)) {
+        summaryShort += '。';
+      }
+    }
+  } else {
+    // 句点がない場合は、読点や助詞で自然に切れる位置を探す
+    if (summaryShort.length > availableLength) {
+      let cutPoint = availableLength;
+      for (let i = availableLength - 1; i >= availableLength - 20 && i >= 20; i--) {
+        const char = summaryShort.charAt(i);
+        if (char === '、' || char === 'の' || char === 'が' || char === 'を' || char === 'に') {
+          cutPoint = i + 1;
+          break;
+        }
+      }
+      summaryShort = summaryShort.substring(0, cutPoint);
+      if (!summaryShort.match(/[。！？]$/)) {
+        summaryShort += '。';
+      }
+    }
+  }
+
+  // Meta Descriptionを組み立て
+  let metaDesc = prefix + summaryShort;
+  
+  // 末尾が句点で終わっていない場合は追加（必須）
+  if (!metaDesc.match(/[。！？]$/)) {
+    metaDesc += '。';
+  }
+
+  // 文字数調整（105〜115文字の範囲に収める、5〜10文字オーバーは許容）
+  if (metaDesc.length < minLength) {
+    // 105文字未満の場合は、もう少し詳細を追加（ただし115文字を超えないように）
+    const remainingSpace = maxLength - metaDesc.length;
+    if (remainingSpace > 10 && cleanedSummary.length > summaryShort.length) {
+      // 次の文を追加できるか確認
+      const remainingText = cleanedSummary.substring(summaryShort.length).trim();
+      const nextSentences = remainingText.match(/[^。！？]+[。！？]/g) || [];
+      
+      if (nextSentences.length > 0) {
+        const nextSentence = nextSentences[0];
+        const candidateLength = metaDesc.length - 1 + nextSentence.length; // 既存の句点を削除して追加
+        
+        if (candidateLength <= maxLength + 10) { // 10文字オーバーまで許容
+          metaDesc = metaDesc.replace(/[。！？]$/, '');
+          metaDesc += nextSentence;
+        }
+      }
+    }
+  } else if (metaDesc.length > maxLength + 10) {
+    // 125文字（115+10）を超える場合は短縮
+    const excess = metaDesc.length - (maxLength + 10);
+    const prefixLength = prefix.length;
+    const currentSummary = metaDesc.substring(prefixLength);
+    const newSummaryLength = Math.max(30, currentSummary.length - excess - 2); // 余裕を持たせる
+    
+    // 自然に切れる位置を探す
+    let truncatedSummary = currentSummary.substring(0, newSummaryLength);
+    for (let i = truncatedSummary.length - 1; i >= truncatedSummary.length - 15 && i >= 0; i--) {
+      const char = truncatedSummary.charAt(i);
+      if (char === '。' || char === '、') {
+        truncatedSummary = truncatedSummary.substring(0, i + (char === '。' ? 1 : 0));
+        break;
+      }
+    }
+    
+    metaDesc = prefix + truncatedSummary;
+    if (!metaDesc.match(/[。！？]$/)) {
+      metaDesc += '。';
+    }
+  }
+  
+  // 「...」で終わっている場合は削除して句点を追加
+  metaDesc = metaDesc.replace(/\.\.\.+[。！？]*$/, '。');
+
+  const finalMetaDesc = metaDesc.trim();
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:150',message:'Final meta description',data:{finalLength:finalMetaDesc.length,finalPreview:finalMetaDesc.substring(0,80),endsWithPeriod:finalMetaDesc.match(/[。！？]$/)!==null,hasEllipsis:finalMetaDesc.includes('...'),isInRange:finalMetaDesc.length>=105&&finalMetaDesc.length<=125},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
+  return finalMetaDesc;
+}
+
+/**
  * OpenAI APIレスポンスから要約情報をパース
  */
-function parseSummaryResponse(response: string): {
+function parseSummaryResponse(
+  response: string,
+  schoolName: string
+): {
   summaryText: string;
   metaTitle: string;
   metaDescription: string;
@@ -83,6 +256,10 @@ function parseSummaryResponse(response: string): {
   const fits = fitsMatch?.[1]?.trim() || '';
   const notFits = notFitsMatch?.[1]?.trim() || '';
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:170',message:'Parsed sections from API response',data:{summaryLength:summary.length,summaryPreview:summary.substring(0,50),fitsLength:fits.length,fitsPreview:fits.substring(0,50),notFitsLength:notFits.length,notFitsPreview:notFits.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
+
   // 要約テキストを組み立て
   let summaryText = summary;
   if (fits) {
@@ -93,8 +270,96 @@ function parseSummaryResponse(response: string): {
   }
   summaryText += '\n\n※本ページの口コミ・評判をもとにAIが傾向を要約しています。';
 
-  const metaTitle = metaTitleMatch?.[1]?.trim() || '';
-  const metaDescription = metaDescriptionMatch?.[1]?.trim() || '';
+  let metaTitle = metaTitleMatch?.[1]?.trim() || '';
+  let metaDescription = metaDescriptionMatch?.[1]?.trim() || '';
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:273',message:'Parsed meta title from API',data:{metaTitleLength:metaTitle.length,metaTitle:metaTitle,hasKuchikomiOrHyoban:metaTitle.includes('口コミ')||metaTitle.includes('評判')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+
+  // meta_titleに「口コミ」または「評判」が含まれているかチェック（より堅牢な方法）
+  const hasKuchikomi = metaTitle && (metaTitle.includes('口コミ') || metaTitle.includes('くちこみ') || metaTitle.includes('クチコミ'));
+  const hasHyoban = metaTitle && (metaTitle.includes('評判') || metaTitle.includes('ひょうばん') || metaTitle.includes('ヒョウバン'));
+  const hasKuchikomiOrHyoban = hasKuchikomi || hasHyoban;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:281',message:'Checking meta title for kuchikomi/hyoban',data:{originalMetaTitle:metaTitle,hasKuchikomi,hasHyoban,hasKuchikomiOrHyoban},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+
+  // meta_titleに「口コミ」「評判」が含まれていない場合は自動的に追加または修正
+  if (!metaTitle || !hasKuchikomiOrHyoban) {
+    if (metaTitle) {
+      // 既存のタイトルがあるが「口コミ・評判」が含まれていない場合
+      // 学校名の後に「の口コミ・評判」を追加
+      // パターン1: 「○○高等学校」で始まる場合
+      if (metaTitle.startsWith(schoolName)) {
+        const rest = metaTitle.substring(schoolName.length).trim();
+        // 「の」が既にある場合は重複を避ける
+        if (rest.startsWith('の')) {
+          metaTitle = `${schoolName}の口コミ・評判${rest.substring(1)}`;
+        } else {
+          metaTitle = `${schoolName}の口コミ・評判${rest}`;
+        }
+      } else if (metaTitle.includes(schoolName)) {
+        // パターン2: 学校名が含まれているが先頭でない場合
+        const schoolNameIndex = metaTitle.indexOf(schoolName);
+        const before = metaTitle.substring(0, schoolNameIndex);
+        const after = metaTitle.substring(schoolNameIndex + schoolName.length);
+        // 「の」が既にある場合は重複を避ける
+        if (after.startsWith('の')) {
+          metaTitle = `${before}${schoolName}の口コミ・評判${after.substring(1)}`;
+        } else {
+          metaTitle = `${before}${schoolName}の口コミ・評判${after}`;
+        }
+      } else {
+        // パターン3: 学校名が含まれていない場合
+        metaTitle = `${schoolName}の口コミ・評判${metaTitle}`;
+      }
+    } else {
+      // meta_titleが生成されていない場合はフォールバック生成
+      metaTitle = `${schoolName}の口コミ・評判を徹底分析`;
+    }
+    
+    // 文字数制限（28〜35文字）を超える場合は調整
+    if (metaTitle.length > 35) {
+      // 後ろから削る
+      const excess = metaTitle.length - 35;
+      const basePart = `${schoolName}の口コミ・評判`;
+      const restPart = metaTitle.substring(basePart.length);
+      if (restPart.length > excess) {
+        // 「を徹底分析」などの末尾部分を短縮または削除
+        const truncatedRest = restPart.substring(0, Math.max(0, restPart.length - excess - 3));
+        metaTitle = basePart + truncatedRest;
+      } else {
+        metaTitle = basePart;
+      }
+    }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:320',message:'Fixed meta title to include kuchikomi/hyoban',data:{fixedMetaTitle:metaTitle,fixedLength:metaTitle.length,originalTitle:metaTitleMatch?.[1]?.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:325',message:'Final meta title before return',data:{finalMetaTitle:metaTitle,finalMetaTitleLength:metaTitle.length,hasKuchikomi:metaTitle.includes('口コミ'),hasHyoban:metaTitle.includes('評判')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+  // #endregion
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:310',message:'Parsed meta description from API',data:{metaDescriptionLength:metaDescription.length,metaDescriptionPreview:metaDescription.substring(0,60),needsFallback:metaDescription.length<105||metaDescription.length>125},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
+  // meta_descriptionが適切な長さでない場合（105文字未満または125文字超過）、要約テキストから生成
+  // 免責文を除いた要約テキストを使用
+  const summaryTextForMeta = summaryText.replace(/\n\n※.*$/, '');
+  if (metaDescription.length < 105 || metaDescription.length > 125) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:200',message:'Using fallback generation',data:{originalLength:metaDescription.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    metaDescription = generateMetaDescriptionFromSummary(schoolName, summaryTextForMeta);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:203',message:'Generated fallback meta description',data:{generatedLength:metaDescription.length,generatedPreview:metaDescription.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+  }
 
   return {
     summaryText: summaryText.trim(),
@@ -184,7 +449,7 @@ export async function callOpenAIForSummary(
       throw new Error('OpenAI APIからのレスポンスが空です');
     }
 
-    const parsed = parseSummaryResponse(responseText);
+    const parsed = parseSummaryResponse(responseText, schoolName);
 
     return {
       ...parsed,
@@ -195,8 +460,43 @@ export async function callOpenAIForSummary(
       },
     };
   } catch (error) {
+    // OpenAI APIエラーの詳細情報を取得
+    let errorDetails: any = {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : undefined,
+    };
+    
+    // OpenAI SDKのエラーオブジェクトから詳細情報を抽出
+    if (error && typeof error === 'object') {
+      const errorObj = error as any;
+      if (errorObj.status) errorDetails.status = errorObj.status;
+      if (errorObj.code) errorDetails.code = errorObj.code;
+      if (errorObj.type) errorDetails.type = errorObj.type;
+      if (errorObj.param) errorDetails.param = errorObj.param;
+      if (errorObj.response) {
+        errorDetails.responseStatus = errorObj.response?.status;
+        errorDetails.responseData = errorObj.response?.data;
+      }
+    }
+    
+    // より詳細なエラーメッセージを構築
+    let detailedMessage = error instanceof Error ? error.message : String(error);
+    if (errorDetails.status) {
+      detailedMessage += ` (Status: ${errorDetails.status})`;
+    }
+    if (errorDetails.code) {
+      detailedMessage += ` (Code: ${errorDetails.code})`;
+    }
+    if (errorDetails.responseData) {
+      detailedMessage += ` (Response: ${JSON.stringify(errorDetails.responseData)})`;
+    }
+    
     if (error instanceof Error) {
-      throw new Error(`OpenAI API呼び出しエラー: ${error.message}`);
+      const enhancedError = new Error(`OpenAI API呼び出しエラー: ${detailedMessage}`);
+      // 元のエラー情報を保持
+      (enhancedError as any).originalError = error;
+      (enhancedError as any).errorDetails = errorDetails;
+      throw enhancedError;
     }
     throw error;
   }
