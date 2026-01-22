@@ -1,0 +1,5 @@
+# UI関連のディレクトリは必ずレビュー
+/app/**/*.tsx @kurataraku
+/components/**/*.tsx @kurataraku
+/app/**/*.css @kurataraku
+/styles/**/*.css @kurataraku

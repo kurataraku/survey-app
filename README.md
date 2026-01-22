@@ -20,16 +20,24 @@ npm install
 
 ### 2. 環境変数の設定
 
-`.env.local`ファイルを作成し、以下の環境変数を設定してください：
+`.env.example`をコピーして`.env.local`を作成し、実際の値を設定してください：
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local`ファイルに以下の環境変数を設定してください：
 
 ```env
-# Supabase設定
+# Supabase設定（必須）
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
 
 Supabaseのダッシュボード（Settings → API）から各値を取得できます。
+
+詳細は`.env.example`を参照してください。
 
 ### 3. Supabaseテーブルの作成
 
@@ -101,3 +109,66 @@ npm start
 
 - スパム対策/CAPTCHA/レート制限は未実装です
 - 本番環境では適切なセキュリティ対策を実装してください
+
+## 開発フロー
+
+### ブランチ構成
+
+```
+main：本番用（直接push禁止）
+  ↑
+dev：統合用（複数PRの受け皿）
+  ↑
+feature/xxx：各メンバー作業用（例：feature/ui-school-header）
+```
+
+### 作業手順
+
+1. **ブランチの作成**
+   ```bash
+   git checkout dev
+   git pull origin dev
+   git checkout -b feature/ui-xxx
+   ```
+
+2. **ローカルで修正・確認**
+   - CursorでUI修正
+   - `npm run dev`でローカル表示確認
+
+3. **コミット・プッシュ**
+   ```bash
+   git add .
+   git commit -m "feat(ui): 変更内容の説明"
+   git push -u origin feature/ui-xxx
+   ```
+
+4. **PR作成**
+   - GitHubでPRを作成（`feature/*` → `dev`）
+   - PRテンプレートに従って記入
+   - Before/Afterのスクショを添付
+
+5. **レビュー・マージ**
+   - レビュー承認後、`dev`にマージ
+   - まとまったタイミングで`dev` → `main`にマージ（本番反映）
+
+### 許可される変更
+
+- ✅ 文言・テキストの変更
+- ✅ 文字サイズ・フォント・色の変更
+- ✅ トーン&マナーの調整
+- ✅ 画像の挿入・差し替え
+- ✅ レイアウト・余白・サイズの調整
+- ✅ スタイリング（CSS/Tailwind）の変更
+
+### 絶対に禁止される変更
+
+- ❌ 機能の追加・変更・削除
+- ❌ バックエンド（API、データベース）への変更
+- ❌ サーバー側（API Route、Server Component）のロジック変更
+- ❌ データ取得ロジックの変更
+- ❌ ルーティングの変更
+- ❌ 認証・セキュリティ関連の変更
+- ❌ 環境変数の追加・変更
+- ❌ パッケージの追加・削除
+
+詳細は`.github/pull_request_template.md`と`.github/ISSUE_TEMPLATE/ui-improvement.md`を参照してください。
