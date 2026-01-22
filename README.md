@@ -2,6 +2,8 @@
 
 Next.js + Supabaseで実装されたアンケートWebアプリケーションです。
 
+> **テスト用PR**: プレビュー環境の動作確認用
+
 ## 技術スタック
 
 - Next.js 16 (App Router) + TypeScript
