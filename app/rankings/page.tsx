@@ -74,7 +74,7 @@ export default function RankingsPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <span className="text-sm text-blue-600 font-medium">
+                <span className="text-sm text-blue-500 font-medium">
                   詳細を見る →
                 </span>
               </div>
