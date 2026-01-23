@@ -84,7 +84,7 @@ export default async function SchoolDetailPage({ params }: PageProps) {
         <div className="mb-4">
           <Link
             href="/schools"
-            className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
+            className="text-sm text-blue-500 hover:text-blue-600 inline-flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

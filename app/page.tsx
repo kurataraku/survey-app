@@ -293,7 +293,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヒーローセクション */}
-      <section className="relative bg-gradient-to-br from-blue-50 to-blue-100 py-16 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-blue-100 to-blue-200 py-16 overflow-hidden">
         {/* 背景イラスト（透過を少し弱めて表示） */}
         <div className="pointer-events-none absolute inset-0 opacity-30">
           <img
@@ -306,7 +306,7 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-              実際の体験談で
+              リアルなクチコミで
               <br />
               通信制高校を選ぼう
             </h1>
@@ -331,7 +331,7 @@ export default function Home() {
                       }
                     }}
                     placeholder="学校名で検索"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                   />
                   {showSuggestions && (
                     <div
@@ -361,7 +361,7 @@ export default function Home() {
                   <select
                     value={selectedPrefecture}
                     onChange={(e) => setSelectedPrefecture(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                   >
                     <option value="">都道府県から探す</option>
                     {prefectures.map((pref) => (
@@ -373,7 +373,7 @@ export default function Home() {
                 </div>
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md hover:shadow-lg"
+                  className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-md hover:shadow-lg"
                 >
                   検索
                 </button>
@@ -385,7 +385,7 @@ export default function Home() {
           <div className="text-center">
             <Link
               href="/survey"
-              className="inline-flex items-center gap-3 px-10 py-4 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="inline-flex items-center gap-3 px-10 py-4 bg-rose-400 text-white rounded-lg hover:bg-rose-500 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               <svg
                 className="w-6 h-6"
@@ -418,7 +418,7 @@ export default function Home() {
               </div>
               <Link
                 href="/schools"
-                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                className="text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
               >
                 もっと見る
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -453,7 +453,7 @@ export default function Home() {
               </div>
               <Link
                 href="/reviews"
-                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                className="text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
               >
                 もっと見る
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -502,7 +502,7 @@ export default function Home() {
               </div>
               <Link
                 href="/features"
-                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                className="text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
               >
                 もっと見る
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -537,7 +537,7 @@ export default function Home() {
               <Link
                 key={pref}
                 href={`/schools?prefecture=${encodeURIComponent(pref)}`}
-                className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-500 hover:border-blue-400 transition-colors"
               >
                 {pref.replace(/[都道府県]$/, '')}
               </Link>
@@ -546,7 +546,7 @@ export default function Home() {
           <div className="mt-6 text-center">
             <Link
               href="/schools"
-              className="text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center gap-1"
+              className="text-blue-500 hover:text-blue-600 font-medium flex items-center justify-center gap-1"
             >
               すべての都道府県を見る
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

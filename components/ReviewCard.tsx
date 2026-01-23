@@ -89,7 +89,7 @@ export default function ReviewCard({
   return (
     <div
       onClick={handleCardClick}
-      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all cursor-pointer"
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">
@@ -98,7 +98,7 @@ export default function ReviewCard({
               <Link
                 href={`/schools/${schoolSlug}`}
                 onClick={(e) => e.stopPropagation()}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                className="text-sm font-medium text-blue-500 hover:text-blue-600"
               >
                 {schoolName}
               </Link>
@@ -107,12 +107,12 @@ export default function ReviewCard({
             )}
             <div className="flex items-center gap-1.5 flex-wrap">
               {reasonForChoosing && reasonForChoosing.length > 0 && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded">
+                <span className="px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 rounded">
                   通信制を選んだ理由：{reasonForChoosingMap[reasonForChoosing[0]] || reasonForChoosing[0]}
                 </span>
               )}
               {attendanceFrequencyProp && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 rounded">
+                <span className="px-2 py-0.5 text-xs font-medium bg-green-50 text-green-600 rounded">
                   通学頻度: {attendanceFrequencyProp}
                 </span>
               )}
@@ -143,13 +143,13 @@ export default function ReviewCard({
       <div className="space-y-2.5 mb-4">
         {goodComment && (
           <div>
-            <p className="text-xs font-semibold text-green-600 mb-1">良い点</p>
+            <p className="text-xs font-semibold text-green-500 mb-1">良い点</p>
             <p className="text-gray-700 line-clamp-2 text-sm">{truncatedGoodComment}</p>
           </div>
         )}
         {badComment && (
           <div>
-            <p className="text-xs font-semibold text-rose-600 mb-1">改善してほしい点</p>
+            <p className="text-xs font-semibold text-rose-500 mb-1">改善してほしい点</p>
             <p className="text-gray-700 line-clamp-2 text-sm">{truncatedBadComment}</p>
           </div>
         )}
@@ -172,7 +172,7 @@ export default function ReviewCard({
           </svg>
           <span>{likeCount}</span>
         </div>
-        <span className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+        <span className="text-sm text-blue-500 hover:text-blue-600 font-medium">
           続きを読む →
         </span>
       </div>

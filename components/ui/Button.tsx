@@ -19,11 +19,11 @@ export default function Button({
   const baseStyles = 'font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
+    primary: 'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-400',
     secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
-    outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50 focus:ring-blue-500',
-    text: 'text-blue-600 hover:bg-blue-50 focus:ring-blue-500',
-    accent: 'bg-rose-500 text-white hover:bg-rose-600 focus:ring-rose-500',
+    outline: 'border-2 border-blue-500 text-blue-500 hover:bg-blue-50 focus:ring-blue-400',
+    text: 'text-blue-500 hover:bg-blue-50 focus:ring-blue-400',
+    accent: 'bg-rose-400 text-white hover:bg-rose-500 focus:ring-rose-400',
   };
   
   const sizes = {
