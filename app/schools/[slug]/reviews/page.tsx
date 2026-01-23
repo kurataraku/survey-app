@@ -198,7 +198,7 @@ export default function SchoolReviewsPage() {
         <div className="mb-3">
           <Link
             href={`/schools/${slug}`}
-            className="text-xs text-blue-600 hover:text-blue-700 mb-2 inline-flex items-center gap-1"
+            className="text-xs text-blue-500 hover:text-blue-600 mb-2 inline-flex items-center gap-1"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

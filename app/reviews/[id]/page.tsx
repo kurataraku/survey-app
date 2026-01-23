@@ -121,7 +121,7 @@ export default function ReviewDetailPage() {
           {review.school_slug ? (
             <Link
               href={`/schools/${review.school_slug}`}
-              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
+              className="text-sm text-blue-500 hover:text-blue-600 mb-4 inline-flex items-center gap-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -131,7 +131,7 @@ export default function ReviewDetailPage() {
           ) : (
             <Link
               href="/schools"
-              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
+              className="text-sm text-blue-500 hover:text-blue-600 mb-4 inline-flex items-center gap-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
