@@ -297,7 +297,7 @@ export default function Home() {
         {/* 背景イラスト（透過を少し弱めて表示） */}
         <div className="pointer-events-none absolute inset-0 opacity-30">
           <img
-            src="/hero-visual.png" // public/hero-visual.png に配置してください
+            src="/new-hero-visual.png" // public/new-hero-visual.png に配置してください
             alt=""
             className="w-full h-full object-cover"
           />
