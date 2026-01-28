@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface Article {
   id: string;
@@ -51,7 +52,7 @@ function ArticlesPageContent() {
         params.append('category', categoryFilter);
       }
 
-      const apiUrl = `/api/admin/articles?${params.toString()}`;
+      const apiUrl = apiPath(`/api/admin/articles?${params.toString()}`);
       console.log('[ArticlesPage] APIリクエスト:', apiUrl);
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:55',message:'APIリクエスト送信前',data:{apiUrl,params:params.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'B'})}).catch(()=>{});
@@ -125,7 +126,7 @@ function ArticlesPageContent() {
     if (categoryFilter) {
       params.append('category', categoryFilter);
     }
-    router.push(`/admin/articles?${params.toString()}`);
+    router.push(`${appPath('/admin/articles')}?${params.toString()}`);
     fetchArticles();
   };
 
@@ -135,7 +136,7 @@ function ArticlesPageContent() {
     }
 
     try {
-      const response = await fetch(`/api/admin/articles/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/articles/${id}`), {
         method: 'DELETE',
       });
 
@@ -169,7 +170,7 @@ function ArticlesPageContent() {
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold text-gray-900">記事管理</h1>
             <Link
-              href="/admin/articles/new"
+              href={appPath('/admin/articles/new')}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               新規作成
@@ -282,7 +283,7 @@ function ArticlesPageContent() {
                           // #region agent log
                           fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:265',message:'記事行クリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'G'})}).catch(()=>{});
                           // #endregion
-                          router.push(`/admin/articles/${article.id}/edit`);
+                          router.push(appPath(`/admin/articles/${article.id}/edit`));
                         }}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -326,7 +327,7 @@ function ArticlesPageContent() {
                                 // #region agent log
                                 fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:265',message:'編集ボタンクリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'H'})}).catch(()=>{});
                                 // #endregion
-                                router.push(`/admin/articles/${article.id}/edit`);
+                                router.push(appPath(`/admin/articles/${article.id}/edit`));
                               }}
                               className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
                             >

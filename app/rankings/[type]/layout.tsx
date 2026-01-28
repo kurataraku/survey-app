@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
 const rankingTypeLabels: Record<string, { title: string; description: string }> = {
   overall: {
@@ -30,12 +31,16 @@ const rankingTypeLabels: Record<string, { title: string; description: string }> 
 export async function generateMetadata({
   params,
 }: {
-  params: { type: string };
+  params: Promise<{ type: string }> | { type: string };
 }): Promise<Metadata> {
-  const rankingInfo = rankingTypeLabels[params.type] || {
+  const resolved = params instanceof Promise ? await params : params;
+  const rankingInfo = rankingTypeLabels[resolved.type] || {
     title: 'ランキング',
     description: '通信制高校を様々な指標でランキング形式で比較。',
   };
+  const appBaseUrl = getAppBaseUrl();
+  const pathname = `/rankings/${resolved.type}`;
+  const canonical = `${appBaseUrl}${pathname}`;
 
   return {
     title: `通信制高校 ${rankingInfo.title} | 通信制高校リアルレビュー`,
@@ -46,6 +51,13 @@ export async function generateMetadata({
       '通信制高校 人気',
       '通信制高校 比較',
     ],
+    alternates: { canonical },
+    openGraph: {
+      title: `通信制高校 ${rankingInfo.title} | 通信制高校リアルレビュー`,
+      description: rankingInfo.description,
+      type: 'website',
+      url: canonical,
+    },
   };
 }
 

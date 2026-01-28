@@ -8,6 +8,7 @@ import ReviewCard from '@/components/ReviewCard';
 import ArticleCard from '@/components/ArticleCard';
 import { prefectures } from '@/lib/prefectures';
 import { normalizeSearchQuery } from '@/lib/utils';
+import { apiPath, appPath, BASE_PATH } from '@/lib/base-path';
 
 interface HomeData {
   topRankedSchools: Array<{
@@ -106,7 +107,7 @@ export default function Home() {
       try {
         // 検索クエリを正規化（全角→半角変換）
         const normalizedQuery = normalizeSearchQuery(searchQuery.trim());
-        const response = await fetch(`/api/schools/autocomplete?q=${encodeURIComponent(normalizedQuery)}`);
+        const response = await fetch(apiPath(`/api/schools/autocomplete?q=${encodeURIComponent(normalizedQuery)}`));
         if (response.ok) {
           const data = await response.json();
           setSuggestions(data.suggestions || []);
@@ -154,7 +155,7 @@ export default function Home() {
   const fetchHomeData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/home');
+      const response = await fetch(apiPath('/api/home'));
       
       // レスポンスのContent-Typeを確認
       const contentType = response.headers.get('content-type');
@@ -230,20 +231,19 @@ export default function Home() {
     if (selectedPrefecture) {
       params.append('prefecture', selectedPrefecture);
     }
-    router.push(`/schools?${params.toString()}`);
+    router.push(`${appPath('/schools')}?${params.toString()}`);
   };
 
   const handleSuggestionClick = (suggestion: SchoolSuggestion) => {
     setSearchQuery(suggestion.name);
     setShowSuggestions(false);
     const params = new URLSearchParams();
-    // 検索クエリを正規化（全角→半角変換）
     const normalizedQuery = normalizeSearchQuery(suggestion.name);
     params.append('q', normalizedQuery);
     if (selectedPrefecture) {
       params.append('prefecture', selectedPrefecture);
     }
-    router.push(`/schools?${params.toString()}`);
+    router.push(`${appPath('/schools')}?${params.toString()}`);
   };
 
   if (loading) {
@@ -295,9 +295,9 @@ export default function Home() {
       {/* ヒーローセクション */}
       <section className="relative bg-gradient-to-br from-blue-100 to-blue-200 py-16 overflow-hidden">
         {/* 背景イラスト（透過を少し弱めて表示） */}
-        <div className="pointer-events-none absolute inset-0 opacity-30">
+          <div className="pointer-events-none absolute inset-0 opacity-30">
           <img
-            src="/hero-visual.png" // public/hero-visual.png に配置してください
+            src={`${BASE_PATH}/hero-visual.png`}
             alt=""
             className="w-full h-full object-cover"
           />
@@ -384,8 +384,8 @@ export default function Home() {
           {/* 主CTA - より大きく目立つデザイン */}
           <div className="text-center">
             <Link
-              href="/survey"
-              className="inline-flex items-center gap-3 px-10 py-4 bg-rose-400 text-white rounded-lg hover:bg-rose-500 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              href={appPath('/survey')}
+              className="inline-flex items-center gap-3 px-10 py-4 bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               <svg
                 className="w-6 h-6"
@@ -417,8 +417,8 @@ export default function Home() {
                 <p className="text-sm text-gray-600">多くの口コミが寄せられている学校</p>
               </div>
               <Link
-                href="/schools"
-                className="text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
+                href={appPath('/schools')}
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
                 もっと見る
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -452,8 +452,8 @@ export default function Home() {
                 <p className="text-sm text-gray-600">多くのいいねが寄せられている口コミ</p>
               </div>
               <Link
-                href="/reviews"
-                className="text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
+                href={appPath('/reviews')}
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
                 もっと見る
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -501,8 +501,8 @@ export default function Home() {
                 <p className="text-sm text-gray-600">通信制高校に関する役立つ情報</p>
               </div>
               <Link
-                href="/features"
-                className="text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1"
+                href={appPath('/features')}
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
               >
                 もっと見る
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -536,8 +536,8 @@ export default function Home() {
             {majorPrefectures.map((pref) => (
               <Link
                 key={pref}
-                href={`/schools?prefecture=${encodeURIComponent(pref)}`}
-                className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-500 hover:border-blue-400 transition-colors"
+                href={`${appPath('/schools')}?prefecture=${encodeURIComponent(pref)}`}
+                className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
               >
                 {pref.replace(/[都道府県]$/, '')}
               </Link>
@@ -545,8 +545,8 @@ export default function Home() {
           </div>
           <div className="mt-6 text-center">
             <Link
-              href="/schools"
-              className="text-blue-500 hover:text-blue-600 font-medium flex items-center justify-center gap-1"
+              href={appPath('/schools')}
+              className="text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center gap-1"
             >
               すべての都道府県を見る
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

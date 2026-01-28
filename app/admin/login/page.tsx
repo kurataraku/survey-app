@@ -3,6 +3,7 @@
 import { useState, FormEvent, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getClient } from '@/lib/supabase/client';
+import { appPath } from '@/lib/base-path';
 
 function LoginForm() {
   const router = useRouter();
@@ -31,7 +32,7 @@ function LoginForm() {
           // パスワードリセット/設定用のトークンが含まれている場合、パスワード設定画面にリダイレクト
           console.log('パスワードリセットトークンを検出しました。パスワード設定画面にリダイレクトします。');
           // URLフラグメントを保持したままリダイレクト
-          router.push(`/admin/reset-password${hashFragment}`);
+          router.push(`${appPath('/admin/reset-password')}${hashFragment}`);
           // #region agent log
           fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:28',message:'Redirecting to reset-password page',data:{type,hasAccessToken:!!accessToken},timestamp:Date.now(),sessionId:'debug-session',runId:'run21',hypothesisId:'U'})}).catch(()=>{});
           // #endregion

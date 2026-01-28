@@ -3,6 +3,8 @@
  * 本番環境での誤設定を防ぐ
  */
 
+import { BASE_PATH } from "./base-path";
+
 export interface SupabaseConfig {
   url: string;
   anonKey: string;
@@ -55,4 +57,9 @@ export function getSiteUrl(): string {
   }
   
   return siteUrl;
+}
+
+/** このアプリのベースURL（例: https://careeressence.jp/tsushin-kuchikomi） */
+export function getAppBaseUrl(): string {
+  return getSiteUrl().replace(/\/$/, "") + BASE_PATH;
 }

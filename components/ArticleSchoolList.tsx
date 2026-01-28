@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { ArticleSchool } from '@/lib/types/articles';
+import { apiPath } from '@/lib/base-path';
 
 interface ArticleSchoolListProps {
   articleId: string;
@@ -31,7 +32,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
 
   const fetchSchools = async () => {
     try {
-      const response = await fetch(`/api/admin/articles/${articleId}`);
+      const response = await fetch(apiPath(`/api/admin/articles/${articleId}`));
       if (!response.ok) {
         throw new Error('記事の取得に失敗しました');
       }
@@ -71,7 +72,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
 
     setIsAdding(true);
     try {
-      const response = await fetch(`/api/admin/articles/${articleId}/schools`, {
+      const response = await fetch(apiPath(`/api/admin/articles/${articleId}/schools`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +132,7 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
     }
 
     try {
-      const response = await fetch(`/api/admin/articles/${articleId}/schools/${schoolId}`, {
+      const response = await fetch(apiPath(`/api/admin/articles/${articleId}/schools/${schoolId}`), {
         method: 'DELETE',
       });
 

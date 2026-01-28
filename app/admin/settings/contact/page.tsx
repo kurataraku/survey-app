@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { appPath } from '@/lib/base-path';
+import { apiPath } from '@/lib/base-path';
 
 export default function ContactSettingsPage() {
   const router = useRouter();
@@ -43,7 +45,7 @@ export default function ContactSettingsPage() {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/admin/settings/contact', {
+      const response = await fetch(apiPath('/api/admin/settings/contact'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -91,7 +93,7 @@ export default function ContactSettingsPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <button
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push(appPath('/admin'))}
             className="text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

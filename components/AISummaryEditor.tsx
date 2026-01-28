@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiPath } from '@/lib/base-path';
 
 interface AISummary {
   id: string;
@@ -42,7 +43,7 @@ export default function AISummaryEditor({ schoolId }: AISummaryEditorProps) {
     setError(null);
     try {
       // draftまたはpublishedの要約を取得
-      const response = await fetch(`/api/admin/schools/${schoolId}/ai-summary`);
+      const response = await fetch(apiPath(`/api/admin/schools/${schoolId}/ai-summary`));
       if (response.ok) {
         const data = await response.json();
         if (data.summary) {
@@ -73,7 +74,7 @@ export default function AISummaryEditor({ schoolId }: AISummaryEditorProps) {
     setGenerating(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/schools/${schoolId}/ai-summary/generate`, {
+      const response = await fetch(apiPath(`/api/admin/schools/${schoolId}/ai-summary/generate`), {
         method: 'POST',
       });
 
@@ -145,7 +146,7 @@ export default function AISummaryEditor({ schoolId }: AISummaryEditorProps) {
     setPublishing(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/ai-summary/${summary.id}/publish`, {
+      const response = await fetch(apiPath(`/api/admin/ai-summary/${summary.id}/publish`), {
         method: 'POST',
       });
 

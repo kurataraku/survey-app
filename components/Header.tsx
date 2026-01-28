@@ -1,33 +1,33 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { BASE_PATH, appPath } from '@/lib/base-path';
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/schools?q=${encodeURIComponent(searchQuery.trim())}`;
+      router.push(`${appPath('/schools')}?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
   const navItems = [
-    { href: '/', label: 'ホーム' },
-    { href: '/schools', label: '学校検索' },
-    { href: '/rankings', label: 'ランキング' },
-    { href: '/features', label: '特集' },
-    { href: '/survey', label: '口コミ投稿' },
+    { href: appPath('/'), label: 'ホーム' },
+    { href: appPath('/schools'), label: '学校検索' },
+    { href: appPath('/rankings'), label: 'ランキング' },
+    { href: appPath('/features'), label: '特集' },
+    { href: appPath('/survey'), label: '口コミ投稿' },
   ];
 
   const isActive = (href: string) => {
-    if (href === '/') {
-      return pathname === '/';
-    }
+    if (href === appPath('/')) return pathname === href;
     return pathname?.startsWith(href);
   };
 
@@ -38,14 +38,14 @@ export default function Header() {
           {/* ロゴ */}
           <div className="flex items-start self-start">
             <Link
-              href="/"
+              href={appPath('/')}
               className="flex items-start focus:outline-none focus:ring-0"
             >
               {/* 視覚障害者向けのテキストラベル */}
               <span className="sr-only">通信制高校リアルレビュー</span>
               {/* ロゴ画像（publicフォルダ直下に配置してください: /public/logo-service.png など） */}
               <img
-                src="/logo-service.png"
+                src={`${BASE_PATH}/logo-service.png`}
                 alt="通信制高校リアルレビュー"
                 className="h-24 md:h-28 lg:h-32 w-auto block"
               />

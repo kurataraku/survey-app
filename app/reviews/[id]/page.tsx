@@ -8,6 +8,7 @@ import RatingDisplay from '@/components/RatingDisplay';
 import LikeButton from '@/components/LikeButton';
 import Chip from '@/components/ui/Chip';
 import { getQuestionLabel, getQuestionLabels, getAttendanceFrequencyLabel, getEnrollmentYearLabel, getGraduationPathLabel } from '@/lib/questionLabels';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface Review {
   id: string;
@@ -64,10 +65,10 @@ export default function ReviewDetailPage() {
   const fetchReview = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/reviews/${id}`);
+      const response = await fetch(apiPath(`/api/reviews/${id}`));
       if (!response.ok) {
         if (response.status === 404) {
-          router.push('/schools');
+          router.push(appPath('/schools'));
           return;
         }
         throw new Error('口コミ情報の取得に失敗しました');
@@ -120,8 +121,8 @@ export default function ReviewDetailPage() {
         <div className="mb-6">
           {review.school_slug ? (
             <Link
-              href={`/schools/${review.school_slug}`}
-              className="text-sm text-blue-500 hover:text-blue-600 mb-4 inline-flex items-center gap-1"
+              href={appPath(`/schools/${review.school_slug}`)}
+              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -130,8 +131,8 @@ export default function ReviewDetailPage() {
             </Link>
           ) : (
             <Link
-              href="/schools"
-              className="text-sm text-blue-500 hover:text-blue-600 mb-4 inline-flex items-center gap-1"
+              href={appPath('/schools')}
+              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-flex items-center gap-1"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

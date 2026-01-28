@@ -6,6 +6,7 @@ import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import SchoolCard from '@/components/SchoolCard';
 import { Article, ArticleSchool } from '@/lib/types/articles';
+import { apiPath, appPath } from '@/lib/base-path';
 
 export default function ArticleDetailPage() {
   const params = useParams();
@@ -22,10 +23,10 @@ export default function ArticleDetailPage() {
   const fetchArticle = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/articles/${encodedSlug}`);
+      const response = await fetch(apiPath(`/api/articles/${encodedSlug}`));
       if (!response.ok) {
         if (response.status === 404) {
-          router.push('/features');
+          router.push(appPath('/features'));
           return;
         }
         throw new Error('記事の取得に失敗しました');
@@ -83,7 +84,7 @@ export default function ArticleDetailPage() {
         {/* ヘッダー */}
         <div className="mb-6">
           <Link
-            href="/features"
+            href={appPath('/features')}
             className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 特集ページ一覧に戻る
@@ -154,7 +155,7 @@ export default function ArticleDetailPage() {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">その他の特集ページ</h2>
           <Link
-            href="/features"
+            href={appPath('/features')}
             className="text-blue-600 hover:text-blue-700 underline"
           >
             特集ページ一覧を見る →

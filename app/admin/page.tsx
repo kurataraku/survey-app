@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { checkAdminAccess } from '@/lib/auth/client';
 import type { AdminUser } from '@/lib/auth/client';
+import { appPath } from '@/lib/base-path';
 
 export default function AdminPage() {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
@@ -22,7 +23,7 @@ export default function AdminPage() {
     {
       title: '学校管理',
       description: '学校情報の登録・編集・削除を行います',
-      href: '/admin/schools',
+      href: appPath('/admin/schools'),
       icon: (
         <svg
           className="w-12 h-12 text-blue-500"
@@ -43,7 +44,7 @@ export default function AdminPage() {
     {
       title: '記事管理',
       description: '特集記事の作成・編集・削除を行います',
-      href: '/admin/articles',
+      href: appPath('/admin/articles'),
       icon: (
         <svg
           className="w-12 h-12 text-blue-500"
@@ -64,7 +65,7 @@ export default function AdminPage() {
     {
       title: 'データエクスポート',
       description: 'アンケート回答データをCSV形式でエクスポートします',
-      href: '/export',
+      href: appPath('/export'),
       icon: (
         <svg
           className="w-12 h-12 text-green-500"
@@ -85,7 +86,7 @@ export default function AdminPage() {
     {
       title: 'お問い合わせ管理',
       description: 'お問い合わせの一覧・詳細確認・既読管理を行います',
-      href: '/admin/contacts',
+      href: appPath('/admin/contacts'),
       icon: (
         <svg
           className="w-12 h-12 text-purple-500"
@@ -110,7 +111,7 @@ export default function AdminPage() {
     menuItems.push({
       title: '管理者管理',
       description: '管理者アカウントの追加・編集・削除を行います（ownerのみ）',
-      href: '/admin/admin-users',
+      href: appPath('/admin/admin-users'),
       icon: (
         <svg
           className="w-12 h-12 text-red-500"

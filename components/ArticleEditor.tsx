@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ArticleFormData, ArticleCategory } from '@/lib/types/articles';
 import { generateSlug } from '@/lib/utils';
 import RichTextEditor from './RichTextEditor';
+import { apiPath } from '@/lib/base-path';
 
 interface ImageUploadProps {
   value: string;
@@ -38,7 +39,7 @@ function ImageUpload({ value, onChange, id }: ImageUploadProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/admin/upload/image', {
+      const response = await fetch(apiPath('/api/admin/upload/image'), {
         method: 'POST',
         body: formData,
       });

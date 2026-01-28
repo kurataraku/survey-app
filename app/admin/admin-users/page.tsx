@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface AdminUser {
   id: string;
@@ -31,7 +32,7 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/admin/admin-users');
+      const response = await fetch(apiPath('/api/admin/admin-users'));
       if (!response.ok) {
         if (response.status === 403) {
           setError('このページにアクセスするにはowner権限が必要です');
@@ -62,7 +63,7 @@ export default function AdminUsersPage() {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/admin/admin-users', {
+      const response = await fetch(apiPath('/api/admin/admin-users'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,7 +142,7 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const response = await fetch(`/api/admin/admin-users/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/admin-users/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -180,7 +181,7 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const response = await fetch(`/api/admin/admin-users/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/admin-users/${id}`), {
         method: 'DELETE',
       });
 
@@ -218,7 +219,7 @@ export default function AdminUsersPage() {
             <p className="text-red-800 font-medium">エラーが発生しました</p>
             <p className="text-red-600 text-sm mt-1">{error}</p>
             <Link
-              href="/admin"
+              href={appPath('/admin')}
               className="mt-4 inline-block px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
               管理画面トップに戻る

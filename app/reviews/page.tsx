@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ReviewCard from '@/components/ReviewCard';
+import { apiPath } from '@/lib/base-path';
 
 interface Review {
   id: string;
@@ -51,7 +52,7 @@ function ReviewsPageContent() {
         limit: limit.toString(),
       });
 
-      const response = await fetch(`/api/reviews?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/reviews?${params.toString()}`));
       if (!response.ok) {
         throw new Error('レビュー取得に失敗しました');
       }

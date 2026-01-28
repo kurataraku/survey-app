@@ -1,9 +1,20 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { appPath } from '@/lib/base-path';
+import { getAppBaseUrl } from '@/lib/env-check';
+
+const appBaseUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
   title: 'このサイトについて｜通信制高校リアルレビュー',
   description: '通信制高校の選び直しを支える、リアルな口コミメディア。入学前に知りたい「本当のこと」を、実際に通った人の声で届けます。後悔のない選択が、未来の一歩になります。',
+  alternates: { canonical: `${appBaseUrl}/about` },
+  openGraph: {
+    title: 'このサイトについて｜通信制高校リアルレビュー',
+    description: '通信制高校の選び直しを支える、リアルな口コミメディア。入学前に知りたい「本当のこと」を、実際に通った人の声で届けます。後悔のない選択が、未来の一歩になります。',
+    type: 'website',
+    url: `${appBaseUrl}/about`,
+  },
 };
 
 export default function AboutPage() {
@@ -166,13 +177,13 @@ export default function AboutPage() {
           </h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link
-              href="/schools"
+              href={appPath('/schools')}
               className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-lg shadow-md hover:shadow-lg"
             >
               学校を検索する
             </Link>
             <Link
-              href="/survey"
+              href={appPath('/survey')}
               className="px-8 py-4 bg-white text-blue-600 border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium text-lg shadow-md hover:shadow-lg"
             >
               口コミを書く

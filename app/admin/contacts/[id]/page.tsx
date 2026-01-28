@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface ContactMessage {
   id: string;
@@ -38,7 +39,7 @@ export default function ContactDetailPage() {
     fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:35',message:'fetchContact called',data:{id,idType:typeof id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     try {
-      const response = await fetch(`/api/admin/contacts/${id}`);
+      const response = await fetch(apiPath(`/api/admin/contacts/${id}`));
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:39',message:'Response received',data:{status:response.status,statusText:response.statusText,ok:response.ok,url:response.url},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
@@ -76,7 +77,7 @@ export default function ContactDetailPage() {
 
     setIsToggling(true);
     try {
-      const response = await fetch(`/api/admin/contacts/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/contacts/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -130,7 +131,7 @@ export default function ContactDetailPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <p className="text-gray-600">問い合わせが見つかりませんでした</p>
             <Link
-              href="/admin/contacts"
+              href={appPath('/admin/contacts')}
               className="mt-4 inline-block text-blue-600 hover:text-blue-700"
             >
               一覧に戻る
@@ -146,7 +147,7 @@ export default function ContactDetailPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <button
-            onClick={() => router.push('/admin/contacts')}
+            onClick={() => router.push(appPath('/admin/contacts'))}
             className="text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

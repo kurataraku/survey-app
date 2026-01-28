@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import StarRatingDisplay from './StarRatingDisplay';
+import { appPath } from '@/lib/base-path';
 
 interface RankingCardProps {
   rank: number;
@@ -26,7 +27,7 @@ export default function RankingCard({
   valueLabel,
   valueType,
 }: RankingCardProps) {
-  const href = slug && slug.trim() !== '' ? `/schools/${encodeURIComponent(slug)}` : `/schools/id/${id}`;
+  const href = slug && slug.trim() !== '' ? appPath(`/schools/${encodeURIComponent(slug)}`) : appPath(`/schools/id/${id}`);
 
   const formatValue = () => {
     if (value === null) return 'データなし';

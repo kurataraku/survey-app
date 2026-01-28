@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getClient } from '@/lib/supabase/client';
+import { BASE_PATH, appPath } from '@/lib/base-path';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -107,7 +108,7 @@ function ResetPasswordForm() {
           
           // verifyエンドポイントを呼び出してトークンを検証
           try {
-            const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(tokenParam!)}&type=${typeParam}&redirect_to=${encodeURIComponent(window.location.origin + '/admin/reset-password')}`;
+            const verifyUrl = `${supabaseUrl}/auth/v1/verify?token=${encodeURIComponent(tokenParam!)}&type=${typeParam}&redirect_to=${encodeURIComponent(window.location.origin + BASE_PATH + '/admin/reset-password')}`;
             
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/reset-password/page.tsx:100',message:'Calling verify endpoint',data:{verifyUrl:verifyUrl.substring(0,200),typeParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run24',hypothesisId:'X'})}).catch(()=>{});
@@ -271,7 +272,7 @@ function ResetPasswordForm() {
 
       // 3秒後にログインページにリダイレクト
       setTimeout(() => {
-        router.push('/admin/login');
+        router.push(appPath('/admin/login'));
       }, 3000);
     } catch (err) {
       // #region agent log

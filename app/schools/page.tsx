@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import SchoolCard from '@/components/SchoolCard';
 import SchoolSearchFilters from '@/components/SchoolSearchFilters';
 import { prefectures } from '@/lib/prefectures';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface School {
   id: string;
@@ -66,7 +67,7 @@ function SchoolsPageContent() {
         params.append('sort', sortBy);
       }
 
-      const response = await fetch(`/api/schools/search?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/schools/search?${params.toString()}`));
       if (!response.ok) {
         throw new Error('学校検索に失敗しました');
       }
@@ -115,7 +116,7 @@ function SchoolsPageContent() {
     if (sort && sort !== 'name') {
       params.append('sort', sort);
     }
-    router.push(`/schools?${params.toString()}`, { scroll: false });
+    router.push(`${appPath('/schools')}?${params.toString()}`, { scroll: false });
   };
 
   return (

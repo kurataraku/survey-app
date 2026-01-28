@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import SchoolDetailClient from '@/components/SchoolDetailClient';
 import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
+import { appPath } from '@/lib/base-path';
 
 interface PageProps {
   params: Promise<{ slug: string }> | { slug: string };
@@ -42,14 +44,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     '通信制 口コミ',
   ];
 
+  const appBaseUrl = getAppBaseUrl();
+  const pathname = `/schools/${resolvedParams.slug}`;
+  const canonical = `${appBaseUrl}${pathname}`;
+
   return {
     title,
     description,
     keywords,
+    alternates: { canonical },
     openGraph: {
       title,
       description,
       type: 'website',
+      url: canonical,
     },
     twitter: {
       card: 'summary',
@@ -83,8 +91,8 @@ export default async function SchoolDetailPage({ params }: PageProps) {
         {/* 戻るリンク */}
         <div className="mb-4">
           <Link
-            href="/schools"
-            className="text-sm text-blue-500 hover:text-blue-600 inline-flex items-center gap-1"
+            href={appPath('/schools')}
+            className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

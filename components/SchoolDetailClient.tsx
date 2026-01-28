@@ -10,6 +10,7 @@ import SchoolSummary from '@/components/SchoolSummary';
 import Tabs from '@/components/ui/Tabs';
 import StatisticsSection from '@/components/StatisticsSection';
 import { SchoolWithStats } from '@/lib/schools/getSchoolWithStats';
+import { appPath } from '@/lib/base-path';
 
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
@@ -359,7 +360,7 @@ export default function SchoolDetailClient({
                   {school.latest_reviews.map((review) => (
                     <Link
                       key={review.id}
-                      href={`/reviews/${review.id}`}
+                      href={appPath(`/reviews/${review.id}`)}
                       className="block p-6 bg-white border border-gray-200 rounded-xl shadow-md hover:border-blue-400 hover:shadow-lg transition-all duration-200"
                     >
                       {/* 上段：★/日付/属性チップ */}
@@ -421,7 +422,7 @@ export default function SchoolDetailClient({
                   ))}
                   <div className="pt-6 border-t border-gray-200">
                     <Link
-                      href={`/schools/${encodedSlug}/reviews`}
+                      href={appPath(`/schools/${encodedSlug}/reviews`)}
                       className="inline-block w-full text-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 active:from-blue-800 active:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg active:shadow-sm active:translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300"
                     >
                       自分に近い口コミを探す/全ての口コミを見る
@@ -453,7 +454,7 @@ export default function SchoolDetailClient({
               {featuredReviews.map((review) => (
               <Link
                 key={review.id}
-                href={`/reviews/${review.id}`}
+                href={appPath(`/reviews/${review.id}`)}
                 className="block p-6 border border-gray-200 rounded-xl shadow-md hover:border-blue-400 hover:shadow-lg transition-all duration-200"
               >
                 <div className="flex items-center justify-between mb-4">
@@ -507,7 +508,7 @@ export default function SchoolDetailClient({
       {school.latest_reviews && school.latest_reviews.length > 0 && (
         <div className="mb-8">
           <Link
-            href={`/schools/${encodedSlug}/reviews`}
+            href={appPath(`/schools/${encodedSlug}/reviews`)}
             className="inline-block w-full text-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 active:from-blue-800 active:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg active:shadow-sm active:translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300"
           >
             自分に近い口コミを探す/全ての口コミを見る

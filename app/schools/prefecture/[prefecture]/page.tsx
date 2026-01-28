@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SchoolCard from '@/components/SchoolCard';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface School {
   id: string;
@@ -40,7 +41,7 @@ function PrefectureSchoolsContent() {
         limit: limit.toString(),
       });
 
-      const response = await fetch(`/api/schools/search?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/schools/search?${params.toString()}`));
       if (!response.ok) {
         throw new Error('学校検索に失敗しました');
       }
@@ -62,8 +63,8 @@ function PrefectureSchoolsContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link
-            href="/schools"
-            className="text-blue-500 hover:text-blue-600 mb-4 inline-block"
+            href={appPath('/schools')}
+            className="text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 学校検索に戻る
           </Link>

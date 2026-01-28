@@ -6,6 +6,7 @@ import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import { getQuestionLabel } from '@/lib/questionLabels';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface School {
   id: string;
@@ -59,10 +60,10 @@ export default function SchoolDetailByIdPage() {
     try {
       // IDで学校を取得
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const response = await fetch(`/api/schools/id/${id}`);
+      const response = await fetch(apiPath(`/api/schools/id/${id}`));
       if (!response.ok) {
         if (response.status === 404) {
-          router.push('/schools');
+          router.push(appPath('/schools'));
           return;
         }
         throw new Error('学校情報の取得に失敗しました');
@@ -73,7 +74,7 @@ export default function SchoolDetailByIdPage() {
       
       // slugがある場合はslugベースのURLにリダイレクト
       if (data.slug) {
-        router.replace(`/schools/${data.slug}`);
+        router.replace(appPath(`/schools/${data.slug}`));
       }
     } catch (error) {
       console.error('学校情報取得エラー:', error);
@@ -115,8 +116,8 @@ export default function SchoolDetailByIdPage() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="mb-4">
             <Link
-              href="/schools"
-              className="text-sm text-blue-500 hover:text-blue-600 mb-4 inline-block"
+              href={appPath('/schools')}
+              className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
             >
               ← 学校一覧に戻る
             </Link>
@@ -148,15 +149,15 @@ export default function SchoolDetailByIdPage() {
             </div>
             {school.slug ? (
               <Link
-                href={`/schools/${school.slug}/reviews`}
-                className="ml-auto px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                href={appPath(`/schools/${school.slug}/reviews`)}
+                className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 すべての口コミを見る
               </Link>
             ) : (
-              <Link
-                href={`/schools/id/${id}/reviews`}
-                className="ml-auto px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                <Link
+                  href={appPath(`/schools/id/${id}/reviews`)}
+                className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 すべての口コミを見る
               </Link>
@@ -354,15 +355,15 @@ export default function SchoolDetailByIdPage() {
               <h2 className="text-xl font-bold text-gray-900">最新の口コミ</h2>
               {school.slug ? (
                 <Link
-                  href={`/schools/${school.slug}/reviews`}
-                  className="text-sm text-blue-500 hover:text-blue-600"
+                  href={appPath(`/schools/${school.slug}/reviews`)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
                 >
                   すべて見る →
                 </Link>
               ) : (
                 <Link
-                  href={`/schools/id/${id}/reviews`}
-                  className="text-sm text-blue-500 hover:text-blue-600"
+                  href={appPath(`/schools/id/${id}/reviews`)}
+                  className="text-sm text-blue-600 hover:text-blue-700"
                 >
                   すべて見る →
                 </Link>
@@ -372,7 +373,7 @@ export default function SchoolDetailByIdPage() {
               {school.latest_reviews.map((review) => (
                 <Link
                   key={review.id}
-                  href={`/reviews/${review.id}`}
+                  href={appPath(`/reviews/${review.id}`)}
                   className="block p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
                 >
                   <div className="flex items-center gap-2 mb-3">
