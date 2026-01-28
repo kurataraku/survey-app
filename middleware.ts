@@ -13,10 +13,9 @@ export async function middleware(request: NextRequest) {
   const skipVercelRedirect = process.env.SKIP_VERCEL_APP_REDIRECT === '1' || process.env.SKIP_VERCEL_APP_REDIRECT === 'true';
 
   // 1. ホスト正規化（最優先）: www / vercel.app → apex に恒久リダイレクト
+  // / は会社トップ、/tsushin-kuchikomi はアプリトップ。パスはそのまま転送。
   if (isWww || (isVercelApp && !skipVercelRedirect)) {
-    const p = pathname;
-    const destPath = p === '/' ? BASE_PATH : p;
-    const path = destPath + request.nextUrl.search;
+    const path = pathname + request.nextUrl.search;
     const redirectUrl = new URL(path, APEX_ORIGIN);
     const res = NextResponse.redirect(redirectUrl, { status: 308 });
     if (isVercelApp) {
