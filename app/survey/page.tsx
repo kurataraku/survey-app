@@ -256,7 +256,7 @@ export default function SurveyPage() {
         <div id="submitted-message" ref={submittedMessageRef} className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="mb-4">
             <svg
-              className="mx-auto h-16 w-16 text-blue-600"
+              className="mx-auto h-16 w-16 text-blue-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -291,7 +291,7 @@ export default function SurveyPage() {
             <p className="text-sm text-blue-900 text-center">
               <span className="font-semibold">匿名で回答できます</span> • 所要時間: 約3〜5分
             </p>
-            <p className="text-xs text-blue-700 text-center mt-1">
+            <p className="text-xs text-blue-600 text-center mt-1">
               ※個人が特定される内容は書かないでください
             </p>
           </div>

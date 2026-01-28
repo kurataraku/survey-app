@@ -87,7 +87,7 @@ export default function SchoolCard({
     <Link
       href={href}
       onClick={handleClick}
-      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all"
+      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all"
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">

@@ -106,7 +106,7 @@ function RankingsContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <p className="text-gray-600">無効なランキングタイプです</p>
-            <Link href="/rankings" className="mt-4 text-blue-600 hover:text-blue-700">
+            <Link href="/rankings" className="mt-4 text-blue-500 hover:text-blue-600">
               ランキング一覧に戻る
             </Link>
           </div>
@@ -133,7 +133,7 @@ function RankingsContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
             <p className="text-gray-600">ランキングデータがありません</p>
-            <Link href="/rankings" className="mt-4 text-blue-600 hover:text-blue-700">
+            <Link href="/rankings" className="mt-4 text-blue-500 hover:text-blue-600">
               ランキング一覧に戻る
             </Link>
           </div>

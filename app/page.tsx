@@ -293,7 +293,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヒーローセクション */}
-      <section className="relative bg-gradient-to-br from-blue-50 to-blue-100 py-16 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-blue-100 to-blue-200 py-16 overflow-hidden">
         {/* 背景イラスト（透過を少し弱めて表示） */}
           <div className="pointer-events-none absolute inset-0 opacity-30">
           <img
@@ -306,7 +306,7 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-              リアルな口コミで
+              リアルなクチコミで
               <br />
               通信制高校を選ぼう
             </h1>
@@ -331,7 +331,7 @@ export default function Home() {
                       }
                     }}
                     placeholder="学校名で検索"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                   />
                   {showSuggestions && (
                     <div
@@ -361,7 +361,7 @@ export default function Home() {
                   <select
                     value={selectedPrefecture}
                     onChange={(e) => setSelectedPrefecture(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                   >
                     <option value="">都道府県から探す</option>
                     {prefectures.map((pref) => (
@@ -373,7 +373,7 @@ export default function Home() {
                 </div>
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md hover:shadow-lg"
+                  className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-md hover:shadow-lg"
                 >
                   検索
                 </button>

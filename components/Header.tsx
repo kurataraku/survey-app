@@ -60,8 +60,8 @@ export default function Header() {
                 href={item.href}
                 className={`px-3 py-2 text-base font-medium transition-colors ${
                   isActive(item.href)
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-700 hover:text-blue-600'
+                    ? 'text-blue-500 border-b-2 border-blue-500'
+                    : 'text-gray-700 hover:text-blue-500'
                 }`}
               >
                 {item.label}
@@ -72,7 +72,7 @@ export default function Header() {
           {/* モバイルメニューボタン */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 text-gray-700 hover:text-blue-600"
+            className="md:hidden p-2 text-gray-700 hover:text-blue-500"
             aria-label="メニュー"
           >
             <svg
@@ -111,7 +111,7 @@ export default function Header() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`px-3 py-2 text-base font-medium rounded-md transition-colors ${
                     isActive(item.href)
-                      ? 'text-blue-600 bg-blue-50'
+                      ? 'text-blue-500 bg-blue-50'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
@@ -126,11 +126,11 @@ export default function Header() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="学校名で検索..."
-                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                 />
                 <button
                   type="submit"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-500"
                   aria-label="検索"
                 >
                   <svg
