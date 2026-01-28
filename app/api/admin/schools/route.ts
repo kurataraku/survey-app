@@ -3,16 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
 
 export async function GET(request: NextRequest) {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:5',message:'GET /api/admin/schools: Entry',data:{url:request.nextUrl.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   const authResult = await requireAdmin(request);
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:8',message:'GET /api/admin/schools: Auth check result',data:{isAuthError:authResult instanceof NextResponse,authStatus:authResult instanceof NextResponse ? authResult.status : 'success',hasUser:authResult instanceof NextResponse ? false : !!authResult?.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -67,30 +58,7 @@ export async function GET(request: NextRequest) {
       .order('name', { ascending: true })
       .range(offset, offset + limit - 1);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:61',message:'GET /api/admin/schools: Before query execution',data:{q,status,prefecture,page,limit,offset},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-
     const { data: schools, error, count } = await query;
-
-    // #region agent log
-    const errorInfo = error
-      ? {
-          message: error.message,
-          code: (error as any).code,
-          details: (error as any).details,
-          hint: (error as any).hint,
-          stringified: (() => {
-            try {
-              return JSON.stringify(error);
-            } catch {
-              return null;
-            }
-          })(),
-        }
-      : null;
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:74',message:'GET /api/admin/schools: Query result',data:{hasError:!!error,errorInfo,schoolsCount:schools?.length||0,total:count||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
 
     if (error) {
       console.error('学校検索エラー:', error);
@@ -98,10 +66,6 @@ export async function GET(request: NextRequest) {
       const message = error.message || '学校検索に失敗しました';
       const code = (error as any).code;
       const hint = (error as any).hint;
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:88',message:'GET /api/admin/schools: Error handling',data:{message,code,hint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
 
       // 特定の不明なエラー（メッセージが \"{\" だけのケース）は、空結果を返してUIを壊さないようにする
       if (message === '{\"') {
@@ -133,9 +97,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('APIエラー:', error);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/admin/schools/route.ts:78',message:'GET /api/admin/schools: Exception caught',data:{errorMessage:error instanceof Error ? error.message : String(error),errorStack:error instanceof Error ? error.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     return NextResponse.json(
       { error: 'サーバーエラーが発生しました' },
       { status: 500 }

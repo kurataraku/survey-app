@@ -73,10 +73,6 @@ export default function QuestionRenderer({
      (question.type === 'singleSelect' && 
       (question.id === 'campus_prefecture' || question.id === 'enrollment_year')));
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/QuestionRenderer.tsx:75',message:'hasFormField check',data:{questionId:question.id,questionType:question.type,usesRadioButtons,hasFormField,fieldName},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-
   return (
     <div className="mb-6" data-question-id={question.id}>
       {hasFormField ? (
@@ -207,9 +203,6 @@ export default function QuestionRenderer({
           rules={{ required: question.required }}
           defaultValue=""
           render={({ field }) => {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/QuestionRenderer.tsx:203',message:'text input render',data:{fieldName,fieldValue:field.value,fieldValueType:typeof field.value,isUndefined:field.value===undefined,isNull:field.value===null},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch(()=>{});
-            // #endregion
             const inputValue = field.value ?? '';
             return (
             <input

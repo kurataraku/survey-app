@@ -23,19 +23,12 @@ function LoginForm() {
         const params = new URLSearchParams(hashFragment.substring(1));
         const accessToken = params.get('access_token');
         const type = params.get('type');
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:20',message:'Checking hash fragment for password reset',data:{hasAccessToken:!!accessToken,type,hashFragmentLength:hashFragment.length,redirectPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run21',hypothesisId:'U'})}).catch(()=>{});
-        // #endregion
-        
+
         if (accessToken && (type === 'recovery' || type === 'magiclink')) {
           // パスワードリセット/設定用のトークンが含まれている場合、パスワード設定画面にリダイレクト
           console.log('パスワードリセットトークンを検出しました。パスワード設定画面にリダイレクトします。');
           // URLフラグメントを保持したままリダイレクト
           router.push(`${appPath('/admin/reset-password')}${hashFragment}`);
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:28',message:'Redirecting to reset-password page',data:{type,hasAccessToken:!!accessToken},timestamp:Date.now(),sessionId:'debug-session',runId:'run21',hypothesisId:'U'})}).catch(()=>{});
-          // #endregion
         }
       }
     }
@@ -46,54 +39,29 @@ function LoginForm() {
     setError(null);
     setLoading(true);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:17',message:'Login form submit',data:{email,hasPassword:!!password,redirectPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
-
     try {
       const supabase = getClient();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:25',message:'Before signInWithPassword',data:{hasSupabaseClient:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
-      
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:30',message:'After signInWithPassword',data:{hasUser:!!data?.user,userEmail:data?.user?.email||null,hasSession:!!data?.session,signInError:signInError?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
-
       if (signInError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:33',message:'Sign in error',data:{signInError:signInError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-        // #endregion
         setError(signInError.message || 'ログインに失敗しました');
         setLoading(false);
         return;
       }
 
       if (!data.user) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:38',message:'No user data',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-        // #endregion
         setError('ログインに失敗しました');
         setLoading(false);
         return;
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:42',message:'Login success, redirecting',data:{userEmail:data.user.email,redirectPath,hasSession:!!data.session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
-
       // ログイン成功: リダイレクト先に移動
       router.push(redirectPath);
       router.refresh();
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/login/page.tsx:47',message:'Login exception',data:{errorMessage:err instanceof Error ? err.message : String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       console.error('Login error:', err);
       setError('予期しないエラーが発生しました');
       setLoading(false);

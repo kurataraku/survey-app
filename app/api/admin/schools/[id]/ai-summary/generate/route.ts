@@ -159,10 +159,6 @@ export async function POST(
       .eq('status', 'draft')
       .single();
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'route.ts:162',message:'Saving meta title to database',data:{metaTitle:openAIResult.metaTitle,metaTitleLength:openAIResult.metaTitle.length,hasKuchikomi:openAIResult.metaTitle.includes('口コミ'),hasHyoban:openAIResult.metaTitle.includes('評判')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-
     const summaryData = {
       school_id: schoolId,
       kind: 'overall',

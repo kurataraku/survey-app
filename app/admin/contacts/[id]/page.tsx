@@ -35,18 +35,9 @@ export default function ContactDetailPage() {
 
   const fetchContact = async () => {
     setIsLoading(true);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:35',message:'fetchContact called',data:{id,idType:typeof id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     try {
       const response = await fetch(apiPath(`/api/admin/contacts/${id}`));
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:39',message:'Response received',data:{status:response.status,statusText:response.statusText,ok:response.ok,url:response.url},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       const data = await response.json();
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:42',message:'Response data parsed',data:{hasContact:!!data.contact,hasError:!!data.error,errorMessage:data.error,errorDetails:data.details,contactId:data.contact?.id,requestedId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       if (!response.ok) {
         const errorMessage = data.error || '問い合わせの取得に失敗しました';
         const errorDetails = data.details ? ` (${data.details})` : '';
@@ -54,17 +45,11 @@ export default function ContactDetailPage() {
       }
       
       if (!data.contact) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:50',message:'Contact data is null/undefined',data:{requestedId:id,responseData:JSON.stringify(data)},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         throw new Error('問い合わせデータが見つかりませんでした');
       }
       
       setContact(data.contact);
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/contacts/[id]/page.tsx:48',message:'Error in fetchContact',data:{errorMessage:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       console.error('問い合わせ取得エラー:', error);
       alert('問い合わせの取得に失敗しました');
     } finally {
