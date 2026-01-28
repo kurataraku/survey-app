@@ -1,23 +1,24 @@
 import Link from 'next/link';
+import { appPath } from '@/lib/base-path';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = {
     main: [
-      { href: '/', label: 'ホーム' },
-      { href: '/schools', label: '学校検索' },
-      { href: '/rankings', label: 'ランキング' },
-      { href: '/features', label: '特集' },
-      { href: '/survey', label: '口コミ投稿' },
+      { href: appPath('/'), label: 'ホーム' },
+      { href: appPath('/schools'), label: '学校検索' },
+      { href: appPath('/rankings'), label: 'ランキング' },
+      { href: appPath('/features'), label: '特集' },
+      { href: appPath('/survey'), label: '口コミ投稿' },
     ],
     about: [
-      { href: '/about', label: 'サイトについて' },
+      { href: appPath('/about'), label: 'サイトについて' },
     ],
     legal: [
-      { href: '/terms', label: '利用規約' },
-      { href: '/privacy', label: 'プライバシーポリシー' },
-      { href: '/contact', label: 'お問い合わせ' },
+      { href: appPath('/terms'), label: '利用規約' },
+      { href: appPath('/privacy'), label: 'プライバシーポリシー' },
+      { href: appPath('/contact'), label: 'お問い合わせ' },
     ],
   };
 

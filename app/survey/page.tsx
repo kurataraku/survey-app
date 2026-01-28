@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { surveySchema, SurveyFormData } from '@/lib/schema';
 import { questions } from '@/lib/questions';
+import { apiPath } from '@/lib/base-path';
 import Stepper from '@/components/Stepper';
 import QuestionRenderer from '@/components/QuestionRenderer';
 import Button from '@/components/ui/Button';
@@ -188,7 +189,7 @@ export default function SurveyPage() {
   const onSubmit = async (data: SurveyFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/submit', {
+      const response = await fetch(apiPath('/api/submit'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

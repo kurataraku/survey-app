@@ -174,3 +174,11 @@ feature/xxx：各メンバー作業用（例：feature/ui-school-header）
 - ❌ パッケージの追加・削除
 
 詳細は`.github/pull_request_template.md`と`.github/ISSUE_TEMPLATE/ui-improvement.md`を参照してください。
+
+## メンバー向けガイド
+
+チームメンバーとして作業を始める場合は、以下のガイドを参照してください：
+
+- **[MEMBER_GUIDE.md](MEMBER_GUIDE.md)** - メンバー向けの完全ガイド（初回セットアップからPR提出まで）
+- **[CURSOR_WORK_TEMPLATE.md](CURSOR_WORK_TEMPLATE.md)** - Cursorでの作業用テンプレート
+- **[GITHUB_SHARING_GUIDE.md](GITHUB_SHARING_GUIDE.md)** - オーナー向けのGitHub共有手順

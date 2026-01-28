@@ -8,6 +8,7 @@ import Select from '@/components/ui/Select';
 import EmptyState from '@/components/ui/EmptyState';
 import Skeleton from '@/components/ui/Skeleton';
 import ReviewFilters, { ReviewFilters as ReviewFiltersType } from '@/components/ReviewFilters';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface Review {
   id: string;
@@ -109,7 +110,7 @@ export default function SchoolReviewsPage() {
         params.append('reason_for_choosing', filters.reason_for_choosing.join(','));
       }
 
-      const response = await fetch(`/api/reviews?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/reviews?${params.toString()}`));
       if (!response.ok) {
         throw new Error('口コミ取得に失敗しました');
       }
@@ -157,7 +158,7 @@ export default function SchoolReviewsPage() {
       params.set('reason_for_choosing', newFilters.reason_for_choosing.join(','));
     }
 
-    router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+    router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${params.toString()}`, { scroll: false });
   };
 
   const handleSortChange = (value: string) => {
@@ -188,7 +189,7 @@ export default function SchoolReviewsPage() {
       params.set('reason_for_choosing', filters.reason_for_choosing.join(','));
     }
 
-    router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+    router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${params.toString()}`, { scroll: false });
   };
 
   return (
@@ -197,7 +198,7 @@ export default function SchoolReviewsPage() {
         {/* ヘッダー */}
         <div className="mb-3">
           <Link
-            href={`/schools/${slug}`}
+            href={appPath(`/schools/${slug}`)}
             className="text-xs text-blue-600 hover:text-blue-700 mb-2 inline-flex items-center gap-1"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +278,7 @@ export default function SchoolReviewsPage() {
                 // URL更新
                 const params = new URLSearchParams(searchParams.toString());
                 params.set('page', newPage.toString());
-                router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+                router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${params.toString()}`, { scroll: false });
               }}
               disabled={page === 1}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
@@ -294,7 +295,7 @@ export default function SchoolReviewsPage() {
                 // URL更新
                 const params = new URLSearchParams(searchParams.toString());
                 params.set('page', newPage.toString());
-                router.push(`/schools/${encodeURIComponent(slug)}/reviews?${params.toString()}`, { scroll: false });
+                router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${params.toString()}`, { scroll: false });
               }}
               disabled={page >= totalPages}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"

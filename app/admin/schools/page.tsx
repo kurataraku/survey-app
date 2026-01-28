@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { prefectures } from '@/lib/prefectures';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface School {
   id: string;
@@ -87,7 +88,7 @@ function SchoolsPageContent() {
       const schoolsWithStats = await Promise.all(
         (data.schools || []).map(async (school: School) => {
           try {
-            const reviewResponse = await fetch(`/api/admin/schools/${school.id}/reviews?is_public=true&limit=1`);
+            const reviewResponse = await fetch(apiPath(`/api/admin/schools/${school.id}/reviews?is_public=true&limit=1`));
             if (reviewResponse.ok) {
               const reviewData = await reviewResponse.json();
               return {
@@ -136,7 +137,7 @@ function SchoolsPageContent() {
     if (prefectureFilter) {
       params.append('prefecture', prefectureFilter);
     }
-    router.push(`/admin/schools?${params.toString()}`);
+    router.push(`${appPath('/admin/schools')}?${params.toString()}`);
   };
 
   const handleFilterChange = () => {
@@ -151,7 +152,7 @@ function SchoolsPageContent() {
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold text-gray-900">学校管理</h1>
             <Link
-              href="/admin/schools/new"
+              href={appPath('/admin/schools/new')}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               新規作成
@@ -322,7 +323,7 @@ function SchoolsPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link
-                          href={`/admin/schools/${school.id}/edit`}
+                          href={appPath(`/admin/schools/${school.id}/edit`)}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           編集

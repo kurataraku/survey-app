@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Review } from '@/lib/types/reviews';
 import { prefectures } from '@/lib/prefectures';
+import { apiPath } from '@/lib/base-path';
 
 interface ReviewManagementListProps {
   schoolId: string;
@@ -36,7 +37,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
       });
       // is_publicフィルタリングは削除（テーブルにis_publicカラムが存在しない可能性があるため）
 
-      const response = await fetch(`/api/admin/schools/${schoolId}/reviews?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/admin/schools/${schoolId}/reviews?${params.toString()}`));
       if (!response.ok) {
         throw new Error('口コミ一覧の取得に失敗しました');
       }
@@ -55,7 +56,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
   const handleTogglePublic = async (reviewId: string, currentIsPublic: boolean) => {
     setUpdatingId(reviewId);
     try {
-      const response = await fetch(`/api/admin/reviews/${reviewId}`, {
+      const response = await fetch(apiPath(`/api/admin/reviews/${reviewId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +146,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
 
     setUpdatingId(reviewId);
     try {
-      const response = await fetch(`/api/admin/reviews/${reviewId}`, {
+      const response = await fetch(apiPath(`/api/admin/reviews/${reviewId}`), {
         method: 'DELETE',
       });
 

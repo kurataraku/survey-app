@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getClient } from '@/lib/supabase/client';
 import { checkAdminAccess } from '@/lib/auth/client';
 import type { AdminUser } from '@/lib/auth/client';
+import { apiPath, appPath } from '@/lib/base-path';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -37,14 +38,14 @@ export default function AdminHeader() {
     }
 
     try {
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch(apiPath('/api/auth/logout'), {
         method: 'POST',
       });
 
       if (response.ok) {
         const supabase = getClient();
         await supabase.auth.signOut();
-        router.push('/admin/login');
+        router.push(appPath('/admin/login'));
         router.refresh();
       }
     } catch (error) {
@@ -62,31 +63,31 @@ export default function AdminHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
-            <Link href="/admin" className="text-xl font-bold text-gray-900">
+            <Link href={appPath('/admin')} className="text-xl font-bold text-gray-900">
               管理画面
             </Link>
             <nav className="flex space-x-4">
               <Link
-                href="/admin/schools"
+                href={appPath('/admin/schools')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 高校管理
               </Link>
               <Link
-                href="/admin/articles"
+                href={appPath('/admin/articles')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 記事管理
               </Link>
               <Link
-                href="/admin/contacts"
+                href={appPath('/admin/contacts')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 お問い合わせ
               </Link>
               {adminUser?.role === 'owner' && (
                 <Link
-                  href="/admin/admin-users"
+                  href={appPath('/admin/admin-users')}
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
                   管理者管理

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import ArticleEditor from '@/components/ArticleEditor';
 import ArticleSchoolList from '@/components/ArticleSchoolList';
 import { ArticleFormData, Article } from '@/lib/types/articles';
+import { apiPath, appPath } from '@/lib/base-path';
 
 export default function EditArticlePage() {
   const params = useParams();
@@ -41,7 +42,7 @@ export default function EditArticlePage() {
   const handleSubmit = async (data: ArticleFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/admin/articles/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/articles/${id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -85,7 +86,7 @@ export default function EditArticlePage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Link
-            href="/admin/articles"
+            href={appPath('/admin/articles')}
             className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 記事一覧に戻る

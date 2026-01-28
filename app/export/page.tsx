@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { apiPath } from '@/lib/base-path';
 
 export default function ExportPage() {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -11,7 +12,7 @@ export default function ExportPage() {
       setIsDownloading(true);
       setError(null);
 
-      const response = await fetch('/api/export');
+      const response = await fetch(apiPath('/api/export'));
 
       if (!response.ok) {
         const contentType = response.headers.get('content-type');

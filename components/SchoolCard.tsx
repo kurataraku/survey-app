@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import StarRatingDisplay from './StarRatingDisplay';
+import { appPath } from '@/lib/base-path';
 
 interface SchoolCardProps {
   id: string;
@@ -69,8 +70,7 @@ export default function SchoolCard({
     const limitedOthers = otherPrefectures.slice(0, 4);
     displayPrefectures = [mainPrefecture, ...limitedOthers];
   }
-  // slugがnullまたは空文字列の場合はidを使用（フォールバック）
-  const href = slug && slug.trim() !== '' ? `/schools/${encodeURIComponent(slug)}` : `/schools/id/${id}`;
+  const href = slug && slug.trim() !== '' ? appPath(`/schools/${encodeURIComponent(slug)}`) : appPath(`/schools/id/${id}`);
   
   const handleClick = (e: React.MouseEvent) => {
     console.log('[SchoolCard] clicked:', { 

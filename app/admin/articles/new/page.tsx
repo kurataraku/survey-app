@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ArticleEditor from '@/components/ArticleEditor';
 import { ArticleFormData } from '@/lib/types/articles';
+import { apiPath, appPath } from '@/lib/base-path';
 
 export default function NewArticlePage() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function NewArticlePage() {
   const handleSubmit = async (data: ArticleFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/admin/articles', {
+      const response = await fetch(apiPath('/api/admin/articles'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -28,7 +29,7 @@ export default function NewArticlePage() {
 
       const article = await response.json();
       alert('記事を作成しました');
-      router.push(`/admin/articles/${article.id}/edit`);
+      router.push(appPath(`/admin/articles/${article.id}/edit`));
     } catch (error) {
       console.error('記事作成エラー:', error);
       alert(error instanceof Error ? error.message : '記事の作成に失敗しました');
@@ -42,7 +43,7 @@ export default function NewArticlePage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Link
-            href="/admin/articles"
+            href={appPath('/admin/articles')}
             className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 記事一覧に戻る

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { apiPath } from '@/lib/base-path';
 
 interface LikeButtonProps {
   reviewId: string;
@@ -24,7 +25,7 @@ export default function LikeButton({
     const action = isLiked ? 'unlike' : 'like';
 
     try {
-      const response = await fetch(`/api/reviews/${reviewId}/like`, {
+      const response = await fetch(apiPath(`/api/reviews/${reviewId}/like`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,8 +1,18 @@
 import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
+
+const appBaseUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
   title: '通信制高校リアルレビュー｜プライバシーポリシー',
   description: '通信制高校リアルレビューのプライバシーポリシーページです。',
+  alternates: { canonical: `${appBaseUrl}/privacy` },
+  openGraph: {
+    title: '通信制高校リアルレビュー｜プライバシーポリシー',
+    description: '通信制高校リアルレビューのプライバシーポリシーページです。',
+    type: 'website',
+    url: `${appBaseUrl}/privacy`,
+  },
 };
 
 export default function PrivacyPage() {

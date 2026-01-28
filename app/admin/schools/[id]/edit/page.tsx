@@ -7,6 +7,7 @@ import SchoolEditor from '@/components/SchoolEditor';
 import ReviewManagementList from '@/components/ReviewManagementList';
 import AISummaryEditor from '@/components/AISummaryEditor';
 import { SchoolFormData, School } from '@/lib/types/schools';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface PrefectureStat {
   prefecture: string;
@@ -43,7 +44,7 @@ export default function EditSchoolPage() {
   const fetchSchool = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/schools/${id}`);
+      const response = await fetch(apiPath(`/api/admin/schools/${id}`));
       if (!response.ok) {
         throw new Error('学校の取得に失敗しました');
       }
@@ -52,7 +53,7 @@ export default function EditSchoolPage() {
     } catch (error) {
       console.error('学校取得エラー:', error);
       alert('学校の取得に失敗しました');
-      router.push('/admin/schools');
+      router.push(appPath('/admin/schools'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export default function EditSchoolPage() {
   const fetchAliases = async () => {
     setLoadingAliases(true);
     try {
-      const response = await fetch(`/api/admin/schools/${id}/aliases`);
+      const response = await fetch(apiPath(`/api/admin/schools/${id}/aliases`));
       if (!response.ok) {
         throw new Error('別名の取得に失敗しました');
       }
@@ -106,7 +107,7 @@ export default function EditSchoolPage() {
   const handleSubmit = async (data: SchoolFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/admin/schools/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/schools/${id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +168,7 @@ export default function EditSchoolPage() {
 
     setIsAddingAlias(true);
     try {
-      const response = await fetch(`/api/admin/schools/${id}/aliases`, {
+      const response = await fetch(apiPath(`/api/admin/schools/${id}/aliases`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -226,7 +227,7 @@ export default function EditSchoolPage() {
 
     setIsMerging(true);
     try {
-      const response = await fetch(`/api/admin/schools/${id}/merge`, {
+      const response = await fetch(apiPath(`/api/admin/schools/${id}/merge`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -240,7 +241,7 @@ export default function EditSchoolPage() {
       }
 
       alert('統合が完了しました');
-      router.push('/admin/schools');
+      router.push(appPath('/admin/schools'));
     } catch (error) {
       console.error('統合エラー:', error);
       alert(error instanceof Error ? error.message : '統合に失敗しました');
@@ -270,7 +271,7 @@ export default function EditSchoolPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Link
-            href="/admin/schools"
+            href={appPath('/admin/schools')}
             className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 学校一覧に戻る

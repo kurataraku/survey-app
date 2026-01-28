@@ -1,12 +1,34 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { BASE_PATH } from '@/lib/base-path';
+
+const APEX_ORIGIN = 'https://careeressence.jp';
 
 export async function middleware(request: NextRequest) {
-  // /admin/* パスを保護（/admin/loginと/admin/reset-passwordは除外）
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    // ログインページとパスワードリセットページは除外
-    if (request.nextUrl.pathname === '/admin/login' || request.nextUrl.pathname === '/admin/reset-password') {
+  // 1. ホスト正規化（最優先）: www / vercel.app → apex に恒久リダイレクト
+  const host = request.headers.get('host') ?? '';
+  const isVercelApp = host.endsWith('.vercel.app');
+  const isWww = host === 'www.careeressence.jp';
+  const skipVercelRedirect = process.env.SKIP_VERCEL_APP_REDIRECT === '1' || process.env.SKIP_VERCEL_APP_REDIRECT === 'true';
+
+  if (isWww || (isVercelApp && !skipVercelRedirect)) {
+    const p = request.nextUrl.pathname;
+    // / のみ BASE_PATH に。それ以外は path をそのまま使う（重ねて /tsushin-kuchikomi/tsushin-kuchikomi にしない）
+    const destPath = p === '/' ? BASE_PATH : p;
+    const path = destPath + request.nextUrl.search;
+    const redirectUrl = new URL(path, APEX_ORIGIN);
+    const res = NextResponse.redirect(redirectUrl, { status: 308 });
+    if (isVercelApp) {
+      res.headers.set('X-Robots-Tag', 'noindex');
+    }
+    return res;
+  }
+
+  // 2. /tsushin-kuchikomi/admin/* を保護（rewrites で path は /tsushin-kuchikomi 始まり）
+  const adminPrefix = `${BASE_PATH}/admin`;
+  if (request.nextUrl.pathname.startsWith(adminPrefix)) {
+    if (request.nextUrl.pathname === `${BASE_PATH}/admin/login` || request.nextUrl.pathname === `${BASE_PATH}/admin/reset-password`) {
       return NextResponse.next();
     }
 
@@ -63,9 +85,8 @@ export async function middleware(request: NextRequest) {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware.ts:52',message:'Auth failed, redirecting to login',data:{authError:authError?.message||null,hasUser:!!user,hasEmail:!!user?.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
-      // 未ログイン: /admin/loginにリダイレクト
       const url = request.nextUrl.clone();
-      url.pathname = '/admin/login';
+      url.pathname = `${BASE_PATH}/admin/login`;
       url.searchParams.set('redirect', request.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
@@ -95,7 +116,6 @@ export async function middleware(request: NextRequest) {
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'middleware.ts:73',message:'Admin user not found, showing 403',data:{adminError:adminError?.message||null,adminErrorCode:adminError?.code||null,hasAdminUser:!!adminUser},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
       // #endregion
-      // ログイン済みだがadmin_usersに未登録/無効: 403ページ
       const url = request.nextUrl.clone();
       url.pathname = '/admin/403';
       return NextResponse.rewrite(url);
@@ -114,6 +134,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

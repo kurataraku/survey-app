@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { appPath } from '@/lib/base-path';
 
 interface ArticleCardProps {
   id: string;
@@ -43,7 +44,7 @@ export default function ArticleCard({
 
   return (
     <Link
-      href={`/features/${encodeURIComponent(slug)}`}
+      href={appPath(`/features/${encodeURIComponent(slug)}`)}
       className="block bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-blue-300 hover:shadow-md transition-all"
     >
       {featured_image_url && (

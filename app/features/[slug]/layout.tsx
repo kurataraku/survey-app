@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
 // メタ情報は簡易版に変更（パフォーマンス向上のため）
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }> | { slug: string };
 }): Promise<Metadata> {
-  // パフォーマンス向上のため、メタ情報は簡易版に変更
-  // 詳細なメタ情報はクライアント側で設定可能
-  const decodedSlug = decodeURIComponent(params.slug);
+  const resolved = params instanceof Promise ? await params : params;
+  const decodedSlug = decodeURIComponent(resolved.slug);
   const articleTitle = decodedSlug.replace(/-/g, ' '); // slugからタイトルを推測（簡易版）
+  const appBaseUrl = getAppBaseUrl();
+  const pathname = `/features/${resolved.slug}`;
+  const canonical = `${appBaseUrl}${pathname}`;
 
   return {
     title: `${articleTitle} | 通信制高校リアルレビュー`,
@@ -19,6 +22,13 @@ export async function generateMetadata({
       '通信制高校 特集',
       '通信制高校 情報',
     ],
+    alternates: { canonical },
+    openGraph: {
+      title: `${articleTitle} | 通信制高校リアルレビュー`,
+      description: '通信制高校に関する特集記事・インタビュー・お役立ち情報を掲載。',
+      type: 'website',
+      url: canonical,
+    },
   };
 }
 

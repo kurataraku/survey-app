@@ -1,8 +1,18 @@
 import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
+
+const appBaseUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
   title: '通信制高校リアルレビュー｜利用規約',
   description: '通信制高校リアルレビューの利用規約ページです。',
+  alternates: { canonical: `${appBaseUrl}/terms` },
+  openGraph: {
+    title: '通信制高校リアルレビュー｜利用規約',
+    description: '通信制高校リアルレビューの利用規約ページです。',
+    type: 'website',
+    url: `${appBaseUrl}/terms`,
+  },
 };
 
 export default function TermsPage() {

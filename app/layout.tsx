@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StructuredData from "@/components/StructuredData";
+import { getAppBaseUrl } from "@/lib/env-check";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,6 +16,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const appBaseUrl = getAppBaseUrl();
+
 export const metadata: Metadata = {
   title: {
     default: "通信制高校リアルレビュー | 口コミ・評判で選ぶ通信制高校",
@@ -22,10 +25,14 @@ export const metadata: Metadata = {
   },
   description: "通信制高校の口コミ・評判を集めたメディアサイト。実際に通った人のリアルな声で、あなたに本当に合う通信制高校を見つけよう。",
   keywords: ["通信制", "通信制高校", "通信制 口コミ", "通信制高校 口コミ", "通信制高校 評判", "通信制高校 選び方"],
+  alternates: {
+    canonical: appBaseUrl,
+  },
   openGraph: {
     type: "website",
     locale: "ja_JP",
     siteName: "通信制高校リアルレビュー",
+    url: appBaseUrl,
     title: "通信制高校リアルレビュー | 口コミ・評判で選ぶ通信制高校",
     description: "通信制高校の口コミ・評判を集めたメディアサイト。実際に通った人のリアルな声で、あなたに本当に合う通信制高校を見つけよう。",
   },
@@ -53,19 +60,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // 構造化データは静的データのみ（パフォーマンス向上のため）
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
-  
-  // 本番環境では警告を表示
-  if (process.env.NODE_ENV === 'production' && (!process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL === 'https://example.com')) {
-    console.warn('⚠️ NEXT_PUBLIC_SITE_URLが設定されていません。本番環境では必ず設定してください。');
-  }
-
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "通信制高校リアルレビュー",
-    "url": baseUrl,
-    "logo": `${baseUrl}/logo-service.png`,
+    "url": appBaseUrl,
+    "logo": `${appBaseUrl}/logo-service.png`,
     "description": "通信制高校の口コミ・評判を集めたメディアサイト",
   };
 
@@ -73,12 +73,12 @@ export default function RootLayout({
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "通信制高校リアルレビュー",
-    "url": baseUrl,
+    "url": appBaseUrl,
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": `${baseUrl}/schools?q={search_term_string}`
+        "urlTemplate": `${appBaseUrl}/schools?q={search_term_string}`
       },
       "query-input": "required name=search_term_string"
     }

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import RankingCard from '@/components/RankingCard';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface School {
   id: string;
@@ -83,7 +84,7 @@ function RankingsContent() {
   const fetchRankings = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/rankings/${type}?page=${page}&limit=20`);
+      const response = await fetch(apiPath(`/api/rankings/${type}?page=${page}&limit=20`));
       if (!response.ok) {
         throw new Error('ランキングの取得に失敗しました');
       }
@@ -148,7 +149,7 @@ function RankingsContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link
-            href="/rankings"
+            href={appPath('/rankings')}
             className="text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← ランキング一覧に戻る
@@ -192,7 +193,7 @@ function RankingsContent() {
               {page} / {data.total_pages}
             </span>
             <button
-              onClick={() => router.push(`/rankings/${type}?page=${page + 1}`)}
+              onClick={() => router.push(`${appPath(`/rankings/${type}`)}?page=${page + 1}`)}
               disabled={page >= data.total_pages}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >

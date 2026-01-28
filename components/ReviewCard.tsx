@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import StarRatingDisplay from './StarRatingDisplay';
+import { appPath } from '@/lib/base-path';
 
 // 通信制を選んだ理由の選択肢名マッピング
 const reasonForChoosingMap: Record<string, string> = {
@@ -96,7 +97,7 @@ export default function ReviewCard({
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             {schoolSlug ? (
               <Link
-                href={`/schools/${schoolSlug}`}
+                href={appPath(`/schools/${schoolSlug}`)}
                 onClick={(e) => e.stopPropagation()}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >

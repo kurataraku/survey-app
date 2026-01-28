@@ -3,6 +3,7 @@
 import { getClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiPath, appPath } from '@/lib/base-path';
 
 export interface AdminUser {
   id: string;
@@ -46,7 +47,7 @@ export async function checkAdminAccess(): Promise<AdminUser | null> {
       return null;
     }
 
-    const response = await fetch('/api/auth/admin-check');
+    const response = await fetch(apiPath('/api/auth/admin-check'));
     if (!response.ok) {
       return null;
     }
@@ -72,11 +73,11 @@ export function useAdminAccess() {
       .then((user) => {
         setAdminUser(user);
         if (!user) {
-          router.push('/admin/login');
+          router.push(appPath('/admin/login'));
         }
       })
       .catch(() => {
-        router.push('/admin/login');
+        router.push(appPath('/admin/login'));
       })
       .finally(() => {
         setLoading(false);

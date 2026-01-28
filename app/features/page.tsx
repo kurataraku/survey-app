@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ArticleCard from '@/components/ArticleCard';
 import { Article } from '@/lib/types/articles';
+import { apiPath, appPath } from '@/lib/base-path';
 
 function FeaturesPageContent() {
   const searchParams = useSearchParams();
@@ -34,7 +35,7 @@ function FeaturesPageContent() {
         params.append('category', activeCategory);
       }
 
-      const response = await fetch(`/api/articles?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/articles?${params.toString()}`));
       if (!response.ok) {
         throw new Error('記事一覧の取得に失敗しました');
       }
@@ -58,7 +59,7 @@ function FeaturesPageContent() {
     if (category !== 'all') {
       params.append('category', category);
     }
-    router.push(`/features?${params.toString()}`);
+    router.push(`${appPath('/features')}?${params.toString()}`);
   };
 
   return (

@@ -1,8 +1,9 @@
 import { MetadataRoute } from 'next';
-import { getSiteUrl } from '@/lib/env-check';
+import { getAppBaseUrl } from '@/lib/env-check';
+import { BASE_PATH } from '@/lib/base-path';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = getSiteUrl();
+  const baseUrl = getAppBaseUrl();
 
   return {
     rules: [
@@ -10,10 +11,10 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         disallow: [
-          '/admin/',
-          '/api/',
-          '/export',
-          '/survey', // フォームページはインデックス不要
+          `${BASE_PATH}/admin/`,
+          `${BASE_PATH}/api/`,
+          `${BASE_PATH}/export`,
+          `${BASE_PATH}/survey`, // フォームページはインデックス不要
         ],
       },
     ],

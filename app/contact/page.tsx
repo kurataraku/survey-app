@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface ContactFormData {
   name: string;
@@ -71,7 +72,7 @@ export default function ContactPage() {
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetch(apiPath('/api/contact'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +144,7 @@ export default function ContactPage() {
               お問い合わせありがとうございます。内容を確認のうえ、ご返信いたします。
             </p>
             <Link
-              href="/"
+              href={appPath('/')}
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
             >
               トップページに戻る
@@ -291,7 +292,7 @@ export default function ContactPage() {
 
             <div className="pt-4 border-t border-gray-200">
               <p className="text-xs text-gray-500 text-center">
-                送信により、<Link href="/privacy" className="text-blue-600 hover:underline">プライバシーポリシー</Link>
+                送信により、<Link href={appPath('/privacy')} className="text-blue-600 hover:underline">プライバシーポリシー</Link>
                 に同意したものとします。
               </p>
             </div>

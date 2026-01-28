@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiPath, appPath } from '@/lib/base-path';
 
 interface ContactMessage {
   id: string;
@@ -35,7 +36,7 @@ export default function ContactsPage() {
         params.append('is_read', filter === 'read' ? 'true' : 'false');
       }
 
-      const response = await fetch(`/api/admin/contacts?${params.toString()}`);
+      const response = await fetch(apiPath(`/api/admin/contacts?${params.toString()}`));
       if (!response.ok) {
         throw new Error('問い合わせ一覧の取得に失敗しました');
       }
@@ -51,7 +52,7 @@ export default function ContactsPage() {
 
   const toggleReadStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/admin/contacts/${id}`, {
+      const response = await fetch(apiPath(`/api/admin/contacts/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +105,7 @@ export default function ContactsPage() {
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold text-gray-900">お問い合わせ一覧</h1>
             <Link
-              href="/admin/settings/contact"
+              href={appPath('/admin/settings/contact')}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
             >
               通知設定
@@ -199,7 +200,7 @@ export default function ContactsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         <Link
-                          href={`/admin/contacts/${contact.id}`}
+                          href={appPath(`/admin/contacts/${contact.id}`)}
                           className="text-blue-600 hover:text-blue-700 hover:underline"
                         >
                           {contact.subject}

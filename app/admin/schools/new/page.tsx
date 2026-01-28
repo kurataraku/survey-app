@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SchoolEditor from '@/components/SchoolEditor';
 import { SchoolFormData } from '@/lib/types/schools';
+import { apiPath, appPath } from '@/lib/base-path';
 
 export default function NewSchoolPage() {
   const router = useRouter();
@@ -13,7 +14,7 @@ export default function NewSchoolPage() {
   const handleSubmit = async (data: SchoolFormData) => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/admin/schools', {
+      const response = await fetch(apiPath('/api/admin/schools'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -28,7 +29,7 @@ export default function NewSchoolPage() {
 
       const school = await response.json();
       alert('学校を作成しました');
-      router.push(`/admin/schools/${school.id}/edit`);
+      router.push(appPath(`/admin/schools/${school.id}/edit`));
     } catch (error) {
       console.error('学校作成エラー:', error);
       alert(error instanceof Error ? error.message : '学校の作成に失敗しました');
@@ -42,7 +43,7 @@ export default function NewSchoolPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-6">
           <Link
-            href="/admin/schools"
+            href={appPath('/admin/schools')}
             className="text-sm text-blue-600 hover:text-blue-700 mb-4 inline-block"
           >
             ← 学校一覧に戻る

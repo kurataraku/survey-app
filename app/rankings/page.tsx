@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { appPath } from '@/lib/base-path';
 
 // 注意: 進学実績ランキングは削除されました。追加しないでください。
 const rankingTypes = [
@@ -59,7 +60,7 @@ export default function RankingsPage() {
           {rankingTypes.map((ranking) => (
             <Link
               key={ranking.id}
-              href={`/rankings/${ranking.id}`}
+              href={appPath(`/rankings/${ranking.id}`)}
               className="block bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-md transition-all"
             >
               <div className="flex items-start gap-4">

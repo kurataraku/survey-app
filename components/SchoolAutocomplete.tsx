@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Control, Controller, UseFormSetValue, useWatch } from 'react-hook-form';
+import { apiPath } from '@/lib/base-path';
 
 interface School {
   id: string;
@@ -61,7 +62,7 @@ export default function SchoolAutocomplete({
     console.log('[SchoolAutocomplete] APIリクエスト送信:', `/api/schools/autocomplete?q=${encodeURIComponent(query)}`);
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/schools/autocomplete?q=${encodeURIComponent(query)}`);
+      const response = await fetch(apiPath(`/api/schools/autocomplete?q=${encodeURIComponent(query)}`));
       console.log('[SchoolAutocomplete] APIレスポンス受信:', response.status, response.statusText);
       
       if (!response.ok) {
@@ -154,7 +155,7 @@ export default function SchoolAutocomplete({
   const createSchool = async (name: string) => {
     setIsCreating(true);
     try {
-      const response = await fetch('/api/schools/create', {
+      const response = await fetch(apiPath('/api/schools/create'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
