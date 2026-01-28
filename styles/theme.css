@@ -45,5 +45,16 @@
   
   --font-sans: var(--ce-font-body);
   --font-heading: var(--ce-font-heading);
+
+  /* 会社ページ（/）専用 - 白背景・余白多め・青アクセント */
+  --company-primary: #4894ef;
+  --company-primary-light: #6ba8f2;
+  --company-text: #1c1c1c;
+  --company-muted: #333333;
+  --company-bg: #ffffff;
+  --company-bg-alt: #f5f5f5;
+  --company-radius-card: 16px;
+  --company-radius-btn: 12px;
+  --company-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
