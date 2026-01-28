@@ -14,19 +14,10 @@ export default function AdminHeader() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/AdminHeader.tsx:15',message:'checkAdminAccess called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     checkAdminAccess().then((user) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/AdminHeader.tsx:19',message:'checkAdminAccess result',data:{hasUser:!!user,userRole:user?.role||null,userEmail:user?.email||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       setAdminUser(user);
       setLoading(false);
     }).catch((error) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'components/AdminHeader.tsx:22',message:'checkAdminAccess error',data:{errorMessage:error?.message||String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       console.error('[AdminHeader] checkAdminAccess error:', error);
       setLoading(false);
     });

@@ -452,6 +452,55 @@ async redirects() {
   - [ ] whatsmydns で A / CNAME の反映を確認した  
   - [ ] Vercel Domains で **Valid Configuration** になっている  
   - [ ] ブラウザで `https://careeressence.jp`・`www`・旧URL の動作を確認した  
+  - [ ] **sitemap / robots** の確認（下記「sitemap / robots の確認」を実施した）
+
+---
+
+## sitemap / robots の確認
+
+SEO まわりを含めて安心するため、以下で **意図どおり表示されるか** だけ確認する。
+
+### 1. 確認する URL
+
+| 対象 | URL |
+|------|-----|
+| robots.txt | `https://careeressence.jp/tsushin-kuchikomi/robots.txt` |
+| sitemap.xml | `https://careeressence.jp/tsushin-kuchikomi/sitemap.xml` |
+
+### 2. 手順（ブラウザ）
+
+1. **robots.txt**
+   - 上記 URL をそのままアドレスバーに入力してアクセスする。
+   - 期待される内容：
+     - `User-Agent: *`
+     - `Allow: /`
+     - `Disallow: /tsushin-kuchikomi/admin/`
+     - `Disallow: /tsushin-kuchikomi/api/`
+     - `Disallow: /tsushin-kuchikomi/export`
+     - `Disallow: /tsushin-kuchikomi/survey`
+     - `Sitemap: https://careeressence.jp/tsushin-kuchikomi/sitemap.xml`
+   - 404 や HTML ページではなく、**テキストとして** 上記のような内容が表示されれば OK。
+
+2. **sitemap.xml**
+   - 上記 URL をそのままアドレスバーに入力してアクセスする。
+   - 期待される内容：
+     - **XML** のサイトマップ（`<urlset>` など）。
+     - 各 `<loc>` は `https://careeressence.jp/tsushin-kuchikomi` または  
+       `https://careeressence.jp/tsushin-kuchikomi/...` で始まっている。
+     - 例: `/`、`/schools`、`/reviews`、`/schools/[slug]`、`/reviews/[id]`、`/features/[slug]` など。
+   - 404 や 500 エラーではなく、**XML が表示され、URL が apex + `/tsushin-kuchikomi` 配下** になっていれば OK。
+
+### 3. 補足
+
+- **ローカル確認**（`npm run dev` 起動後）  
+  - `http://localhost:3000/tsushin-kuchikomi/robots.txt`  
+  - `http://localhost:3000/tsushin-kuchikomi/sitemap.xml`  
+  でも同様にアクセスして確認できる。  
+  - ローカルでは `NEXT_PUBLIC_SITE_URL` が未設定だと `baseUrl` が `https://example.com/tsushin-kuchikomi` になるため、**本番デプロイ後の URL 確認** がより重要。
+
+- **sitemap.xml が 500 になる場合**  
+  - Supabase 接続・環境変数（`NEXT_PUBLIC_SUPABASE_URL` など）を確認する。  
+  - Vercel の **Functions / Logs** でエラー内容を確認する。
 
 ---
 

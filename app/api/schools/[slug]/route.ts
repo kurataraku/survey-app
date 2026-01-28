@@ -59,10 +59,6 @@ export async function GET(
       .eq('is_public', true)
       .eq('status', 'active') // 承認済み（active）のみ
       .single();
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/schools/[slug]/route.ts:60',message:'学校詳細取得:ステータス確認',data:{slug,schoolId:school?.id,schoolStatus:school?.status,found:!!school},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
 
     if (schoolError || !school) {
       console.log('[API] /api/schools/[slug] - School not found. Error:', schoolError);

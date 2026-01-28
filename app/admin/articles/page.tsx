@@ -34,9 +34,6 @@ function ArticlesPageContent() {
   const limit = 20;
 
   const fetchArticles = useCallback(async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:40',message:'fetchArticles開始',data:{page,searchQuery,categoryFilter,limit},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     console.log('[ArticlesPage] fetchArticles開始');
     setLoading(true);
     setError(null);
@@ -54,30 +51,18 @@ function ArticlesPageContent() {
 
       const apiUrl = apiPath(`/api/admin/articles?${params.toString()}`);
       console.log('[ArticlesPage] APIリクエスト:', apiUrl);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:55',message:'APIリクエスト送信前',data:{apiUrl,params:params.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
 
       const response = await fetch(apiUrl);
-      
+
       console.log('[ArticlesPage] APIレスポンス:', response.status, response.statusText);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:62',message:'APIレスポンス受信',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '記事一覧の取得に失敗しました' }));
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:66',message:'APIエラー検出',data:{status:response.status,errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
         throw new Error(errorData.error || `記事一覧の取得に失敗しました (${response.status})`);
       }
 
       const data = await response.json();
       console.log('[ArticlesPage] APIデータ:', { articlesCount: data.articles?.length || 0, total: data.total, totalPages: data.total_pages });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:72',message:'APIデータ処理',data:{articlesCount:data.articles?.length||0,total:data.total||0,totalPages:data.total_pages||1,hasArticles:!!data.articles},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
 
       setArticles(data.articles || []);
       setTotal(data.total || 0);
@@ -85,9 +70,6 @@ function ArticlesPageContent() {
     } catch (error) {
       console.error('[ArticlesPage] 記事一覧取得エラー:', error);
       const errorMessage = error instanceof Error ? error.message : '記事一覧の取得に失敗しました';
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:79',message:'エラー発生',data:{errorMessage},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       setError(errorMessage);
       setArticles([]);
       setTotal(0);
@@ -100,9 +82,6 @@ function ArticlesPageContent() {
 
   useEffect(() => {
     console.log('[ArticlesPage] useEffect実行:', { page, searchQuery, categoryFilter });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:118',message:'useEffect実行:fetchArticles呼び出し',data:{page,searchQuery,categoryFilter},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     fetchArticles();
   }, [fetchArticles]);
 
@@ -110,9 +89,6 @@ function ArticlesPageContent() {
   useEffect(() => {
     if (articles.length > 0) {
       console.log('[ArticlesPage] 記事一覧レンダリング:', { articlesCount: articles.length, total, loading, error });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:125',message:'記事一覧レンダリング開始',data:{articlesCount:articles.length,total,loading,error:error||null},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
     }
   }, [articles.length, total, loading, error]);
 
@@ -280,9 +256,6 @@ function ArticlesPageContent() {
                         className="hover:bg-gray-50 cursor-pointer"
                         onClick={() => {
                           console.log('[ArticlesPage] 記事行クリック:', article.id);
-                          // #region agent log
-                          fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:265',message:'記事行クリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'G'})}).catch(()=>{});
-                          // #endregion
                           router.push(appPath(`/admin/articles/${article.id}/edit`));
                         }}
                       >
@@ -324,9 +297,6 @@ function ArticlesPageContent() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 console.log('[ArticlesPage] 編集ボタンクリック:', article.id);
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/admin/articles/page.tsx:265',message:'編集ボタンクリックイベント',data:{articleId:article.id,articleTitle:article.title},timestamp:Date.now(),sessionId:'debug-session',runId:'article-edit-debug',hypothesisId:'H'})}).catch(()=>{});
-                                // #endregion
                                 router.push(appPath(`/admin/articles/${article.id}/edit`));
                               }}
                               className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"

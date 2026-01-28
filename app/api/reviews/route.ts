@@ -154,9 +154,6 @@ export async function GET(request: NextRequest) {
     let filteredReviews = (allReviewsData || []).filter((review: any) => {
       // pending状態の学校の口コミを除外
       const school = Array.isArray(review.schools) ? review.schools[0] : review.schools;
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/reviews/route.ts:159',message:'口コミフィルタリング:学校ステータス確認',data:{reviewId:review.id,schoolId:review.school_id,schoolStatus:school?.status,willInclude:school?.status==='active'},timestamp:Date.now(),sessionId:'debug-session',runId:'pending-check',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       if (!school || school.status !== 'active') {
         return false; // 学校が存在しない、またはstatusが'active'でない場合は除外
       }

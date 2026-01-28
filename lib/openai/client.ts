@@ -70,11 +70,7 @@ ${reviewsText}
 function generateMetaDescriptionFromSummary(
   schoolName: string,
   summaryText: string
-): string {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:70',message:'generateMetaDescriptionFromSummary entry',data:{schoolName,summaryTextLength:summaryText.length,summaryTextPreview:summaryText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
+): string {  
   // 要約テキストから概要部分のみを抽出（「## この学校が合う人」の前まで）
   let summary = '';
   if (summaryText.includes('## この学校が合う人')) {
@@ -84,11 +80,6 @@ function generateMetaDescriptionFromSummary(
     // 「## この学校が合う人」がない場合は全体から免責文を除いたものを使用
     summary = summaryText.replace(/\n\n※.*$/, '').trim();
   }
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:85',message:'Extracted summary',data:{summaryLength:summary.length,summaryPreview:summary.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-
   // 概要から不要な接頭語を削除
   const prefixPatterns = [
     new RegExp(`^${schoolName}の口コミ・評判から見える特徴として、`),
@@ -235,12 +226,7 @@ function generateMetaDescriptionFromSummary(
   // 「...」で終わっている場合は削除して句点を追加
   metaDesc = metaDesc.replace(/\.\.\.+[。！？]*$/, '。');
 
-  const finalMetaDesc = metaDesc.trim();
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:150',message:'Final meta description',data:{finalLength:finalMetaDesc.length,finalPreview:finalMetaDesc.substring(0,80),endsWithPeriod:finalMetaDesc.match(/[。！？]$/)!==null,hasEllipsis:finalMetaDesc.includes('...'),isInRange:finalMetaDesc.length>=105&&finalMetaDesc.length<=125},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
-  
+  const finalMetaDesc = metaDesc.trim();  
   return finalMetaDesc;
 }
 
@@ -265,11 +251,6 @@ function parseSummaryResponse(
   const summary = summaryMatch?.[1]?.trim() || '';
   const fits = fitsMatch?.[1]?.trim() || '';
   const notFits = notFitsMatch?.[1]?.trim() || '';
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:170',message:'Parsed sections from API response',data:{summaryLength:summary.length,summaryPreview:summary.substring(0,50),fitsLength:fits.length,fitsPreview:fits.substring(0,50),notFitsLength:notFits.length,notFitsPreview:notFits.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
-
   // 要約テキストを組み立て
   let summaryText = summary;
   if (fits) {
@@ -282,20 +263,10 @@ function parseSummaryResponse(
 
   let metaTitle = metaTitleMatch?.[1]?.trim() || '';
   let metaDescription = metaDescriptionMatch?.[1]?.trim() || '';
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:273',message:'Parsed meta title from API',data:{metaTitleLength:metaTitle.length,metaTitle:metaTitle,hasKuchikomiOrHyoban:metaTitle.includes('口コミ')||metaTitle.includes('評判')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-
   // meta_titleに「口コミ」または「評判」が含まれているかチェック（より堅牢な方法）
   const hasKuchikomi = metaTitle && (metaTitle.includes('口コミ') || metaTitle.includes('くちこみ') || metaTitle.includes('クチコミ'));
   const hasHyoban = metaTitle && (metaTitle.includes('評判') || metaTitle.includes('ひょうばん') || metaTitle.includes('ヒョウバン'));
   const hasKuchikomiOrHyoban = hasKuchikomi || hasHyoban;
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:281',message:'Checking meta title for kuchikomi/hyoban',data:{originalMetaTitle:metaTitle,hasKuchikomi,hasHyoban,hasKuchikomiOrHyoban},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-
   // meta_titleに「口コミ」「評判」が含まれていない場合は自動的に追加または修正
   if (!metaTitle || !hasKuchikomiOrHyoban) {
     if (metaTitle) {
@@ -343,33 +314,11 @@ function parseSummaryResponse(
       } else {
         metaTitle = basePart;
       }
-    }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:320',message:'Fixed meta title to include kuchikomi/hyoban',data:{fixedMetaTitle:metaTitle,fixedLength:metaTitle.length,originalTitle:metaTitleMatch?.[1]?.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-  }
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:325',message:'Final meta title before return',data:{finalMetaTitle:metaTitle,finalMetaTitleLength:metaTitle.length,hasKuchikomi:metaTitle.includes('口コミ'),hasHyoban:metaTitle.includes('評判')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:310',message:'Parsed meta description from API',data:{metaDescriptionLength:metaDescription.length,metaDescriptionPreview:metaDescription.substring(0,60),needsFallback:metaDescription.length<105||metaDescription.length>125},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-
+    }  }
   // meta_descriptionが適切な長さでない場合（105文字未満または125文字超過）、要約テキストから生成
   // 免責文を除いた要約テキストを使用
   const summaryTextForMeta = summaryText.replace(/\n\n※.*$/, '');
-  if (metaDescription.length < 105 || metaDescription.length > 125) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:200',message:'Using fallback generation',data:{originalLength:metaDescription.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    metaDescription = generateMetaDescriptionFromSummary(schoolName, summaryTextForMeta);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/0312fc5c-8c2b-4b8c-9a2b-089d506d00dc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:203',message:'Generated fallback meta description',data:{generatedLength:metaDescription.length,generatedPreview:metaDescription.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-  }
+  if (metaDescription.length < 105 || metaDescription.length > 125) {    metaDescription = generateMetaDescriptionFromSummary(schoolName, summaryTextForMeta);  }
 
   return {
     summaryText: summaryText.trim(),
