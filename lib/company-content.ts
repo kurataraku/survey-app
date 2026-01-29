@@ -6,6 +6,14 @@
 export const COMPANY = {
   name: '株式会社キャリアエッセンス',
   catchphrase: '今がもっと注目される社会へ',
+  /** Hero のサブキャッチ（会社名は非表示） */
+  subCatchphrase: '私達は人の過去でなく今を応援することで社会の発展を支えていきます。',
+  /** ヘッダー用ロゴ。public/company/logo.jpg を配置すること */
+  logoPath: '/company/logo.jpg',
+  /** 設立日（フッター用） */
+  established: '2021年4月1日',
+  /** 連絡先メール（フッター用） */
+  contactEmail: 'info@careeressence.co.jp',
 } as const;
 
 export const VISION = {
@@ -56,7 +64,14 @@ export const SERVICES = [
 export const EXECUTIVE = {
   name: '倉田 嵩之',
   title: '代表取締役',
-  photoPath: '/company/rep-photo.svg',
+  /** 代表写真。public/company/rep-photo.jpg を配置すること */
+  photoPath: '/company/rep-photo.jpg',
+  /** 代表紹介コメント（経歴・ビジョン） */
+  comment: `2009年伊藤忠商事入社。M&A・リスク管理制度の企画・運営・審査業務に従事。
+
+2014年リクルート入社。スタディサプリ進路部門で営業・営業企画に従事。
+
+「今を生きる企業と人を応援したい」というビジョンで、2021年キャリアエッセンスを創業。`,
 } as const;
 
 export const ADDRESS = {

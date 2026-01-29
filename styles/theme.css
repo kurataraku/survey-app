@@ -49,6 +49,7 @@
   /* 会社ページ（/）専用 - 白背景・余白多め・青アクセント */
   --company-primary: #4894ef;
   --company-primary-light: #6ba8f2;
+  --company-primary-hover: #3a7bd9;
   --company-text: #1c1c1c;
   --company-muted: #333333;
   --company-bg: #ffffff;
@@ -56,5 +57,17 @@
   --company-radius-card: 16px;
   --company-radius-btn: 12px;
   --company-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --company-shadow-header: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --company-shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --company-section-gap: 5rem;
+  --company-container-max: 1024px;
+  --company-gutter: 1rem;
+  --company-gutter-sm: 1.5rem;
+  --company-gutter-lg: 2rem;
+  --company-font-size-hero: clamp(1.75rem, 4vw, 2.5rem);
+  --company-font-size-h2: 1.5rem;
+  --company-font-size-body: 1rem;
+  --company-line-height-tight: 1.25;
+  --company-line-height-relaxed: 1.7;
 }
 
