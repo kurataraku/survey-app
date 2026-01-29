@@ -49,7 +49,8 @@ export function GoogleAnalytics() {
         lastPathRef.current = path;
         return true;
       }
-      if (!sendPageView(path, loc)) return true;
+      const sent = sendPageView(path, loc);
+      if (!sent) return true;
       lastPathRef.current = path;
       return true;
     };
@@ -59,7 +60,8 @@ export function GoogleAnalytics() {
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      if (trySend() || attempts >= 10) clearInterval(interval);
+      const ok = trySend();
+      if (ok || attempts >= 10) clearInterval(interval);
     }, 80);
 
     return () => clearInterval(interval);

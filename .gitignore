@@ -32,6 +32,7 @@ yarn-error.log*
 
 # cursor debug logs
 .cursor/debug.log
+debug-ga.txt
 
 # CSV files for seeding
 *.csv
