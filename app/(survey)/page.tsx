@@ -242,7 +242,7 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <section className="relative bg-gradient-to-br from-blue-100 to-blue-200 py-16 overflow-hidden">
         <div className="pointer-events-none absolute inset-0 opacity-30">
-          <img src={`${BASE_PATH}/hero-visual.png`} alt="" className="w-full h-full object-cover" />
+          <img src={`${BASE_PATH}/hero-visual.png`} alt="通信制高校検索のビジュアル" className="w-full h-full object-cover" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">

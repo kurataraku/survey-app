@@ -32,6 +32,7 @@ export const metadata: Metadata = {
     title: "通信制高校リアルレビュー | 口コミ・評判で選ぶ通信制高校",
     description:
       "通信制高校の口コミ・評判を集めたメディアサイト。実際に通った人のリアルな声で、あなたに本当に合う通信制高校を見つけよう。",
+    images: [{ url: `${appBaseUrl}/logo-service.png` }],
   },
   twitter: {
     card: "summary_large_image",

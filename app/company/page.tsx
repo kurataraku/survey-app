@@ -9,10 +9,30 @@ import {
   EXECUTIVE,
 } from '@/lib/company-content';
 import { appPath } from '@/lib/base-path';
+import { getSiteUrl } from '@/lib/env-check';
+
+const siteUrl = getSiteUrl().replace(/\/$/, '');
+const canonical = siteUrl + '/';
+const description = `${COMPANY.name}の公式サイト。${COMPANY.catchphrase}`;
+const title = `${COMPANY.name} | ${COMPANY.catchphrase}`;
 
 export const metadata: Metadata = {
-  title: `${COMPANY.name} | ${COMPANY.catchphrase}`,
-  description: `${COMPANY.name}の公式サイト。${COMPANY.catchphrase}`,
+  title,
+  description,
+  alternates: { canonical },
+  openGraph: {
+    type: 'website',
+    locale: 'ja_JP',
+    url: canonical,
+    title,
+    description,
+    images: [{ url: `${siteUrl}${COMPANY.logoPath}` }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+  },
 };
 
 const SERVICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
