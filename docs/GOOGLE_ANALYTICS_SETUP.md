@@ -29,7 +29,7 @@ Google アナリティクス連携を正しく計測するための設定と確�
 |------|------|
 | **計測ID** | 環境変数 `NEXT_PUBLIC_GA_MEASUREMENT_ID`（例: `G-XXXXXXXXXX`） |
 | **読み込み** | ルートレイアウトで `GoogleAnalyticsInit` が **next/script** により gtag を読み込み（会社トップ `/` と `/tsushin-kuchikomi` 配下の両方）。Network タブで `gtag` / `googletagmanager` フィルタするとリクエストを確認しやすい。 |
-| **ページビュー** | `GoogleAnalytics` クライアントで、初期表示 ＋ クライアント遷移時に `page_view` を送信（`page_path` / `page_location` はブラウザの実際の URL） |
+| **ページビュー** | `GoogleAnalytics` クライアントで、初期表示 ＋ クライアント遷移時に `page_view` を送信（`page_path` / `page_location` はブラウザの実際の URL）。同一 path の 2 秒以内の重複送信はガードして除外。 |
 | **除外** | `/tsushin-kuchikomi/admin` 配下では **page_view を送信しない**（管理画面のため）。gtag の読み込みは全ページで行う。 |
 
 - 会社トップ `https://careeressence.jp/`
