@@ -5,8 +5,8 @@ import { useEffect, useRef } from 'react';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
-/** 同一 path の短時間重複送信を防ぐ（Strict Mode 二重マウント等対策）。モジュールレベルで ref リセットに依存しない。 */
-const DEDUPE_MS = 2000;
+/** 同一 path の短時間重複送信を防ぐ。モジュールレベルで ref リセットに依存しない。 */
+const DEDUPE_MS = 3000;
 let lastSentPath: string | null = null;
 let lastSentTime = 0;
 
@@ -31,6 +31,7 @@ function sendPageView(path: string, location: string): boolean {
 export function GoogleAnalytics() {
   const pathname = usePathname();
   const lastPathRef = useRef<string | null>(null);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
     if (!GA_ID || typeof window === 'undefined') return;
@@ -43,6 +44,11 @@ export function GoogleAnalytics() {
     const trySend = (): boolean => {
       if (typeof window.gtag !== 'function') return false;
       if (prev !== null && prev === path) return true;
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        lastPathRef.current = path;
+        return true;
+      }
       if (!sendPageView(path, loc)) return true;
       lastPathRef.current = path;
       return true;
