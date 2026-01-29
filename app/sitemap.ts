@@ -1,6 +1,7 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
+import { prefectures } from '@/lib/prefectures';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = getAppBaseUrl();
@@ -21,6 +22,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.9,
     },
+    ...prefectures.map((pref) => ({
+      url: `${baseUrl}/schools/prefecture/${encodeURIComponent(pref)}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.85,
+    })),
     {
       url: `${baseUrl}/reviews`,
       lastModified: new Date(),
@@ -33,6 +40,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.8,
     },
+    ...(['overall', 'review-count', 'staff', 'atmosphere', 'credit', 'tuition'] as const).map(
+      (type) => ({
+        url: `${baseUrl}/rankings/${type}`,
+        lastModified: new Date(),
+        changeFrequency: 'daily' as const,
+        priority: 0.8,
+      })
+    ),
     {
       url: `${baseUrl}/features`,
       lastModified: new Date(),
@@ -96,6 +111,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
               lastModified: school.updated_at ? new Date(school.updated_at) : new Date(),
               changeFrequency: 'weekly',
               priority: 0.9,
+            });
+            dynamicPages.push({
+              url: `${baseUrl}/schools/${school.slug}/reviews`,
+              lastModified: school.updated_at ? new Date(school.updated_at) : new Date(),
+              changeFrequency: 'weekly',
+              priority: 0.85,
             });
           }
         });
