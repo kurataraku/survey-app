@@ -90,7 +90,10 @@ export default function CompanyLayout({
             </p>
             <p
               className="mt-2 text-sm leading-relaxed"
-              style={{ color: 'var(--company-muted)' }}
+              style={{
+                color: 'var(--company-muted)',
+                fontFamily: 'var(--font-geist-sans), "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif',
+              }}
             >
               {ADDRESS.postal}
               <br />
@@ -100,7 +103,10 @@ export default function CompanyLayout({
             </p>
             <p
               className="mt-3 text-sm leading-relaxed"
-              style={{ color: 'var(--company-muted)' }}
+              style={{
+                color: 'var(--company-muted)',
+                fontFamily: 'var(--font-geist-sans), "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif',
+              }}
             >
               設立　{COMPANY.established}
               <br />

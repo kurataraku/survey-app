@@ -47,7 +47,7 @@ export const SERVICES = [
     id: 'dx' as const,
     name: '企業・学校向けDX推進支援',
     description:
-      '業務整理・要件設計からシステム／AI活用、運用定着までを一気通貫で支援するDX推進サービスを提供しています。',
+      '業務整理・要件設計からシステム／AIの導入/活用、運用定着までを一気通貫で支援するDX推進サービスを提供しています。',
     href: null,
     hasButton: false,
   },

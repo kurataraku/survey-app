@@ -69,20 +69,14 @@ export default function CompanyTopPage() {
       <section
         className="relative overflow-hidden px-4 pb-20 pt-16 sm:px-6 sm:pb-28 sm:pt-24 lg:px-8 lg:pt-28"
         style={{
-          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%)',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f5f9ff 45%, #eef5ff 100%)',
         }}
       >
-        {/* 装飾: 右側の抽象図形（SPでは非表示） */}
+        {/* 装飾: 右側の青グラデーション（うっすら・箱なし） */}
         <div
-          className="absolute right-0 top-1/2 hidden h-64 w-64 -translate-y-1/2 translate-x-1/4 rounded-full opacity-20 lg:block"
+          className="absolute inset-0 hidden lg:block"
           style={{
-            background: 'radial-gradient(circle, var(--company-primary) 0%, transparent 70%)',
-          }}
-        />
-        <div
-          className="absolute bottom-1/4 right-1/4 hidden h-32 w-32 rounded-2xl opacity-10 lg:block"
-          style={{
-            background: 'linear-gradient(135deg, var(--company-primary) 0%, var(--company-primary-light) 100%)',
+            background: 'radial-gradient(ellipse 80% 60% at 85% 50%, rgba(72,148,239,0.08) 0%, transparent 60%)',
           }}
         />
         <div
@@ -112,7 +106,7 @@ export default function CompanyTopPage() {
       </section>
 
       <div
-        className="mx-auto flex flex-col px-4 pb-24 sm:px-6 lg:px-8"
+        className="mx-auto flex flex-col px-4 pb-24 pt-14 sm:px-6 sm:pt-20 lg:px-8"
         style={{ maxWidth: 'var(--company-container-max)', gap: 'var(--company-section-gap)' }}
       >
         {/* Vision */}
@@ -224,7 +218,18 @@ export default function CompanyTopPage() {
                   fontFamily: 'var(--font-geist-sans), "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif',
                 }}
               >
-                {EXECUTIVE.comment}
+                {EXECUTIVE.comment.split(/(\d{4}年)/g).map((part, i) =>
+                  /^\d{4}年$/.test(part) ? (
+                    <span
+                      key={i}
+                      style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif' }}
+                    >
+                      {part}
+                    </span>
+                  ) : (
+                    part
+                  )
+                )}
               </div>
             </div>
           </div>
