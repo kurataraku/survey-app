@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SchoolCard from '@/components/SchoolCard';
@@ -207,42 +208,20 @@ export default function Home() {
     router.push(`${appPath('/schools')}?${params.toString()}`);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-lg p-5">
-                <div className="h-4 bg-gray-200 rounded animate-pulse mb-3" />
-                <div className="h-3 bg-gray-200 rounded animate-pulse mb-4 w-2/3" />
-                <div className="h-3 bg-gray-200 rounded animate-pulse" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center py-12">
-            <h3 className="mt-4 text-lg font-semibold text-gray-900">データの読み込みに失敗しました</h3>
-            <p className="mt-2 text-sm text-gray-600">しばらくしてから再度お試しください</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <section className="relative bg-gradient-to-br from-blue-100 to-blue-200 py-16 overflow-hidden">
+      <section className="relative min-h-[420px] bg-gradient-to-br from-blue-100 to-blue-200 py-16 overflow-hidden">
         <div className="pointer-events-none absolute inset-0 opacity-30">
-          <img src={`${BASE_PATH}/hero-visual.png`} alt="通信制高校検索のビジュアル" className="w-full h-full object-cover" />
+          <div className="relative h-full w-full">
+            <Image
+              src={`${BASE_PATH}/hero-visual.png`}
+              alt="通信制高校検索のビジュアル"
+              fill
+              sizes="100vw"
+              priority
+              className="object-cover"
+            />
+          </div>
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
@@ -315,96 +294,110 @@ export default function Home() {
         </div>
       </section>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {data.popularSchools.length > 0 && (
-          <section className="mb-12">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">注目の学校</h2>
-                <p className="text-sm text-gray-600">多くの口コミが寄せられている学校</p>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-lg p-5">
+                <div className="h-4 bg-gray-200 rounded animate-pulse mb-3" />
+                <div className="h-3 bg-gray-200 rounded animate-pulse mb-4 w-2/3" />
+                <div className="h-3 bg-gray-200 rounded animate-pulse" />
               </div>
-              <Link href={appPath('/schools')} className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                もっと見る
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {data.popularSchools.slice(0, 3).map((school) => (
-                <SchoolCard
-                  key={school.id}
-                  id={school.id}
-                  name={school.name}
-                  prefecture={school.prefecture}
-                  prefectures={school.prefectures || undefined}
-                  slug={school.slug}
-                  reviewCount={school.review_count}
-                  overallAvg={school.overall_avg}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-        {data.latestReviews.length > 0 && (
-          <section className="mb-12">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">注目の口コミ</h2>
-                <p className="text-sm text-gray-600">多くのいいねが寄せられている口コミ</p>
-              </div>
-              <Link href={appPath('/reviews')} className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                もっと見る
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {data.latestReviews.map((review) => (
-                <ReviewCard
-                  key={review.id}
-                  id={review.id}
-                  schoolName={review.schools?.name || review.school_name}
-                  schoolSlug={review.schools?.slug || null}
-                  overallSatisfaction={review.overall_satisfaction}
-                  goodComment={review.good_comment}
-                  badComment={review.bad_comment}
-                  enrollmentYear={null}
-                  attendanceFrequency={null}
-                  likeCount={review.like_count}
-                  createdAt={review.created_at}
-                  status={review.status}
-                  reasonForChoosing={review.reason_for_choosing}
-                  attendanceFrequencyProp={review.attendance_frequency}
-                  campusPrefecture={review.campus_prefecture}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-        {data.latestArticles.length > 0 && (
-          <section className="mb-12">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">特集記事</h2>
-                <p className="text-sm text-gray-600">通信制高校に関する役立つ情報</p>
-              </div>
-              <Link href={appPath('/features')} className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
-                もっと見る
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {data.latestArticles.map((article) => (
-                <ArticleCard
-                  key={article.id}
-                  id={article.id}
-                  title={article.title}
-                  slug={article.slug}
-                  category={article.category}
-                  excerpt={article.excerpt}
-                  featured_image_url={article.featured_image_url}
-                  published_at={article.published_at}
-                />
-              ))}
-            </div>
-          </section>
+            ))}
+          </div>
+        ) : data && (
+          <>
+            {data.popularSchools.length > 0 && (
+              <section className="mb-12">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">注目の学校</h2>
+                    <p className="text-sm text-gray-600">多くの口コミが寄せられている学校</p>
+                  </div>
+                  <Link href={appPath('/schools')} className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                    もっと見る
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {data.popularSchools.slice(0, 3).map((school) => (
+                    <SchoolCard
+                      key={school.id}
+                      id={school.id}
+                      name={school.name}
+                      prefecture={school.prefecture}
+                      prefectures={school.prefectures || undefined}
+                      slug={school.slug}
+                      reviewCount={school.review_count}
+                      overallAvg={school.overall_avg}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {data.latestReviews.length > 0 && (
+              <section className="mb-12">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">注目の口コミ</h2>
+                    <p className="text-sm text-gray-600">多くのいいねが寄せられている口コミ</p>
+                  </div>
+                  <Link href={appPath('/reviews')} className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                    もっと見る
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {data.latestReviews.map((review) => (
+                    <ReviewCard
+                      key={review.id}
+                      id={review.id}
+                      schoolName={review.schools?.name || review.school_name}
+                      schoolSlug={review.schools?.slug || null}
+                      overallSatisfaction={review.overall_satisfaction}
+                      goodComment={review.good_comment}
+                      badComment={review.bad_comment}
+                      enrollmentYear={null}
+                      attendanceFrequency={null}
+                      likeCount={review.like_count}
+                      createdAt={review.created_at}
+                      status={review.status}
+                      reasonForChoosing={review.reason_for_choosing}
+                      attendanceFrequencyProp={review.attendance_frequency}
+                      campusPrefecture={review.campus_prefecture}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {data.latestArticles.length > 0 && (
+              <section className="mb-12">
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-1">特集記事</h2>
+                    <p className="text-sm text-gray-600">通信制高校に関する役立つ情報</p>
+                  </div>
+                  <Link href={appPath('/features')} className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
+                    もっと見る
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {data.latestArticles.map((article) => (
+                    <ArticleCard
+                      key={article.id}
+                      id={article.id}
+                      title={article.title}
+                      slug={article.slug}
+                      category={article.category}
+                      excerpt={article.excerpt}
+                      featured_image_url={article.featured_image_url}
+                      published_at={article.published_at}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
         <section className="bg-white rounded-lg shadow-sm p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">都道府県別で探す</h2>
