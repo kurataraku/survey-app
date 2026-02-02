@@ -10,6 +10,9 @@ interface PageProps {
   params: Promise<{ slug: string }> | { slug: string };
 }
 
+// ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
+export const revalidate = 60;
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const resolvedParams = params instanceof Promise ? await params : params;
   const encodedSlug = resolvedParams.slug;

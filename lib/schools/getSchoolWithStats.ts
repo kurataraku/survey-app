@@ -1,4 +1,6 @@
+import { cache } from 'react';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { unstable_cache } from 'next/cache';
 
 export interface SchoolWithStats {
   id: string;
@@ -63,10 +65,58 @@ export interface SchoolWithStats {
   } | null;
 }
 
+/** サイト全体の評価平均（1時間キャッシュ） */
+async function getGlobalAverages() {
+  const supabase = createAdminSupabaseClient();
+  const { data: allGlobalReviews } = await supabase
+    .from('survey_responses')
+    .select('overall_satisfaction, answers');
+
+  const toValidRatings = (rows: any[] | null | undefined, key: string) =>
+    rows && rows.length > 0
+      ? rows
+          .map((r) => r.answers?.[key])
+          .filter(
+            (rating: any): rating is string =>
+              rating !== null && rating !== undefined && rating !== '' && rating !== '6'
+          )
+          .map((r: string) => parseInt(r, 10))
+          .filter((r: number) => !isNaN(r) && r >= 1 && r <= 5)
+      : [];
+
+  const averageOrNull = (values: number[]) =>
+    values.length > 0
+      ? parseFloat((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2))
+      : null;
+
+  return {
+    flexibility_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'flexibility_rating')),
+    staff_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'staff_rating')),
+    support_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'support_rating')),
+    atmosphere_fit_rating_avg: averageOrNull(
+      toValidRatings(allGlobalReviews, 'atmosphere_fit_rating')
+    ),
+    credit_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'credit_rating')),
+    unique_course_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'unique_course_rating')),
+    career_support_rating_avg: averageOrNull(
+      toValidRatings(allGlobalReviews, 'career_support_rating')
+    ),
+    campus_life_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'campus_life_rating')),
+    tuition_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'tuition_rating')),
+  };
+}
+
+const getCachedGlobalAverages = unstable_cache(
+  getGlobalAverages,
+  ['global-averages'],
+  { revalidate: 3600 } // 1時間
+);
+
 /**
  * slugから学校情報と統計、AI要約を取得（Server Component用）
+ * React cacheでgenerateMetadataとpage間の二重呼び出しを防止
  */
-export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats | null> {
+export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWithStats | null> => {
   const supabase = createAdminSupabaseClient();
 
   // slugをデコード
@@ -79,7 +129,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
     }
   }
 
-  // 学校情報を取得
+  // 1. 学校情報を取得
   const { data: school, error: schoolError } = await supabase
     .from('schools')
     .select('*')
@@ -92,30 +142,33 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
     return null;
   }
 
-  // AI要約を取得（publishedのみ）
-  const { data: aiSummary } = await supabase
-    .from('school_ai_summaries')
-    .select('summary_text, meta_title, meta_description')
-    .eq('school_id', school.id)
-    .eq('kind', 'overall')
-    .is('topic', null)
-    .eq('status', 'published')
-    .single();
+  // 2. AI要約・口コミデータ・グローバル平均を並列取得
+  const [aiSummaryResult, allReviewsDataResult, globalAverages] = await Promise.all([
+    supabase
+      .from('school_ai_summaries')
+      .select('summary_text, meta_title, meta_description')
+      .eq('school_id', school.id)
+      .eq('kind', 'overall')
+      .is('topic', null)
+      .eq('status', 'published')
+      .single(),
+    supabase
+      .from('survey_responses')
+      .select(
+        'id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers'
+      )
+      .eq('school_id', school.id),
+    getCachedGlobalAverages(),
+  ]);
 
-  // 口コミ数を取得
-  const { count: reviewCount } = await supabase
-    .from('survey_responses')
-    .select('*', { count: 'exact', head: true })
-    .eq('school_id', school.id);
+  const resolvedAiSummary = aiSummaryResult.data;
+  const { data: allReviewsData } = allReviewsDataResult;
 
-  // 評価の平均値を計算
-  const { data: reviews } = await supabase
-    .from('survey_responses')
-    .select('overall_satisfaction, answers')
-    .eq('school_id', school.id);
+  const reviews = allReviewsData ?? [];
+  const reviewCount = reviews.length;
 
   // overall_satisfactionの平均と外れ値件数を計算
-  const overallValues = reviews?.map((r) => r.overall_satisfaction) || [];
+  const overallValues = reviews.map((r) => r.overall_satisfaction);
   const validOverallValues = overallValues.filter(
     (v): v is number => v !== null && v !== undefined && v !== 6 && v >= 1 && v <= 5
   );
@@ -123,11 +176,12 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   const overallAvg =
     validOverallValues.length > 0
       ? parseFloat(
-          (validOverallValues.reduce((sum, v) => sum + v, 0) / validOverallValues.length).toFixed(2)
+          (validOverallValues.reduce((sum, v) => sum + v, 0) / validOverallValues.length).toFixed(
+            2
+          )
         )
       : null;
 
-  // answers JSONBから評価データを取得
   const toValidRatings = (rows: any[] | null | undefined, key: string) =>
     rows && rows.length > 0
       ? rows
@@ -151,18 +205,18 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   const campusLifeRatings = toValidRatings(reviews, 'campus_life_rating');
 
   const staffOutlierCount =
-    reviews?.filter((r) => r.answers?.staff_rating === '6' || r.answers?.staff_rating === 6)
+    reviews.filter((r) => r.answers?.staff_rating === '6' || r.answers?.staff_rating === 6)
       .length || 0;
   const atmosphereOutlierCount =
-    reviews?.filter(
+    reviews.filter(
       (r) =>
         r.answers?.atmosphere_fit_rating === '6' || r.answers?.atmosphere_fit_rating === 6
     ).length || 0;
   const creditOutlierCount =
-    reviews?.filter((r) => r.answers?.credit_rating === '6' || r.answers?.credit_rating === 6)
+    reviews.filter((r) => r.answers?.credit_rating === '6' || r.answers?.credit_rating === 6)
       .length || 0;
   const tuitionOutlierCount =
-    reviews?.filter((r) => r.answers?.tuition_rating === '6' || r.answers?.tuition_rating === 6)
+    reviews.filter((r) => r.answers?.tuition_rating === '6' || r.answers?.tuition_rating === 6)
       .length || 0;
 
   const averageOrNull = (values: number[]) =>
@@ -180,52 +234,52 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   const careerSupportRatingAvg = averageOrNull(careerSupportRatings);
   const campusLifeRatingAvg = averageOrNull(campusLifeRatings);
 
-  // サイト全体の評価平均を計算
-  const { data: allGlobalReviews } = await supabase
-    .from('survey_responses')
-    .select('overall_satisfaction, answers');
+  // 4. いいね数を1クエリで一括取得（N+1解消）
+  const reviewIds = reviews.map((r) => r.id);
+  let likesMap: Record<string, number> = {};
+  if (reviewIds.length > 0) {
+    const { data: likesData } = await supabase
+      .from('review_likes')
+      .select('review_id')
+      .in('review_id', reviewIds);
 
-  const globalFlexibilityRatings = toValidRatings(allGlobalReviews, 'flexibility_rating');
-  const globalStaffRatings = toValidRatings(allGlobalReviews, 'staff_rating');
-  const globalSupportRatings = toValidRatings(allGlobalReviews, 'support_rating');
-  const globalAtmosphereRatings = toValidRatings(allGlobalReviews, 'atmosphere_fit_rating');
-  const globalCreditRatings = toValidRatings(allGlobalReviews, 'credit_rating');
-  const globalUniqueCourseRatings = toValidRatings(allGlobalReviews, 'unique_course_rating');
-  const globalCareerSupportRatings = toValidRatings(allGlobalReviews, 'career_support_rating');
-  const globalCampusLifeRatings = toValidRatings(allGlobalReviews, 'campus_life_rating');
-  const globalTuitionRatings = toValidRatings(allGlobalReviews, 'tuition_rating');
+    likesData?.forEach((like) => {
+      likesMap[like.review_id] = (likesMap[like.review_id] || 0) + 1;
+    });
+  }
 
-  const globalFlexibilityRatingAvg = averageOrNull(globalFlexibilityRatings);
-  const globalStaffRatingAvg = averageOrNull(globalStaffRatings);
-  const globalSupportRatingAvg = averageOrNull(globalSupportRatings);
-  const globalAtmosphereFitRatingAvg = averageOrNull(globalAtmosphereRatings);
-  const globalCreditRatingAvg = averageOrNull(globalCreditRatings);
-  const globalUniqueCourseRatingAvg = averageOrNull(globalUniqueCourseRatings);
-  const globalCareerSupportRatingAvg = averageOrNull(globalCareerSupportRatings);
-  const globalCampusLifeRatingAvg = averageOrNull(globalCampusLifeRatings);
-  const globalTuitionRatingAvg = averageOrNull(globalTuitionRatings);
+  const reviewsWithLikes = reviews.map((r) => ({
+    ...r,
+    like_count: likesMap[r.id] || 0,
+  }));
 
-  // 統計情報を取得
-  const { data: allReviewsForStats } = await supabase
-    .from('survey_responses')
-    .select('respondent_role, status, graduation_path, answers')
-    .eq('school_id', school.id);
+  const latestReviews = reviewsWithLikes
+    .sort((a, b) => (b.like_count || 0) - (a.like_count || 0))
+    .slice(0, 3)
+    .map((r) => ({
+      id: r.id,
+      overall_satisfaction: r.overall_satisfaction,
+      good_comment: r.good_comment,
+      bad_comment: r.bad_comment,
+      created_at: r.created_at,
+      like_count: r.like_count || 0,
+    }));
 
+  // 統計情報（reviewsから集計）
   const respondentRoleStats = {
-    本人: allReviewsForStats?.filter((r) => r.respondent_role === '本人').length || 0,
-    保護者: allReviewsForStats?.filter((r) => r.respondent_role === '保護者').length || 0,
+    本人: reviews.filter((r) => r.respondent_role === '本人').length || 0,
+    保護者: reviews.filter((r) => r.respondent_role === '保護者').length || 0,
   };
 
   const statusStats = {
-    在籍中: allReviewsForStats?.filter((r) => r.status === '在籍中').length || 0,
-    卒業した: allReviewsForStats?.filter((r) => r.status === '卒業した').length || 0,
+    在籍中: reviews.filter((r) => r.status === '在籍中').length || 0,
+    卒業した: reviews.filter((r) => r.status === '卒業した').length || 0,
     '以前在籍していた（転校・退学など）':
-      allReviewsForStats?.filter((r) => r.status === '以前在籍していた（転校・退学など）')
-        .length || 0,
+      reviews.filter((r) => r.status === '以前在籍していた（転校・退学など）').length || 0,
   };
 
   const graduationPathStats: Record<string, number> = {};
-  allReviewsForStats?.forEach((r) => {
+  reviews.forEach((r) => {
     if (r.graduation_path) {
       graduationPathStats[r.graduation_path] =
         (graduationPathStats[r.graduation_path] || 0) + 1;
@@ -233,7 +287,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   });
 
   const reasonForChoosingStats: Record<string, number> = {};
-  allReviewsForStats?.forEach((r) => {
+  reviews.forEach((r) => {
     const reasons = r.answers?.reason_for_choosing;
     if (Array.isArray(reasons)) {
       reasons.forEach((reason: string) => {
@@ -243,7 +297,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   });
 
   const enrollmentTypeStats: Record<string, number> = {};
-  allReviewsForStats?.forEach((r) => {
+  reviews.forEach((r) => {
     const enrollmentType = r.answers?.enrollment_type;
     if (enrollmentType) {
       enrollmentTypeStats[enrollmentType] = (enrollmentTypeStats[enrollmentType] || 0) + 1;
@@ -251,7 +305,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   });
 
   const attendanceFrequencyStats: Record<string, number> = {};
-  allReviewsForStats?.forEach((r) => {
+  reviews.forEach((r) => {
     const frequency = r.answers?.attendance_frequency;
     if (frequency) {
       attendanceFrequencyStats[frequency] = (attendanceFrequencyStats[frequency] || 0) + 1;
@@ -259,7 +313,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   });
 
   const teachingStyleStats: Record<string, number> = {};
-  allReviewsForStats?.forEach((r) => {
+  reviews.forEach((r) => {
     const styles = r.answers?.teaching_style;
     if (Array.isArray(styles)) {
       styles.forEach((style: string) => {
@@ -269,7 +323,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
   });
 
   const studentAtmosphereStats: Record<string, number> = {};
-  allReviewsForStats?.forEach((r) => {
+  reviews.forEach((r) => {
     const atmospheres = r.answers?.student_atmosphere;
     if (Array.isArray(atmospheres)) {
       atmospheres.forEach((atmosphere: string) => {
@@ -277,38 +331,6 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
       });
     }
   });
-
-  // すべての口コミを取得して、いいね数でソート
-  const { data: allReviews } = await supabase
-    .from('survey_responses')
-    .select('id, overall_satisfaction, good_comment, bad_comment, created_at')
-    .eq('school_id', school.id);
-
-  // 各口コミのいいね数を取得
-  const reviewsWithLikes = await Promise.all(
-    (allReviews || []).map(async (review) => {
-      let likeCount = 0;
-      try {
-        const { count } = await supabase
-          .from('review_likes')
-          .select('*', { count: 'exact', head: true })
-          .eq('review_id', review.id);
-
-        likeCount = count || 0;
-      } catch (error) {
-        // review_likesテーブルが存在しない場合は0を返す
-      }
-      return {
-        ...review,
-        like_count: likeCount,
-      };
-    })
-  );
-
-  // いいね数順でソートして上位3件を取得
-  const latestReviews = reviewsWithLikes
-    .sort((a, b) => b.like_count - a.like_count)
-    .slice(0, 3);
 
   return {
     id: school.id,
@@ -319,7 +341,7 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
     intro: school.intro,
     highlights: school.highlights,
     faq: school.faq,
-    review_count: reviewCount || 0,
+    review_count: reviewCount,
     overall_avg: overallAvg,
     staff_rating_avg: staffRatingAvg,
     atmosphere_fit_rating_avg: atmosphereFitRatingAvg,
@@ -332,30 +354,13 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
       credit: creditOutlierCount,
       tuition: tuitionOutlierCount,
     },
-    latest_reviews: latestReviews?.map((review) => ({
-      id: review.id,
-      overall_satisfaction: review.overall_satisfaction,
-      good_comment: review.good_comment,
-      bad_comment: review.bad_comment,
-      created_at: review.created_at,
-      like_count: review.like_count || 0,
-    })) || [],
+    latest_reviews: latestReviews,
     flexibility_rating_avg: flexibilityRatingAvg,
     support_rating_avg: supportRatingAvg,
     unique_course_rating_avg: uniqueCourseRatingAvg,
     career_support_rating_avg: careerSupportRatingAvg,
     campus_life_rating_avg: campusLifeRatingAvg,
-    global_averages: {
-      flexibility_rating_avg: globalFlexibilityRatingAvg,
-      staff_rating_avg: globalStaffRatingAvg,
-      support_rating_avg: globalSupportRatingAvg,
-      atmosphere_fit_rating_avg: globalAtmosphereFitRatingAvg,
-      credit_rating_avg: globalCreditRatingAvg,
-      unique_course_rating_avg: globalUniqueCourseRatingAvg,
-      career_support_rating_avg: globalCareerSupportRatingAvg,
-      campus_life_rating_avg: globalCampusLifeRatingAvg,
-      tuition_rating_avg: globalTuitionRatingAvg,
-    },
+    global_averages: globalAverages,
     statistics: {
       respondent_role: respondentRoleStats,
       status: statusStats,
@@ -366,12 +371,12 @@ export async function getSchoolWithStats(slug: string): Promise<SchoolWithStats 
       teaching_style: teachingStyleStats,
       student_atmosphere: studentAtmosphereStats,
     },
-    ai_summary: aiSummary
+    ai_summary: resolvedAiSummary
       ? {
-          summary_text: aiSummary.summary_text,
-          meta_title: aiSummary.meta_title,
-          meta_description: aiSummary.meta_description,
+          summary_text: resolvedAiSummary.summary_text,
+          meta_title: resolvedAiSummary.meta_title,
+          meta_description: resolvedAiSummary.meta_description,
         }
       : null,
   };
-}
+});
