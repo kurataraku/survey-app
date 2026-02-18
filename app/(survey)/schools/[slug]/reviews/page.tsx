@@ -9,9 +9,10 @@ import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 
-export const revalidate = 3600;
+/** 常にサーバーでレンダリングし、口コミ本文を初期HTMLに含める（クローラー対応） */
+export const dynamic = 'force-dynamic';
 
-/** ビルド時に学校別口コミ一覧を静的生成し、初期HTMLに本文を含める */
+/** ビルド時にパスを事前生成（中身は dynamic で毎回取得） */
 export async function generateStaticParams() {
   const slugs = await getSchoolSlugs();
   return slugs;
