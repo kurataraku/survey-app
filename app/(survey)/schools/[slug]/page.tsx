@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import { getSchoolSlugs } from '@/lib/schools/getSchoolSlugs';
 import SchoolDetailClient from '@/components/SchoolDetailClient';
+import SchoolFeaturedReviewsServer from '@/components/SchoolFeaturedReviewsServer';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import { appPath } from '@/lib/base-path';
@@ -113,7 +114,15 @@ export default async function SchoolDetailPage({ params }: PageProps) {
           </Link>
         </div>
 
-        <SchoolDetailClient school={school} encodedSlug={encodedSlug} />
+        <SchoolDetailClient school={school} encodedSlug={encodedSlug}>
+          {/* 注目の口コミ（良い点・悪い点）— Server Component でSSR保証 */}
+          {school.latest_reviews && school.latest_reviews.length > 0 && (
+            <SchoolFeaturedReviewsServer
+              latestReviews={school.latest_reviews}
+              encodedSlug={encodedSlug}
+            />
+          )}
+        </SchoolDetailClient>
       </div>
     </div>
   );

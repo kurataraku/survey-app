@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import SchoolReviewCard from '@/components/SchoolReviewCard';
-import EmptyState from '@/components/ui/EmptyState';
+import SchoolReviewsListServer from '@/components/SchoolReviewsListServer';
 import SchoolReviewsFilters from './SchoolReviewsFilters';
 import { getReviewsBySchoolSlug } from '@/lib/reviews/getReviewsBySchoolSlug';
 import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
@@ -150,58 +149,13 @@ export default async function SchoolReviewsPage({ params, searchParams }: PagePr
           <h2 className="text-base font-semibold text-gray-900">口コミ</h2>
         </div>
 
-        {data.reviews.length === 0 ? (
-          <EmptyState
-            title="口コミが見つかりませんでした"
-            description="この学校にはまだ口コミが投稿されていません。"
-          />
-        ) : (
-          <>
-            <div className="space-y-4 mb-8">
-              {data.reviews.map((review) => (
-                <SchoolReviewCard
-                  key={review.id}
-                  id={review.id}
-                  schoolName={review.school_name ?? ''}
-                  schoolSlug={review.school_slug}
-                  overallSatisfaction={review.overall_satisfaction ?? 0}
-                  goodComment={review.good_comment ?? ''}
-                  badComment={review.bad_comment ?? ''}
-                  enrollmentYear={review.enrollment_year}
-                  attendanceFrequency={review.attendance_frequency}
-                  likeCount={review.like_count}
-                  createdAt={review.created_at}
-                />
-              ))}
-            </div>
-
-            {data.totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Link
-                  href={buildPaginationUrl(page - 1)}
-                  className={`px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 ${
-                    page <= 1 ? 'pointer-events-none opacity-50' : ''
-                  }`}
-                  aria-disabled={page <= 1}
-                >
-                  前へ
-                </Link>
-                <span className="px-4 py-2 text-gray-600">
-                  {page} / {data.totalPages}
-                </span>
-                <Link
-                  href={buildPaginationUrl(page + 1)}
-                  className={`px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 ${
-                    page >= data.totalPages ? 'pointer-events-none opacity-50' : ''
-                  }`}
-                  aria-disabled={page >= data.totalPages}
-                >
-                  次へ
-                </Link>
-              </div>
-            )}
-          </>
-        )}
+        <SchoolReviewsListServer
+          reviews={data.reviews}
+          schoolName={data.schoolName}
+          page={page}
+          totalPages={data.totalPages}
+          buildPaginationUrl={buildPaginationUrl}
+        />
       </div>
     </div>
   );
