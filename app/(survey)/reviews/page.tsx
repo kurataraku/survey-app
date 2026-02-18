@@ -1,165 +1,98 @@
-'use client';
-
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import ReviewCard from '@/components/ReviewCard';
-import { apiPath, appPath } from '@/lib/base-path';
+import { getReviewsList } from '@/lib/reviews/getReviewsList';
+import { appPath } from '@/lib/base-path';
+import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
-interface Review {
-  id: string;
-  school_id: string | null;
-  school_name: string;
-  overall_satisfaction: number;
-  good_comment: string;
-  created_at: string;
-  like_count: number;
-  schools: {
-    id: string;
-    name: string;
-    slug: string | null;
-  } | null;
+export const revalidate = 300;
+
+interface PageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
 }
 
-function ReviewsPageContent() {
-  const searchParams = useSearchParams();
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+function getStr(v: string | string[] | undefined): string {
+  if (v === undefined) return '';
+  return Array.isArray(v) ? v[0] ?? '' : v;
+}
 
-  const limit = 20;
+export const metadata: Metadata = {
+  title: '最新口コミ | 通信制高校リアルレビュー',
+  description: '通信制高校の口コミ・評判を最新順で閲覧。実際に通った人のリアルな声で、あなたに合う学校を見つけよう。',
+  alternates: { canonical: `${getAppBaseUrl()}/reviews` },
+};
 
-  useEffect(() => {
-    const pageParam = searchParams.get('page');
-    if (pageParam) {
-      const parsedPage = parseInt(pageParam, 10);
-      if (!isNaN(parsedPage) && parsedPage > 0) {
-        setPage(parsedPage);
-      }
-    }
-  }, [searchParams]);
+export default async function ReviewsPage({ searchParams }: PageProps) {
+  const resolved = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
+  const page = parseInt(getStr(resolved.page) || '1', 10);
+  const sort = getStr(resolved.sort) || 'newest';
 
-  useEffect(() => {
-    fetchReviews();
-  }, [page]);
-
-  const fetchReviews = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-
-      const response = await fetch(apiPath(`/api/reviews?${params.toString()}`));
-      if (!response.ok) {
-        throw new Error('レビュー取得に失敗しました');
-      }
-
-      const data = await response.json();
-      setReviews(data.reviews);
-      setTotal(data.total);
-      setTotalPages(data.total_pages);
-    } catch (error) {
-      console.error('レビュー取得エラー:', error);
-      alert('レビュー取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const data = await getReviewsList({ page, limit: 20, sort });
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            最新口コミ
-          </h1>
-          {total > 0 && (
-            <p className="text-gray-600 mb-4">
-              {total}件の口コミが見つかりました
-            </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">最新口コミ</h1>
+          {data.total > 0 && (
+            <p className="text-gray-600 mb-4">{data.total}件の口コミが見つかりました</p>
           )}
         </div>
 
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        ) : reviews.length === 0 ? (
+        {data.reviews.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600">口コミが見つかりませんでした</p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {reviews.map((review) => (
+              {data.reviews.map((review) => (
                 <ReviewCard
                   key={review.id}
                   id={review.id}
-                  schoolName={review.schools?.name || review.school_name}
-                  schoolSlug={review.schools?.slug || null}
+                  schoolName={review.school_name}
+                  schoolSlug={review.school_slug}
                   overallSatisfaction={review.overall_satisfaction}
                   goodComment={review.good_comment}
-                  enrollmentYear={null}
-                  attendanceFrequency={null}
+                  badComment={review.bad_comment}
+                  enrollmentYear={review.enrollment_year}
+                  attendanceFrequency={review.attendance_frequency}
                   likeCount={review.like_count}
                   createdAt={review.created_at}
                 />
               ))}
             </div>
 
-            {totalPages > 1 && (
+            {data.totalPages > 1 && (
               <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => {
-                    const newPage = page - 1;
-                    setPage(newPage);
-                    window.history.pushState({}, '', `${appPath('/reviews')}?page=${newPage}`);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  前へ
-                </button>
+                {page > 1 ? (
+                  <Link
+                    href={page === 2 ? appPath('/reviews') : appPath(`/reviews?page=${page - 1}`)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    前へ
+                  </Link>
+                ) : (
+                  <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">前へ</span>
+                )}
                 <span className="px-4 py-2 text-gray-600">
-                  {page} / {totalPages}
+                  {page} / {data.totalPages}
                 </span>
-                <button
-                  onClick={() => {
-                    const newPage = page + 1;
-                    setPage(newPage);
-                    window.history.pushState({}, '', `${appPath('/reviews')}?page=${newPage}`);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  次へ
-                </button>
+                {page < data.totalPages ? (
+                  <Link
+                    href={appPath(`/reviews?page=${page + 1}`)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    次へ
+                  </Link>
+                ) : (
+                  <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">次へ</span>
+                )}
               </div>
             )}
           </>
         )}
       </div>
     </div>
-  );
-}
-
-export default function ReviewsPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        </div>
-      </div>
-    }>
-      <ReviewsPageContent />
-    </Suspense>
   );
 }

@@ -1,189 +1,77 @@
-'use client';
-
-import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import SchoolCard from '@/components/SchoolCard';
-import SchoolSearchFilters from '@/components/SchoolSearchFilters';
-import { prefectures } from '@/lib/prefectures';
-import { apiPath, appPath } from '@/lib/base-path';
+import SchoolsPageFilters from './SchoolsPageFilters';
+import { searchSchools } from '@/lib/schools/searchSchools';
+import { appPath } from '@/lib/base-path';
+import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
-interface School {
-  id: string;
-  name: string;
-  prefecture: string;
-  prefectures?: string[] | null;
-  matched_prefecture?: string | null;
-  slug: string | null;
-  review_count: number;
-  overall_avg: number | null;
+export const revalidate = 300;
+
+interface PageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
 }
 
-function SchoolsPageContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [schools, setSchools] = useState<School[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [selectedPrefecture, setSelectedPrefecture] = useState(
-    searchParams.get('prefecture') || ''
-  );
-  const [minRating, setMinRating] = useState<number | null>(
-    searchParams.get('min_rating') ? parseFloat(searchParams.get('min_rating')!) : null
-  );
-  const [minReviewCount, setMinReviewCount] = useState<number | null>(
-    searchParams.get('min_review_count') ? parseInt(searchParams.get('min_review_count')!, 10) : null
-  );
-  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'name');
+function getStr(v: string | string[] | undefined): string {
+  if (v === undefined) return '';
+  return Array.isArray(v) ? v[0] ?? '' : v;
+}
 
-  const limit = 20;
+export const metadata: Metadata = {
+  title: '通信制高校を探す | 通信制高校リアルレビュー',
+  description: '口コミ・評判で通信制高校を検索。都道府県、評価、口コミ数で絞り込んで、あなたに合う学校を見つけよう。',
+  alternates: { canonical: `${getAppBaseUrl()}/schools` },
+};
 
-  useEffect(() => {
-    fetchSchools();
-  }, [page, searchQuery, selectedPrefecture, minRating, minReviewCount, sortBy]);
+export default async function SchoolsPage({ searchParams }: PageProps) {
+  const resolved = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
+  const q = getStr(resolved.q);
+  const page = parseInt(getStr(resolved.page) || '1', 10);
+  const prefecture = getStr(resolved.prefecture);
+  const minRating = resolved.min_rating ? parseFloat(getStr(resolved.min_rating)) : null;
+  const minReviewCount = resolved.min_review_count ? parseInt(getStr(resolved.min_review_count), 10) : null;
+  const sort = getStr(resolved.sort) || 'name';
 
-  const fetchSchools = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-      if (searchQuery) {
-        params.append('q', searchQuery);
-      }
-      if (selectedPrefecture) {
-        params.append('prefecture', selectedPrefecture);
-      }
-      if (minRating !== null) {
-        params.append('min_rating', minRating.toString());
-      }
-      if (minReviewCount !== null) {
-        params.append('min_review_count', minReviewCount.toString());
-      }
-      if (sortBy) {
-        params.append('sort', sortBy);
-      }
-
-      const response = await fetch(apiPath(`/api/schools/search?${params.toString()}`));
-      if (!response.ok) {
-        throw new Error('学校検索に失敗しました');
-      }
-
-      const data = await response.json();
-      setSchools(data.schools);
-      setTotal(data.total);
-      setTotalPages(data.total_pages);
-    } catch (error) {
-      console.error('学校検索エラー:', error);
-      alert('学校検索に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    updateURL();
-  };
-
-  const updateURL = () => {
-    updateURLWithFilters(selectedPrefecture, minRating, minReviewCount, sortBy);
-  };
-
-  const updateURLWithFilters = (
-    prefecture: string,
-    rating: number | null,
-    reviewCount: number | null,
-    sort: string
-  ) => {
-    const urlParams = new URLSearchParams();
-    if (searchQuery) {
-      urlParams.append('q', searchQuery);
-    }
-    if (prefecture) {
-      urlParams.append('prefecture', prefecture);
-    }
-    if (rating !== null) {
-      urlParams.append('min_rating', rating.toString());
-    }
-    if (reviewCount !== null) {
-      urlParams.append('min_review_count', reviewCount.toString());
-    }
-    if (sort && sort !== 'name') {
-      urlParams.append('sort', sort);
-    }
-    router.push(`${appPath('/schools')}?${urlParams.toString()}`, { scroll: false });
-  };
+  const data = await searchSchools({
+    q,
+    page,
+    limit: 20,
+    prefecture,
+    min_rating: Number.isNaN(minRating) ? null : minRating,
+    min_review_count: Number.isNaN(minReviewCount) ? null : minReviewCount,
+    sort,
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            通信制高校を探す
-          </h1>
-
-          <SchoolSearchFilters
-            searchQuery={searchQuery}
-            onSearchQueryChange={setSearchQuery}
-            selectedPrefecture={selectedPrefecture}
-            onPrefectureChange={(value) => {
-              setSelectedPrefecture(value);
-              setPage(1);
-              updateURLWithFilters(value, minRating, minReviewCount, sortBy);
-            }}
-            minRating={minRating}
-            onMinRatingChange={(value) => {
-              setMinRating(value);
-              setPage(1);
-              updateURLWithFilters(selectedPrefecture, value, minReviewCount, sortBy);
-            }}
-            minReviewCount={minReviewCount}
-            onMinReviewCountChange={(value) => {
-              setMinReviewCount(value);
-              setPage(1);
-              updateURLWithFilters(selectedPrefecture, minRating, value, sortBy);
-            }}
-            sortBy={sortBy}
-            onSortByChange={(value) => {
-              setSortBy(value);
-              setPage(1);
-              updateURLWithFilters(selectedPrefecture, minRating, minReviewCount, value);
-            }}
-            onSubmit={handleSearch}
-            prefectures={prefectures}
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">通信制高校を探す</h1>
+          <SchoolsPageFilters
+            initialQ={q}
+            initialPrefecture={prefecture}
+            initialMinRating={Number.isNaN(minRating) ? null : minRating}
+            initialMinReviewCount={Number.isNaN(minReviewCount) ? null : minReviewCount}
+            initialSort={sort}
           />
-
-          {total > 0 && (
-            <p className="text-gray-600 mb-4">
-              {total}件の学校が見つかりました
-            </p>
+          {data.total > 0 && (
+            <p className="text-gray-600 mb-4">{data.total}件の学校が見つかりました</p>
           )}
         </div>
 
-        {loading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        ) : schools.length === 0 ? (
+        {data.schools.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600">学校が見つかりませんでした</p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {schools.map((school) => (
+              {data.schools.map((school) => (
                 <SchoolCard
                   key={school.id}
                   id={school.id}
                   name={school.name}
                   prefecture={school.prefecture}
-                  prefectures={school.prefectures || undefined}
-                  matchedPrefecture={school.matched_prefecture || undefined}
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
@@ -191,25 +79,31 @@ function SchoolsPageContent() {
               ))}
             </div>
 
-            {totalPages > 1 && (
+            {data.total_pages > 1 && (
               <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  前へ
-                </button>
+                {page > 1 ? (
+                  <Link
+                    href={buildSchoolsUrl({ q, prefecture, minRating, minReviewCount, sort, page: page === 2 ? undefined : page - 1 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    前へ
+                  </Link>
+                ) : (
+                  <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">前へ</span>
+                )}
                 <span className="px-4 py-2 text-gray-600">
-                  {page} / {totalPages}
+                  {page} / {data.total_pages}
                 </span>
-                <button
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  次へ
-                </button>
+                {page < data.total_pages ? (
+                  <Link
+                    href={buildSchoolsUrl({ q, prefecture, minRating, minReviewCount, sort, page: page + 1 })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    次へ
+                  </Link>
+                ) : (
+                  <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">次へ</span>
+                )}
               </div>
             )}
           </>
@@ -219,18 +113,21 @@ function SchoolsPageContent() {
   );
 }
 
-export default function SchoolsPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        </div>
-      </div>
-    }>
-      <SchoolsPageContent />
-    </Suspense>
-  );
+function buildSchoolsUrl(params: {
+  q: string;
+  prefecture: string;
+  minRating: number | null;
+  minReviewCount: number | null;
+  sort: string;
+  page?: number;
+}): string {
+  const search = new URLSearchParams();
+  if (params.q) search.set('q', params.q);
+  if (params.prefecture) search.set('prefecture', params.prefecture);
+  if (params.minRating != null) search.set('min_rating', params.minRating.toString());
+  if (params.minReviewCount != null) search.set('min_review_count', params.minReviewCount.toString());
+  if (params.sort && params.sort !== 'name') search.set('sort', params.sort);
+  if (params.page != null && params.page > 1) search.set('page', params.page.toString());
+  const qs = search.toString();
+  return appPath(`/schools${qs ? `?${qs}` : ''}`);
 }

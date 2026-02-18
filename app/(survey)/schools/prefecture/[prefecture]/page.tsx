@@ -1,103 +1,73 @@
-'use client';
-
-import { useState, useEffect, Suspense } from 'react';
-import { useParams } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import SchoolCard from '@/components/SchoolCard';
-import { apiPath, appPath } from '@/lib/base-path';
+import { searchSchools } from '@/lib/schools/searchSchools';
+import { appPath } from '@/lib/base-path';
+import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
-interface School {
-  id: string;
-  name: string;
-  prefecture: string;
-  prefectures?: string[] | null;
-  matched_prefecture?: string | null;
-  slug: string | null;
-  review_count: number;
-  overall_avg: number | null;
+export const revalidate = 3600;
+
+interface PageProps {
+  params: Promise<{ prefecture: string }> | { prefecture: string };
+  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
 }
 
-function PrefectureSchoolsContent() {
-  const params = useParams();
-  const prefecture = decodeURIComponent(params.prefecture as string);
-  const [schools, setSchools] = useState<School[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 20;
+function getStr(v: string | string[] | undefined): string {
+  if (v === undefined) return '';
+  return Array.isArray(v) ? v[0] ?? '' : v;
+}
 
-  useEffect(() => {
-    fetchSchools();
-  }, [prefecture, page]);
-
-  const fetchSchools = async () => {
-    setLoading(true);
-    try {
-      const q = new URLSearchParams({
-        prefecture: prefecture,
-        page: page.toString(),
-        limit: limit.toString(),
-      });
-
-      const response = await fetch(apiPath(`/api/schools/search?${q.toString()}`));
-      if (!response.ok) {
-        throw new Error('学校検索に失敗しました');
-      }
-
-      const data = await response.json();
-      setSchools(data.schools);
-      setTotal(data.total);
-      setTotalPages(data.total_pages);
-    } catch (error) {
-      console.error('学校検索エラー:', error);
-      alert('学校検索に失敗しました');
-    } finally {
-      setLoading(false);
-    }
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolved = params instanceof Promise ? await params : params;
+  const prefecture = decodeURIComponent(resolved.prefecture);
+  const title = `${prefecture}の通信制高校 | 通信制高校リアルレビュー`;
+  const canonical = `${getAppBaseUrl()}/schools/prefecture/${encodeURIComponent(prefecture)}`;
+  return {
+    title,
+    description: `${prefecture}の通信制高校を口コミ・評判で検索。実際に通った人のリアルな声で、あなたに合う学校を見つけよう。`,
+    alternates: { canonical },
   };
+}
+
+export default async function PrefectureSchoolsPage({ params, searchParams }: PageProps) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
+  const prefecture = decodeURIComponent(resolvedParams.prefecture);
+  const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
+
+  const data = await searchSchools({
+    prefecture,
+    page,
+    limit: 20,
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <Link
-            href={appPath('/schools')}
-            className="text-blue-600 hover:text-blue-700 mb-4 inline-block"
-          >
+          <Link href={appPath('/schools')} className="text-blue-600 hover:text-blue-700 mb-4 inline-block">
             ← 学校検索に戻る
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            {prefecture}の通信制高校
-          </h1>
-          {total > 0 && (
-            <p className="text-gray-600">
-              {total}校が見つかりました
-            </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">{prefecture}の通信制高校</h1>
+          {data.total > 0 && (
+            <p className="text-gray-600">{data.total}校が見つかりました</p>
           )}
         </div>
 
-        {loading ? (
+        {data.schools.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        ) : schools.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600">
-              {prefecture}の通信制高校が見つかりませんでした
-            </p>
+            <p className="text-gray-600">{prefecture}の通信制高校が見つかりませんでした</p>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {schools.map((school) => (
+              {data.schools.map((school) => (
                 <SchoolCard
                   key={school.id}
                   id={school.id}
                   name={school.name}
                   prefecture={school.prefecture}
-                  prefectures={school.prefectures || undefined}
-                  matchedPrefecture={school.matched_prefecture || undefined}
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
@@ -105,48 +75,38 @@ function PrefectureSchoolsContent() {
               ))}
             </div>
 
-            {totalPages > 1 && (
+            {data.total_pages > 1 && (
               <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  前へ
-                </button>
+                {page > 1 ? (
+                  <Link
+                    href={page === 2
+                      ? appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}`)
+                      : appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}?page=${page - 1}`)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    前へ
+                  </Link>
+                ) : (
+                  <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">前へ</span>
+                )}
                 <span className="px-4 py-2 text-gray-600">
-                  {page} / {totalPages}
+                  {page} / {data.total_pages}
                 </span>
-                <button
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  次へ
-                </button>
+                {page < data.total_pages ? (
+                  <Link
+                    href={appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}?page=${page + 1}`)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    次へ
+                  </Link>
+                ) : (
+                  <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">次へ</span>
+                )}
               </div>
             )}
           </>
         )}
       </div>
     </div>
-  );
-}
-
-export default function PrefectureSchoolsPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center py-12">
-              <p className="text-gray-600">読み込み中...</p>
-            </div>
-          </div>
-        </div>
-      }
-    >
-      <PrefectureSchoolsContent />
-    </Suspense>
   );
 }

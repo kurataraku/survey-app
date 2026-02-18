@@ -1,7 +1,13 @@
-'use client';
-
 import Link from 'next/link';
 import { appPath } from '@/lib/base-path';
+import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
+
+export const metadata: Metadata = {
+  title: 'ランキング | 通信制高校リアルレビュー',
+  description: '総合評判・口コミ数・先生対応など、様々な指標で通信制高校をランキング形式で確認できます。',
+  alternates: { canonical: `${getAppBaseUrl()}/rankings` },
+};
 
 // 注意: 進学実績ランキングは削除されました。追加しないでください。
 const rankingTypes = [
