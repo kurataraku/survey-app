@@ -1,118 +1,72 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import LikeButton from '@/components/LikeButton';
 import Chip from '@/components/ui/Chip';
+import StructuredData from '@/components/StructuredData';
 import { getQuestionLabel, getEnrollmentYearLabel, getGraduationPathLabel } from '@/lib/questionLabels';
-import { apiPath, appPath } from '@/lib/base-path';
+import { getReviewById, type ReviewData } from '@/lib/reviews/getReviewById';
+import { getReviewIds } from '@/lib/reviews/getReviewIds';
+import { appPath } from '@/lib/base-path';
 
-interface Review {
-  id: string;
-  school_id: string;
-  school_name: string;
-  school_slug: string | null;
-  respondent_role: string;
-  status: string;
-  graduation_path?: string | null;
-  graduation_path_other?: string | null;
-  overall_satisfaction: number;
-  good_comment: string;
-  bad_comment: string;
-  reason_for_choosing: string[] | null | undefined;
-  course?: string | null;
-  enrollment_type?: string | null;
-  enrollment_year?: string | null;
-  attendance_frequency?: string | null;
-  campus_prefecture?: string | null;
-  teaching_style?: string[] | null | undefined;
-  student_atmosphere?: string[] | null | undefined;
-  atmosphere_other?: string | null;
-  flexibility_rating?: number | null;
-  staff_rating?: number | null;
-  support_rating?: number | null;
-  atmosphere_fit_rating?: number | null;
-  credit_rating?: number | null;
-  unique_course_rating?: number | null;
-  career_support_rating?: number | null;
-  campus_life_rating?: number | null;
-  tuition_rating?: number | null;
-  like_count: number;
-  is_liked: boolean;
-  created_at: string;
-  outlier_counts?: {
-    overall: number;
-    staff: number;
-    atmosphere: number;
-    credit: number;
-    tuition: number;
+export const revalidate = 3600;
+
+/** ビルド時に口コミ詳細を静的生成し、初期HTMLに本文を含める */
+export async function generateStaticParams() {
+  const ids = await getReviewIds();
+  return ids;
+}
+
+interface PageProps {
+  params: Promise<{ id: string }> | { id: string };
+}
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function buildReviewJsonLd(review: ReviewData) {
+  const reviewBody = [review.good_comment, review.bad_comment]
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 500);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Review',
+    itemReviewed: {
+      '@type': 'EducationalOrganization',
+      name: review.school_name,
+    },
+    author: { '@type': 'Person', name: '匿名' },
+    reviewRating: {
+      '@type': 'Rating',
+      ratingValue: review.overall_satisfaction,
+      bestRating: 5,
+      worstRating: 1,
+    },
+    reviewBody: reviewBody || `${review.school_name}の口コミ`,
+    datePublished: review.created_at,
   };
 }
 
-export default function ReviewDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const id = params.id as string;
-  const [review, setReview] = useState<Review | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchReview = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(apiPath(`/api/reviews/${id}`));
-      if (!response.ok) {
-        if (response.status === 404) {
-          router.push(appPath('/schools'));
-          return;
-        }
-        throw new Error('口コミ情報の取得に失敗しました');
-      }
-
-      const data = await response.json();
-      setReview(data);
-    } catch (error) {
-      console.error('口コミ情報取得エラー:', error);
-      alert('口コミ情報の取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchReview();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+export default async function ReviewDetailPage({ params }: PageProps) {
+  const resolved = params instanceof Promise ? await params : params;
+  const review = await getReviewById(resolved.id);
 
   if (!review) {
-    return null;
+    notFound();
   }
+
+  const jsonLd = buildReviewJsonLd(review);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <StructuredData data={jsonLd} />
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-6">
           {review.school_slug ? (
@@ -167,9 +121,7 @@ export default function ReviewDetailPage() {
               {review.enrollment_year && (
                 <Chip variant="outline">{getEnrollmentYearLabel(review.enrollment_year)}</Chip>
               )}
-              {review.course && (
-                <Chip variant="outline">{review.course}</Chip>
-              )}
+              {review.course && <Chip variant="outline">{review.course}</Chip>}
               {review.status === '卒業した' && review.graduation_path && (
                 <Chip variant="success">
                   {getGraduationPathLabel(review.graduation_path)}
@@ -177,7 +129,7 @@ export default function ReviewDetailPage() {
                 </Chip>
               )}
             </div>
-            {Array.isArray(review.reason_for_choosing) && review.reason_for_choosing.length > 0 && (
+            {review.reason_for_choosing.length > 0 && (
               <div>
                 <p className="text-sm font-semibold text-gray-700 mb-2">通信制を選んだ理由</p>
                 <div className="flex flex-wrap gap-2">
@@ -191,18 +143,23 @@ export default function ReviewDetailPage() {
             )}
           </div>
 
-          {(review.attendance_frequency || review.campus_prefecture || (Array.isArray(review.teaching_style) && review.teaching_style.length > 0) || (Array.isArray(review.student_atmosphere) && review.student_atmosphere.length > 0)) && (
+          {(review.attendance_frequency ||
+            review.campus_prefecture ||
+            review.teaching_style.length > 0 ||
+            review.student_atmosphere.length > 0) && (
             <div className="mb-8 pb-8 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900 mb-4">学習・環境</h2>
               <div className="flex flex-wrap gap-2 mb-4">
                 {review.attendance_frequency && (
-                  <Chip variant="outline">{getQuestionLabel('attendance_frequency', review.attendance_frequency)}</Chip>
+                  <Chip variant="outline">
+                    {getQuestionLabel('attendance_frequency', review.attendance_frequency)}
+                  </Chip>
                 )}
                 {review.campus_prefecture && (
                   <Chip variant="outline">{review.campus_prefecture}</Chip>
                 )}
               </div>
-              {Array.isArray(review.teaching_style) && review.teaching_style.length > 0 && (
+              {review.teaching_style.length > 0 && (
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-gray-700 mb-2">授業のスタイル</p>
                   <div className="flex flex-wrap gap-2">
@@ -214,7 +171,7 @@ export default function ReviewDetailPage() {
                   </div>
                 </div>
               )}
-              {Array.isArray(review.student_atmosphere) && review.student_atmosphere.length > 0 && (
+              {review.student_atmosphere.length > 0 && (
                 <div className="mb-4">
                   <p className="text-sm font-semibold text-gray-700 mb-2">生徒の雰囲気</p>
                   <div className="flex flex-wrap gap-2">
@@ -235,7 +192,15 @@ export default function ReviewDetailPage() {
             </div>
           )}
 
-          {(review.flexibility_rating || review.staff_rating || review.support_rating || review.atmosphere_fit_rating || review.credit_rating || review.unique_course_rating || review.career_support_rating || review.campus_life_rating || review.tuition_rating) && (
+          {(review.flexibility_rating ||
+            review.staff_rating ||
+            review.support_rating ||
+            review.atmosphere_fit_rating ||
+            review.credit_rating ||
+            review.unique_course_rating ||
+            review.career_support_rating ||
+            review.campus_life_rating ||
+            review.tuition_rating) && (
             <div className="mb-8 pb-8 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900 mb-4">詳細評価</h2>
               <RatingDisplay

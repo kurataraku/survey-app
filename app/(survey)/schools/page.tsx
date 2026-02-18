@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import SchoolCard from '@/components/SchoolCard';
+import SchoolCardServer from '@/components/SchoolCardServer';
 import SchoolsPageFilters from './SchoolsPageFilters';
 import { searchSchools } from '@/lib/schools/searchSchools';
 import { appPath } from '@/lib/base-path';
@@ -67,7 +67,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.schools.map((school) => (
-                <SchoolCard
+                <SchoolCardServer
                   key={school.id}
                   id={school.id}
                   name={school.name}

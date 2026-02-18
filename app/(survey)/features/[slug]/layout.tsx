@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { createClient } from '@supabase/supabase-js';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
+import { getArticleBySlug } from '@/lib/articles/getArticleBySlug';
 
 const DESCRIPTION_MAX = 160;
 
@@ -22,37 +22,20 @@ export async function generateMetadata({
   params: Promise<{ slug: string }> | { slug: string };
 }): Promise<Metadata> {
   const resolved = params instanceof Promise ? await params : params;
-  const slug = resolved.slug;
+  const slug = decodeURIComponent(resolved.slug);
   const appBaseUrl = getAppBaseUrl();
-  const pathname = `/features/${slug}`;
+  const pathname = `/features/${resolved.slug}`;
   const canonical = `${appBaseUrl}${pathname}`;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return {
-      title: '特集記事 | 通信制高校リアルレビュー',
-      description: '通信制高校に関する特集記事・インタビュー・お役立ち情報を掲載。',
-      alternates: { canonical },
-      openGraph: { type: 'website', url: canonical },
-    };
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const { data: article } = await supabase
-    .from('articles')
-    .select('title, meta_title, meta_description, excerpt, featured_image_url')
-    .eq('slug', slug)
-    .eq('is_public', true)
-    .single();
+  const article = await getArticleBySlug(slug);
 
   const title = article?.meta_title ?? article?.title ?? '特集記事';
   const fullTitle = `${title} | 通信制高校リアルレビュー`;
   const rawDesc = (article?.meta_description ?? article?.excerpt ?? '').trim();
-  const description = rawDesc
-    ? truncate(rawDesc, DESCRIPTION_MAX)
+  const description = article
+    ? (rawDesc ? truncate(rawDesc, DESCRIPTION_MAX) : '通信制高校に関する特集記事・インタビュー・お役立ち情報を掲載。')
     : '通信制高校に関する特集記事・インタビュー・お役立ち情報を掲載。';
-  const ogImage = toAbsoluteImageUrl(article?.featured_image_url ?? null);
+  const ogImage = article ? toAbsoluteImageUrl(article.featured_image_url ?? null) : undefined;
 
   return {
     title: fullTitle,

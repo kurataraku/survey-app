@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import ReviewCard from '@/components/ReviewCard';
+import ReviewCardServer from '@/components/ReviewCardServer';
 import { getReviewsList } from '@/lib/reviews/getReviewsList';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
@@ -47,7 +47,7 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.reviews.map((review) => (
-                <ReviewCard
+                <ReviewCardServer
                   key={review.id}
                   id={review.id}
                   schoolName={review.school_name}

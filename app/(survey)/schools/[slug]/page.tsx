@@ -1,17 +1,24 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
+import { getSchoolSlugs } from '@/lib/schools/getSchoolSlugs';
 import SchoolDetailClient from '@/components/SchoolDetailClient';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import { appPath } from '@/lib/base-path';
 
+// ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
+export const revalidate = 60;
+
+/** ビルド時に学校個別ページを静的生成し、初期HTMLに本文を含める */
+export async function generateStaticParams() {
+  const slugs = await getSchoolSlugs();
+  return slugs;
+}
+
 interface PageProps {
   params: Promise<{ slug: string }> | { slug: string };
 }
-
-// ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
-export const revalidate = 60;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const resolvedParams = params instanceof Promise ? await params : params;

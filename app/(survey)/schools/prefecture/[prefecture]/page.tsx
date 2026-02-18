@@ -1,12 +1,18 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import SchoolCard from '@/components/SchoolCard';
+import SchoolCardServer from '@/components/SchoolCardServer';
 import { searchSchools } from '@/lib/schools/searchSchools';
+import { prefectures } from '@/lib/prefectures';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 
 export const revalidate = 3600;
+
+/** ビルド時に都道府県別学校一覧を静的生成し、初期HTMLに本文を含める */
+export async function generateStaticParams() {
+  return prefectures.map((prefecture) => ({ prefecture }));
+}
 
 interface PageProps {
   params: Promise<{ prefecture: string }> | { prefecture: string };
@@ -63,7 +69,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.schools.map((school) => (
-                <SchoolCard
+                <SchoolCardServer
                   key={school.id}
                   id={school.id}
                   name={school.name}

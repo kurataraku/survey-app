@@ -10,7 +10,11 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isVercelApp = host.endsWith('.vercel.app');
   const isWww = host === 'www.careeressence.jp';
-  const skipVercelRedirect = process.env.SKIP_VERCEL_APP_REDIRECT === '1' || process.env.SKIP_VERCEL_APP_REDIRECT === 'true';
+  // 本番では必ず vercel.app → apex にリダイレクトする（SEO・社内利用のため vercel ドメインを実質クローズ）
+  const isProduction = process.env.VERCEL_ENV === 'production';
+  const skipVercelRedirect =
+    !isProduction &&
+    (process.env.SKIP_VERCEL_APP_REDIRECT === '1' || process.env.SKIP_VERCEL_APP_REDIRECT === 'true');
 
   // 1. ホスト正規化（最優先）: www / vercel.app → apex に恒久リダイレクト
   // / は会社トップ、/tsushin-kuchikomi はアプリトップ。パスはそのまま転送。

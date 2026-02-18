@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
-import SchoolCard from '@/components/SchoolCard';
+import SchoolCardServer from '@/components/SchoolCardServer';
 import { getArticleBySlug } from '@/lib/articles/getArticleBySlug';
 import { getArticleSlugs } from '@/lib/articles/getArticleSlugs';
 import { appPath } from '@/lib/base-path';
@@ -101,7 +101,7 @@ export default async function ArticleDetailPage({ params }: PageProps) {
                 const school = articleSchool.school;
                 return (
                   <div key={articleSchool.id}>
-                    <SchoolCard
+                    <SchoolCardServer
                       id={school.id}
                       name={school.name}
                       prefecture={school.prefecture}

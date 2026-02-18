@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
+import { getReviewById } from '@/lib/reviews/getReviewById';
 
-// メタ情報は簡易版に変更（パフォーマンス向上のため）
+const DESCRIPTION_MAX = 160;
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1).trimEnd() + '…';
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -12,18 +19,37 @@ export async function generateMetadata({
   const pathname = `/reviews/${resolved.id}`;
   const canonical = `${appBaseUrl}${pathname}`;
 
+  const review = await getReviewById(resolved.id);
+
+  if (!review) {
+    return {
+      title: '口コミが見つかりません',
+      alternates: { canonical },
+    };
+  }
+
+  const title = `${review.school_name}の口コミ | 通信制高校リアルレビュー`;
+  const rawDesc = [review.good_comment, review.bad_comment]
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 200);
+  const description = rawDesc
+    ? truncate(rawDesc, DESCRIPTION_MAX)
+    : `${review.school_name}の口コミ・レビュー詳細。実際に通った人のリアルな体験談。`;
+
   return {
-    title: '口コミ詳細 | 通信制高校リアルレビュー',
-    description: '通信制高校の口コミ・レビュー詳細を確認。実際に通った人のリアルな体験談。',
+    title,
+    description,
     keywords: [
+      `${review.school_name} 口コミ`,
       '通信制高校 口コミ',
       '通信制 口コミ',
       '通信制高校 体験談',
     ],
     alternates: { canonical },
     openGraph: {
-      title: '口コミ詳細 | 通信制高校リアルレビュー',
-      description: '通信制高校の口コミ・レビュー詳細を確認。実際に通った人のリアルな体験談。',
+      title,
+      description,
       type: 'website',
       url: canonical,
     },
@@ -35,7 +61,5 @@ export default function ReviewDetailLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // 構造化データはクライアント側で生成するため、ここでは削除
-  // パフォーマンス向上のため、サーバー側での追加クエリを避ける
   return <>{children}</>;
 }

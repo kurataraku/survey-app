@@ -1,155 +1,120 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import ReviewCard from '@/components/ReviewCard';
+import SchoolReviewCard from '@/components/SchoolReviewCard';
 import EmptyState from '@/components/ui/EmptyState';
-import Skeleton from '@/components/ui/Skeleton';
-import ReviewFilters, { ReviewFilters as ReviewFiltersType } from '@/components/ReviewFilters';
-import { apiPath, appPath } from '@/lib/base-path';
+import SchoolReviewsFilters from './SchoolReviewsFilters';
+import { getReviewsBySchoolSlug } from '@/lib/reviews/getReviewsBySchoolSlug';
+import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
+import { getSchoolSlugs } from '@/lib/schools/getSchoolSlugs';
+import { appPath } from '@/lib/base-path';
+import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
-interface Review {
-  id: string;
-  school_id: string;
-  school_name: string;
-  school_slug: string | null;
-  overall_satisfaction: number;
-  good_comment: string;
-  bad_comment: string;
-  enrollment_year: number | null;
-  attendance_frequency: string | null;
-  like_count: number;
-  created_at: string;
+export const revalidate = 3600;
+
+/** ビルド時に学校別口コミ一覧を静的生成し、初期HTMLに本文を含める */
+export async function generateStaticParams() {
+  const slugs = await getSchoolSlugs();
+  return slugs;
 }
 
-export default function SchoolReviewsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const slug = decodeURIComponent(params.slug as string);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [totalBeforeFilter, setTotalBeforeFilter] = useState(0);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [sort, setSort] = useState('newest');
-  const [schoolName, setSchoolName] = useState('');
-  const [filters, setFilters] = useState<ReviewFiltersType>({});
+interface PageProps {
+  params: Promise<{ slug: string }> | { slug: string };
+  searchParams?:
+    | Promise<Record<string, string | string[] | undefined>>
+    | Record<string, string | string[] | undefined>;
+}
 
-  const limit = 20;
+function getStr(value: string | string[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
 
-  useEffect(() => {
-    const role = searchParams.get('role') || undefined;
-    const graduationPath = searchParams.get('graduation_path') || undefined;
-    const enrollmentType = searchParams.get('enrollment_type') || undefined;
-    const attendanceFrequency = searchParams.get('attendance_frequency') || undefined;
-    const campusPrefecture = searchParams.get('campus_prefecture') || undefined;
-    const reasonForChoosing = searchParams.get('reason_for_choosing');
-    const reasonForChoosingArray = reasonForChoosing
-      ? reasonForChoosing.split(',').filter((r) => r.trim() !== '')
-      : undefined;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const decodedSlug = decodeURIComponent(resolvedParams.slug);
 
-    setFilters({
-      role,
-      graduation_path: graduationPath,
-      enrollment_type: enrollmentType,
-      attendance_frequency: attendanceFrequency,
-      campus_prefecture: campusPrefecture,
-      reason_for_choosing: reasonForChoosingArray,
-    });
+  const school = await getSchoolWithStats(decodedSlug);
+  if (!school) {
+    return { title: '学校が見つかりません' };
+  }
 
-    const pageParam = searchParams.get('page');
-    if (pageParam) {
-      setPage(parseInt(pageParam, 10));
-    }
+  const title = `${school.name}の口コミ一覧 | 通信制高校リアルレビュー`;
+  const description = `${school.name}の口コミ・評判を掲載。在校生・卒業生・保護者の生の声で、あなたに合う通信制高校を見つけよう。`;
 
-    const sortParam = searchParams.get('sort');
-    if (sortParam) {
-      setSort(sortParam);
-    }
-  }, [searchParams]);
+  const appBaseUrl = getAppBaseUrl();
+  const canonical = `${appBaseUrl}/schools/${resolvedParams.slug}/reviews`;
 
-  useEffect(() => {
-    fetchReviews();
-  }, [slug, page, sort, filters]);
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      url: canonical,
+    },
+  };
+}
 
-  const fetchReviews = async () => {
-    setLoading(true);
-    try {
-      const encodedSlug = encodeURIComponent(slug);
-      const q = new URLSearchParams({
-        school_slug: encodedSlug,
-        sort: sort,
-        page: page.toString(),
-        limit: limit.toString(),
-      });
+export default async function SchoolReviewsPage({ params, searchParams }: PageProps) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
 
-      if (filters.role) q.append('role', filters.role);
-      if (filters.graduation_path) q.append('graduation_path', filters.graduation_path);
-      if (filters.enrollment_type) q.append('enrollment_type', filters.enrollment_type);
-      if (filters.attendance_frequency) q.append('attendance_frequency', filters.attendance_frequency);
-      if (filters.campus_prefecture) q.append('campus_prefecture', filters.campus_prefecture);
-      if (filters.reason_for_choosing && filters.reason_for_choosing.length > 0) {
-        q.append('reason_for_choosing', filters.reason_for_choosing.join(','));
-      }
+  const decodedSlug = decodeURIComponent(resolvedParams.slug);
+  const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
+  const sort = getStr(resolvedSearch.sort) || 'newest';
+  const role = getStr(resolvedSearch.role);
+  const graduationPath = getStr(resolvedSearch.graduation_path);
+  const enrollmentType = getStr(resolvedSearch.enrollment_type);
+  const attendanceFrequency = getStr(resolvedSearch.attendance_frequency);
+  const campusPrefecture = getStr(resolvedSearch.campus_prefecture);
+  const reasonForChoosingRaw = getStr(resolvedSearch.reason_for_choosing);
+  const reasonForChoosingArray = reasonForChoosingRaw
+    ? reasonForChoosingRaw.split(',').filter((r) => r.trim() !== '')
+    : undefined;
 
-      const response = await fetch(apiPath(`/api/reviews?${q.toString()}`));
-      if (!response.ok) {
-        throw new Error('口コミ取得に失敗しました');
-      }
+  const data = await getReviewsBySchoolSlug({
+    schoolSlug: decodedSlug,
+    page,
+    limit: 20,
+    sort,
+    role,
+    graduation_path: graduationPath,
+    enrollment_type: enrollmentType,
+    attendance_frequency: attendanceFrequency,
+    campus_prefecture: campusPrefecture,
+    reason_for_choosing: reasonForChoosingArray,
+  });
 
-      const data = await response.json();
-      setReviews(data.reviews);
-      setTotal(data.total);
-      setTotalBeforeFilter(data.total_before_filter || data.total);
-      setTotalPages(data.total_pages);
-      if (data.reviews.length > 0) {
-        setSchoolName(data.reviews[0].school_name);
-      }
-    } catch (error) {
-      console.error('口コミ取得エラー:', error);
-      alert('口コミの取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
+  // 学校が存在しない（レビュー0かつschoolName空 = 学校未取得）の場合は notFound
+  if (!data.schoolName && data.reviews.length === 0) {
+    notFound();
+  }
+
+  const filters = {
+    role,
+    graduation_path: graduationPath,
+    enrollment_type: enrollmentType,
+    attendance_frequency: attendanceFrequency,
+    campus_prefecture: campusPrefecture,
+    reason_for_choosing: reasonForChoosingArray,
   };
 
-  const handleFiltersChange = (newFilters: ReviewFiltersType) => {
-    setFilters(newFilters);
-    setPage(1);
+  const baseUrl = appPath(`/schools/${encodeURIComponent(decodedSlug)}/reviews`);
 
+  const buildPaginationUrl = (newPage: number) => {
     const q = new URLSearchParams();
     q.set('sort', sort);
-    if (newFilters.role) q.set('role', newFilters.role);
-    if (newFilters.graduation_path) q.set('graduation_path', newFilters.graduation_path);
-    if (newFilters.enrollment_type) q.set('enrollment_type', newFilters.enrollment_type);
-    if (newFilters.attendance_frequency) q.set('attendance_frequency', newFilters.attendance_frequency);
-    if (newFilters.campus_prefecture) q.set('campus_prefecture', newFilters.campus_prefecture);
-    if (newFilters.reason_for_choosing && newFilters.reason_for_choosing.length > 0) {
-      q.set('reason_for_choosing', newFilters.reason_for_choosing.join(','));
-    }
-
-    router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${q.toString()}`, { scroll: false });
-  };
-
-  const handleSortChange = (value: string) => {
-    setSort(value);
-    setPage(1);
-
-    const q = new URLSearchParams();
-    q.set('sort', value);
-    if (filters.role) q.set('role', filters.role);
-    if (filters.graduation_path) q.set('graduation_path', filters.graduation_path);
-    if (filters.enrollment_type) q.set('enrollment_type', filters.enrollment_type);
-    if (filters.attendance_frequency) q.set('attendance_frequency', filters.attendance_frequency);
-    if (filters.campus_prefecture) q.set('campus_prefecture', filters.campus_prefecture);
-    if (filters.reason_for_choosing && filters.reason_for_choosing.length > 0) {
-      q.set('reason_for_choosing', filters.reason_for_choosing.join(','));
-    }
-
-    router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${q.toString()}`, { scroll: false });
+    if (newPage > 1) q.set('page', newPage.toString());
+    if (role) q.set('role', role);
+    if (graduationPath) q.set('graduation_path', graduationPath);
+    if (enrollmentType) q.set('enrollment_type', enrollmentType);
+    if (attendanceFrequency) q.set('attendance_frequency', attendanceFrequency);
+    if (campusPrefecture) q.set('campus_prefecture', campusPrefecture);
+    if (reasonForChoosingArray?.length) q.set('reason_for_choosing', reasonForChoosingArray.join(','));
+    return `${baseUrl}?${q.toString()}`;
   };
 
   return (
@@ -157,7 +122,7 @@ export default function SchoolReviewsPage() {
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-3">
           <Link
-            href={appPath(`/schools/${slug}`)}
+            href={appPath(`/schools/${decodedSlug}`)}
             className="text-xs text-blue-600 hover:text-blue-700 mb-2 inline-flex items-center gap-1"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,39 +131,26 @@ export default function SchoolReviewsPage() {
             学校詳細に戻る
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            {schoolName || '口コミ一覧'}
+            {data.schoolName || '口コミ一覧'}
           </h1>
-          {total > 0 && (
-            <p className="text-sm text-gray-600">{total}件の口コミ</p>
-          )}
+          {data.total > 0 && <p className="text-sm text-gray-600">{data.total}件の口コミ</p>}
         </div>
 
-        <ReviewFilters
+        <SchoolReviewsFilters
+          slug={decodedSlug}
           filters={filters}
-          onFiltersChange={handleFiltersChange}
-          totalCount={totalBeforeFilter}
-          filteredCount={total}
           sort={sort}
-          onSortChange={handleSortChange}
+          totalBeforeFilter={data.totalBeforeFilter}
+          filteredCount={data.total}
         />
 
-        <div className="border-t border-gray-200 my-3"></div>
+        <div className="border-t border-gray-200 my-3" />
 
         <div className="mb-3">
           <h2 className="text-base font-semibold text-gray-900">口コミ</h2>
         </div>
 
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white border border-gray-200 rounded-lg p-5">
-                <Skeleton height={20} width="60%" className="mb-3" />
-                <Skeleton height={16} width="40%" className="mb-4" />
-                <Skeleton height={16} width="80%" />
-              </div>
-            ))}
-          </div>
-        ) : reviews.length === 0 ? (
+        {data.reviews.length === 0 ? (
           <EmptyState
             title="口コミが見つかりませんでした"
             description="この学校にはまだ口コミが投稿されていません。"
@@ -206,15 +158,15 @@ export default function SchoolReviewsPage() {
         ) : (
           <>
             <div className="space-y-4 mb-8">
-              {reviews.map((review) => (
-                <ReviewCard
+              {data.reviews.map((review) => (
+                <SchoolReviewCard
                   key={review.id}
                   id={review.id}
-                  schoolName={review.school_name}
+                  schoolName={review.school_name ?? ''}
                   schoolSlug={review.school_slug}
-                  overallSatisfaction={review.overall_satisfaction}
-                  goodComment={review.good_comment}
-                  badComment={review.bad_comment}
+                  overallSatisfaction={review.overall_satisfaction ?? 0}
+                  goodComment={review.good_comment ?? ''}
+                  badComment={review.bad_comment ?? ''}
                   enrollmentYear={review.enrollment_year}
                   attendanceFrequency={review.attendance_frequency}
                   likeCount={review.like_count}
@@ -223,37 +175,29 @@ export default function SchoolReviewsPage() {
               ))}
             </div>
 
-            {totalPages > 1 && (
+            {data.totalPages > 1 && (
               <div className="flex justify-center gap-2">
-                <button
-                  onClick={() => {
-                    const newPage = page - 1;
-                    setPage(newPage);
-                    const q = new URLSearchParams(searchParams.toString());
-                    q.set('page', newPage.toString());
-                    router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${q.toString()}`, { scroll: false });
-                  }}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                <Link
+                  href={buildPaginationUrl(page - 1)}
+                  className={`px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 ${
+                    page <= 1 ? 'pointer-events-none opacity-50' : ''
+                  }`}
+                  aria-disabled={page <= 1}
                 >
                   前へ
-                </button>
+                </Link>
                 <span className="px-4 py-2 text-gray-600">
-                  {page} / {totalPages}
+                  {page} / {data.totalPages}
                 </span>
-                <button
-                  onClick={() => {
-                    const newPage = page + 1;
-                    setPage(newPage);
-                    const q = new URLSearchParams(searchParams.toString());
-                    q.set('page', newPage.toString());
-                    router.push(`${appPath(`/schools/${encodeURIComponent(slug)}/reviews`)}?${q.toString()}`, { scroll: false });
-                  }}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                <Link
+                  href={buildPaginationUrl(page + 1)}
+                  className={`px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 ${
+                    page >= data.totalPages ? 'pointer-events-none opacity-50' : ''
+                  }`}
+                  aria-disabled={page >= data.totalPages}
                 >
                   次へ
-                </button>
+                </Link>
               </div>
             )}
           </>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import ArticleCard from '@/components/ArticleCard';
+import ArticleCardServer from '@/components/ArticleCardServer';
 import { getArticlesList } from '@/lib/articles/getArticlesList';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
@@ -87,7 +87,7 @@ export default async function FeaturesPage({ searchParams }: PageProps) {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {data.articles.map((article) => (
-                <ArticleCard
+                <ArticleCardServer
                   key={article.id}
                   id={article.id}
                   title={article.title}
