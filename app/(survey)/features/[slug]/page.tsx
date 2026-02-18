@@ -1,81 +1,53 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import SchoolCard from '@/components/SchoolCard';
-import { Article, ArticleSchool } from '@/lib/types/articles';
-import { apiPath, appPath } from '@/lib/base-path';
+import { getArticleBySlug } from '@/lib/articles/getArticleBySlug';
+import { getArticleSlugs } from '@/lib/articles/getArticleSlugs';
+import { appPath } from '@/lib/base-path';
+import type { ArticleSchool } from '@/lib/types/articles';
 
-export default function ArticleDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const encodedSlug = params.slug as string;
-  const slug = decodeURIComponent(encodedSlug);
-  const [article, setArticle] = useState<Article | null>(null);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 3600;
 
-  useEffect(() => {
-    fetchArticle();
-  }, [encodedSlug]);
+/** ビルド時に特集記事を静的生成し、初期HTMLに本文を含める */
+export async function generateStaticParams() {
+  const slugs = await getArticleSlugs();
+  return slugs;
+}
 
-  const fetchArticle = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(apiPath(`/api/articles/${encodedSlug}`));
-      if (!response.ok) {
-        if (response.status === 404) {
-          router.push(appPath('/features'));
-          return;
-        }
-        throw new Error('記事の取得に失敗しました');
-      }
+interface PageProps {
+  params: Promise<{ slug: string }> | { slug: string };
+}
 
-      const data = await response.json();
-      setArticle(data);
-    } catch (error) {
-      console.error('記事取得エラー:', error);
-      alert('記事の取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case 'interview':
-        return 'リアル体験談 クチコミ・インタビュー';
-      case 'useful_info':
-        return '通信制高校お役立ち情報';
-      default:
-        return category;
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        </div>
-      </div>
-    );
+function getCategoryLabel(category: string) {
+  switch (category) {
+    case 'interview':
+      return 'リアル体験談 クチコミ・インタビュー';
+    case 'useful_info':
+      return '通信制高校お役立ち情報';
+    default:
+      return category;
   }
+}
+
+function formatDate(dateString: string | null) {
+  if (!dateString) return '';
+  return new Date(dateString).toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+export default async function ArticleDetailPage({ params }: PageProps) {
+  const resolved = params instanceof Promise ? await params : params;
+  const encodedSlug = resolved.slug;
+  const slug = decodeURIComponent(encodedSlug);
+
+  const article = await getArticleBySlug(slug);
 
   if (!article) {
-    return null;
+    notFound();
   }
 
   return (

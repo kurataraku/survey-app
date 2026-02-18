@@ -1,111 +1,87 @@
-'use client';
-
-import { useState, useEffect, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import RankingCard from '@/components/RankingCard';
-import { apiPath, appPath } from '@/lib/base-path';
+import RankingCardServer from '@/components/RankingCardServer';
+import { getRankingsByType } from '@/lib/rankings/getRankingsByType';
+import { appPath } from '@/lib/base-path';
+import type { Metadata } from 'next';
+import { getAppBaseUrl } from '@/lib/env-check';
 
-interface School {
-  id: string;
-  name: string;
-  prefecture: string;
-  slug: string | null;
-  review_count: number;
-  overall_avg: number | null;
-  staff_avg: number | null;
-  atmosphere_avg: number | null;
-  credit_avg: number | null;
-  tuition_avg: number | null;
+export const revalidate = 3600;
+
+/** ビルド時に1ページ目を静的生成し、初期HTMLにランキング本文を含める */
+export async function generateStaticParams() {
+  return [
+    { type: 'overall' },
+    { type: 'review-count' },
+    { type: 'staff' },
+    { type: 'atmosphere' },
+    { type: 'credit' },
+    { type: 'tuition' },
+  ];
 }
 
-interface RankingsData {
-  schools: School[];
-  total: number;
-  page: number;
-  limit: number;
-  total_pages: number;
-  type: string;
-}
-
-// 注意: 進学実績ランキングは削除されました。追加しないでください。
-const rankingConfig: Record<string, { title: string; valueKey: keyof School; valueLabel: string; valueType: 'rating' | 'count' | 'percentage' }> = {
-  overall: {
-    title: '総合評判ランキング',
-    valueKey: 'overall_avg',
-    valueLabel: '総合満足度',
-    valueType: 'rating',
-  },
-  staff: {
-    title: '先生対応ランキング',
-    valueKey: 'staff_avg',
-    valueLabel: '先生対応評価',
-    valueType: 'rating',
-  },
-  atmosphere: {
-    title: '雰囲気ランキング',
-    valueKey: 'atmosphere_avg',
-    valueLabel: '雰囲気評価',
-    valueType: 'rating',
-  },
-  credit: {
-    title: '単位取得ランキング',
-    valueKey: 'credit_avg',
-    valueLabel: '単位取得評価',
-    valueType: 'rating',
-  },
-  tuition: {
-    title: '学費満足度ランキング',
-    valueKey: 'tuition_avg',
-    valueLabel: '学費満足度',
-    valueType: 'rating',
-  },
-  'review-count': {
-    title: '口コミ数ランキング',
-    valueKey: 'review_count',
-    valueLabel: '口コミ数',
-    valueType: 'count',
-  },
+const rankingConfig: Record<
+  string,
+  {
+    title: string;
+    valueKey: 'overall_avg' | 'staff_avg' | 'atmosphere_avg' | 'credit_avg' | 'tuition_avg' | 'review_count';
+    valueLabel: string;
+    valueType: 'rating' | 'count' | 'percentage';
+  }
+> = {
+  overall: { title: '総合評判ランキング', valueKey: 'overall_avg', valueLabel: '総合満足度', valueType: 'rating' },
+  staff: { title: '先生対応ランキング', valueKey: 'staff_avg', valueLabel: '先生対応評価', valueType: 'rating' },
+  atmosphere: { title: '雰囲気ランキング', valueKey: 'atmosphere_avg', valueLabel: '雰囲気評価', valueType: 'rating' },
+  credit: { title: '単位取得ランキング', valueKey: 'credit_avg', valueLabel: '単位取得評価', valueType: 'rating' },
+  tuition: { title: '学費満足度ランキング', valueKey: 'tuition_avg', valueLabel: '学費満足度', valueType: 'rating' },
+  'review-count': { title: '口コミ数ランキング', valueKey: 'review_count', valueLabel: '口コミ数', valueType: 'count' },
 };
 
-function RankingsContent() {
-  const params = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const type = params.type as string;
-  const [data, setData] = useState<RankingsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const page = parseInt(searchParams.get('page') || '1', 10);
+interface PageProps {
+  params: Promise<{ type: string }> | { type: string };
+  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
+}
 
-  useEffect(() => {
-    fetchRankings();
-  }, [type, page]);
+function getStr(value: string | string[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
 
-  const fetchRankings = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(apiPath(`/api/rankings/${type}?page=${page}&limit=20`));
-      if (!response.ok) {
-        throw new Error('ランキングの取得に失敗しました');
-      }
-      const rankingsData = await response.json();
-      setData(rankingsData);
-    } catch (error) {
-      console.error('ランキング取得エラー:', error);
-      alert('ランキングの取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
+  const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
+
+  const config = rankingConfig[resolvedParams.type];
+  const title = config ? `通信制高校 ${config.title}` : 'ランキング';
+  const appBaseUrl = getAppBaseUrl();
+  const basePath = `/rankings/${resolvedParams.type}`;
+  const canonical = page > 1 ? `${appBaseUrl}${basePath}?page=${page}` : `${appBaseUrl}${basePath}`;
+
+  return {
+    alternates: { canonical },
+    openGraph: { url: canonical },
   };
+}
 
-  const config = rankingConfig[type];
+export default async function RankingsTypePage({ params, searchParams }: PageProps) {
+  const resolvedParams = params instanceof Promise ? await params : params;
+  const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
 
-  if (!config) {
+  const type = resolvedParams.type;
+  const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
+
+  const result = await getRankingsByType(type, { page, limit: 20 });
+
+  if ('error' in result) {
+    if (result.error === '無効なランキングタイプです' || result.error.includes('進学実績')) {
+      notFound();
+    }
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center py-12">
-            <p className="text-gray-600">無効なランキングタイプです</p>
+            <p className="text-gray-600">{result.error}</p>
             <Link href={appPath('/rankings')} className="mt-4 text-blue-500 hover:text-blue-600">
               ランキング一覧に戻る
             </Link>
@@ -115,22 +91,21 @@ function RankingsContent() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center py-12">
-            <p className="text-gray-600">読み込み中...</p>
-          </div>
-        </div>
-      </div>
-    );
+  const config = rankingConfig[type];
+  if (!config) {
+    notFound();
   }
 
-  if (!data || data.schools.length === 0) {
+  if (result.schools.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <Link href={appPath('/rankings')} className="text-blue-600 hover:text-blue-700 mb-4 inline-block">
+              ← ランキング一覧に戻る
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{config.title}</h1>
+          </div>
           <div className="text-center py-12">
             <p className="text-gray-600">ランキングデータがありません</p>
             <Link href={appPath('/rankings')} className="mt-4 text-blue-500 hover:text-blue-600">
@@ -148,23 +123,18 @@ function RankingsContent() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <Link
-            href={appPath('/rankings')}
-            className="text-blue-600 hover:text-blue-700 mb-4 inline-block"
-          >
+          <Link href={appPath('/rankings')} className="text-blue-600 hover:text-blue-700 mb-4 inline-block">
             ← ランキング一覧に戻る
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {config.title}
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{config.title}</h1>
           <p className="text-gray-600">
-            {data.total}校中 {startRank}位〜{Math.min(startRank + data.schools.length - 1, data.total)}位を表示
+            {result.total}校中 {startRank}位〜{Math.min(startRank + result.schools.length - 1, result.total)}位を表示
           </p>
         </div>
 
         <div className="space-y-4 mb-8">
-          {data.schools.map((school, index) => (
-            <RankingCard
+          {result.schools.map((school, index) => (
+            <RankingCardServer
               key={school.id}
               rank={startRank + index}
               id={school.id}
@@ -179,47 +149,34 @@ function RankingsContent() {
           ))}
         </div>
 
-        {/* ページネーション */}
-        {data.total_pages > 1 && (
+        {result.total_pages > 1 && (
           <div className="flex justify-center gap-2">
-            <button
-              onClick={() => router.push(appPath(`/rankings/${type}?page=${page - 1}`))}
-              disabled={page === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              前へ
-            </button>
+            {page > 1 ? (
+              <Link
+                href={page === 2 ? appPath(`/rankings/${type}`) : appPath(`/rankings/${type}?page=${page - 1}`)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                前へ
+              </Link>
+            ) : (
+              <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">前へ</span>
+            )}
             <span className="px-4 py-2 text-gray-600">
-              {page} / {data.total_pages}
+              {page} / {result.total_pages}
             </span>
-            <button
-              onClick={() => router.push(appPath(`/rankings/${type}`) + `?page=${page + 1}`)}
-              disabled={page >= data.total_pages}
-              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              次へ
-            </button>
+            {page < result.total_pages ? (
+              <Link
+                href={appPath(`/rankings/${type}?page=${page + 1}`)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                次へ
+              </Link>
+            ) : (
+              <span className="px-4 py-2 border border-gray-300 rounded-lg opacity-50 cursor-not-allowed">次へ</span>
+            )}
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-export default function RankingsTypePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center py-12">
-              <p className="text-gray-600">読み込み中...</p>
-            </div>
-          </div>
-        </div>
-      }
-    >
-      <RankingsContent />
-    </Suspense>
   );
 }
