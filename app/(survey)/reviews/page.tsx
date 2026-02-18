@@ -5,6 +5,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 
 /** 常にサーバーでレンダリングし、口コミ本文を初期HTMLに含める（クローラー対応） */
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 interface PageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;

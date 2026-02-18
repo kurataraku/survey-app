@@ -11,6 +11,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 
 /** 常にサーバーでレンダリングし、口コミ本文を初期HTMLに含める（クローラー対応） */
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 /** ビルド時にパスを事前生成（中身は dynamic で毎回取得） */
 export async function generateStaticParams() {
