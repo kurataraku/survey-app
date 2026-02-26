@@ -63,6 +63,12 @@ export interface SchoolWithStats {
     meta_title: string | null;
     meta_description: string | null;
   } | null;
+  /** 公開済みSEO本文（topic -> 本文） */
+  seo_sections?: Record<string, string>;
+  /** 公開済みFAQ（Q&A配列） */
+  faq_items?: Array<{ question: string; answer: string }>;
+  /** 公開済み「良い点・改善してほしい点の傾向」（LLM要約3箇条ずつ） */
+  review_tendency?: { good_points: string[]; improvement_points: string[] } | null;
 }
 
 /** サイト全体の評価平均（1時間キャッシュ） */
@@ -142,26 +148,43 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
     return null;
   }
 
-  // 2. AI要約・口コミデータ・グローバル平均を並列取得
-  const [aiSummaryResult, allReviewsDataResult, globalAverages] = await Promise.all([
-    supabase
-      .from('school_ai_summaries')
-      .select('summary_text, meta_title, meta_description')
-      .eq('school_id', school.id)
-      .eq('kind', 'overall')
-      .is('topic', null)
-      .eq('status', 'published')
-      .single(),
-    supabase
-      .from('survey_responses')
-      .select(
-        'id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers'
-      )
-      .eq('school_id', school.id),
-    getCachedGlobalAverages(),
-  ]);
+  // 2. AI要約・SEO本文・良い点・改善点傾向・口コミデータ・グローバル平均を並列取得
+  const [aiSummaryResult, seoSectionsResult, reviewTendencyResult, allReviewsDataResult, globalAverages] =
+    await Promise.all([
+      supabase
+        .from('school_ai_summaries')
+        .select('summary_text, meta_title, meta_description')
+        .eq('school_id', school.id)
+        .eq('kind', 'overall')
+        .is('topic', null)
+        .eq('status', 'published')
+        .single(),
+      supabase
+        .from('school_ai_summaries')
+        .select('topic, summary_text')
+        .eq('school_id', school.id)
+        .eq('kind', 'seo')
+        .eq('status', 'published'),
+      supabase
+        .from('school_ai_summaries')
+        .select('summary_text')
+        .eq('school_id', school.id)
+        .eq('kind', 'review_tendency')
+        .is('topic', null)
+        .eq('status', 'published')
+        .maybeSingle(),
+      supabase
+        .from('survey_responses')
+        .select(
+          'id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers'
+        )
+        .eq('school_id', school.id),
+      getCachedGlobalAverages(),
+    ]);
 
   const resolvedAiSummary = aiSummaryResult.data;
+  const seoSectionsRows = seoSectionsResult.data ?? [];
+  const reviewTendencyRow = reviewTendencyResult.data;
   const { data: allReviewsData } = allReviewsDataResult;
 
   const reviews = allReviewsData ?? [];
@@ -378,5 +401,36 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
           meta_description: resolvedAiSummary.meta_description,
         }
       : null,
+    seo_sections: (() => {
+      const map: Record<string, string> = {};
+      for (const row of seoSectionsRows) {
+        if (row.topic && row.topic !== 'faq') map[row.topic] = row.summary_text;
+      }
+      return Object.keys(map).length > 0 ? map : undefined;
+    })(),
+    faq_items: (() => {
+      const faqRow = seoSectionsRows.find((r) => r.topic === 'faq');
+      if (!faqRow?.summary_text) return undefined;
+      try {
+        const arr = JSON.parse(faqRow.summary_text) as Array<{ question: string; answer: string }>;
+        return Array.isArray(arr) && arr.length > 0 ? arr : undefined;
+      } catch {
+        return undefined;
+      }
+    })(),
+    review_tendency: (() => {
+      if (!reviewTendencyRow?.summary_text) return undefined;
+      try {
+        const parsed = JSON.parse(reviewTendencyRow.summary_text) as {
+          good_points?: string[];
+          improvement_points?: string[];
+        };
+        const good = Array.isArray(parsed.good_points) ? parsed.good_points.slice(0, 3) : [];
+        const improvement = Array.isArray(parsed.improvement_points) ? parsed.improvement_points.slice(0, 3) : [];
+        return good.length > 0 || improvement.length > 0 ? { good_points: good, improvement_points: improvement } : undefined;
+      } catch {
+        return undefined;
+      }
+    })(),
   };
 });

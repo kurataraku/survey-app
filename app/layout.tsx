@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 
 const appBaseUrl = getAppBaseUrl();
 
+/** 本番では NEXT_PUBLIC_SITE_URL を設定すること。未設定時は example.com になる */
+export const metadataBase = new URL(appBaseUrl);
+
 /** Google検索結果のサイト名指定用（ドメインレベルで1つのサイト名を指定） */
 const websiteSchema = {
   "@context": "https://schema.org",

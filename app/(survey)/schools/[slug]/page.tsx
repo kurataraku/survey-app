@@ -7,6 +7,7 @@ import SchoolFeaturedReviewsServer from '@/components/SchoolFeaturedReviewsServe
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import { appPath } from '@/lib/base-path';
+import StructuredData from '@/components/StructuredData';
 
 // ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
 export const revalidate = 60;
@@ -94,8 +95,25 @@ export default async function SchoolDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const faqSchema =
+    school.faq_items && school.faq_items.length > 0
+      ? {
+          '@context': 'https://schema.org' as const,
+          '@type': 'FAQPage' as const,
+          mainEntity: school.faq_items.map((item) => ({
+            '@type': 'Question' as const,
+            name: item.question,
+            acceptedAnswer: {
+              '@type': 'Answer' as const,
+              text: item.answer,
+            },
+          })),
+        }
+      : null;
+
   return (
     <div className="min-h-screen bg-blue-50/30 py-8">
+      {faqSchema && <StructuredData data={faqSchema} />}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-4">
           <Link

@@ -106,3 +106,43 @@
 | 高 | `/reviews/[id]` | generateStaticParams + getReviewIds でSSG化 |
 | 中 | `/schools/prefecture/[prefecture]` | generateStaticParams（47都道府県） |
 | 低 | `/schools`, `/features` | SchoolCardServer, ArticleCardServer の導入検討 |
+
+---
+
+## 学校個別ページ ソース・SEOチェック（N高 ページソース）
+
+> 最終更新: ページソース全文を基にSSR・クローラビリティを確認し、必要修正を実施
+
+### 確認結果（良好な点）
+
+| 項目 | 状態 |
+|------|------|
+| **SSR** | 主要コンテンツはすべて初期HTMLに含まれる（H1・評価・口コミ要約・目次・良い点・気になる点・詳細評価・みんなの傾向・注目の口コミ・評判の詳細・FAQ） |
+| **非表示タブ** | 「みんなの傾向」は `class="hidden"` だがDOMに出力されているためクローラーが読める |
+| **メタ** | title, description, keywords, robots, googlebot, canonical, og:*, twitter:* が出力されている |
+| **構造化データ** | WebSite / Organization / SearchAction がルートで出力済み |
+| **robots** | `index, follow` および googleBot の max-snippet 等が (survey)/layout で設定済み |
+
+### 実施した修正
+
+1. **metadataBase**  
+   - ルート `app/layout.tsx` に `metadataBase: new URL(getAppBaseUrl())` を追加。  
+   - 本番で `NEXT_PUBLIC_SITE_URL` を設定すれば canonical / og:url が正しい絶対URLになる。
+
+2. **FAQPage 構造化データ**  
+   - 学校個別ページで `faq_items` がある場合に、FAQPage の JSON-LD を出力するよう追加。  
+   - Google の FAQ リッチリザルト対象とするため。
+
+3. **robots.txt の sitemap URL**  
+   - `sitemap` を `getSiteUrl()` のドメイン直下ではなく `getAppBaseUrl() + '/sitemap.xml'` に変更。  
+   - ベースパス（`/tsushin-kuchikomi`）配下でサイトを提供している場合に正しい sitemap を指すようにした。
+
+### 本番環境で必要な設定
+
+- **NEXT_PUBLIC_SITE_URL** を本番ドメイン（例: `https://example.com`）に設定すること。  
+  未設定または localhost のままの場合、canonical・og:url が localhost になり検索・SNSシェアで不適切になる。
+
+### 補足（ソース上の軽微な点）
+
+- `<div hidden="">` が body 直下にあるのは Next/React のテンプレート由来。hidden のため検索結果のメインコンテンツには影響しない。
+- 末尾の RSC 用 `<script>` ペイロードは Next.js のクライアント hydration 用であり、クローラーは初期HTMLのテキストを評価するため問題なし。

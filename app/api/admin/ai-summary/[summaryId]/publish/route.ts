@@ -47,13 +47,17 @@ export async function POST(
     // 部分ユニークインデックスにより、publishedは1件のみ保証される
 
     // まず既存のpublishedをdraftに戻す（存在する場合）
-    const { error: unpublishError } = await supabase
+    let unpublishQuery = supabase
       .from('school_ai_summaries')
       .update({ status: 'draft' })
       .eq('school_id', summary.school_id)
       .eq('kind', summary.kind || 'overall')
-      .is('topic', summary.topic)
       .eq('status', 'published');
+    unpublishQuery =
+      summary.topic == null
+        ? unpublishQuery.is('topic', null)
+        : unpublishQuery.eq('topic', summary.topic);
+    const { error: unpublishError } = await unpublishQuery;
 
     if (unpublishError) {
       console.error('既存公開要約の非公開化エラー:', unpublishError);

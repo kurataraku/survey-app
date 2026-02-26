@@ -1,9 +1,9 @@
 import { MetadataRoute } from 'next';
-import { getSiteUrl } from '@/lib/env-check';
+import { getAppBaseUrl } from '@/lib/env-check';
 import { BASE_PATH } from '@/lib/base-path';
 
 export default function robots(): MetadataRoute.Robots {
-  const apexUrl = getSiteUrl().replace(/\/$/, '');
+  const appBaseUrl = getAppBaseUrl().replace(/\/$/, '');
 
   return {
     rules: [
@@ -18,6 +18,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: `${apexUrl}/sitemap.xml`,
+    sitemap: `${appBaseUrl}/sitemap.xml`,
   };
 }

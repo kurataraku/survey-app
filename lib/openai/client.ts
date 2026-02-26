@@ -1,4 +1,7 @@
 import OpenAI from 'openai';
+import type { SeoSectionKey } from '@/lib/seo-sections';
+import { SEO_SECTION_LABELS, FAQ_QUESTIONS, type FaqItem } from '@/lib/seo-sections';
+import type { ReviewTendencySummary } from '@/lib/review-tendency';
 
 /**
  * OpenAIクライアントの初期化
@@ -459,4 +462,273 @@ export async function callOpenAIForSummary(
     }
     throw error;
   }
+}
+
+// --- SEO本文・FAQ生成（供給路用） ---
+
+function formatReviewsForPrompt(
+  reviews: Array<{ good_comment: string; bad_comment: string; overall_satisfaction: number; answers?: Record<string, unknown> }>
+): string {
+  const MAX = 8000;
+  let len = 0;
+  const parts: string[] = [];
+  for (const r of reviews) {
+    const block = `【口コミ】満足度${r.overall_satisfaction}/5\n良い点: ${(r.good_comment || '').slice(0, 200)}\n気になる点: ${(r.bad_comment || '').slice(0, 200)}\n`;
+    if (len + block.length > MAX) break;
+    parts.push(block);
+    len += block.length;
+  }
+  return parts.join('\n');
+}
+
+function createSeoSectionPrompt(
+  schoolName: string,
+  sectionKey: SeoSectionKey,
+  reviewsText: string,
+  officialText: string
+): string {
+  const label = SEO_SECTION_LABELS[sectionKey];
+  const instructions: Record<SeoSectionKey, string> = {
+    good_bad:
+      '口コミの良い評判・悪い評判を項目別（先生対応・雰囲気・単位・学費・柔軟さ・サポートなど）に整理し、傾向として200〜400字でまとめてください。断定は避け、「〜という声がある」「傾向として」と表現してください。',
+    tuition:
+      '学費に関する口コミの傾向（納得感・負担感）をまとめつつ、数値（金額・回数）は口コミからは断定せず「公式の案内を確認してください」と促す形にしてください。200〜350字。',
+    learning:
+      'レポート・単位取得に関する口コミの傾向をまとめてください。公式情報があれば補足。200〜350字。',
+    syllabus:
+      'スクーリング・通学頻度に関する口コミの傾向と、公式情報があればその要点をまとめてください。200〜350字。',
+    flexibility:
+      '不登校や心身の波がある子の「通いやすさ」「学びの柔軟さ」に関する口コミの傾向をまとめてください。200〜350字。',
+  };
+  return `あなたは通信制高校の口コミ・評判を分析する専門家です。以下の口コミと公式情報のみを根拠に、「${label}」の本文を生成してください。
+
+学校名: ${schoolName}
+
+【口コミデータ】
+${reviewsText}
+
+【公式・紹介文（参考）】
+${officialText || '（なし）'}
+
+${instructions[sectionKey]}
+
+注意: 口コミにない内容は書かないでください。数値は公式のみ断定。口コミは「傾向」「〜という声」で表現。出力は本文のみ（見出しやラベルは付けない）。`;
+}
+
+/**
+ * SEO本文セクションを1つ生成（GPT連携）
+ */
+export async function callOpenAIForSeoSection(
+  schoolName: string,
+  sectionKey: SeoSectionKey,
+  reviews: Array<{
+    good_comment: string;
+    bad_comment: string;
+    overall_satisfaction: number;
+    answers?: Record<string, unknown>;
+  }>,
+  officialText?: string
+): Promise<{ summaryText: string; tokensUsed: { prompt: number; completion: number; total: number } }> {
+  const client = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const reviewsText = formatReviewsForPrompt(reviews);
+  const prompt = createSeoSectionPrompt(schoolName, sectionKey, reviewsText, officialText || '');
+
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'あなたは通信制高校の口コミを分析する専門家です。口コミと公式情報のみを根拠に、客観的で中立的な本文を生成してください。',
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.5,
+    max_tokens: 800,
+  });
+
+  const summaryText = (completion.choices[0]?.message?.content || '').trim();
+  if (!summaryText) throw new Error('OpenAI APIからのレスポンスが空です');
+
+  return {
+    summaryText,
+    tokensUsed: {
+      prompt: completion.usage?.prompt_tokens || 0,
+      completion: completion.usage?.completion_tokens || 0,
+      total: completion.usage?.total_tokens || 0,
+    },
+  };
+}
+
+function createFaqPrompt(
+  schoolName: string,
+  reviewsText: string,
+  officialText: string
+): string {
+  const qList = FAQ_QUESTIONS.map((q, i) => `${i + 1}. ${q}`).join('\n');
+  return `あなたは通信制高校の口コミ・評判を分析する専門家です。以下の口コミと公式情報のみを根拠に、次の5問に答えてください。
+
+学校名: ${schoolName}
+
+【口コミデータ】
+${reviewsText}
+
+【公式・紹介文（参考）】
+${officialText || '（なし）'}
+
+【質問】
+${qList}
+
+出力形式（JSONのみ、他は書かない）:
+[
+  {"question": "質問1の全文", "answer": "回答1（80〜150字）"},
+  {"question": "質問2の全文", "answer": "回答2"},
+  ...
+]
+
+注意: 口コミ・公式にない内容は書かず、「〜という声がある」「傾向として」を使う。口コミが少ない場合は「現時点では限られた声のなかでは〜」と表現。`;
+}
+
+/**
+ * FAQ 5問の回答を一括生成（GPT連携）
+ */
+export async function callOpenAIForFaq(
+  schoolName: string,
+  reviews: Array<{
+    good_comment: string;
+    bad_comment: string;
+    overall_satisfaction: number;
+    answers?: Record<string, unknown>;
+  }>,
+  officialText?: string
+): Promise<{ items: FaqItem[]; tokensUsed: { prompt: number; completion: number; total: number } }> {
+  const client = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const reviewsText = formatReviewsForPrompt(reviews);
+  const prompt = createFaqPrompt(schoolName, reviewsText, officialText || '');
+
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'あなたは通信制高校の口コミを分析する専門家です。指定された5問に、口コミ・公式情報のみを根拠に答えてください。出力は必ずJSON配列のみにしてください。',
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.5,
+    max_tokens: 1500,
+  });
+
+  const raw = (completion.choices[0]?.message?.content || '').trim();
+  const jsonMatch = raw.match(/\[[\s\S]*\]/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+  let items: FaqItem[];
+  try {
+    items = JSON.parse(jsonStr) as FaqItem[];
+  } catch {
+    throw new Error('FAQのJSONパースに失敗しました: ' + raw.slice(0, 200));
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('FAQが空です');
+  }
+  // 5問に揃える（不足分はFAQ_QUESTIONSから補う）
+  const result: FaqItem[] = FAQ_QUESTIONS.slice(0, 5).map((q, i) => ({
+    question: items[i]?.question || q,
+    answer: items[i]?.answer || '口コミ・公式情報を確認のうえ、追って記載します。',
+  }));
+
+  return {
+    items: result,
+    tokensUsed: {
+      prompt: completion.usage?.prompt_tokens || 0,
+      completion: completion.usage?.completion_tokens || 0,
+      total: completion.usage?.total_tokens || 0,
+    },
+  };
+}
+
+/** 良い点・改善してほしい点の傾向用プロンプト（3箇条ずつ要約） */
+function createReviewTendencyPrompt(schoolName: string, reviewsText: string): string {
+  return `あなたは通信制高校の口コミ・評判を分析する専門家です。以下の口コミデータを踏まえ、この学校の「良い点」を要約して3つの箇条書きに、「改善してほしい点」も要約して3つの箇条書きにまとめてください。
+
+学校名: ${schoolName}
+
+【口コミデータ】
+${reviewsText}
+
+出力形式（JSONのみ、他は書かない）:
+{
+  "good_points": ["良い点の要約1", "良い点の要約2", "良い点の要約3"],
+  "improvement_points": ["改善してほしい点の要約1", "改善してほしい点の要約2", "改善してほしい点の要約3"]
+}
+
+注意:
+- 各項目は1文で簡潔に（目安40〜80字）。口コミの傾向をまとめ、断定は避けて「〜という声がある」などと表現してください。
+- 口コミが少ない場合は「現時点では限られた声のなかでは〜」と表現してください。
+- 個人名・誹謗中傷は含めないでください。`;
+}
+
+/**
+ * 良い点・改善してほしい点の傾向を3箇条ずつ生成（GPT連携）
+ */
+export async function callOpenAIForReviewTendency(
+  schoolName: string,
+  reviews: Array<{
+    good_comment: string;
+    bad_comment: string;
+    overall_satisfaction: number;
+    answers?: Record<string, unknown>;
+  }>
+): Promise<{
+  summary: ReviewTendencySummary;
+  tokensUsed: { prompt: number; completion: number; total: number };
+}> {
+  const client = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const reviewsText = formatReviewsForPrompt(reviews);
+  const prompt = createReviewTendencyPrompt(schoolName, reviewsText);
+
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'あなたは通信制高校の口コミを分析する専門家です。口コミのみを根拠に、良い点と改善してほしい点をそれぞれ3つの箇条書きに要約してください。出力は必ず指定のJSON形式のみにしてください。',
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.5,
+    max_tokens: 800,
+  });
+
+  const raw = (completion.choices[0]?.message?.content || '').trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : raw;
+  let parsed: ReviewTendencySummary;
+  try {
+    parsed = JSON.parse(jsonStr) as ReviewTendencySummary;
+  } catch {
+    throw new Error('良い点・改善点要約のJSONパースに失敗しました: ' + raw.slice(0, 200));
+  }
+  const good_points = Array.isArray(parsed.good_points)
+    ? parsed.good_points.slice(0, 3).map((s) => (typeof s === 'string' ? s : '').trim()).filter(Boolean)
+    : [];
+  const improvement_points = Array.isArray(parsed.improvement_points)
+    ? parsed.improvement_points.slice(0, 3).map((s) => (typeof s === 'string' ? s : '').trim()).filter(Boolean)
+    : [];
+  return {
+    summary: {
+      good_points: good_points.length >= 3 ? good_points : [...good_points, ...Array(3 - good_points.length).fill('口コミを元に追って記載します。')].slice(0, 3),
+      improvement_points: improvement_points.length >= 3 ? improvement_points : [...improvement_points, ...Array(3 - improvement_points.length).fill('口コミを元に追って記載します。')].slice(0, 3),
+    },
+    tokensUsed: {
+      prompt: completion.usage?.prompt_tokens || 0,
+      completion: completion.usage?.completion_tokens || 0,
+      total: completion.usage?.total_tokens || 0,
+    },
+  };
 }

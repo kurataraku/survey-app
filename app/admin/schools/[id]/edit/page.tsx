@@ -6,6 +6,7 @@ import Link from 'next/link';
 import SchoolEditor from '@/components/SchoolEditor';
 import ReviewManagementList from '@/components/ReviewManagementList';
 import AISummaryEditor from '@/components/AISummaryEditor';
+import SeoSectionsEditor from '@/components/SeoSectionsEditor';
 import { SchoolFormData, School } from '@/lib/types/schools';
 import { apiPath, appPath } from '@/lib/base-path';
 
@@ -22,7 +23,7 @@ export default function EditSchoolPage() {
   const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'reviews' | 'ai-summary'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'reviews' | 'ai-summary' | 'seo-sections'>('basic');
   const [prefectureStats, setPrefectureStats] = useState<PrefectureStat[]>([]);
   const [totalResponses, setTotalResponses] = useState(0);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -312,6 +313,16 @@ export default function EditSchoolPage() {
             >
               AI要約
             </button>
+            <button
+              onClick={() => setActiveTab('seo-sections')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'seo-sections'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              評判の詳細・FAQ
+            </button>
           </nav>
         </div>
 
@@ -517,8 +528,10 @@ export default function EditSchoolPage() {
             </div>
           ) : activeTab === 'reviews' ? (
             <ReviewManagementList schoolId={id} />
-          ) : (
+          ) : activeTab === 'ai-summary' ? (
             <AISummaryEditor schoolId={id} />
+          ) : (
+            <SeoSectionsEditor schoolId={id} />
           )}
         </div>
       </div>

@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Sparkles, CheckCircle2, XCircle, User } from 'lucide-react';
+import { Sparkles, CheckCircle2, XCircle, User, ChevronDown } from 'lucide-react';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import SchoolRadarChart from '@/components/SchoolRadarChart';
@@ -11,6 +12,11 @@ import Tabs from '@/components/ui/Tabs';
 import StatisticsSection from '@/components/StatisticsSection';
 import { SchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import { appPath } from '@/lib/base-path';
+import { SEO_SECTION_KEYS, SEO_SECTION_LABELS } from '@/lib/seo-sections';
+
+const CONCLUSION_MAX_CHARS = 350;
+const FEW_REVIEWS_THRESHOLD = 5;
+const GRAPH_HIDDEN_THRESHOLD = 3;
 
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
@@ -23,6 +29,21 @@ export default function SchoolDetailClient({
   encodedSlug,
   children,
 }: SchoolDetailClientProps) {
+  const [expandedSeoContent, setExpandedSeoContent] = useState<Record<string, boolean>>({});
+  const [openSeoAccordion, setOpenSeoAccordion] = useState<Record<string, boolean>>({});
+  const [graphActiveTab, setGraphActiveTab] = useState<'ratings' | 'statistics'>('ratings');
+
+  useEffect(() => {
+    const syncTabFromHash = () => {
+      if (typeof window === 'undefined') return;
+      if (window.location.hash === '#section-trends') setGraphActiveTab('statistics');
+      else if (window.location.hash === '#section-ratings') setGraphActiveTab('ratings');
+    };
+    syncTabFromHash();
+    window.addEventListener('hashchange', syncTabFromHash);
+    return () => window.removeEventListener('hashchange', syncTabFromHash);
+  }, []);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
@@ -48,103 +69,215 @@ export default function SchoolDetailClient({
         latestReviews={school.latest_reviews}
       />
 
-      {/* AIによる口コミ要約 */}
-      {school.ai_summary && (
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 relative overflow-hidden border border-gray-200">
-          {/* 上部薄い青のバー帯 */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
-          
-          {/* ヘッダー */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Sparkles className="w-5 h-5 text-blue-600" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900">
-              AIによる口コミ要約
-            </h2>
-          </div>
-          
-          {/* 本文 */}
-          <div className="prose prose-sm max-w-prose">
-            <div className="text-gray-700 leading-relaxed space-y-4">
-              {(() => {
-                const lines = school.ai_summary.summary_text.split('\n');
-                let currentSection: 'good' | 'bad' | null = null;
-                
-                return lines.map((line, index) => {
-                  const trimmedLine = line.trim();
-                  
-                  // 「この学校が合う人」セクション
-                  if (trimmedLine === '## この学校が合う人' || trimmedLine.startsWith('## この学校が合う人')) {
-                    currentSection = 'good';
-                    return (
-                      <div key={index} className="flex items-start gap-2 mt-6 mb-4">
-                        <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                        <h3 className="font-semibold text-gray-900 text-lg">この学校が合う人</h3>
-                      </div>
-                    );
-                  }
-                  
-                  // 「この学校が合わない人」セクション
-                  if (trimmedLine === '## この学校が合わない人' || trimmedLine.startsWith('## この学校が合わない人')) {
-                    currentSection = 'bad';
-                    return (
-                      <div key={index} className="flex items-start gap-2 mt-6 mb-4">
-                        <XCircle className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" />
-                        <h3 className="font-semibold text-gray-900 text-lg">この学校が合わない人</h3>
-                      </div>
-                    );
-                  }
-                  
-                  // 箇条書きアイテム（「-」または「・」で始まる行）
-                  if (/^[-・]\s/.test(trimmedLine)) {
-                    const content = trimmedLine.replace(/^[-・]\s/, '');
-                    if (currentSection === 'good') {
-                      return (
-                        <div key={index} className="flex items-start gap-3 ml-7 mb-2">
-                          <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <span className="flex-1 leading-relaxed">{content}</span>
-                        </div>
-                      );
-                    } else if (currentSection === 'bad') {
-                      return (
-                        <div key={index} className="flex items-start gap-3 ml-7 mb-2">
-                          <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
-                          <span className="flex-1 leading-relaxed">{content}</span>
-                        </div>
-                      );
-                    }
-                  }
-                  
-                  // 通常のテキスト行
-                  if (trimmedLine && !trimmedLine.startsWith('##') && !/^[-・]\s/.test(trimmedLine)) {
-                    // セクション判定をリセット（見出し以外の行では維持）
-                    return (
-                      <p key={index} className="mb-3 last:mb-0 leading-relaxed">
-                        {line}
-                      </p>
-                    );
-                  }
-                  
-                  // 空行
-                  if (!trimmedLine) {
-                    return <br key={index} />;
-                  }
-                  
-                  return null;
-                });
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 口コミ要約（この学校の特徴/合う人/合わない人）— 結論は「##」の手前まで、続きは合う人・合わない人のみ表示して重複を防ぐ */}
+      {school.ai_summary && (() => {
+        const text = school.ai_summary.summary_text;
+        const firstH2 = text.indexOf('\n## ');
+        const leadPart =
+          firstH2 === -1 ? text.trim() : text.slice(0, firstH2).trim();
+        const conclusionLead =
+          leadPart.length > CONCLUSION_MAX_CHARS
+            ? leadPart.slice(0, CONCLUSION_MAX_CHARS).trim() + '…'
+            : leadPart;
+        const restFromH2 = firstH2 === -1 ? '' : text.slice(firstH2).trimStart();
+        const hasRest = restFromH2.length > 0;
+        const isFewReviews = school.review_count < FEW_REVIEWS_THRESHOLD;
 
-      {/* タブで情報を段階的に表示 */}
-      <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
-        <Tabs
-          tabs={[
+        const renderRestSummary = (restText: string) => {
+          const lines = restText.split('\n');
+          let currentSection: 'good' | 'bad' | null = null;
+          return lines.map((line, index) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine === '## この学校が合う人' || trimmedLine.startsWith('## この学校が合う人')) {
+              currentSection = 'good';
+              return (
+                <div key={index} className="flex items-start gap-2 mt-6 mb-4">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <h3 className="font-semibold text-gray-900 text-lg">この学校が合う人</h3>
+                </div>
+              );
+            }
+            if (trimmedLine === '## この学校が合わない人' || trimmedLine.startsWith('## この学校が合わない人')) {
+              currentSection = 'bad';
+              return (
+                <div key={index} className="flex items-start gap-2 mt-6 mb-4">
+                  <XCircle className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" />
+                  <h3 className="font-semibold text-gray-900 text-lg">この学校が合わない人</h3>
+                </div>
+              );
+            }
+            if (/^[-・]\s/.test(trimmedLine)) {
+              const content = trimmedLine.replace(/^[-・]\s/, '');
+              if (currentSection === 'good') {
+                return (
+                  <div key={index} className="flex items-start gap-3 ml-7 mb-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span className="flex-1 leading-relaxed">{content}</span>
+                  </div>
+                );
+              }
+              if (currentSection === 'bad') {
+                return (
+                  <div key={index} className="flex items-start gap-3 ml-7 mb-2">
+                    <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
+                    <span className="flex-1 leading-relaxed">{content}</span>
+                  </div>
+                );
+              }
+            }
+            if (trimmedLine && !trimmedLine.startsWith('##') && !/^[-・]\s/.test(trimmedLine)) {
+              return (
+                <p key={index} className="mb-3 last:mb-0 leading-relaxed">
+                  {line}
+                </p>
+              );
+            }
+            if (!trimmedLine) return <br key={index} />;
+            return null;
+          });
+        };
+
+        return (
+          <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 relative overflow-hidden border border-gray-200">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                口コミ要約（この学校の特徴/合う人/合わない人）
+              </h2>
+            </div>
+            <div className="prose prose-sm max-w-prose text-gray-700 leading-relaxed">
+              <p className="mb-3">{conclusionLead}</p>
+              {isFewReviews && (
+                <p className="text-sm text-amber-700 bg-amber-50/80 rounded-lg px-3 py-2 mb-4">
+                  口コミは{school.review_count}件のため、傾向の参考としてご覧ください。
+                </p>
+              )}
+              {hasRest && (
+                <details className="mt-4">
+                  <summary className="cursor-pointer font-medium text-gray-700">
+                    口コミ要約の続き（合う人・合わない人）
+                  </summary>
+                  <div className="mt-4 pl-0">{renderRestSummary(restFromH2)}</div>
+                </details>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 目次（アンカー） */}
+      <nav id="page-toc" className="bg-white rounded-2xl shadow-md p-4 md:p-6 mb-8 border border-gray-200" aria-label="ページ目次">
+        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">目次</h2>
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <li><a href="#section-review-summary" className="text-blue-600 hover:underline">良い点・改善してほしい点</a></li>
+          <li>
+            <a
+              href="#section-ratings"
+              className="text-blue-600 hover:underline"
+              onClick={() => setGraphActiveTab('ratings')}
+            >
+              詳細評価
+            </a>
+          </li>
+          <li>
+            <a
+              href="#section-trends"
+              className="text-blue-600 hover:underline"
+              onClick={() => setGraphActiveTab('statistics')}
+            >
+              みんなの傾向
+            </a>
+          </li>
+          <li><a href="#section-featured" className="text-blue-600 hover:underline">注目の口コミ</a></li>
+          <li><a href="#section-seo-body" className="text-blue-600 hover:underline">評判の詳細・よくある質問</a></li>
+          <li>
+            <Link
+              href={appPath(`/schools/${encodedSlug}/reviews`)}
+              className="text-blue-600 hover:underline"
+            >
+              口コミ一覧
+            </Link>
+          </li>
+        </ul>
+      </nav>
+
+      {/* 口コミ一覧への導線（ページ上部に1回のみ） */}
+      <div className="mb-6">
+        <Link
+          href={appPath(`/schools/${encodedSlug}/reviews`)}
+          className="inline-block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
+        >
+          自分に近い口コミを探す / 全ての口コミを見る
+        </Link>
+      </div>
+
+      {/* 口コミサマリー（良い点・改善してほしい点の傾向）— LLM要約3箇条ずつ */}
+      <section id="section-review-summary" className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">良い点・改善してほしい点の傾向</h2>
+        {school.review_tendency ? (
+          <>
+            {school.review_count < FEW_REVIEWS_THRESHOLD && (
+              <p className="text-sm text-amber-700 bg-amber-50/80 rounded-lg px-3 py-2 mb-4">
+                現在{school.review_count}件の口コミをもとに要約しています。
+              </p>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-semibold text-green-700 mb-2">良い点</h3>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  {school.review_tendency.good_points.map((text, i) => (
+                    <li key={i}>・{text}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-rose-700 mb-2">改善してほしい点</h3>
+                <ul className="text-sm text-gray-700 space-y-1">
+                  {school.review_tendency.improvement_points.map((text, i) => (
+                    <li key={i}>・{text}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </>
+        ) : school.review_count === 0 ? (
+          <p className="text-gray-500 text-sm">口コミがまだありません。</p>
+        ) : (
+          <p className="text-gray-500 text-sm">要約はまだ公開されていません。口コミ一覧をご覧ください。</p>
+        )}
+      </section>
+
+      {/* グラフブロック（詳細評価・みんなの傾向）— 全タブをDOMに出力してSSR/SEO対応 */}
+      <div id="section-graph" className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
+        {school.review_count < GRAPH_HIDDEN_THRESHOLD ? (
+          <div className="py-8 text-center">
+            <p className="text-gray-600 mb-4">
+              口コミ集計グラフは{school.review_count}件のため表示していません。
+            </p>
+            {school.intro && (
+              <div className="text-left max-w-prose mx-auto mb-6 p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-700 line-clamp-4">{school.intro}</p>
+              </div>
+            )}
+            <Link
+              href={appPath('/survey')}
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
+            >
+              口コミを投稿する
+            </Link>
+          </div>
+        ) : (
+          <Tabs
+            renderAllPanelsInDOM
+            activeTab={graphActiveTab}
+            onTabChange={(id) => setGraphActiveTab(id as 'ratings' | 'statistics')}
+            tabs={[
             {
               id: 'ratings',
+              panelId: 'section-ratings',
               label: '詳細評価',
               content: school.overall_avg !== null ? (
                 <div className="space-y-6">
@@ -229,6 +362,7 @@ export default function SchoolDetailClient({
             },
             {
               id: 'statistics',
+              panelId: 'section-trends',
               label: 'みんな（口コミ回答者）の傾向',
               content: school.statistics && school.review_count > 0 ? (
                 <div className="space-y-6">
@@ -422,14 +556,6 @@ export default function SchoolDetailClient({
                       </div>
                     </Link>
                   ))}
-                  <div className="pt-6 border-t border-gray-200">
-                    <Link
-                      href={appPath(`/schools/${encodedSlug}/reviews`)}
-                      className="inline-block w-full text-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 active:from-blue-800 active:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg active:shadow-sm active:translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300"
-                    >
-                      自分に近い口コミを探す/全ての口コミを見る
-                    </Link>
-                  </div>
                 </div>
               ) : (
                 <p className="text-gray-500 text-center py-8">口コミがありません</p>
@@ -437,30 +563,148 @@ export default function SchoolDetailClient({
             },
           ]}
         />
+        )}
       </div>
 
       {/* 注目の口コミ（children で Server Component を挿入・SSR保証） */}
-      {children}
+      <div id="section-featured">{children}</div>
 
-      {/* 口コミ一覧への導線 */}
-      {school.latest_reviews && school.latest_reviews.length > 0 && (
-        <div className="mb-8">
+      <div id="section-reviews" className="mb-8">
+        {!school.latest_reviews?.length && (
           <Link
-            href={appPath(`/schools/${encodedSlug}/reviews`)}
-            className="inline-block w-full text-center px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 active:from-blue-800 active:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg active:shadow-sm active:translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-blue-300"
+            href={appPath('/survey')}
+            className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-sm"
           >
-            自分に近い口コミを探す/全ての口コミを見る
+            口コミを投稿する
           </Link>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* 学校紹介 */}
-      {school.intro && (
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">学校紹介</h2>
-          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{school.intro}</p>
+      {/* 評判の詳細・よくある質問 — アコーディオン＋プレビュー */}
+      {(school.seo_sections && Object.keys(school.seo_sections).length > 0) || (school.faq_items && school.faq_items.length > 0) ? (
+        <div id="section-seo-body" className="mb-8 space-y-3">
+          {SEO_SECTION_KEYS.map(
+            (key) =>
+              school.seo_sections?.[key] && (
+                <div
+                  key={key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setOpenSeoAccordion((prev) => ({ ...prev, [key]: !prev[key] }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setOpenSeoAccordion((prev) => ({ ...prev, [key]: !prev[key] }));
+                    }
+                  }}
+                  className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50/50 hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 cursor-pointer"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-bold text-gray-900 mb-1.5">{SEO_SECTION_LABELS[key]}</h3>
+                      {!openSeoAccordion[key] ? (
+                        <>
+                          <p className="text-slate-600 text-sm leading-relaxed line-clamp-3 whitespace-pre-wrap">
+                            {school.seo_sections[key].trim() || 'まだ口コミが十分に集まっていません。'}
+                          </p>
+                          <span className="mt-2 inline-block text-sm font-medium text-blue-600">続きを読む</span>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap mt-1">
+                            {school.seo_sections[key]}
+                          </p>
+                          <span className="mt-2 inline-block text-sm font-medium text-blue-600">閉じる</span>
+                        </>
+                      )}
+                    </div>
+                    <ChevronDown
+                      className={`flex-shrink-0 w-5 h-5 text-gray-500 transition-transform duration-200 ${openSeoAccordion[key] ? 'rotate-180' : ''}`}
+                      aria-hidden
+                    />
+                  </div>
+                </div>
+              )
+          )}
+          {school.faq_items && school.faq_items.length > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setOpenSeoAccordion((prev) => ({ ...prev, faq: !prev.faq }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setOpenSeoAccordion((prev) => ({ ...prev, faq: !prev.faq }));
+                }
+              }}
+              className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm transition-all duration-200 hover:border-gray-300 hover:bg-gray-50/50 hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 cursor-pointer"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-gray-900 mb-1.5">
+                    よくある質問（FAQ）
+                    {school.faq_items.length > 0 && (
+                      <span className="ml-2 text-xs font-normal text-gray-500">（{school.faq_items.length}件）</span>
+                    )}
+                  </h3>
+                  {!openSeoAccordion.faq ? (
+                    <>
+                      <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">
+                        {school.faq_items[0]
+                          ? `${school.faq_items[0].question}${school.faq_items[0].answer ? ` — ${school.faq_items[0].answer.slice(0, 60)}…` : ''}`
+                          : 'まだ口コミが十分に集まっていません。'}
+                      </p>
+                      <span className="mt-2 inline-block text-sm font-medium text-blue-600">続きを読む</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mt-3 space-y-4">
+                        {school.faq_items.map((item, i) => {
+                          const faqKey = `faq-${i}`;
+                          const expanded = expandedSeoContent[faqKey];
+                          return (
+                            <div key={i} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+                              <h4 className="text-sm font-semibold text-gray-900 mb-1">{item.question}</h4>
+                              <p className={`text-gray-700 text-sm leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
+                                {item.answer.trim() || 'まだ口コミが十分に集まっていません。'}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedSeoContent((prev) => ({ ...prev, [faqKey]: !prev[faqKey] }));
+                                }}
+                                className="mt-1 text-sm font-medium text-blue-600 hover:underline"
+                              >
+                                {expanded ? '閉じる' : '詳細を見る'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <span className="mt-3 inline-block text-sm font-medium text-blue-600">閉じる</span>
+                    </>
+                  )}
+                </div>
+                <ChevronDown
+                  className={`flex-shrink-0 w-5 h-5 text-gray-500 transition-transform duration-200 ${openSeoAccordion.faq ? 'rotate-180' : ''}`}
+                  aria-hidden
+                />
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
+
+      {/* ページ最下部：口コミ一覧への導線（同上） */}
+      <div className="mt-8">
+        <Link
+          href={appPath(`/schools/${encodedSlug}/reviews`)}
+          className="inline-block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
+        >
+          自分に近い口コミを探す / 全ての口コミを見る
+        </Link>
+      </div>
     </>
   );
 }

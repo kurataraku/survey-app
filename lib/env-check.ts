@@ -61,5 +61,7 @@ export function getSiteUrl(): string {
 
 /** このアプリのベースURL（例: https://careeressence.jp/tsushin-kuchikomi） */
 export function getAppBaseUrl(): string {
-  return getSiteUrl().replace(/\/$/, "") + BASE_PATH;
+  const siteUrl = getSiteUrl();
+  const base = siteUrl.replace(/\/$/, '') + BASE_PATH;
+  return base;
 }
