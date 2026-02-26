@@ -236,7 +236,7 @@ export default function SeoSectionsEditor({ schoolId }: SeoSectionsEditorProps) 
                   <div>
                     <p className="font-semibold text-green-700 mb-1">良い点</p>
                     <ul className="list-disc list-inside space-y-0.5">
-                      {publishedParsed.good_points.map((s, i) => (
+                      {(publishedParsed.good_points ?? []).map((s, i) => (
                         <li key={i}>{s}</li>
                       ))}
                     </ul>
@@ -244,7 +244,7 @@ export default function SeoSectionsEditor({ schoolId }: SeoSectionsEditorProps) 
                   <div>
                     <p className="font-semibold text-rose-700 mb-1">改善してほしい点</p>
                     <ul className="list-disc list-inside space-y-0.5">
-                      {publishedParsed.improvement_points.map((s, i) => (
+                      {(publishedParsed.improvement_points ?? []).map((s, i) => (
                         <li key={i}>{s}</li>
                       ))}
                     </ul>
