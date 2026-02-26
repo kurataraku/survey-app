@@ -8,6 +8,7 @@ import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
+import { FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
 
 // ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
 export const revalidate = 60;
@@ -95,14 +96,27 @@ export default async function SchoolDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const faqSchema =
+  const faqForSchema =
     school.faq_items && school.faq_items.length > 0
+      ? [...school.faq_items]
+          .map((item) => ({
+            ...item,
+            displayQuestion: FAQ_OLD_TO_NEW[item.question] ?? item.question,
+          }))
+          .sort((a, b) => {
+            const ia = FAQ_DISPLAY_ORDER.indexOf(a.displayQuestion);
+            const ib = FAQ_DISPLAY_ORDER.indexOf(b.displayQuestion);
+            return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+          })
+      : [];
+  const faqSchema =
+    faqForSchema.length > 0
       ? {
           '@context': 'https://schema.org' as const,
           '@type': 'FAQPage' as const,
-          mainEntity: school.faq_items.map((item) => ({
+          mainEntity: faqForSchema.map((item) => ({
             '@type': 'Question' as const,
-            name: item.question,
+            name: item.displayQuestion,
             acceptedAnswer: {
               '@type': 'Answer' as const,
               text: item.answer,

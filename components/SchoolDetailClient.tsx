@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Sparkles, CheckCircle2, XCircle, User, ChevronDown } from 'lucide-react';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
@@ -12,7 +12,7 @@ import Tabs from '@/components/ui/Tabs';
 import StatisticsSection from '@/components/StatisticsSection';
 import { SchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import { appPath } from '@/lib/base-path';
-import { SEO_SECTION_KEYS, SEO_SECTION_LABELS } from '@/lib/seo-sections';
+import { SEO_SECTION_KEYS, SEO_SECTION_LABELS, FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
 
 const CONCLUSION_MAX_CHARS = 350;
 const FEW_REVIEWS_THRESHOLD = 5;
@@ -32,6 +32,21 @@ export default function SchoolDetailClient({
   const [expandedSeoContent, setExpandedSeoContent] = useState<Record<string, boolean>>({});
   const [openSeoAccordion, setOpenSeoAccordion] = useState<Record<string, boolean>>({});
   const [graphActiveTab, setGraphActiveTab] = useState<'ratings' | 'statistics'>('ratings');
+
+  /** FAQをユーザー関心順に並べ、旧質問文を新表示文に差し替え */
+  const faqItemsForDisplay = useMemo(() => {
+    if (!school.faq_items?.length) return [];
+    return [...school.faq_items]
+      .map((item) => ({
+        ...item,
+        displayQuestion: FAQ_OLD_TO_NEW[item.question] ?? item.question,
+      }))
+      .sort((a, b) => {
+        const ia = FAQ_DISPLAY_ORDER.indexOf(a.displayQuestion);
+        const ib = FAQ_DISPLAY_ORDER.indexOf(b.displayQuestion);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      });
+  }, [school.faq_items]);
 
   useEffect(() => {
     const syncTabFromHash = () => {
@@ -626,7 +641,7 @@ export default function SchoolDetailClient({
                 </div>
               )
           )}
-          {school.faq_items && school.faq_items.length > 0 && (
+          {faqItemsForDisplay.length > 0 && (
             <div
               role="button"
               tabIndex={0}
@@ -643,15 +658,13 @@ export default function SchoolDetailClient({
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-bold text-gray-900 mb-1.5">
                     よくある質問（FAQ）
-                    {school.faq_items.length > 0 && (
-                      <span className="ml-2 text-xs font-normal text-gray-500">（{school.faq_items.length}件）</span>
-                    )}
+                    <span className="ml-2 text-xs font-normal text-gray-500">（{faqItemsForDisplay.length}件）</span>
                   </h3>
                   {!openSeoAccordion.faq ? (
                     <>
                       <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">
-                        {school.faq_items[0]
-                          ? `${school.faq_items[0].question}${school.faq_items[0].answer ? ` — ${school.faq_items[0].answer.slice(0, 60)}…` : ''}`
+                        {faqItemsForDisplay[0]
+                          ? `${faqItemsForDisplay[0].displayQuestion}${faqItemsForDisplay[0].answer ? ` — ${faqItemsForDisplay[0].answer.slice(0, 60)}…` : ''}`
                           : 'まだ口コミが十分に集まっていません。'}
                       </p>
                       <span className="mt-2 inline-block text-sm font-medium text-blue-600">続きを読む</span>
@@ -659,12 +672,12 @@ export default function SchoolDetailClient({
                   ) : (
                     <>
                       <div className="mt-3 space-y-4">
-                        {school.faq_items.map((item, i) => {
+                        {faqItemsForDisplay.map((item, i) => {
                           const faqKey = `faq-${i}`;
                           const expanded = expandedSeoContent[faqKey];
                           return (
                             <div key={i} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
-                              <h4 className="text-sm font-semibold text-gray-900 mb-1">{item.question}</h4>
+                              <h4 className="text-sm font-semibold text-gray-900 mb-1">{item.displayQuestion}</h4>
                               <p className={`text-gray-700 text-sm leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
                                 {item.answer.trim() || 'まだ口コミが十分に集まっていません。'}
                               </p>

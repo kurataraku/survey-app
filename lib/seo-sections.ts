@@ -24,13 +24,27 @@ export const SEO_SECTION_LABELS: Record<SeoSectionKey, string> = {
   flexibility: '不登校の子にとっての通いやすさ',
 };
 
+/** ユーザー関心順：①生徒の雰囲気 ②不登校 ③体調/メンタル ④先生・サポート ⑤学校の強み */
 export const FAQ_QUESTIONS = [
-  '在校生の雰囲気はどんな感じですか？',
-  'この学校で特に評価が高いポイントはどこですか？',
-  '不登校傾向の子にとって「学びの柔軟さ」はどうですか？',
-  '「先生・職員の対応」はどう評価されていますか？',
-  '「心や体調の波へのサポート」はどうですか？',
+  '生徒の雰囲気は？',
+  '不登校ぎみでも通いやすい？',
+  '体調やメンタルに波がある場合、無理なく続けられる？',
+  '先生や職員のサポートはどれくらい手厚い？相談しやすい？',
+  'この学校の強みは？選ばれている理由は？',
 ] as const;
+
+/** 既存FAQ表示用：旧質問文→新表示文（DBに旧文で保存されている場合の差し替え） */
+export const FAQ_OLD_TO_NEW: Record<string, string> = {
+  '在校生の雰囲気はどんな感じですか？': '生徒の雰囲気は？',
+  '「在校生の雰囲気」はどんな評価ですか？': '生徒の雰囲気は？',
+  '不登校傾向の子にとって「学びの柔軟さ」はどうですか？': '不登校ぎみでも通いやすい？',
+  '「心や体調の波へのサポート」はどうですか？': '体調やメンタルに波がある場合、無理なく続けられる？',
+  '「先生・職員の対応」はどう評価されていますか？': '先生や職員のサポートはどれくらい手厚い？相談しやすい？',
+  'この学校で特に評価が高いポイントはどこですか？': 'この学校の強みは？選ばれている理由は？',
+};
+
+/** 表示順（FAQ_QUESTIONS と同じユーザー関心順） */
+export const FAQ_DISPLAY_ORDER: readonly string[] = FAQ_QUESTIONS;
 
 export function isSeoSectionKey(topic: string | null): topic is SeoSectionKey {
   return topic !== null && SEO_SECTION_KEYS.includes(topic as SeoSectionKey);
