@@ -40,7 +40,7 @@ export async function POST(
       );
     }
 
-    const { data: reviews = [], error: reviewsError } = await supabase
+    const { data: reviewsData, error: reviewsError } = await supabase
       .from('survey_responses')
       .select('id, good_comment, bad_comment, overall_satisfaction, created_at, answers')
       .eq('school_id', schoolId)
@@ -56,10 +56,11 @@ export async function POST(
       );
     }
 
-    const reviewCount = reviews.length;
+    const reviewsList = reviewsData ?? [];
+    const reviewCount = reviewsList.length;
     const maxCreatedAt =
-      reviews.length > 0
-        ? reviews.reduce((max, r) => (r.created_at > max ? r.created_at : max), reviews[0].created_at)
+      reviewsList.length > 0
+        ? reviewsList.reduce((max, r) => (r.created_at > max ? r.created_at : max), reviewsList[0].created_at)
         : null;
 
     if (reviewCount === 0) {
@@ -71,7 +72,7 @@ export async function POST(
 
     const { summary, tokensUsed } = await callOpenAIForReviewTendency(
       school.name,
-      reviews.map((r) => ({
+      reviewsList.map((r) => ({
         good_comment: r.good_comment || '',
         bad_comment: r.bad_comment || '',
         overall_satisfaction: r.overall_satisfaction ?? 0,
