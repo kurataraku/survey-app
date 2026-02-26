@@ -642,7 +642,7 @@ export default function SchoolDetailClient({
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-base font-bold text-gray-900 mb-1.5">
-                    在校生の雰囲気はどんな感じですか？
+                    よくある質問（FAQ）
                     {school.faq_items.length > 0 && (
                       <span className="ml-2 text-xs font-normal text-gray-500">（{school.faq_items.length}件）</span>
                     )}
