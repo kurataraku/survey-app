@@ -24,7 +24,7 @@ Google アナリティクス（GA4）実装を本番に反映する前に、**�
 
 - **計測ID設定時**
   - gtag は `next/script` の `afterInteractive` で読み込み（レンダリングをブロックしない）
-  - `GoogleAnalytics` は `useEffect` で `page_view` を送るのみ。`return null` のため **DOM ・レイアウトへの影響なし**
+  - `GoogleAnalytics` は **初期表示とクライアント遷移時** に `page_view` を送信。`return null` のため **DOM ・レイアウトへの影響なし**
   - `/tsushin-kuchikomi/admin` 配下では `page_view` を送信しないが、gtag の読み込みは全ページで行う
 
 - **他機能との接点**

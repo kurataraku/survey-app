@@ -47,6 +47,8 @@ export function GoogleAnalytics() {
       if (isInitialMount.current) {
         isInitialMount.current = false;
         lastPathRef.current = path;
+        // 初期表示（フルロード）でも page_view を送る（send_page_view: false のため手動送信が必要）
+        sendPageView(path, loc);
         return true;
       }
       const sent = sendPageView(path, loc);
