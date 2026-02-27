@@ -69,6 +69,37 @@ export const VALIDATION_FIELD_LABELS: Record<string, string> = {
   email: 'メールアドレス',
 };
 
+/** フィールド名 → CSVの列番号（1始まり。ID=1, 送信日時=2, 学校名=3...） */
+export const VALIDATION_FIELD_COLUMN: Record<string, number> = {
+  school_name: 3,
+  respondent_role: 4,
+  status: 5,
+  graduation_path: 6,
+  graduation_path_other: 7,
+  reason_for_choosing: 8,
+  course: 9,
+  enrollment_type: 10,
+  enrollment_year: 11,
+  attendance_frequency: 12,
+  campus_prefecture: 13,
+  teaching_style: 14,
+  student_atmosphere: 15,
+  atmosphere_other: 16,
+  flexibility_rating: 17,
+  staff_rating: 18,
+  support_rating: 19,
+  atmosphere_fit_rating: 20,
+  credit_rating: 21,
+  unique_course_rating: 22,
+  career_support_rating: 23,
+  campus_life_rating: 24,
+  tuition_rating: 25,
+  overall_satisfaction: 26,
+  good_comment: 27,
+  bad_comment: 28,
+  email: 29,
+};
+
 /** 1行分のインポート用データ（API送信前の形状。school_id は API で解決） */
 export interface SurveyImportRow {
   school_name: string;

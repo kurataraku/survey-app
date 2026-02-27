@@ -7,6 +7,7 @@ import {
   validateImportRows,
   getTemplateCsvContent,
   VALIDATION_FIELD_LABELS,
+  VALIDATION_FIELD_COLUMN,
   type ParseCsvResult,
   type SurveyImportRow,
   type RowValidationError,
@@ -196,18 +197,31 @@ export default function AdminImportPage() {
               {validationErrors.length > 0 && (
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-700 mb-2">エラー行（修正してください）</p>
+                  <p className="text-xs text-gray-500 mb-2">※「CSV○列目」はExcel等で開いたときの列番号です。該当セルの値を「入力値」のとおりに修正してください。</p>
                   <ul className="text-sm text-gray-600 space-y-4 max-h-[420px] overflow-y-auto pr-2">
                     {validationErrors.map((err, i) => (
                       <li key={i} className="border border-amber-200 rounded-lg bg-amber-50/50 p-3">
-                        <p className="font-medium text-gray-900 mb-2">行{err.rowIndex}</p>
-                        <ul className="list-disc list-inside space-y-1 text-amber-900/90">
+                        <p className="font-medium text-gray-900 mb-2">CSVの行{err.rowIndex}（データ{err.rowIndex}件目）</p>
+                        <ul className="list-disc list-inside space-y-2 text-amber-900/90">
                           {err.issues.map((iss, j) => {
                             const fieldKey = typeof iss.path[0] === 'string' ? iss.path[0] : String(iss.path[0]);
                             const label = VALIDATION_FIELD_LABELS[fieldKey] ?? fieldKey;
+                            const colNum = VALIDATION_FIELD_COLUMN[fieldKey];
+                            const raw = (err.row as Record<string, unknown>)[fieldKey];
+                            const displayValue =
+                              raw === undefined || raw === null
+                                ? '（未入力）'
+                                : Array.isArray(raw)
+                                  ? (raw as string[]).join('；')
+                                  : String(raw);
+                            const colInfo = colNum != null ? `CSV${colNum}列目・` : '';
                             return (
-                              <li key={j}>
-                                <span className="font-medium text-gray-800">{label}:</span>{' '}
-                                {iss.message}
+                              <li key={j} className="flex flex-col gap-0.5">
+                                <span className="font-medium text-gray-800">{colInfo}{label}</span>
+                                <span className="text-red-700 bg-red-50/80 px-1.5 py-0.5 rounded text-xs font-mono">
+                                  入力値: 「{displayValue}」
+                                </span>
+                                <span className="text-gray-700">{iss.message}</span>
                               </li>
                             );
                           })}
