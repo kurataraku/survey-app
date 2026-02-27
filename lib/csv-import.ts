@@ -327,17 +327,29 @@ function csvRowToImportRow(
 }
 
 /**
+ * 行がヘッダー行と同じ内容か（2行目がヘッダー重複のときにスキップするため）
+ */
+function isHeaderRow(values: string[]): boolean {
+  const H = EXPORT_CSV_HEADERS;
+  if (values.length < 5) return false;
+  const v3 = String(values[3] ?? '').trim();
+  const v4 = String(values[4] ?? '').trim();
+  return v3 === H[3] && v4 === H[4]; // 「あなたの立場」「状況」がそのままならヘッダー行
+}
+
+/**
  * CSV文字列をパースし、インポート用行の配列に変換する
  */
 export function parseCsvToImportRows(csvText: string): ParseCsvResult {
   const parseErrors: Array<{ rowIndex: number; message: string }> = [];
-  const lines = parseCsvLines(csvText);
+  const normalized = csvText.replace(/^\uFEFF/, ''); // BOM除去（UTF-8 BOMで1行目がずれないように）
+  const lines = parseCsvLines(normalized);
 
   if (lines.length === 0) {
     return { headers: [], rows: [], parseErrors: [{ rowIndex: 0, message: 'CSVにデータがありません' }] };
   }
 
-  const headers = lines[0].map((h) => h.trim());
+  const headers = lines[0].map((h) => String(h ?? '').trim().replace(/^\uFEFF/, ''));
   const dataLines = lines.slice(1);
   const rows: SurveyImportRow[] = [];
 
@@ -348,6 +360,8 @@ export function parseCsvToImportRows(csvText: string): ParseCsvResult {
 
     const isEmptyRow = values.every((cell) => !String(cell).trim());
     if (isEmptyRow) continue;
+
+    if (isHeaderRow(values)) continue; // ヘッダー行の重複をスキップ（2行目がヘッダーなど）
 
     if (values.length < expectedMinColumns) {
       parseErrors.push({
