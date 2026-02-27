@@ -38,6 +38,37 @@ export const EXPORT_CSV_HEADERS = [
   'メールアドレス',
 ] as const;
 
+/** バリデーションの path（フィールド名）→ 表示用の列名 */
+export const VALIDATION_FIELD_LABELS: Record<string, string> = {
+  school_name: 'どの通信制高校についての口コミですか？（学校名）',
+  respondent_role: 'あなたの立場',
+  status: '状況',
+  graduation_path: '卒業後の進路',
+  graduation_path_other: '卒業後の進路（その他）',
+  reason_for_choosing: '通信制を選んだ理由',
+  course: '在籍していたコース',
+  enrollment_type: '入学タイミング',
+  enrollment_year: '入学年',
+  attendance_frequency: '主な通学頻度',
+  campus_prefecture: '主に通っていたキャンパス都道府県',
+  teaching_style: '授業スタイル',
+  student_atmosphere: '生徒の雰囲気',
+  atmosphere_other: 'その他（生徒の雰囲気）',
+  flexibility_rating: '学びの柔軟さ（評価）',
+  staff_rating: '先生・職員の対応（評価）',
+  support_rating: '心や体調の波・不安などに対するサポート（評価）',
+  atmosphere_fit_rating: '在校生の雰囲気が自分に合っていたか（評価）',
+  credit_rating: '単位取得のしやすさ（評価）',
+  unique_course_rating: '独自授業・コースの充実度（評価）',
+  career_support_rating: '進路サポート（評価）',
+  campus_life_rating: '行事やキャンパスライフの過ごしやすさ（評価）',
+  tuition_rating: '学費の納得感（評価）',
+  overall_satisfaction: '総合満足度',
+  good_comment: '良かった点（自由記述）',
+  bad_comment: '改善してほしい点/合わない点（自由記述）',
+  email: 'メールアドレス',
+};
+
 /** 1行分のインポート用データ（API送信前の形状。school_id は API で解決） */
 export interface SurveyImportRow {
   school_name: string;

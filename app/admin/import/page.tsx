@@ -6,6 +6,7 @@ import {
   parseCsvToImportRows,
   validateImportRows,
   getTemplateCsvContent,
+  VALIDATION_FIELD_LABELS,
   type ParseCsvResult,
   type SurveyImportRow,
   type RowValidationError,
@@ -195,11 +196,22 @@ export default function AdminImportPage() {
               {validationErrors.length > 0 && (
                 <div className="mt-4">
                   <p className="text-sm font-medium text-gray-700 mb-2">エラー行（修正してください）</p>
-                  <ul className="text-sm text-gray-600 space-y-2 max-h-60 overflow-y-auto">
+                  <ul className="text-sm text-gray-600 space-y-4 max-h-[420px] overflow-y-auto pr-2">
                     {validationErrors.map((err, i) => (
-                      <li key={i} className="border-b border-gray-100 pb-2">
-                        <span className="font-medium">行{err.rowIndex}:</span>{' '}
-                        {err.issues.map((iss) => iss.message).join(' / ')}
+                      <li key={i} className="border border-amber-200 rounded-lg bg-amber-50/50 p-3">
+                        <p className="font-medium text-gray-900 mb-2">行{err.rowIndex}</p>
+                        <ul className="list-disc list-inside space-y-1 text-amber-900/90">
+                          {err.issues.map((iss, j) => {
+                            const fieldKey = typeof iss.path[0] === 'string' ? iss.path[0] : String(iss.path[0]);
+                            const label = VALIDATION_FIELD_LABELS[fieldKey] ?? fieldKey;
+                            return (
+                              <li key={j}>
+                                <span className="font-medium text-gray-800">{label}:</span>{' '}
+                                {iss.message}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </li>
                     ))}
                   </ul>
