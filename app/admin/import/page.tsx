@@ -207,7 +207,7 @@ export default function AdminImportPage() {
                             const fieldKey = typeof iss.path[0] === 'string' ? iss.path[0] : String(iss.path[0]);
                             const label = VALIDATION_FIELD_LABELS[fieldKey] ?? fieldKey;
                             const colNum = VALIDATION_FIELD_COLUMN[fieldKey];
-                            const raw = (err.row as Record<string, unknown>)[fieldKey];
+                            const raw = (err.row as unknown as Record<string, unknown>)[fieldKey];
                             const displayValue =
                               raw === undefined || raw === null
                                 ? '（未入力）'
