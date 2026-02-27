@@ -241,6 +241,30 @@ function normalizeAttendanceFrequency(value: string): string {
   return s;
 }
 
+/** 括弧を全角に統一し、前後のスペースを除去（スキーマのenumは全角（）のみ有効） */
+function normalizeEnumParens(value: string): string {
+  const t = value?.trim() ?? '';
+  return t
+    .replace(/\s*\(\s*/g, '\uFF08') // 半角( と前後スペース → 全角（
+    .replace(/\s*\)\s*/g, '\uFF09'); // 半角) と前後スペース → 全角）
+}
+
+/** 評価1〜5用：数値や "5.0" を "1"〜"5" に正規化 */
+function normalizeRating1to5(value: string): string {
+  const t = value?.trim() ?? '';
+  const n = Math.round(Number(t));
+  if (Number.isFinite(n) && n >= 1 && n <= 5) return String(n);
+  return t;
+}
+
+/** 評価1〜6用：数値や "6.0" を "1"〜"6" に正規化 */
+function normalizeRating1to6(value: string): string {
+  const t = value?.trim() ?? '';
+  const n = Math.round(Number(t));
+  if (Number.isFinite(n) && n >= 1 && n <= 6) return String(n);
+  return t;
+}
+
 /**
  * CSV 1行をインポート用オブジェクトに変換
  */
@@ -249,19 +273,21 @@ function csvRowToImportRow(
   values: string[],
   rowIndex: number
 ): { data: SurveyImportRow } | { error: string } {
-  const get = (fieldName: string): string => {
-    const idx = headers.indexOf(fieldName);
+  const get = (fieldName: string, headerIndex: number): string => {
+    let idx = headers.indexOf(fieldName);
+    if (idx < 0 && headerIndex >= 0 && headerIndex < values.length) idx = headerIndex; // ヘッダー名不一致時は列位置で取得（Excelで短縮されても読める）
     if (idx < 0 || idx >= values.length) return '';
     const v = values[idx];
-    return typeof v === 'string' ? v.trim() : '';
+    return String(v ?? '').trim();
   };
 
-  const schoolName = get(EXPORT_CSV_HEADERS[2]);
-  const respondentRole = get(EXPORT_CSV_HEADERS[3]);
-  const status = get(EXPORT_CSV_HEADERS[4]);
-  const reasonRaw = get(EXPORT_CSV_HEADERS[7]);
-  const teachingStyleRaw = get(EXPORT_CSV_HEADERS[13]);
-  const studentAtmosphereRaw = get(EXPORT_CSV_HEADERS[14]);
+  const H = EXPORT_CSV_HEADERS;
+  const schoolName = get(H[2], 2);
+  const respondentRole = get(H[3], 3);
+  const status = get(H[4], 4);
+  const reasonRaw = get(H[7], 7);
+  const teachingStyleRaw = get(H[13], 13);
+  const studentAtmosphereRaw = get(H[14], 14);
 
   if (!schoolName) {
     return { error: '学校名が空です' };
@@ -270,31 +296,31 @@ function csvRowToImportRow(
   const data: SurveyImportRow = {
     school_name: schoolName,
     respondent_role: respondentRole || '',
-    status: status || '',
-    graduation_path: emptyToUndefined(get(EXPORT_CSV_HEADERS[5])),
-    graduation_path_other: emptyToUndefined(get(EXPORT_CSV_HEADERS[6])),
+    status: normalizeEnumParens(status || ''),
+    graduation_path: emptyToUndefined(get(H[5], 5)),
+    graduation_path_other: emptyToUndefined(get(H[6], 6)),
     reason_for_choosing: splitSemicolon(reasonRaw),
-    course: emptyToUndefined(get(EXPORT_CSV_HEADERS[8])),
-    enrollment_type: get(EXPORT_CSV_HEADERS[9]),
-    enrollment_year: get(EXPORT_CSV_HEADERS[10]),
-    attendance_frequency: normalizeAttendanceFrequency(get(EXPORT_CSV_HEADERS[11])),
-    campus_prefecture: get(EXPORT_CSV_HEADERS[12]),
+    course: emptyToUndefined(get(H[8], 8)),
+    enrollment_type: normalizeEnumParens(get(H[9], 9)),
+    enrollment_year: get(H[10], 10),
+    attendance_frequency: normalizeAttendanceFrequency(get(H[11], 11)),
+    campus_prefecture: get(H[12], 12),
     teaching_style: splitSemicolon(teachingStyleRaw),
     student_atmosphere: splitSemicolon(studentAtmosphereRaw),
-    atmosphere_other: emptyToUndefined(get(EXPORT_CSV_HEADERS[15])),
-    flexibility_rating: get(EXPORT_CSV_HEADERS[16]),
-    staff_rating: get(EXPORT_CSV_HEADERS[17]),
-    support_rating: get(EXPORT_CSV_HEADERS[18]),
-    atmosphere_fit_rating: get(EXPORT_CSV_HEADERS[19]),
-    credit_rating: get(EXPORT_CSV_HEADERS[20]),
-    unique_course_rating: get(EXPORT_CSV_HEADERS[21]),
-    career_support_rating: get(EXPORT_CSV_HEADERS[22]),
-    campus_life_rating: get(EXPORT_CSV_HEADERS[23]),
-    tuition_rating: get(EXPORT_CSV_HEADERS[24]),
-    overall_satisfaction: get(EXPORT_CSV_HEADERS[25]),
-    good_comment: get(EXPORT_CSV_HEADERS[26]),
-    bad_comment: get(EXPORT_CSV_HEADERS[27]),
-    email: normalizeEmailForImport(get(EXPORT_CSV_HEADERS[28])),
+    atmosphere_other: emptyToUndefined(get(H[15], 15)),
+    flexibility_rating: normalizeRating1to5(get(H[16], 16)),
+    staff_rating: normalizeRating1to5(get(H[17], 17)),
+    support_rating: normalizeRating1to5(get(H[18], 18)),
+    atmosphere_fit_rating: normalizeRating1to5(get(H[19], 19)),
+    credit_rating: normalizeRating1to5(get(H[20], 20)),
+    unique_course_rating: normalizeRating1to6(get(H[21], 21)),
+    career_support_rating: normalizeRating1to5(get(H[22], 22)),
+    campus_life_rating: normalizeRating1to6(get(H[23], 23)),
+    tuition_rating: normalizeRating1to6(get(H[24], 24)),
+    overall_satisfaction: normalizeRating1to5(get(H[25], 25)),
+    good_comment: get(H[26], 26),
+    bad_comment: get(H[27], 27),
+    email: normalizeEmailForImport(get(H[28], 28)),
   };
 
   return { data };
