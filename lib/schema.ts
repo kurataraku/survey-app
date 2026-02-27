@@ -133,3 +133,55 @@ export const surveySchema = baseSchema
 
 export type SurveyFormData = z.infer<typeof surveySchema>;
 
+/**
+ * インポート用スキーマ（CSV一括投入）
+ * 通常スキーマと同じ厳密なバリデーションだが、school_id は不要（API側で学校名から解決）
+ */
+export const surveyImportSchema = baseSchema
+  .refine(
+    (data) => {
+      if (data.status === '卒業した') return !!data.graduation_path;
+      return true;
+    },
+    { message: '卒業後の進路を選択してください', path: ['graduation_path'] }
+  )
+  .refine(
+    (data) => {
+      if (data.graduation_path === 'その他') {
+        return !!data.graduation_path_other && data.graduation_path_other.trim().length > 0;
+      }
+      return true;
+    },
+    { message: 'その他（卒業後の進路）を入力してください', path: ['graduation_path_other'] }
+  )
+  .refine(
+    (data) => {
+      if (data.student_atmosphere?.includes('その他')) {
+        return !!data.atmosphere_other && data.atmosphere_other.trim().length > 0;
+      }
+      return true;
+    },
+    { message: 'その他（生徒の雰囲気）を入力してください', path: ['atmosphere_other'] }
+  )
+  .superRefine((data, ctx) => {
+    const overallSatisfaction = data.overall_satisfaction ? parseInt(data.overall_satisfaction) : undefined;
+    const minLength = getCommentMinLength(overallSatisfaction, 'good');
+    if (data.good_comment.trim().length < minLength) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `良かった点は${minLength}文字以上入力してください`,
+        path: ['good_comment'],
+      });
+    }
+    const minLengthBad = getCommentMinLength(overallSatisfaction, 'bad');
+    if (data.bad_comment.trim().length < minLengthBad) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `改善してほしい点/合わない点は${minLengthBad}文字以上入力してください`,
+        path: ['bad_comment'],
+      });
+    }
+  });
+
+export type SurveyImportFormData = z.infer<typeof surveyImportSchema>;
+
