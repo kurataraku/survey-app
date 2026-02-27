@@ -3,6 +3,7 @@
  * エクスポートCSVと同じフォーマットをパースし、surveySchema互換のオブジェクトに変換する
  */
 
+import Papa from 'papaparse';
 import type { z } from 'zod';
 
 /** エクスポートCSVと同じヘッダー（テンプレート・マッピング用） */
@@ -138,73 +139,19 @@ export interface ParseCsvResult {
 }
 
 /**
- * CSV文字列をパース（BOM除去・ダブルクォート対応）
+ * CSV文字列をパース（papaparse使用。BOM・ダブルクォート内改行・エスケープを正しく処理）
  */
 function parseCsvLines(csvText: string): string[][] {
-  const trimmed = csvText.replace(/^\uFEFF/, '').trim();
-  const lines: string[][] = [];
-  let i = 0;
+  const cleaned = csvText
+    .replace(/^\uFEFF/, '')        // 実際のBOM
+    .replace(/^\\uFEFF/i, '');     // リテラル文字列 \uFEFF（BOM付与スクリプトの誤挿入対策）
 
-  while (i < trimmed.length) {
-    const row: string[] = [];
-    let field = '';
+  const result = Papa.parse<string[]>(cleaned, {
+    header: false,
+    skipEmptyLines: false,
+  });
 
-    while (i < trimmed.length) {
-      const c = trimmed[i];
-
-      if (c === '"') {
-        i += 1;
-        while (i < trimmed.length) {
-          if (trimmed[i] === '"') {
-            if (trimmed[i + 1] === '"') {
-              field += '"';
-              i += 2;
-            } else {
-              i += 1;
-              break;
-            }
-          } else {
-            field += trimmed[i];
-            i += 1;
-          }
-        }
-        continue;
-      }
-
-      if (c === ',') {
-        row.push(field);
-        field = '';
-        i += 1;
-        continue;
-      }
-
-      if (c === '\r' && trimmed[i + 1] === '\n') {
-        row.push(field);
-        lines.push(row);
-        field = '';
-        i += 2;
-        continue;
-      }
-
-      if (c === '\n' || c === '\r') {
-        row.push(field);
-        lines.push(row);
-        field = '';
-        i += 1;
-        continue;
-      }
-
-      field += c;
-      i += 1;
-    }
-
-    if (field !== '' || row.length > 0) {
-      row.push(field);
-      lines.push(row);
-    }
-  }
-
-  return lines;
+  return result.data;
 }
 
 /**
@@ -326,15 +273,35 @@ function csvRowToImportRow(
   return { data };
 }
 
+/** セルを正規化（trim + BOM除去）して比較用に使う */
+function normCell(v: unknown): string {
+  return String(v ?? '').trim().replace(/\uFEFF/g, '');
+}
+
 /**
- * 行がヘッダー行と同じ内容か（2行目がヘッダー重複のときにスキップするため）
+ * 行がヘッダー行と同じ内容か（2行目がヘッダー重複・1行目が空で2行目がヘッダーなどのときにスキップ）
  */
 function isHeaderRow(values: string[]): boolean {
   const H = EXPORT_CSV_HEADERS;
   if (values.length < 5) return false;
-  const v3 = String(values[3] ?? '').trim();
-  const v4 = String(values[4] ?? '').trim();
-  return v3 === H[3] && v4 === H[4]; // 「あなたの立場」「状況」がそのままならヘッダー行
+  const v2 = normCell(values[2]);
+  const v3 = normCell(values[3]);
+  const v4 = normCell(values[4]);
+  const v10 = normCell(values[10]);
+  // データ行では 2=学校名, 3=本人|保護者, 4=在籍中|卒業した|..., 10=2021 など。ヘッダーなら 3=あなたの立場, 4=状況, 10=入学年
+  if (v3 === 'あなたの立場' && v4 === '状況') return true;
+  if (v3 === 'あなたの立場' || v4 === '状況') {
+    if (v2.includes('学校名') || v10 === '入学年') return true;
+  }
+  return false;
+}
+
+/** 行がヘッダー行として使えるか（1列目がIDまたは3列目付近に「あなたの立場」がある） */
+function isHeaderLine(values: string[]): boolean {
+  if (values.length < 4) return false;
+  const v0 = normCell(values[0]);
+  const v3 = normCell(values[3]);
+  return v0 === 'ID' || (v3 === 'あなたの立場' && values.length >= 10);
 }
 
 /**
@@ -342,21 +309,33 @@ function isHeaderRow(values: string[]): boolean {
  */
 export function parseCsvToImportRows(csvText: string): ParseCsvResult {
   const parseErrors: Array<{ rowIndex: number; message: string }> = [];
-  const normalized = csvText.replace(/^\uFEFF/, ''); // BOM除去（UTF-8 BOMで1行目がずれないように）
+  const normalized = csvText.replace(/^\uFEFF/, ''); // BOM除去
   const lines = parseCsvLines(normalized);
 
   if (lines.length === 0) {
     return { headers: [], rows: [], parseErrors: [{ rowIndex: 0, message: 'CSVにデータがありません' }] };
   }
 
-  const headers = lines[0].map((h) => String(h ?? '').trim().replace(/^\uFEFF/, ''));
-  const dataLines = lines.slice(1);
+  // 1行目が空やBOMだけの場合は、ヘッダーらしい行を探す（多くのCSVで2行目がヘッダーの場合に対応）
+  let headerRowIndex = 0;
+  if (!isHeaderLine(lines[0]) && lines.length > 1) {
+    for (let k = 1; k < Math.min(lines.length, 5); k++) {
+      if (isHeaderLine(lines[k])) {
+        headerRowIndex = k;
+        break;
+      }
+    }
+  }
+
+  const headers = lines[headerRowIndex].map((h) => normCell(h));
+  const dataLines = lines.slice(headerRowIndex + 1);
   const rows: SurveyImportRow[] = [];
 
   const expectedMinColumns = EXPORT_CSV_HEADERS.length;
+  const dataStartRow = headerRowIndex + 2; // 1-based（ヘッダー行の次がデータ1件目）
   for (let i = 0; i < dataLines.length; i++) {
     const values = dataLines[i];
-    const rowIndex = i + 2; // 1-based, かつヘッダーが1行目
+    const rowIndex = dataStartRow + i;
 
     const isEmptyRow = values.every((cell) => !String(cell).trim());
     if (isEmptyRow) continue;
