@@ -90,16 +90,39 @@ export async function POST(
       );
     }
 
-    // 2. survey_responsesのschool_idを更新
+    // 2. survey_responsesを統合先に紐づける
+    // 2a. school_id が統合元のレコード → school_id と school_name を統合先に更新
+    //     （管理画面の口コミ一覧は school_name で検索しているため、school_name も更新が必要）
     const { error: updateError } = await supabase
       .from('survey_responses')
-      .update({ school_id: target_school_id })
+      .update({
+        school_id: target_school_id,
+        school_name: targetSchool.name,
+      })
       .eq('school_id', sourceSchoolId);
 
     if (updateError) {
       console.error('survey_responses更新エラー:', updateError);
       return NextResponse.json(
         { error: '口コミデータの更新に失敗しました', details: updateError.message },
+        { status: 500 }
+      );
+    }
+
+    // 2b. school_id が null で school_name が統合元の名前のレコードも統合先に紐づける
+    const { error: updateByNameError } = await supabase
+      .from('survey_responses')
+      .update({
+        school_id: target_school_id,
+        school_name: targetSchool.name,
+      })
+      .is('school_id', null)
+      .eq('school_name', sourceSchool.name);
+
+    if (updateByNameError) {
+      console.error('survey_responses（school_name紐づけ）更新エラー:', updateByNameError);
+      return NextResponse.json(
+        { error: '口コミデータの更新に失敗しました', details: updateByNameError.message },
         { status: 500 }
       );
     }

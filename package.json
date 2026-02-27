@@ -15,7 +15,8 @@
     "delete-dummy-data": "tsx scripts/delete-dummy-data.ts",
     "setup:initial-owner": "tsx scripts/setup-initial-owner.ts",
     "send-password-reset": "tsx scripts/send-password-reset.ts",
-    "set-password-directly": "tsx scripts/set-password-directly.ts"
+    "set-password-directly": "tsx scripts/set-password-directly.ts",
+    "debug:merge": "tsx scripts/debug-merge.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
