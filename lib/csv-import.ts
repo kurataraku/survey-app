@@ -161,6 +161,24 @@ function emptyToUndefined(s: string): string | undefined {
   return t === '' ? undefined : t;
 }
 
+/** メールアドレス用：全角＠を半角@に置換（IME全角入力で入力されても通るようにする） */
+function normalizeEmailForImport(value: string): string {
+  const t = value?.trim() ?? '';
+  return t.replace(/\uFF20/g, '@'); // 全角＠ → 半角@
+}
+
+/**
+ * 主な通学頻度用：チルダ・全角チルダを波ダッシュに統一（enumは 〜 U+301C のみ有効）
+ * 例: 週3~4 → 週3〜4, 月1～月数回 → 月1〜数回
+ */
+function normalizeAttendanceFrequency(value: string): string {
+  const t = value?.trim() ?? '';
+  const waveDash = '\u301C'; // 波ダッシュ
+  let s = t.replace(/\u007E/g, waveDash).replace(/\uFF5E/g, waveDash); // 半角~ と 全角～
+  if (s.includes('月数回')) s = s.replace('月数回', '数回'); // 「月1～月数回」→「月1〜数回」
+  return s;
+}
+
 /**
  * CSV 1行をインポート用オブジェクトに変換
  */
@@ -197,7 +215,7 @@ function csvRowToImportRow(
     course: emptyToUndefined(get(EXPORT_CSV_HEADERS[8])),
     enrollment_type: get(EXPORT_CSV_HEADERS[9]),
     enrollment_year: get(EXPORT_CSV_HEADERS[10]),
-    attendance_frequency: get(EXPORT_CSV_HEADERS[11]),
+    attendance_frequency: normalizeAttendanceFrequency(get(EXPORT_CSV_HEADERS[11])),
     campus_prefecture: get(EXPORT_CSV_HEADERS[12]),
     teaching_style: splitSemicolon(teachingStyleRaw),
     student_atmosphere: splitSemicolon(studentAtmosphereRaw),
@@ -214,7 +232,7 @@ function csvRowToImportRow(
     overall_satisfaction: get(EXPORT_CSV_HEADERS[25]),
     good_comment: get(EXPORT_CSV_HEADERS[26]),
     bad_comment: get(EXPORT_CSV_HEADERS[27]),
-    email: get(EXPORT_CSV_HEADERS[28]),
+    email: normalizeEmailForImport(get(EXPORT_CSV_HEADERS[28])),
   };
 
   return { data };
