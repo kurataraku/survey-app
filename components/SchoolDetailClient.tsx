@@ -16,7 +16,7 @@ import { SEO_SECTION_KEYS, SEO_SECTION_LABELS, FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER
 
 const CONCLUSION_MAX_CHARS = 350;
 const FEW_REVIEWS_THRESHOLD = 5;
-const GRAPH_HIDDEN_THRESHOLD = 3;
+const GRAPH_HIDDEN_THRESHOLD = 1;
 
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
