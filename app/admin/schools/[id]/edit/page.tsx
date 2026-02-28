@@ -512,6 +512,7 @@ export default function EditSchoolPage() {
               </div>
 
               <SchoolEditor
+                schoolId={id}
                 initialData={{
                   name: school.name,
                   prefecture: school.prefecture,

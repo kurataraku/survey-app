@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SchoolFormData } from '@/lib/types/schools';
 import { generateSlug } from '@/lib/utils';
 import { prefectures } from '@/lib/prefectures';
+import { apiPath } from '@/lib/base-path';
 import JsonArrayEditor from './JsonArrayEditor';
 import JsonObjectArrayEditor from './JsonObjectArrayEditor';
 
@@ -11,13 +12,17 @@ interface SchoolEditorProps {
   initialData?: Partial<SchoolFormData>;
   onSubmit: (data: SchoolFormData) => Promise<void>;
   isSubmitting?: boolean;
+  /** 学校ID（指定時のみ「AIで生成」ボタンを表示） */
+  schoolId?: string;
 }
 
 export default function SchoolEditor({
   initialData,
   onSubmit,
   isSubmitting = false,
+  schoolId,
 }: SchoolEditorProps) {
+  const [generatingIntro, setGeneratingIntro] = useState(false);
   const [formData, setFormData] = useState<SchoolFormData>({
     name: initialData?.name || '',
     prefecture: initialData?.prefecture || '',
@@ -178,9 +183,43 @@ export default function SchoolEditor({
       </div>
 
       <div>
-        <label htmlFor="intro" className="block text-sm font-medium text-gray-700 mb-1">
-          紹介文
-        </label>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <label htmlFor="intro" className="block text-sm font-medium text-gray-700">
+            学校概要（紹介文）
+          </label>
+          {schoolId && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!confirm('公式サイトを検索して学校概要をAI生成しますか？\n（Perplexity API を使用します）')) {
+                  return;
+                }
+                setGeneratingIntro(true);
+                try {
+                  const res = await fetch(apiPath(`/api/admin/schools/${schoolId}/intro/generate`), {
+                    method: 'POST',
+                    credentials: 'include',
+                  });
+                  if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || '生成に失敗しました');
+                  }
+                  const data = await res.json();
+                  setFormData((prev) => ({ ...prev, intro: data.intro || '' }));
+                  alert(`生成しました（使用トークン: ${data.tokensUsed?.total ?? '不明'}）`);
+                } catch (e) {
+                  alert(e instanceof Error ? e.message : '学校概要の生成に失敗しました');
+                } finally {
+                  setGeneratingIntro(false);
+                }
+              }}
+              disabled={generatingIntro || isSubmitting}
+              className="text-sm px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generatingIntro ? '生成中...' : 'AIで生成'}
+            </button>
+          )}
+        </div>
         <textarea
           id="intro"
           name="intro"
@@ -189,7 +228,7 @@ export default function SchoolEditor({
           rows={6}
           autoComplete="off"
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="学校の紹介文を入力してください"
+          placeholder="学校の紹介文を入力してください（AIで生成ボタンで公式サイトから要約を生成できます）"
         />
       </div>
 
