@@ -106,11 +106,12 @@ export default function AISummaryEditor({ schoolId }: AISummaryEditorProps) {
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/ai-summary/${summary.id}`, {
+      const response = await fetch(apiPath(`/api/admin/ai-summary/${summary.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           summary_text: editedSummaryText,
           meta_title: editedMetaTitle || null,
@@ -120,15 +121,15 @@ export default function AISummaryEditor({ schoolId }: AISummaryEditorProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || '下書きの保存に失敗しました');
+        throw new Error(errorData.error || '保存に失敗しました');
       }
 
       const data = await response.json();
       setSummary(data.summary);
-      alert('下書きを保存しました');
+      alert(summary.status === 'published' ? '変更を保存しました' : '下書きを保存しました');
     } catch (error) {
-      console.error('下書き保存エラー:', error);
-      setError(error instanceof Error ? error.message : '下書きの保存に失敗しました');
+      console.error('保存エラー:', error);
+      setError(error instanceof Error ? error.message : '保存に失敗しました');
     } finally {
       setSaving(false);
     }
@@ -255,10 +256,14 @@ export default function AISummaryEditor({ schoolId }: AISummaryEditorProps) {
             <button
               type="button"
               onClick={handleSaveDraft}
-              disabled={saving || summary.status === 'published'}
+              disabled={saving}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {saving ? '保存中...' : '下書き保存'}
+              {saving
+                ? '保存中...'
+                : summary.status === 'published'
+                  ? '変更を保存'
+                  : '下書き保存'}
             </button>
             {summary.status === 'draft' && (
               <button

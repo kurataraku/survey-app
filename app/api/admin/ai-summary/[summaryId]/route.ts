@@ -38,14 +38,7 @@ export async function PUT(
       );
     }
 
-    if (summary.status === 'published') {
-      return NextResponse.json(
-        { error: '公開済みの要約は編集できません。先に非公開にしてください。' },
-        { status: 400 }
-      );
-    }
-
-    // 下書きを更新
+    // 下書き・公開済みどちらも内容（要約テキスト・メタ）のみ更新可能
     const { data: updatedSummary, error: updateError } = await supabase
       .from('school_ai_summaries')
       .update({
