@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Sparkles, CheckCircle2, XCircle, User, ChevronDown } from 'lucide-react';
+import { Sparkles, CheckCircle2, XCircle, User, ChevronDown, School } from 'lucide-react';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import SchoolRadarChart from '@/components/SchoolRadarChart';
@@ -183,6 +183,19 @@ export default function SchoolDetailClient({
         );
       })()}
 
+      {/* 学校概要（公式サイト情報） */}
+      {school.intro && (
+        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <School className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">学校概要</h2>
+          </div>
+          <p className="text-sm text-gray-700 leading-relaxed">{school.intro}</p>
+        </div>
+      )}
+
       {/* 目次（アンカー） */}
       <nav id="page-toc" className="bg-white rounded-2xl shadow-md p-4 md:p-6 mb-8 border border-gray-200" aria-label="ページ目次">
         <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">目次</h2>
@@ -272,11 +285,6 @@ export default function SchoolDetailClient({
             <p className="text-gray-600 mb-4">
               口コミ集計グラフは{school.review_count}件のため表示していません。
             </p>
-            {school.intro && (
-              <div className="text-left max-w-prose mx-auto mb-6 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-700 line-clamp-4">{school.intro}</p>
-              </div>
-            )}
             <Link
               href={appPath('/survey')}
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"

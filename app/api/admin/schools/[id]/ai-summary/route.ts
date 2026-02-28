@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth/admin';
+import { requireAdminOrAgent } from '@/lib/auth/admin';
 
 /**
  * 学校のAI要約を取得（draftまたはpublished）
@@ -9,7 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const authResult = await requireAdmin(request);
+  const authResult = await requireAdminOrAgent(request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth/admin';
+import { requireAdminOrAgent } from '@/lib/auth/admin';
 import { SEO_SECTION_KEYS, FAQ_TOPIC } from '@/lib/seo-sections';
 
 /**
@@ -10,7 +10,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const authResult = await requireAdmin(_request);
+  const authResult = await requireAdminOrAgent(_request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

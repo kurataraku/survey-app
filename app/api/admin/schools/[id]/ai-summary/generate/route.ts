@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth/admin';
+import { requireAdminOrAgent } from '@/lib/auth/admin';
 import { callOpenAIForSummary } from '@/lib/openai/client';
 import { createHash } from 'crypto';
 
@@ -23,7 +23,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const authResult = await requireAdmin(request);
+  const authResult = await requireAdminOrAgent(request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -69,16 +69,6 @@ export async function POST(
     if (!reviews || reviews.length === 0) {
       return NextResponse.json(
         { error: '口コミがありません。要約を生成するには口コミが必要です。' },
-        { status: 400 }
-      );
-    }
-
-    // 口コミ件数が少ない場合のチェック（3件未満は拒否）
-    if (reviews.length < 3) {
-      return NextResponse.json(
-        {
-          error: '口コミが少なすぎます。要約を生成するには最低3件の口コミが必要です。',
-        },
         { status: 400 }
       );
     }

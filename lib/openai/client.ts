@@ -665,10 +665,14 @@ ${reviewsText}
   "improvement_points": ["改善してほしい点の要約1", "改善してほしい点の要約2", "改善してほしい点の要約3"]
 }
 
-注意:
-- 各項目は1文で簡潔に（目安40〜80字）。口コミの傾向をまとめ、断定は避けて「〜という声がある」などと表現してください。
-- 口コミが少ない場合は「現時点では限られた声のなかでは〜」と表現してください。
-- 個人名・誹謗中傷は含めないでください。`;
+★文字数ルール（厳守）★:
+- 各項目は必ず40〜80字にすること。40字未満は不可。
+- 1文で簡潔に書く。具体的な内容（何がどう良い/悪いか）を含めて40字以上にする。
+- 例（55字）: 「自宅学習が中心で自分のペースで進められるため、不登校経験者でも無理なく学習を続けやすいという声がある」
+- 例（48字）: 「担任の先生が個別に学習計画を立ててくれるため、勉強が苦手な生徒でも安心して取り組めると評価されている」
+- 断定は避けて「〜という声がある」「〜と評価されている」などと表現。
+- 口コミが少ない場合は「現時点では限られた声のなかでは〜」と表現。
+- 個人名・誹謗中傷は含めない。`;
 }
 
 /**
@@ -731,4 +735,267 @@ export async function callOpenAIForReviewTendency(
       total: completion.usage?.total_tokens || 0,
     },
   };
+}
+
+// --- meta_title / meta_description 専用の軽量生成 ---
+
+export interface MetaGenerationAlert {
+  code: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+}
+
+interface MetaGenerationResult {
+  metaTitle: string;
+  metaDescription: string;
+  alerts: MetaGenerationAlert[];
+  tokensUsed: { prompt: number; completion: number; total: number };
+}
+
+const FORBIDDEN_WORDS = ['絶対', '必ず', '間違いなく', '確実に', '最高の', '最悪の'];
+
+function detectForbiddenWords(text: string): string[] {
+  return FORBIDDEN_WORDS.filter((w) => text.includes(w));
+}
+
+function validateMeta(
+  schoolName: string,
+  metaTitle: string,
+  metaDescription: string
+): MetaGenerationAlert[] {
+  const alerts: MetaGenerationAlert[] = [];
+
+  if (metaTitle.length < 28 || metaTitle.length > 35) {
+    alerts.push({
+      code: 'ALERT-03',
+      message: `meta_title が ${metaTitle.length}文字（目標28-35）`,
+      severity: 'warning',
+    });
+  }
+  if (!metaTitle.includes('口コミ') && !metaTitle.includes('評判')) {
+    alerts.push({
+      code: 'ALERT-04',
+      message: 'meta_title に「口コミ」「評判」が含まれていない',
+      severity: 'warning',
+    });
+  }
+  if (metaDescription.length < 105 || metaDescription.length > 115) {
+    alerts.push({
+      code: 'ALERT-01',
+      message: `meta_description が ${metaDescription.length}文字（目標105-115）`,
+      severity: 'warning',
+    });
+  }
+  if (!/[。！？]$/.test(metaDescription)) {
+    alerts.push({
+      code: 'ALERT-02',
+      message: 'meta_description が句点で終わっていない',
+      severity: 'warning',
+    });
+  }
+  const forbidden = detectForbiddenWords(metaTitle + metaDescription);
+  if (forbidden.length > 0) {
+    alerts.push({
+      code: 'ALERT-14',
+      message: `禁止ワード検出: ${forbidden.join(', ')}`,
+      severity: 'warning',
+    });
+  }
+  return alerts;
+}
+
+function isMetaValid(metaTitle: string, metaDescription: string): boolean {
+  return (
+    metaTitle.length >= 28 &&
+    metaTitle.length <= 35 &&
+    (metaTitle.includes('口コミ') || metaTitle.includes('評判')) &&
+    metaDescription.length >= 105 &&
+    metaDescription.length <= 125 &&
+    /[。！？]$/.test(metaDescription)
+  );
+}
+
+/**
+ * meta_title + meta_description のみを軽量に生成（summary_text は生成しない）
+ * バリデーション不通過なら最大3回リトライ
+ */
+export async function callOpenAIForMeta(
+  schoolName: string,
+  reviews: Array<{
+    good_comment: string;
+    bad_comment: string;
+    overall_satisfaction: number;
+  }>
+): Promise<MetaGenerationResult> {
+  const client = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+
+  const reviewsText = reviews
+    .slice(0, 30)
+    .map((r, i) => {
+      const good = (r.good_comment || '').slice(0, 150);
+      const bad = (r.bad_comment || '').slice(0, 150);
+      return `【${i + 1}】${r.overall_satisfaction}/5 良:${good} 改:${bad}`;
+    })
+    .join('\n');
+
+  const titlePrefix = `${schoolName}の口コミ・評判`;
+  const titlePrefixLen = titlePrefix.length;
+  const titleRemaining = 32 - titlePrefixLen; // 目標32字（28-35の中央寄り）
+  const descPrefix = `${schoolName}の口コミ・評判から見える特徴として、`;
+  const descPrefixLen = descPrefix.length;
+  const descBodyTarget = 110 - descPrefixLen; // 本文部分の目標文字数
+
+  const prompt = `以下の口コミデータを基に、通信制高校「${schoolName}」の SEO 用メタ情報のみを生成してください。
+
+口コミデータ:
+${reviewsText}
+
+■ meta_title の生成ルール（★文字数厳守★）:
+- 「${titlePrefix}」（${titlePrefixLen}字）で始め、その後に学校の特徴を表す修飾語を${titleRemaining > 0 ? titleRemaining + '字程度' : '数字'}追加して、合計28〜35字にする。
+- 修飾語の例: 「｜自由な学びと手厚いサポートの実態」「を徹底分析｜学費・通学・サポート体制」「まとめ｜在校生が語る学びの実態」
+- 28字未満は不可。必ず28字以上にすること。
+
+■ meta_description の生成ルール（★文字数厳守★）:
+- 「${descPrefix}」（${descPrefixLen}字）で始める。
+- その後に学校の特徴を2〜3文で具体的に書き、合計105〜115字にする（本文部分は${descBodyTarget}字前後）。
+- 文末は必ず句点（。）で終わる。途中で切れないこと。
+- 特徴は口コミの傾向を反映し、具体的に書く（例: 「自宅学習を中心に自分のペースで学べる環境が整い、先生のサポートが手厚いと評価されている。一方で自己管理力が求められるとの声もある。」）
+
+出力形式（この2行のみ出力。他の文章は一切書かない）:
+meta_title: ここにタイトル
+meta_description: ここに説明文`;
+
+  let bestTitle = '';
+  let bestDesc = '';
+  let totalTokens = { prompt: 0, completion: 0, total: 0 };
+  const MAX_ATTEMPTS = 3;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const completion = await client.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content:
+            '通信制高校のSEOメタ情報を生成する専門家です。指定された文字数を厳守してください。',
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: attempt === 1 ? 0.5 : 0.7,
+      max_tokens: 500,
+    });
+
+    totalTokens.prompt += completion.usage?.prompt_tokens || 0;
+    totalTokens.completion += completion.usage?.completion_tokens || 0;
+    totalTokens.total += completion.usage?.total_tokens || 0;
+
+    const text = completion.choices[0]?.message?.content || '';
+    const titleMatch = text.match(/meta_title:\s*(.+?)(?:\n|$)/i);
+    const descMatch = text.match(/meta_description:\s*(.+?)(?:\n|$)/i);
+
+    bestTitle = titleMatch?.[1]?.trim() || bestTitle;
+    bestDesc = descMatch?.[1]?.trim() || bestDesc;
+
+    if (isMetaValid(bestTitle, bestDesc)) break;
+  }
+
+  if (!bestTitle) {
+    bestTitle = `${schoolName}の口コミ・評判を徹底分析`;
+    if (bestTitle.length > 35) {
+      bestTitle = `${schoolName}の口コミ・評判`;
+    }
+  }
+
+  if (!bestDesc) {
+    bestDesc = `${schoolName}の口コミ・評判から見える特徴として、在校生・卒業生の声をもとに学校の雰囲気や学習環境について詳しくまとめています。`;
+    if (!/[。！？]$/.test(bestDesc)) bestDesc += '。';
+  }
+
+  const alerts = validateMeta(schoolName, bestTitle, bestDesc);
+
+  return {
+    metaTitle: bestTitle,
+    metaDescription: bestDesc,
+    alerts,
+    tokensUsed: totalTokens,
+  };
+}
+
+// --- 都道府県推定 ---
+
+import { prefectures as VALID_PREFECTURES } from '@/lib/prefectures';
+
+export interface PrefectureResult {
+  prefecture: string;
+  confidence: 'high' | 'medium' | 'low';
+  reasoning: string;
+}
+
+/**
+ * LLM で学校名から本部所在地の都道府県を推定する
+ */
+export async function callOpenAIForPrefecture(
+  schoolName: string
+): Promise<PrefectureResult> {
+  const client = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+
+  const prompt = `通信制高校「${schoolName}」の本部（主たる事務所）が所在する都道府県を答えてください。
+
+注意:
+- 通信制高校は本部とキャンパスが異なる都道府県にあることが多いです。本部の所在地を答えてください。
+- 確信が持てない場合は confidence を low にしてください。
+
+以下のJSON形式のみ出力してください:
+{"prefecture": "○○県", "confidence": "high", "reasoning": "理由を1文で"}`;
+
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      {
+        role: 'system',
+        content:
+          '日本の通信制高校に詳しい専門家です。学校の本部所在地を正確に回答してください。',
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.2,
+    max_tokens: 200,
+  });
+
+  const raw = (completion.choices[0]?.message?.content || '').trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return { prefecture: '', confidence: 'low', reasoning: 'JSONパース失敗' };
+  }
+
+  try {
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      prefecture?: string;
+      confidence?: string;
+      reasoning?: string;
+    };
+
+    const pref = parsed.prefecture || '';
+    const conf = (['high', 'medium', 'low'].includes(parsed.confidence || '')
+      ? parsed.confidence
+      : 'low') as 'high' | 'medium' | 'low';
+
+    if (!VALID_PREFECTURES.includes(pref)) {
+      return {
+        prefecture: pref,
+        confidence: 'low',
+        reasoning: `「${pref}」は有効な都道府県名ではありません`,
+      };
+    }
+
+    return {
+      prefecture: pref,
+      confidence: conf,
+      reasoning: parsed.reasoning || '',
+    };
+  } catch {
+    return { prefecture: '', confidence: 'low', reasoning: 'JSONパース失敗: ' + raw.slice(0, 100) };
+  }
 }

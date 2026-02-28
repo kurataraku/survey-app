@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { requireAdmin } from '@/lib/auth/admin';
+import { requireAdminOrAgent } from '@/lib/auth/admin';
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireAdmin(request);
+  const authResult = await requireAdminOrAgent(request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAdmin(request);
+  const authResult = await requireAdminOrAgent(request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

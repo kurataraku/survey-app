@@ -86,6 +86,34 @@ export async function requireAdmin(
 }
 
 /**
+ * API route用: 管理者権限 または エージェント API Key を要求
+ * AGENT_API_KEY による Bearer 認証を優先的にチェックし、
+ * 一致しなければ従来の Cookie ベース認証にフォールバックする
+ */
+export async function requireAdminOrAgent(
+  request: NextRequest
+): Promise<AdminAuthResult | NextResponse> {
+  const authHeader = request.headers.get('authorization');
+  const agentKey = process.env.AGENT_API_KEY;
+
+  if (agentKey && authHeader === `Bearer ${agentKey}`) {
+    return {
+      user: { id: 'agent', email: 'agent@system' },
+      adminUser: {
+        id: 'agent',
+        email: 'agent@system',
+        role: 'owner',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  return requireAdmin(request);
+}
+
+/**
  * API route用: owner権限を要求
  * owner以外の場合は403エラーを返す
  */

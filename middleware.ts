@@ -35,6 +35,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
+    // エージェント API は Bearer 認証を使うため middleware の Cookie チェックをスキップ
+    if (pathname.startsWith(`${BASE_PATH}/api/admin/agent/`)) {
+      return NextResponse.next();
+    }
+
     let response = NextResponse.next({
       request: {
         headers: request.headers,

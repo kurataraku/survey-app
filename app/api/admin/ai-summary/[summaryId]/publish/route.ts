@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth/admin';
+import { requireAdminOrAgent } from '@/lib/auth/admin';
 
 /**
  * 要約を公開状態に切り替える（トランザクション処理）
@@ -9,7 +9,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ summaryId: string }> | { summaryId: string } }
 ) {
-  const authResult = await requireAdmin(request);
+  const authResult = await requireAdminOrAgent(request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
