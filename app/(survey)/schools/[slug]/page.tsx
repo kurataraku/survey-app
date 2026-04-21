@@ -14,6 +14,7 @@ import { FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
 import { parseAiSummarySections } from '@/lib/schools/parseAiSummarySections';
 import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
+import { normalizeSchoolMetaDescription } from '@/lib/schools/normalizeSchoolMetaDescription';
 
 // ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
 export const revalidate = 60;
@@ -49,9 +50,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const title = school.ai_summary?.meta_title || `${school.name}の口コミ・評判`;
-  const description =
-    school.ai_summary?.meta_description ||
-    `${school.name}の口コミ・評判をまとめました。在校生・卒業生・保護者の生の声を掲載しています。`;
+  const description = normalizeSchoolMetaDescription(
+    school.name,
+    school.ai_summary?.meta_description
+  );
 
   const keywords = [
     `${school.name} 口コミ`,
