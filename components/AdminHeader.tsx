@@ -71,6 +71,12 @@ export default function AdminHeader() {
                 記事管理
               </Link>
               <Link
+                href={appPath('/admin/seo-drafts')}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                SEO記事
+              </Link>
+              <Link
                 href={appPath('/admin/contacts')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >

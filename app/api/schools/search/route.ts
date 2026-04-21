@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeText } from '@/lib/utils';
+import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     const prefecture = searchParams.get('prefecture') || '';
     const minRating = searchParams.get('min_rating') ? parseFloat(searchParams.get('min_rating')!) : null;
     const minReviewCount = searchParams.get('min_review_count') ? parseInt(searchParams.get('min_review_count')!, 10) : null;
-    const sort = searchParams.get('sort') || 'name';
+    const sort = searchParams.get('sort') || DEFAULT_SCHOOL_LIST_SORT;
     const offset = (page - 1) * limit;
 
     // 検索クエリを正規化（qが空の場合は全件検索）
@@ -262,9 +263,10 @@ export async function GET(request: NextRequest) {
       sortedSchools.sort((a, b) => b.review_count - a.review_count);
     } else if (sort === 'review_count_asc') {
       sortedSchools.sort((a, b) => a.review_count - b.review_count);
-    } else {
-      // デフォルト: 名前順
+    } else if (sort === 'name') {
       sortedSchools.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } else {
+      sortedSchools.sort((a, b) => b.review_count - a.review_count);
     }
 
     // 9. ページネーション

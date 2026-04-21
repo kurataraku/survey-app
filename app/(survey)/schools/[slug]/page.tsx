@@ -8,7 +8,12 @@ import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
+import SchoolPageBreadcrumbs from '@/components/SchoolPageBreadcrumbs';
+import SchoolEducationalOrganizationJsonLd from '@/components/SchoolEducationalOrganizationJsonLd';
 import { FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
+import { parseAiSummarySections } from '@/lib/schools/parseAiSummarySections';
+import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints';
+import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 
 // ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
 export const revalidate = 60;
@@ -125,10 +130,22 @@ export default async function SchoolDetailPage({ params }: PageProps) {
         }
       : null;
 
+  const parsedAiSummary = parseAiSummarySections(school.ai_summary?.summary_text);
+  const tuitionAttendStatsHint =
+    school.review_count >= MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND
+      ? buildTuitionAttendStatsHint(school)
+      : null;
+
   return (
     <div className="min-h-screen bg-blue-50/30 py-8">
       {faqSchema && <StructuredData data={faqSchema} />}
+      <SchoolEducationalOrganizationJsonLd school={school} encodedSlug={encodedSlug} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SchoolPageBreadcrumbs
+          schoolName={school.name}
+          encodedSlug={encodedSlug}
+          variant="hub"
+        />
         <div className="mb-4">
           <Link
             href={appPath('/schools')}
@@ -146,13 +163,15 @@ export default async function SchoolDetailPage({ params }: PageProps) {
           </Link>
         </div>
 
-        <SchoolDetailClient school={school} encodedSlug={encodedSlug}>
+        <SchoolDetailClient
+          school={school}
+          encodedSlug={encodedSlug}
+          parsedAiSummary={parsedAiSummary}
+          tuitionAttendStatsHint={tuitionAttendStatsHint}
+        >
           {/* 注目の口コミ（良い点・悪い点）— Server Component でSSR保証 */}
           {school.latest_reviews && school.latest_reviews.length > 0 && (
-            <SchoolFeaturedReviewsServer
-              latestReviews={school.latest_reviews}
-              encodedSlug={encodedSlug}
-            />
+            <SchoolFeaturedReviewsServer latestReviews={school.latest_reviews} />
           )}
         </SchoolDetailClient>
       </div>

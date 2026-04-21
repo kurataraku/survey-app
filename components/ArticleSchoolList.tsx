@@ -214,7 +214,9 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                   }`}
                 >
                   <div className="font-medium">{school.name}</div>
-                  <div className="text-sm text-gray-500">{school.prefecture}</div>
+                  {school.prefecture?.trim() && school.prefecture !== '不明' ? (
+                    <div className="text-sm text-gray-500">本校所在地：{school.prefecture}</div>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -286,9 +288,12 @@ export default function ArticleSchoolList({ articleId }: ArticleSchoolListProps)
                       <div className="font-medium text-gray-900">
                         {articleSchool.school?.name || '学校名不明'}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {articleSchool.school?.prefecture}
-                      </div>
+                      {articleSchool.school?.prefecture?.trim() &&
+                      articleSchool.school.prefecture !== '不明' ? (
+                        <div className="text-sm text-gray-500">
+                          本校所在地：{articleSchool.school.prefecture}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex gap-2">
                       <button

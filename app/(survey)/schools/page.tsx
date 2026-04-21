@@ -2,6 +2,7 @@ import Link from 'next/link';
 import SchoolCardServer from '@/components/SchoolCardServer';
 import SchoolsPageFilters from './SchoolsPageFilters';
 import { searchSchools } from '@/lib/schools/searchSchools';
+import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
@@ -30,7 +31,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
   const prefecture = getStr(resolved.prefecture);
   const minRating = resolved.min_rating ? parseFloat(getStr(resolved.min_rating)) : null;
   const minReviewCount = resolved.min_review_count ? parseInt(getStr(resolved.min_review_count), 10) : null;
-  const sort = getStr(resolved.sort) || 'name';
+  const sort = getStr(resolved.sort) || DEFAULT_SCHOOL_LIST_SORT;
 
   const data = await searchSchools({
     q,
@@ -72,6 +73,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
                   id={school.id}
                   name={school.name}
                   prefecture={school.prefecture}
+                  hidePrefectureUnderFilter={Boolean(prefecture.trim())}
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
@@ -126,7 +128,7 @@ function buildSchoolsUrl(params: {
   if (params.prefecture) search.set('prefecture', params.prefecture);
   if (params.minRating != null) search.set('min_rating', params.minRating.toString());
   if (params.minReviewCount != null) search.set('min_review_count', params.minReviewCount.toString());
-  if (params.sort && params.sort !== 'name') search.set('sort', params.sort);
+  if (params.sort && params.sort !== DEFAULT_SCHOOL_LIST_SORT) search.set('sort', params.sort);
   if (params.page != null && params.page > 1) search.set('page', params.page.toString());
   const qs = search.toString();
   return appPath(`/schools${qs ? `?${qs}` : ''}`);

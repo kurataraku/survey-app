@@ -74,6 +74,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
                   id={school.id}
                   name={school.name}
                   prefecture={school.prefecture}
+                  hidePrefectureUnderFilter
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}

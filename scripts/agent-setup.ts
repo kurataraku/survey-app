@@ -34,7 +34,7 @@ function parseArgs(): CliArgs {
     all: false,
     schoolId: null,
     steps: ['prefecture', 'slug', 'intro', 'summary', 'meta', 'seo_sections', 'faq', 'review_tendency'],
-    publish: false,
+    publish: true,
     dryRun: false,
     delta: 5,
     limit: 10,

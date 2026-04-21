@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
 import { normalizeText } from '@/lib/utils';
+import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 
 export interface SearchSchool {
   id: string;
@@ -39,7 +40,7 @@ export const searchSchools = cache(async (
     prefecture = '',
     min_rating = null,
     min_review_count = null,
-    sort = 'name',
+    sort = DEFAULT_SCHOOL_LIST_SORT,
   } = params;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -165,8 +166,10 @@ export const searchSchools = cache(async (
     schoolsWithStats.sort((a, b) => b.review_count - a.review_count);
   } else if (sort === 'review_count_asc') {
     schoolsWithStats.sort((a, b) => a.review_count - b.review_count);
-  } else {
+  } else if (sort === 'name') {
     schoolsWithStats.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  } else {
+    schoolsWithStats.sort((a, b) => b.review_count - a.review_count);
   }
 
   const total = schoolsWithStats.length;

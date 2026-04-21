@@ -40,14 +40,14 @@ export async function getAdminUser(
       return null;
     }
 
-    // admin_usersテーブルで権限確認
+    // admin_usersテーブルで権限確認（メールは大文字小文字の揺れを許容）
     const adminSupabase = createAdminSupabaseClient();
     const { data: adminUser, error: adminError } = await adminSupabase
       .from('admin_users')
       .select('*')
-      .eq('email', user.email)
+      .ilike('email', user.email.trim())
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (adminError || !adminUser) {
       return null;

@@ -14,10 +14,9 @@ interface Review {
 
 interface SchoolFeaturedReviewsServerProps {
   latestReviews: Review[];
-  encodedSlug: string;
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string) {
   const date = new Date(dateString);
   return date.toLocaleDateString('ja-JP', {
     year: 'numeric',
@@ -29,7 +28,6 @@ function formatDate(dateString: string): string {
 /** 注目の口コミ（いいね数順・最大3件）— Server Component でSSR保証 */
 export default function SchoolFeaturedReviewsServer({
   latestReviews,
-  encodedSlug,
 }: SchoolFeaturedReviewsServerProps) {
   const featuredReviews = [...latestReviews]
     .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0))
@@ -42,12 +40,11 @@ export default function SchoolFeaturedReviewsServer({
       <h2 className="text-xl font-bold text-gray-900 mb-6">注目の口コミ</h2>
       <div className="space-y-4">
         {featuredReviews.map((review) => (
-          <Link
+          <article
             key={review.id}
-            href={appPath(`/reviews/${review.id}`)}
-            className="block p-6 border border-gray-200 rounded-xl shadow-md hover:border-blue-400 hover:shadow-lg transition-all duration-200"
+            className="p-6 border border-gray-200 rounded-xl shadow-sm bg-white"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-50 rounded-full">
                   <User className="w-4 h-4 text-blue-600" aria-hidden />
@@ -79,20 +76,28 @@ export default function SchoolFeaturedReviewsServer({
             {review.good_comment && (
               <div className="mb-4 p-3 bg-green-50/50 rounded-lg border-l-4 border-green-500">
                 <p className="text-xs font-semibold text-green-700 mb-2">良い点</p>
-                <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
+                <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
                   {review.good_comment}
                 </p>
               </div>
             )}
             {review.bad_comment && (
-              <div className="p-3 bg-rose-50/50 rounded-lg border-l-4 border-rose-500">
+              <div className="mb-4 p-3 bg-rose-50/50 rounded-lg border-l-4 border-rose-500">
                 <p className="text-xs font-semibold text-rose-700 mb-2">改善してほしい点</p>
-                <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
+                <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
                   {review.bad_comment}
                 </p>
               </div>
             )}
-          </Link>
+            <div className="pt-2 border-t border-gray-100">
+              <Link
+                href={appPath(`/reviews/${review.id}`)}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800"
+              >
+                この口コミの詳細・回答属性を見る
+              </Link>
+            </div>
+          </article>
         ))}
       </div>
     </div>

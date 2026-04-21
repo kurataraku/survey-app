@@ -32,6 +32,7 @@ function createSummaryPrompt(schoolName: string): string {
 - 3点を1つの段落にまとめ、180〜220字（200字前後）に収めること。
 - 220字を超えたら情報を削って短くすること。180字未満なら具体的な特徴を追加すること。
 - 箇条書き禁止。見出し・ラベル禁止。本文のみ出力。
+- 文字数カウント（例:「（198字）」「（200文字）」など）は絶対に出力しないこと。
 - 公式サイトに情報がない項目は省略。`;
 }
 
@@ -67,9 +68,15 @@ export async function callPerplexityForSummary(
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Perplexity APIキーが無効です。Vercelの環境変数 PERPLEXITY_API_KEY を確認してください。'
+      );
+    }
     const errorBody = await response.text().catch(() => '');
+    const shortBody = errorBody.length > 200 ? errorBody.slice(0, 200) + '...' : errorBody;
     throw new Error(
-      `Perplexity API エラー (${response.status}): ${errorBody || response.statusText}`
+      `Perplexity API エラー (${response.status}): ${shortBody || response.statusText}`
     );
   }
 
@@ -81,8 +88,11 @@ export async function callPerplexityForSummary(
     throw new Error('Perplexity API からのレスポンスが空です');
   }
 
+  // LLMが末尾に付けてしまう文字数カウント表記を除去
+  const cleaned = content.trim().replace(/[（(]\s*\d+\s*[字文][字]?\s*[）)]\s*$/, '').trim();
+
   return {
-    summaryText: content.trim(),
+    summaryText: cleaned,
     citations,
     tokensUsed: {
       prompt: data.usage?.prompt_tokens || 0,

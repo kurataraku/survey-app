@@ -46,8 +46,13 @@ ${reviewsText}
 
 以下の形式で要約を生成してください：
 
-## 概要（250〜400字）
-口コミ・評判から見える学校の特徴を、傾向として要約してください。ただし、「口コミ」「評判」という言葉は使わず、特徴そのものを直接説明してください。断定ではなく、傾向として表現してください。
+## 判断材料のリード（200〜320字）
+保護者が通信制高校を比較検討するうえで役立つ内容にしてください。学費の負担感、通学やオンラインの実態、サポートや面談の手触り、単位取得のしんどさなど、口コミに根ざした具体論点を必ず含めてください。抽象的な形容に偏らず、「どのような家庭・学習スタイル向きか」が伝わるように書いてください。「口コミ」「評判」という語は全体で2回までに抑えてください。
+
+## 学費・通学スタイルの注意点
+- 項目1（学費の体感、追加費用の有無、納得感などに触れる）
+- 項目2（通学頻度・オンライン比率・通いやすさなどに触れる）
+- 項目3（必要なら補足）
 
 ## この学校が合う人
 - 項目1（簡潔に）
@@ -74,13 +79,9 @@ function generateMetaDescriptionFromSummary(
   schoolName: string,
   summaryText: string
 ): string {  
-  // 要約テキストから概要部分のみを抽出（「## この学校が合う人」の前まで）
-  let summary = '';
-  if (summaryText.includes('## この学校が合う人')) {
-    const summaryMatch = summaryText.match(/^([\s\S]*?)(?=\n\n## この学校が合う人|\n## この学校が合う人)/);
-    summary = summaryMatch?.[1]?.trim() || '';
-  } else {
-    // 「## この学校が合う人」がない場合は全体から免責文を除いたものを使用
+  // 先頭のリードのみ（学費・通学セクション等をメタ文面に混ぜない）
+  let summary = summaryText.split(/\n##\s+/)[0]?.replace(/\n\n※.*$/, '').trim() || '';
+  if (!summary) {
     summary = summaryText.replace(/\n\n※.*$/, '').trim();
   }
   // 概要から不要な接頭語を削除
@@ -245,17 +246,26 @@ function parseSummaryResponse(
   metaDescription: string;
 } {
   // レスポンスをパース（マークダウン形式を想定）
-  const summaryMatch = response.match(/## 概要[^\n]*\n([\s\S]*?)(?=\n## |$)/);
+  const summaryMatch =
+    response.match(/## 判断材料のリード[^\n]*\n([\s\S]*?)(?=\n## |$)/) ||
+    response.match(/## 概要[^\n]*\n([\s\S]*?)(?=\n## |$)/);
+  const tuitionMatch = response.match(
+    /## 学費・通学スタイルの注意点[^\n]*\n([\s\S]*?)(?=\n## |$)/
+  );
   const fitsMatch = response.match(/## この学校が合う人[\s\S]*?\n([\s\S]*?)(?=\n## |$)/);
   const notFitsMatch = response.match(/## この学校が合わない人[\s\S]*?\n([\s\S]*?)(?=\n## |$)/);
   const metaTitleMatch = response.match(/meta_title:\s*(.+?)(?:\n|$)/i);
   const metaDescriptionMatch = response.match(/meta_description:\s*(.+?)(?:\n|$)/i);
 
   const summary = summaryMatch?.[1]?.trim() || '';
+  const tuition = tuitionMatch?.[1]?.trim() || '';
   const fits = fitsMatch?.[1]?.trim() || '';
   const notFits = notFitsMatch?.[1]?.trim() || '';
-  // 要約テキストを組み立て
+  // 要約テキストを組み立て（先頭ブロックには見出し行を付けない＝従来DB形式と互換）
   let summaryText = summary;
+  if (tuition) {
+    summaryText += '\n\n## 学費・通学スタイルの注意点\n' + tuition;
+  }
   if (fits) {
     summaryText += '\n\n## この学校が合う人\n' + fits;
   }
@@ -351,7 +361,7 @@ export async function callOpenAIForSummary(
   };
 }> {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
 
   // 口コミテキストを整形（最大文字数制限）
   const MAX_CHAR_PER_REVIEW = 300; // good_comment + bad_comment の合計
@@ -530,7 +540,7 @@ export async function callOpenAIForSeoSection(
   officialText?: string
 ): Promise<{ summaryText: string; tokensUsed: { prompt: number; completion: number; total: number } }> {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
   const reviewsText = formatReviewsForPrompt(reviews);
   const prompt = createSeoSectionPrompt(schoolName, sectionKey, reviewsText, officialText || '');
 
@@ -604,7 +614,7 @@ export async function callOpenAIForFaq(
   officialText?: string
 ): Promise<{ items: FaqItem[]; tokensUsed: { prompt: number; completion: number; total: number } }> {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
   const reviewsText = formatReviewsForPrompt(reviews);
   const prompt = createFaqPrompt(schoolName, reviewsText, officialText || '');
 
@@ -691,7 +701,7 @@ export async function callOpenAIForReviewTendency(
   tokensUsed: { prompt: number; completion: number; total: number };
 }> {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
   const reviewsText = formatReviewsForPrompt(reviews);
   const prompt = createReviewTendencyPrompt(schoolName, reviewsText);
 
@@ -828,7 +838,7 @@ export async function callOpenAIForMeta(
   }>
 ): Promise<MetaGenerationResult> {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
 
   const reviewsText = reviews
     .slice(0, 30)
@@ -900,15 +910,36 @@ meta_description: ここに説明文`;
     if (isMetaValid(bestTitle, bestDesc)) break;
   }
 
-  if (!bestTitle) {
-    bestTitle = `${schoolName}の口コミ・評判を徹底分析`;
+  if (!bestTitle || bestTitle.length < 28) {
+    bestTitle = `${schoolName}の口コミ・評判｜在校生が語る学びの実態`;
+    if (bestTitle.length > 35) {
+      bestTitle = `${schoolName}の口コミ・評判を徹底分析`;
+    }
+    if (bestTitle.length > 35) {
+      bestTitle = `${schoolName}の口コミ・評判まとめ`;
+    }
     if (bestTitle.length > 35) {
       bestTitle = `${schoolName}の口コミ・評判`;
     }
   }
 
-  if (!bestDesc) {
-    bestDesc = `${schoolName}の口コミ・評判から見える特徴として、在校生・卒業生の声をもとに学校の雰囲気や学習環境について詳しくまとめています。`;
+  if (!bestDesc || bestDesc.length < 100) {
+    const descBase = `${schoolName}の口コミ・評判から見える特徴として、`;
+    const descBodies = [
+      '在校生・卒業生の声をもとに学校の雰囲気や学習環境、サポート体制について詳しくまとめています。進路選びの参考にご覧ください。',
+      '在校生・卒業生のリアルな声をもとに学校の雰囲気や学習環境、先生のサポート体制について詳しくまとめています。',
+      '在校生の声をもとに学校の雰囲気や学習環境について詳しくまとめています。進路選びの参考にご覧ください。',
+    ];
+    for (const body of descBodies) {
+      const candidate = descBase + body;
+      if (candidate.length >= 105 && candidate.length <= 125) {
+        bestDesc = candidate;
+        break;
+      }
+    }
+    if (!bestDesc || bestDesc.length < 100) {
+      bestDesc = descBase + descBodies[0];
+    }
     if (!/[。！？]$/.test(bestDesc)) bestDesc += '。';
   }
 
@@ -939,7 +970,7 @@ export async function callOpenAIForPrefecture(
   schoolName: string
 ): Promise<PrefectureResult> {
   const client = getOpenAIClient();
-  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
 
   const prompt = `通信制高校「${schoolName}」の本部（主たる事務所）が所在する都道府県を答えてください。
 

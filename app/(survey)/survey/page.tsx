@@ -9,6 +9,7 @@ import { apiPath } from '@/lib/base-path';
 import Stepper from '@/components/Stepper';
 import QuestionRenderer from '@/components/QuestionRenderer';
 import Button from '@/components/ui/Button';
+import CampaignBanner from '@/components/CampaignBanner';
 
 export default function SurveyPage() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -263,6 +264,8 @@ export default function SurveyPage() {
               ※個人が特定される内容は書かないでください
             </p>
           </div>
+
+          <CampaignBanner />
 
           <h1 className="text-3xl font-bold mb-2 text-center text-gray-900">
             口コミアンケートにご協力ください

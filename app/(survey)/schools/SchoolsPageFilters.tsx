@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import SchoolSearchFilters from '@/components/SchoolSearchFilters';
 import { prefectures } from '@/lib/prefectures';
 import { appPath } from '@/lib/base-path';
+import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 
 interface SchoolsPageFiltersProps {
   initialQ: string;
@@ -47,7 +48,7 @@ export default function SchoolsPageFilters({
     if (prefecture) params.set('prefecture', prefecture);
     if (rating != null) params.set('min_rating', rating.toString());
     if (reviewCount != null) params.set('min_review_count', reviewCount.toString());
-    if (sort && sort !== 'name') params.set('sort', sort);
+    if (sort && sort !== DEFAULT_SCHOOL_LIST_SORT) params.set('sort', sort);
     return `${appPath('/schools')}${params.toString() ? `?${params.toString()}` : ''}`;
   };
 

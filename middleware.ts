@@ -28,6 +28,47 @@ export async function middleware(request: NextRequest) {
     return res;
   }
 
+  // 2b. /tsushin-kuchikomi/api/admin/* でも Supabase セッションを更新する
+  // （管理画面は 2 で更新されるが、fetch が /api/admin だけを叩くため未更新だと getUser() が失敗し 403 になる）
+  const adminApiPrefix = `${BASE_PATH}/api/admin`;
+  if (
+    pathname.startsWith(adminApiPrefix) &&
+    !pathname.startsWith(`${BASE_PATH}/api/admin/agent/`)
+  ) {
+    let response = NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
+
+    const supabaseApi = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              request.cookies.set(name, value)
+            );
+            response = NextResponse.next({
+              request,
+            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+
+    await supabaseApi.auth.getUser();
+
+    return response;
+  }
+
   // 2. /tsushin-kuchikomi/admin/* を保護（rewrites で path は /tsushin-kuchikomi 始まり）
   const adminPrefix = `${BASE_PATH}/admin`;
   if (pathname.startsWith(adminPrefix)) {
@@ -92,9 +133,9 @@ export async function middleware(request: NextRequest) {
     const { data: adminUser, error: adminError } = await adminSupabase
       .from('admin_users')
       .select('*')
-      .eq('email', user.email)
+      .ilike('email', user.email.trim())
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
     if (adminError || !adminUser) {
       const url = request.nextUrl.clone();

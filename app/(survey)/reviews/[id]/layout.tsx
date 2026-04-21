@@ -28,7 +28,7 @@ export async function generateMetadata({
     };
   }
 
-  const title = `${review.school_name}の口コミ | 通信制高校リアルレビュー`;
+  const title = `${review.school_name}の口コミ（投稿） | 通信制高校リアルレビュー`;
   const rawDesc = [review.good_comment, review.bad_comment]
     .filter(Boolean)
     .join(' ')

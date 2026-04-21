@@ -75,7 +75,9 @@ export default function RankingCardServer({
 
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">{name}</h3>
-          <p className="text-sm text-gray-600 mb-3">{prefecture}</p>
+          {prefecture?.trim() && prefecture !== '不明' ? (
+            <p className="text-sm text-gray-600 mb-3">本校所在地：{prefecture}</p>
+          ) : null}
 
           <div className="flex items-center justify-between">
             <div className="flex-1">

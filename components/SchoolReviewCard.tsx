@@ -59,15 +59,12 @@ export default function SchoolReviewCard({
   createdAt,
 }: SchoolReviewCardProps) {
   return (
-    <Link
-      href={appPath(`/reviews/${id}`)}
-      className="block p-5 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all"
-    >
+    <article className="p-5 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-gray-300 transition-colors">
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             {schoolSlug ? (
-              <span className="text-sm font-medium text-blue-500">{schoolName}</span>
+              <span className="text-sm font-medium text-blue-600">{schoolName}</span>
             ) : (
               <span className="text-sm text-gray-600">{schoolName}</span>
             )}
@@ -87,7 +84,6 @@ export default function SchoolReviewCard({
         </div>
       </div>
 
-      {/* 口コミ本文：SEOのため初期HTMLに含める（全文をDOMに保持、表示はline-clampで制御） */}
       <div className="space-y-2.5 mb-4">
         {goodComment && (
           <div>
@@ -103,13 +99,14 @@ export default function SchoolReviewCard({
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-3 border-t border-gray-100 flex-wrap gap-2">
         <div className="flex items-center gap-1 text-sm text-gray-600">
           <svg
             className="w-4 h-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden
           >
             <path
               strokeLinecap="round"
@@ -120,8 +117,13 @@ export default function SchoolReviewCard({
           </svg>
           <span>{likeCount}</span>
         </div>
-        <span className="text-sm text-blue-500 font-medium">続きを読む →</span>
+        <Link
+          href={appPath(`/reviews/${id}`)}
+          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+        >
+          この口コミの詳細・回答属性を見る
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 }

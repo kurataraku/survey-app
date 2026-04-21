@@ -114,9 +114,14 @@ async function saveSummary(
   reviewsCountUsed: number,
   publish: boolean,
   maxCreatedAt: string | null = null
-) {
-  const status = publish ? 'published' : 'draft';
+): Promise<{ id: string; skippedPublished: boolean }> {
+  // published済みが存在する場合は上書きしない（目検の方が精度が高いため）
+  const existingPublished = await getExistingPublishedSummary(supabase, schoolId, kind, topic);
+  if (existingPublished) {
+    return { id: existingPublished.id, skippedPublished: true };
+  }
 
+  const status = publish ? 'published' : 'draft';
   const existing = await getExistingDraftSummary(supabase, schoolId, kind, topic);
 
   const payload = {
@@ -133,17 +138,6 @@ async function saveSummary(
     created_by: null,
   };
 
-  if (publish) {
-    let unpublishQuery = supabase
-      .from('school_ai_summaries')
-      .update({ status: 'draft' })
-      .eq('school_id', schoolId)
-      .eq('kind', kind)
-      .eq('status', 'published');
-    unpublishQuery = topic === null ? unpublishQuery.is('topic', null) : unpublishQuery.eq('topic', topic);
-    await unpublishQuery;
-  }
-
   if (existing) {
     const { data, error } = await supabase
       .from('school_ai_summaries')
@@ -152,7 +146,7 @@ async function saveSummary(
       .select('id')
       .single();
     if (error) throw new Error(`要約保存エラー: ${error.message}`);
-    return data?.id;
+    return { id: data?.id || existing.id, skippedPublished: false };
   } else {
     const { data, error } = await supabase
       .from('school_ai_summaries')
@@ -160,7 +154,7 @@ async function saveSummary(
       .select('id')
       .single();
     if (error) throw new Error(`要約作成エラー: ${error.message}`);
-    return data?.id;
+    return { id: data?.id || '', skippedPublished: false };
   }
 }
 
@@ -329,6 +323,18 @@ export async function POST(
       }
     }
 
+    // --- 口コミデータの事前取得（summary, meta, SEO, FAQ, 傾向で共有） ---
+    const allReviews = await getPublicReviews(supabase, schoolId);
+    const maxCreatedAt = allReviews.length > 0
+      ? allReviews.reduce((max, r) => (r.created_at > max ? r.created_at : max), allReviews[0].created_at)
+      : null;
+    const reviewsForGen = allReviews.map((r) => ({
+      good_comment: r.good_comment || '',
+      bad_comment: r.bad_comment || '',
+      overall_satisfaction: r.overall_satisfaction || 0,
+      answers: r.answers as Record<string, unknown> | undefined,
+    }));
+
     // --- A4: summary (OpenAI 口コミ要約 → school_ai_summaries.summary_text) ---
     if (steps.includes('summary')) {
       const existingOverall = await getExistingPublishedSummary(supabase, schoolId, 'overall');
@@ -340,13 +346,12 @@ export async function POST(
         results.summary = { status: 'skipped', reason: 'already_set' };
       } else {
         try {
-          const reviews = await getPublicReviews(supabase, schoolId);
-          if (reviews.length === 0) {
+          if (allReviews.length === 0) {
             results.summary = { status: 'skipped', reason: 'no_reviews' };
           } else {
             const summaryResult = await callOpenAIForSummary(
               school.name,
-              reviews.map((r) => ({
+              allReviews.map((r) => ({
                 good_comment: r.good_comment || '',
                 bad_comment: r.bad_comment || '',
                 overall_satisfaction: r.overall_satisfaction || 0,
@@ -357,29 +362,13 @@ export async function POST(
             const text = summaryResult.summaryText;
 
             if (!dryRun) {
-              const targetId = existingDraft?.id || existingOverall?.id;
-              if (targetId) {
-                await supabase.from('school_ai_summaries').update({
-                  summary_text: text,
-                  reviews_count_used: reviewCount,
-                  source_signature: sourceSignature(reviewCount, reviews[0]?.created_at || null),
-                  generated_at: new Date().toISOString(),
-                }).eq('id', targetId);
-              } else {
-                await supabase.from('school_ai_summaries').insert({
-                  school_id: schoolId,
-                  kind: 'overall',
-                  topic: null,
-                  status: 'draft',
-                  summary_text: text,
-                  meta_title: null,
-                  meta_description: null,
-                  reviews_count_used: reviewCount,
-                  source_signature: sourceSignature(reviewCount, reviews[0]?.created_at || null),
-                  generated_at: new Date().toISOString(),
-                  created_by: null,
-                });
-              }
+              await saveSummary(
+                supabase, schoolId, 'overall', null,
+                text,
+                existingOverall?.meta_title || existingDraft?.meta_title || null,
+                existingOverall?.meta_description || existingDraft?.meta_description || null,
+                reviewCount, publish, maxCreatedAt
+              );
             }
 
             results.summary = { status: 'ok', value: `${text.length}字` };
@@ -393,18 +382,17 @@ export async function POST(
 
     // --- A5-A6: meta_title / meta_description ---
     if (steps.includes('meta')) {
-      const existingOverall = await getExistingPublishedSummary(supabase, schoolId, 'overall');
-      const existingDraft = await getExistingDraftSummary(supabase, schoolId, 'overall');
-      const hasMeta = existingOverall?.meta_title || existingDraft?.meta_title;
+      const existingOverallForMeta = await getExistingPublishedSummary(supabase, schoolId, 'overall');
+      const existingDraftForMeta = await getExistingDraftSummary(supabase, schoolId, 'overall');
+      const hasMeta = existingOverallForMeta?.meta_title || existingDraftForMeta?.meta_title;
 
       if (hasMeta) {
         results.meta = { status: 'skipped', reason: 'already_set' };
       } else {
         try {
-          const reviews = await getPublicReviews(supabase, schoolId, 30);
           const metaResult = await callOpenAIForMeta(
             school.name,
-            reviews.map((r) => ({
+            allReviews.slice(0, 30).map((r) => ({
               good_comment: r.good_comment || '',
               bad_comment: r.bad_comment || '',
               overall_satisfaction: r.overall_satisfaction || 0,
@@ -414,27 +402,22 @@ export async function POST(
           alerts.push(...metaResult.alerts);
 
           if (!dryRun) {
-            const targetId = existingDraft?.id || existingOverall?.id;
-            if (targetId) {
+            if (existingDraftForMeta?.id) {
+              // draftレコードにmeta情報を追記（publishedは触らない）
               await supabase.from('school_ai_summaries').update({
                 meta_title: metaResult.metaTitle,
                 meta_description: metaResult.metaDescription,
                 reviews_count_used: reviewCount,
-              }).eq('id', targetId);
+              }).eq('id', existingDraftForMeta.id);
             } else {
-              await supabase.from('school_ai_summaries').insert({
-                school_id: schoolId,
-                kind: 'overall',
-                topic: null,
-                status: 'draft',
-                summary_text: '',
-                meta_title: metaResult.metaTitle,
-                meta_description: metaResult.metaDescription,
-                reviews_count_used: reviewCount,
-                source_signature: sourceSignature(reviewCount, null),
-                generated_at: new Date().toISOString(),
-                created_by: null,
-              });
+              // draftもpublishedもない場合のみ新規作成
+              await saveSummary(
+                supabase, schoolId, 'overall', null,
+                '',
+                metaResult.metaTitle,
+                metaResult.metaDescription,
+                reviewCount, publish, maxCreatedAt
+              );
             }
           }
 
@@ -450,83 +433,75 @@ export async function POST(
       }
     }
 
-    // --- Group B: 口コミ増分判定 ---
-    const existingPublished = await getExistingPublishedSummary(supabase, schoolId, 'overall');
-    const lastUsedCount = existingPublished?.reviews_count_used ?? 0;
-    const delta = reviewCount - lastUsedCount;
-    const isFirstRunB = !existingPublished || lastUsedCount === 0;
-    const shouldRunB = reviewCount >= 3 && (isFirstRunB || delta >= deltaThreshold);
-
-    if (reviewCount >= 3 && !isFirstRunB && delta >= deltaThreshold) {
-      alerts.push({
-        code: 'ALERT-13',
-        message: `既存の公開済みコンテンツを再生成（口コミ増分: ${delta}件）`,
-        severity: 'info',
-      });
-    }
-    if (reviewCount >= 3 && reviewCount <= 5 && shouldRunB) {
-      alerts.push({
-        code: 'ALERT-12',
-        message: `口コミ${reviewCount}件で生成。精度が低い可能性`,
-        severity: 'info',
-      });
-    }
-
-    const reviews = shouldRunB ? await getPublicReviews(supabase, schoolId) : [];
-    const maxCreatedAt = reviews.length > 0
-      ? reviews.reduce((max, r) => (r.created_at > max ? r.created_at : max), reviews[0].created_at)
-      : null;
-    const reviewsForGen = reviews.map((r) => ({
-      good_comment: r.good_comment || '',
-      bad_comment: r.bad_comment || '',
-      overall_satisfaction: r.overall_satisfaction || 0,
-      answers: r.answers as Record<string, unknown> | undefined,
-    }));
-
     // --- B1-B5: SEO sections ---
     if (steps.includes('seo_sections')) {
-      if (!shouldRunB) {
-        results.seo_sections = {
-          status: 'skipped',
-          reason: reviewCount < 3 ? 'insufficient_reviews' : 'delta_insufficient',
-          delta,
-        };
+      if (reviewCount < 1) {
+        results.seo_sections = { status: 'skipped', reason: 'no_reviews' };
       } else {
-        try {
-          let sectionsOk = 0;
-          for (const key of SEO_SECTION_KEYS) {
-            const seoResult = await callOpenAIForSeoSection(school.name, key, reviewsForGen);
-            totalOpenAITokens += seoResult.tokensUsed.total;
+        // published済みのtopicを特定し、それ以外のみ生成対象にする
+        const { data: existingSeoAll } = await supabase
+          .from('school_ai_summaries')
+          .select('topic, status, reviews_count_used')
+          .eq('school_id', schoolId)
+          .eq('kind', 'seo')
+          .in('topic', [...SEO_SECTION_KEYS]);
 
-            const textLen = seoResult.summaryText.length;
-            if (textLen < 200 || textLen > 400) {
-              alerts.push({
-                code: 'ALERT-08',
-                message: `SEO「${key}」が ${textLen}文字（目標200-400）`,
-                severity: 'warning',
-              });
-            }
+        const publishedTopics = new Set(
+          (existingSeoAll || []).filter((s: any) => s.status === 'published').map((s: any) => s.topic)
+        );
+        const keysToGenerate = SEO_SECTION_KEYS.filter((k) => !publishedTopics.has(k));
 
-            if (!dryRun) {
-              await saveSummary(supabase, schoolId, 'seo', key, seoResult.summaryText, null, null, reviewCount, publish, maxCreatedAt);
-            }
-            sectionsOk++;
+        if (keysToGenerate.length === 0) {
+          results.seo_sections = { status: 'skipped', reason: 'all_published', sections_published: publishedTopics.size };
+        } else {
+          if (reviewCount <= 2) {
+            alerts.push({
+              code: 'ALERT-12',
+              message: `口コミ${reviewCount}件でSEOセクション生成。精度が低い可能性`,
+              severity: 'info',
+            });
           }
-          results.seo_sections = { status: 'ok', sections_count: sectionsOk, review_delta: delta };
-        } catch (e) {
-          results.seo_sections = { status: 'error', reason: e instanceof Error ? e.message : String(e) };
+          try {
+            let sectionsOk = 0;
+            const skippedKeys: string[] = [];
+            for (const key of keysToGenerate) {
+              const seoResult = await callOpenAIForSeoSection(school.name, key, reviewsForGen);
+              totalOpenAITokens += seoResult.tokensUsed.total;
+
+              const textLen = seoResult.summaryText.length;
+              if (textLen < 200 || textLen > 400) {
+                alerts.push({
+                  code: 'ALERT-08',
+                  message: `SEO「${key}」が ${textLen}文字（目標200-400）`,
+                  severity: 'warning',
+                });
+              }
+
+              if (!dryRun) {
+                await saveSummary(supabase, schoolId, 'seo', key, seoResult.summaryText, null, null, reviewCount, publish, maxCreatedAt);
+              }
+              sectionsOk++;
+            }
+            results.seo_sections = {
+              status: 'ok',
+              sections_count: sectionsOk,
+              sections_skipped_published: publishedTopics.size,
+            };
+          } catch (e) {
+            results.seo_sections = { status: 'error', reason: e instanceof Error ? e.message : String(e) };
+          }
         }
       }
     }
 
     // --- B6: FAQ ---
     if (steps.includes('faq')) {
-      if (!shouldRunB) {
-        results.faq = {
-          status: 'skipped',
-          reason: reviewCount < 3 ? 'insufficient_reviews' : 'delta_insufficient',
-          delta,
-        };
+      const existingFaqPublished = await getExistingPublishedSummary(supabase, schoolId, 'seo', 'faq');
+
+      if (existingFaqPublished) {
+        results.faq = { status: 'skipped', reason: 'already_published' };
+      } else if (reviewCount < 1) {
+        results.faq = { status: 'skipped', reason: 'no_reviews' };
       } else {
         try {
           const faqResult = await callOpenAIForFaq(school.name, reviewsForGen);
@@ -556,15 +531,22 @@ export async function POST(
       }
     }
 
-    // --- B7: review_tendency ---
+    // --- B7: review_tendency (school_ai_summaries kind='review_tendency') ---
     if (steps.includes('review_tendency')) {
-      if (!shouldRunB) {
-        results.review_tendency = {
-          status: 'skipped',
-          reason: reviewCount < 3 ? 'insufficient_reviews' : 'delta_insufficient',
-          delta,
-        };
+      const existingTendPublished = await getExistingPublishedSummary(supabase, schoolId, 'review_tendency');
+
+      if (existingTendPublished) {
+        results.review_tendency = { status: 'skipped', reason: 'already_published' };
+      } else if (reviewCount < 1) {
+        results.review_tendency = { status: 'skipped', reason: 'no_reviews' };
       } else {
+        if (reviewCount <= 2) {
+          alerts.push({
+            code: 'ALERT-12',
+            message: `口コミ${reviewCount}件で口コミ傾向生成。精度が低い可能性`,
+            severity: 'info',
+          });
+        }
         try {
           const tendResult = await callOpenAIForReviewTendency(school.name, reviewsForGen);
           totalOpenAITokens += tendResult.tokensUsed.total;
@@ -581,34 +563,11 @@ export async function POST(
           }
 
           if (!dryRun) {
-            const { data: existingTendency } = await supabase
-              .from('review_tendency')
-              .select('id')
-              .eq('school_id', schoolId)
-              .eq('status', 'draft')
-              .single();
-
-            const tendencyPayload = {
-              school_id: schoolId,
-              status: publish ? 'published' : 'draft',
-              summary_text: JSON.stringify(tendResult.summary),
-              reviews_count_used: reviewCount,
-              generated_at: new Date().toISOString(),
-            };
-
-            if (publish) {
-              await supabase
-                .from('review_tendency')
-                .update({ status: 'draft' })
-                .eq('school_id', schoolId)
-                .eq('status', 'published');
-            }
-
-            if (existingTendency) {
-              await supabase.from('review_tendency').update(tendencyPayload).eq('id', existingTendency.id);
-            } else {
-              await supabase.from('review_tendency').insert(tendencyPayload);
-            }
+            await saveSummary(
+              supabase, schoolId, 'review_tendency', null,
+              JSON.stringify(tendResult.summary),
+              null, null, reviewCount, publish, maxCreatedAt
+            );
           }
           results.review_tendency = { status: 'ok' };
         } catch (e) {
@@ -617,30 +576,25 @@ export async function POST(
       }
     }
 
-    // --- publish overall if requested ---
+    // --- publish overall if requested (published済みがなければdraftを昇格) ---
     if (publish && !dryRun) {
-      const { data: draftOverall } = await supabase
-        .from('school_ai_summaries')
-        .select('id')
-        .eq('school_id', schoolId)
-        .eq('kind', 'overall')
-        .is('topic', null)
-        .eq('status', 'draft')
-        .single();
-
-      if (draftOverall) {
-        await supabase
+      const existingOverallPublished = await getExistingPublishedSummary(supabase, schoolId, 'overall');
+      if (!existingOverallPublished) {
+        const { data: draftOverall } = await supabase
           .from('school_ai_summaries')
-          .update({ status: 'draft' })
+          .select('id')
           .eq('school_id', schoolId)
           .eq('kind', 'overall')
           .is('topic', null)
-          .eq('status', 'published');
+          .eq('status', 'draft')
+          .single();
 
-        await supabase
-          .from('school_ai_summaries')
-          .update({ status: 'published' })
-          .eq('id', draftOverall.id);
+        if (draftOverall) {
+          await supabase
+            .from('school_ai_summaries')
+            .update({ status: 'published' })
+            .eq('id', draftOverall.id);
+        }
       }
     }
 
@@ -648,7 +602,6 @@ export async function POST(
       school_id: schoolId,
       school_name: school.name,
       review_count: reviewCount,
-      review_delta: delta,
       results,
       alerts,
       tokens_used: { openai: totalOpenAITokens, perplexity: totalPerplexityTokens },

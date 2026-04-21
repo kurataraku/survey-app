@@ -213,7 +213,8 @@ export async function POST(request: NextRequest) {
       atmosphere_fit_rating: atmosphereFitRating,
       credit_rating: creditRating,
       tuition_rating: tuitionRating,
-      is_public: true,
+      is_public: false,
+      moderation_status: 'pending',
     });
 
     if (error) {
@@ -222,6 +223,27 @@ export async function POST(request: NextRequest) {
         { error: 'データの保存に失敗しました', details: error.message },
         { status: 500 }
       );
+    }
+
+    // 保存したレコードのIDを取得してモデレーションを非同期起動
+    const { data: savedResponse } = await supabase
+      .from('survey_responses')
+      .select('id')
+      .eq('school_name', schoolNameToSave)
+      .eq('email', data.email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (savedResponse?.id) {
+      const moderationUrl = `${process.env.AGENT_BASE_URL ?? ''}/api/admin/reviews/${savedResponse.id}/moderate`;
+      fetch(moderationUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.AGENT_API_KEY ?? '',
+        },
+      }).catch((e) => console.error('[submit] モデレーション起動失敗:', e));
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

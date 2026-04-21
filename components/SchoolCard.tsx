@@ -94,13 +94,11 @@ export default function SchoolCard({
           <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">
             {name}
           </h3>
-          <div className="flex flex-wrap gap-1">
-            {displayPrefectures.map((pref, index) => (
-              <span key={index} className="text-sm text-gray-600">
-                {pref}{index < displayPrefectures.length - 1 && '、'}
-              </span>
-            ))}
-          </div>
+          {displayPrefectures.length > 0 ? (
+            <p className="text-sm text-gray-600">
+              本校所在地：{displayPrefectures.join('、')}
+            </p>
+          ) : null}
         </div>
       </div>
 

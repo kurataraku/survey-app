@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Sparkles, CheckCircle2, XCircle, User, ChevronDown, School } from 'lucide-react';
+import { Sparkles, CheckCircle2, XCircle, User, ChevronDown, School, Bus } from 'lucide-react';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
 import SchoolRadarChart from '@/components/SchoolRadarChart';
@@ -13,20 +13,32 @@ import StatisticsSection from '@/components/StatisticsSection';
 import { SchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import { appPath } from '@/lib/base-path';
 import { SEO_SECTION_KEYS, SEO_SECTION_LABELS, FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
+import type { ParsedAiSummarySections } from '@/lib/schools/parseAiSummarySections';
+import {
+  sliceSummaryForFv,
+  stripAiSummaryDisclaimer,
+  stripTuitionCommuteMarkdownSection,
+} from '@/lib/schools/parseAiSummarySections';
+import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 
 const CONCLUSION_MAX_CHARS = 350;
+const DECISION_LEAD_MAX_CHARS = 300;
 const FEW_REVIEWS_THRESHOLD = 5;
 const GRAPH_HIDDEN_THRESHOLD = 1;
 
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
   encodedSlug: string;
+  parsedAiSummary: ParsedAiSummarySections;
+  tuitionAttendStatsHint: string | null;
   children?: React.ReactNode;
 }
 
 export default function SchoolDetailClient({
   school,
   encodedSlug,
+  parsedAiSummary,
+  tuitionAttendStatsHint,
   children,
 }: SchoolDetailClientProps) {
   const [expandedSeoContent, setExpandedSeoContent] = useState<Record<string, boolean>>({});
@@ -68,6 +80,15 @@ export default function SchoolDetailClient({
     });
   };
 
+  const fvSummary = useMemo(() => sliceSummaryForFv(parsedAiSummary, 4), [parsedAiSummary]);
+  const showTuitionCommuteTrend = school.review_count >= MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND;
+  const decisionLeadTruncated = useMemo(() => {
+    const t = parsedAiSummary.overviewPlain.trim();
+    if (!t) return null;
+    if (t.length <= DECISION_LEAD_MAX_CHARS) return t;
+    return `${t.slice(0, DECISION_LEAD_MAX_CHARS).trim()}…`;
+  }, [parsedAiSummary.overviewPlain]);
+
   return (
     <>
       {/* 結論サマリー */}
@@ -82,25 +103,48 @@ export default function SchoolDetailClient({
         atmosphereFitRatingAvg={school.atmosphere_fit_rating_avg}
         creditRatingAvg={school.credit_rating_avg}
         latestReviews={school.latest_reviews}
+        decisionLead={decisionLeadTruncated}
+        fitsBullets={fvSummary.fitsBullets}
+        notFitsBullets={fvSummary.notFitsBullets}
+        tuitionCommuteBullets={
+          showTuitionCommuteTrend ? fvSummary.tuitionCommuteBullets.slice(0, 3) : []
+        }
+        tuitionAttendStatsHint={showTuitionCommuteTrend ? tuitionAttendStatsHint : null}
       />
 
-      {/* 口コミ要約（この学校の特徴/合う人/合わない人）— 結論は「##」の手前まで、続きは合う人・合わない人のみ表示して重複を防ぐ */}
+      {/* 口コミ要約の詳細（FVと役割分担。全文・箇条書きは折りたたみ） */}
       {school.ai_summary && (() => {
-        const text = school.ai_summary.summary_text;
-        const firstH2 = text.indexOf('\n## ');
-        const leadPart =
-          firstH2 === -1 ? text.trim() : text.slice(0, firstH2).trim();
-        const conclusionLead =
-          leadPart.length > CONCLUSION_MAX_CHARS
-            ? leadPart.slice(0, CONCLUSION_MAX_CHARS).trim() + '…'
-            : leadPart;
-        const restFromH2 = firstH2 === -1 ? '' : text.slice(firstH2).trimStart();
-        const hasRest = restFromH2.length > 0;
         const isFewReviews = school.review_count < FEW_REVIEWS_THRESHOLD;
+        const p = parsedAiSummary;
+        const hasStructured =
+          Boolean(p.overviewPlain) ||
+          p.fitsBullets.length > 0 ||
+          p.notFitsBullets.length > 0 ||
+          (showTuitionCommuteTrend && p.tuitionCommuteBullets.length > 0);
+        const rawFallback = stripAiSummaryDisclaimer(school.ai_summary.summary_text).trim();
+        const firstH2 = rawFallback.indexOf('\n## ');
+        const legacyLead =
+          firstH2 === -1 ? rawFallback : rawFallback.slice(0, firstH2).trim();
+        const legacyRest = firstH2 === -1 ? '' : rawFallback.slice(firstH2).trimStart();
+        const legacyRestForRender = showTuitionCommuteTrend
+          ? legacyRest
+          : stripTuitionCommuteMarkdownSection(legacyRest);
 
-        const renderRestSummary = (restText: string) => {
+        const renderBulletList = (items: string[], icon: 'check' | 'x' | 'bus') =>
+          items.map((text, index) => (
+            <div key={`${icon}-${index}`} className="flex items-start gap-3 mb-2">
+              {icon === 'check' && (
+                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+              )}
+              {icon === 'x' && <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />}
+              {icon === 'bus' && <Bus className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />}
+              <span className="flex-1 leading-relaxed text-gray-700">{text}</span>
+            </div>
+          ));
+
+        const renderLegacyRest = (restText: string) => {
           const lines = restText.split('\n');
-          let currentSection: 'good' | 'bad' | null = null;
+          let currentSection: 'good' | 'bad' | 'tuition' | null = null;
           return lines.map((line, index) => {
             const trimmedLine = line.trim();
             if (trimmedLine === '## この学校が合う人' || trimmedLine.startsWith('## この学校が合う人')) {
@@ -121,26 +165,35 @@ export default function SchoolDetailClient({
                 </div>
               );
             }
-            if (/^[-・]\s/.test(trimmedLine)) {
-              const content = trimmedLine.replace(/^[-・]\s/, '');
-              if (currentSection === 'good') {
+            if (
+              trimmedLine === '## 学費・通学スタイルの注意点' ||
+              trimmedLine.startsWith('## 学費・通学スタイルの注意点')
+            ) {
+              currentSection = 'tuition';
+              return (
+                <div key={index} className="flex items-start gap-2 mt-6 mb-4">
+                  <Bus className="w-5 h-5 text-amber-700 mt-0.5 flex-shrink-0" />
+                  <h3 className="font-semibold text-gray-900 text-lg">学費・通学スタイルの注意点</h3>
+                </div>
+              );
+            }
+            if (/^[-・*]\s/.test(trimmedLine)) {
+              const content = trimmedLine.replace(/^[-・*]\s/, '');
+              if (currentSection === 'good' || currentSection === 'bad' || currentSection === 'tuition') {
+                const ic = currentSection === 'good' ? 'check' : currentSection === 'bad' ? 'x' : 'bus';
                 return (
                   <div key={index} className="flex items-start gap-3 ml-7 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span className="flex-1 leading-relaxed">{content}</span>
-                  </div>
-                );
-              }
-              if (currentSection === 'bad') {
-                return (
-                  <div key={index} className="flex items-start gap-3 ml-7 mb-2">
-                    <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
+                    {ic === 'check' && (
+                      <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    )}
+                    {ic === 'x' && <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />}
+                    {ic === 'bus' && <Bus className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />}
                     <span className="flex-1 leading-relaxed">{content}</span>
                   </div>
                 );
               }
             }
-            if (trimmedLine && !trimmedLine.startsWith('##') && !/^[-・]\s/.test(trimmedLine)) {
+            if (trimmedLine && !trimmedLine.startsWith('##') && !/^[-・*]\s/.test(trimmedLine)) {
               return (
                 <p key={index} className="mb-3 last:mb-0 leading-relaxed">
                   {line}
@@ -152,6 +205,58 @@ export default function SchoolDetailClient({
           });
         };
 
+        const extendedBody = hasStructured ? (
+          <div className="mt-4 space-y-6 text-gray-700">
+            {p.overviewPlain ? (
+              <div>
+                <h3 className="text-base font-bold text-gray-900 mb-2">判断材料の全文</h3>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{p.overviewPlain}</p>
+              </div>
+            ) : null}
+            {p.fitsBullets.length > 0 && (
+              <div>
+                <h3 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  この学校が合う人（一覧）
+                </h3>
+                {renderBulletList(p.fitsBullets, 'check')}
+              </div>
+            )}
+            {p.notFitsBullets.length > 0 && (
+              <div>
+                <h3 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-rose-600" />
+                  この学校が合わない人（一覧）
+                </h3>
+                {renderBulletList(p.notFitsBullets, 'x')}
+              </div>
+            )}
+            {showTuitionCommuteTrend && p.tuitionCommuteBullets.length > 0 && (
+              <div>
+                <h3 className="text-base font-bold text-gray-900 mb-2 flex items-center gap-2">
+                  <Bus className="w-5 h-5 text-amber-700" />
+                  学費・通学スタイルの注意点（一覧）
+                </h3>
+                {renderBulletList(p.tuitionCommuteBullets, 'bus')}
+              </div>
+            )}
+          </div>
+        ) : legacyRestForRender.length > 0 ? (
+          <div className="mt-4 pl-0">{renderLegacyRest(legacyRestForRender)}</div>
+        ) : (
+          <p className="mt-4 text-sm text-gray-600 whitespace-pre-wrap">
+            {legacyLead.length > CONCLUSION_MAX_CHARS
+              ? `${legacyLead.slice(0, CONCLUSION_MAX_CHARS)}…`
+              : legacyLead}
+          </p>
+        );
+
+        const showDetails =
+          hasStructured ||
+          legacyRestForRender.length > 0 ||
+          legacyLead.length > DECISION_LEAD_MAX_CHARS ||
+          (decisionLeadTruncated && p.overviewPlain.length > decisionLeadTruncated.length);
+
         return (
           <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 relative overflow-hidden border border-gray-200">
             <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500" />
@@ -159,25 +264,22 @@ export default function SchoolDetailClient({
               <div className="p-2 bg-blue-50 rounded-lg">
                 <Sparkles className="w-5 h-5 text-blue-600" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900">
-                口コミ要約（この学校の特徴/合う人/合わない人）
-              </h2>
+              <h2 className="text-xl font-bold text-gray-900">口コミ要約（詳細）</h2>
             </div>
             <div className="prose prose-sm max-w-prose text-gray-700 leading-relaxed">
-              <p className="mb-3">{conclusionLead}</p>
               {isFewReviews && (
                 <p className="text-sm text-amber-700 bg-amber-50/80 rounded-lg px-3 py-2 mb-4">
                   口コミは{school.review_count}件のため、傾向の参考としてご覧ください。
                 </p>
               )}
-              {hasRest && (
-                <details className="mt-4">
+              {showDetails ? (
+                <details className="mt-0">
                   <summary className="cursor-pointer font-medium text-gray-700">
-                    口コミ要約の続き（合う人・合わない人）
+                    要約の全文・箇条書き一覧を開く
                   </summary>
-                  <div className="mt-4 pl-0">{renderRestSummary(restFromH2)}</div>
+                  {extendedBody}
                 </details>
-              )}
+              ) : null}
             </div>
           </div>
         );
@@ -226,7 +328,7 @@ export default function SchoolDetailClient({
               href={appPath(`/schools/${encodedSlug}/reviews`)}
               className="text-blue-600 hover:underline"
             >
-              口コミ一覧
+              口コミ一覧（絞り込み）
             </Link>
           </li>
         </ul>
@@ -238,7 +340,7 @@ export default function SchoolDetailClient({
           href={appPath(`/schools/${encodedSlug}/reviews`)}
           className="inline-block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
         >
-          自分に近い口コミを探す / 全ての口コミを見る
+          条件で絞り込む（口コミ一覧へ）
         </Link>
       </div>
 
@@ -517,12 +619,10 @@ export default function SchoolDetailClient({
               content: school.latest_reviews.length > 0 ? (
                 <div className="space-y-4">
                   {school.latest_reviews.map((review) => (
-                    <Link
+                    <article
                       key={review.id}
-                      href={appPath(`/reviews/${review.id}`)}
-                      className="block p-6 bg-white border border-gray-200 rounded-xl shadow-md hover:border-blue-400 hover:shadow-lg transition-all duration-200"
+                      className="p-6 bg-white border border-gray-200 rounded-xl shadow-md"
                     >
-                      {/* 上段：★/日付/属性チップ */}
                       <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-100">
                         <div className="p-2 bg-blue-50 rounded-full">
                           <User className="w-4 h-4 text-blue-600" />
@@ -533,12 +633,11 @@ export default function SchoolDetailClient({
                         </span>
                       </div>
 
-                      {/* 本文：良い点/改善点を1行ずつ */}
                       <div className="space-y-4 mb-5">
                         {review.good_comment && (
                           <div className="p-3 bg-green-50/50 rounded-lg border-l-4 border-green-500">
                             <p className="text-xs font-semibold text-green-700 mb-2">良い点</p>
-                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-1">
+                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
                               {review.good_comment}
                             </p>
                           </div>
@@ -548,21 +647,21 @@ export default function SchoolDetailClient({
                             <p className="text-xs font-semibold text-rose-700 mb-2">
                               改善してほしい点
                             </p>
-                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-1">
+                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
                               {review.bad_comment}
                             </p>
                           </div>
                         )}
                       </div>
 
-                      {/* 下段：いいねと詳細導線 */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-gray-100">
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <svg
                             className="w-4 h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
+                            aria-hidden
                           >
                             <path
                               strokeLinecap="round"
@@ -573,11 +672,14 @@ export default function SchoolDetailClient({
                           </svg>
                           <span>{review.like_count || 0}</span>
                         </div>
-                        <span className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                          続きを読む →
-                        </span>
+                        <Link
+                          href={appPath(`/reviews/${review.id}`)}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          この口コミの詳細・回答属性を見る
+                        </Link>
                       </div>
-                    </Link>
+                    </article>
                   ))}
                 </div>
               ) : (
@@ -723,7 +825,7 @@ export default function SchoolDetailClient({
           href={appPath(`/schools/${encodedSlug}/reviews`)}
           className="inline-block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
         >
-          自分に近い口コミを探す / 全ての口コミを見る
+          条件で絞り込む（口コミ一覧へ）
         </Link>
       </div>
     </>

@@ -7,6 +7,8 @@ interface SchoolCardServerProps {
   prefecture: string;
   prefectures?: string[];
   matchedPrefecture?: string;
+  /** 一覧が都道府県で絞り込まれているとき、本校所在地など別県表記が誤解を招くため所在地行を出さない */
+  hidePrefectureUnderFilter?: boolean;
   slug: string | null;
   reviewCount: number;
   overallAvg: number | null;
@@ -41,6 +43,7 @@ export default function SchoolCardServer({
   prefecture,
   prefectures,
   matchedPrefecture,
+  hidePrefectureUnderFilter = false,
   slug,
   reviewCount,
   overallAvg,
@@ -59,7 +62,9 @@ export default function SchoolCardServer({
   const allPrefectures = Array.from(allPrefecturesSet);
 
   let displayPrefectures: string[] = [];
-  if (allPrefectures.length === 0) {
+  if (hidePrefectureUnderFilter) {
+    displayPrefectures = [];
+  } else if (allPrefectures.length === 0) {
     displayPrefectures = [];
   } else if (matchedPrefecture && allPrefectures.includes(matchedPrefecture)) {
     const otherPrefectures = allPrefectures.filter((p) => p !== matchedPrefecture);
@@ -83,14 +88,11 @@ export default function SchoolCardServer({
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">{name}</h3>
-          <div className="flex flex-wrap gap-1">
-            {displayPrefectures.map((pref, index) => (
-              <span key={index} className="text-sm text-gray-600">
-                {pref}
-                {index < displayPrefectures.length - 1 && '、'}
-              </span>
-            ))}
-          </div>
+          {displayPrefectures.length > 0 ? (
+            <p className="text-sm text-gray-600">
+              本校所在地：{displayPrefectures.join('、')}
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -105,6 +105,49 @@ export default function AdminPage() {
       color: 'teal',
     },
     {
+      title: 'SEO記事生成',
+      description: 'AIエージェントによるSEO記事の自動生成・管理を行います',
+      href: appPath('/admin/seo-drafts'),
+      icon: (
+        <svg
+          className="w-12 h-12 text-indigo-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a2.25 2.25 0 01-1.591.659H9.061a2.25 2.25 0 01-1.591-.659L5 14.5m14 0V17a2 2 0 01-2 2H7a2 2 0 01-2-2v-2.5"
+          />
+        </svg>
+      ),
+      color: 'indigo',
+    },
+    {
+      title: '口コミ承認',
+      description: 'AI審査済みの口コミを確認・承認・却下します',
+      href: appPath('/admin/reviews'),
+      icon: (
+        <svg className="w-12 h-12 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      color: 'orange',
+    },
+    {
+      title: 'キャンペーン管理',
+      description: 'QUOカードPayキャンペーンの作成・管理を行います',
+      href: appPath('/admin/campaigns'),
+      icon: (
+        <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+        </svg>
+      ),
+      color: 'amber',
+    },
+    {
       title: 'お問い合わせ管理',
       description: 'お問い合わせの一覧・詳細確認・既読管理を行います',
       href: appPath('/admin/contacts'),

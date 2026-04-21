@@ -8,6 +8,8 @@ import { getSchoolSlugs } from '@/lib/schools/getSchoolSlugs';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
+import SchoolPageBreadcrumbs from '@/components/SchoolPageBreadcrumbs';
+import { isDefaultSchoolReviewsIndex } from '@/lib/schools/school-reviews-seo';
 
 /** 常にサーバーでレンダリングし、口コミ本文を初期HTMLに含める（クローラー対応） */
 export const dynamic = 'force-dynamic';
@@ -31,8 +33,13 @@ function getStr(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps): Promise<Metadata> {
   const resolvedParams = params instanceof Promise ? await params : params;
+  const resolvedSearch =
+    searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const decodedSlug = decodeURIComponent(resolvedParams.slug);
 
   const school = await getSchoolWithStats(decodedSlug);
@@ -40,11 +47,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: '学校が見つかりません' };
   }
 
-  const title = `${school.name}の口コミ一覧 | 通信制高校リアルレビュー`;
-  const description = `${school.name}の口コミ・評判を掲載。在校生・卒業生・保護者の生の声で、あなたに合う通信制高校を見つけよう。`;
+  const title = `${school.name}の口コミ一覧（絞り込み） | 通信制高校リアルレビュー`;
+  const description = `${school.name}の口コミを条件で絞り込みできます。学校ページの口コミ・評判まとめとあわせてご利用ください。`;
 
   const appBaseUrl = getAppBaseUrl();
-  const canonical = `${appBaseUrl}/schools/${resolvedParams.slug}/reviews`;
+  const hubCanonical = `${appBaseUrl}/schools/${resolvedParams.slug}`;
+  const listCanonical = `${appBaseUrl}/schools/${resolvedParams.slug}/reviews`;
+  const useHubCanonical = isDefaultSchoolReviewsIndex(
+    resolvedSearch as Record<string, string | string[] | undefined>
+  );
+  const canonical = useHubCanonical ? hubCanonical : listCanonical;
 
   return {
     title,
@@ -64,6 +76,10 @@ export default async function SchoolReviewsPage({ params, searchParams }: PagePr
   const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
 
   const decodedSlug = decodeURIComponent(resolvedParams.slug);
+  const school = await getSchoolWithStats(decodedSlug);
+  if (!school) {
+    notFound();
+  }
   const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
   const sort = getStr(resolvedSearch.sort) || 'newest';
   const role = getStr(resolvedSearch.role);
@@ -121,18 +137,23 @@ export default async function SchoolReviewsPage({ params, searchParams }: PagePr
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
+        <SchoolPageBreadcrumbs
+          schoolName={school.name}
+          encodedSlug={resolvedParams.slug}
+          variant="reviews"
+        />
         <div className="mb-3">
           <Link
-            href={appPath(`/schools/${decodedSlug}`)}
+            href={appPath(`/schools/${encodeURIComponent(decodedSlug)}`)}
             className="text-xs text-blue-600 hover:text-blue-700 mb-2 inline-flex items-center gap-1"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            学校詳細に戻る
+            {school.name}の口コミ・評判（まとめ）へ戻る
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            {data.schoolName || '口コミ一覧'}
+            {data.schoolName || school.name}の口コミ一覧（絞り込み）
           </h1>
           {data.total > 0 && <p className="text-sm text-gray-600">{data.total}件の口コミ</p>}
         </div>

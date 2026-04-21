@@ -9,6 +9,7 @@ import { getQuestionLabel, getEnrollmentYearLabel, getGraduationPathLabel } from
 import { getReviewById, type ReviewData } from '@/lib/reviews/getReviewById';
 import { getReviewIds } from '@/lib/reviews/getReviewIds';
 import { appPath } from '@/lib/base-path';
+import { getAppBaseUrl } from '@/lib/env-check';
 
 export const revalidate = 3600;
 
@@ -35,13 +36,21 @@ function buildReviewJsonLd(review: ReviewData) {
     .filter(Boolean)
     .join(' ')
     .slice(0, 500);
+  const base = getAppBaseUrl();
+  const schoolHubUrl = review.school_slug
+    ? `${base}/schools/${encodeURIComponent(review.school_slug)}`
+    : undefined;
+  const itemReviewed: Record<string, unknown> = {
+    '@type': 'EducationalOrganization',
+    name: review.school_name,
+  };
+  if (schoolHubUrl) {
+    itemReviewed.url = schoolHubUrl;
+  }
   return {
     '@context': 'https://schema.org',
     '@type': 'Review',
-    itemReviewed: {
-      '@type': 'EducationalOrganization',
-      name: review.school_name,
-    },
+    itemReviewed,
     author: { '@type': 'Person', name: '匿名' },
     reviewRating: {
       '@type': 'Rating',
@@ -77,7 +86,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              {review.school_name}の詳細に戻る
+              {review.school_name}の口コミ・評判（まとめ）へ戻る
             </Link>
           ) : (
             <Link
@@ -96,7 +105,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {review.school_name}の口コミ
+                {review.school_name}の口コミ（投稿）
               </h1>
               <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
                 <StarRatingDisplay value={review.overall_satisfaction} size="md" />
