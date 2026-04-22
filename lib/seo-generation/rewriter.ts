@@ -1,4 +1,5 @@
 import { callLLM, resolveModel } from './llm-client';
+import { defaultOpenAiPremiumModel } from './openai-model-defaults';
 import type { SeoMeta, QualityScore, SeoDraftEvidence } from './types';
 
 interface RewriterInput {
@@ -18,7 +19,7 @@ interface RewriterOutput {
 export async function runRewriter(input: RewriterInput): Promise<RewriterOutput> {
   const { provider, model } = resolveModel(
     'SEO_WRITER_MODEL',
-    process.env.ANTHROPIC_API_KEY ? 'claude-opus-4-20250514' : 'gpt-5.4',
+    process.env.ANTHROPIC_API_KEY ? 'claude-opus-4-20250514' : defaultOpenAiPremiumModel(),
     process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai'
   );
 

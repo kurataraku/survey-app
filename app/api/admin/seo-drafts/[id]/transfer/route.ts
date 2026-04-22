@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/admin';
-import { cleanMdBody, mdToHtml, generateSeoSlug } from '@/lib/seo-generation/transfer-utils';
+import {
+  cleanMdBody,
+  mdToHtml,
+  generateSeoSlug,
+  schoolSlugsFromReviewEvidenceUrls,
+} from '@/lib/seo-generation/transfer-utils';
 
 export async function POST(
   request: NextRequest,
@@ -91,12 +96,49 @@ export async function POST(
       );
     }
 
+    // 関連学校: 学校別は対象校を先頭に。ナレッジは根拠 review の /schools/{slug} から自動紐づけ
+    const linkedSchoolIds: string[] = [];
+    const seenSchool = new Set<string>();
+    const pushSchoolId = (sid: string | null | undefined) => {
+      if (!sid || seenSchool.has(sid)) return;
+      seenSchool.add(sid);
+      linkedSchoolIds.push(sid);
+    };
+
     if (draft.draft_type === 'school' && draft.school_id) {
-      await supabase.from('article_schools').insert({
+      pushSchoolId(draft.school_id);
+    }
+
+    const { data: evidenceRows } = await supabase
+      .from('seo_draft_evidence')
+      .select('kind, url')
+      .eq('draft_id', id)
+      .order('retrieved_at', { ascending: true })
+      .order('id', { ascending: true });
+
+    const slugs = schoolSlugsFromReviewEvidenceUrls(evidenceRows || []);
+    if (slugs.length > 0) {
+      const { data: schoolsBySlug } = await supabase
+        .from('schools')
+        .select('id, slug')
+        .in('slug', slugs);
+      const slugToId = new Map((schoolsBySlug || []).map((s) => [s.slug, s.id]));
+      for (const slug of slugs) {
+        const sid = slugToId.get(slug);
+        if (sid) pushSchoolId(sid);
+      }
+    }
+
+    if (linkedSchoolIds.length > 0) {
+      const relRows = linkedSchoolIds.map((school_id, i) => ({
         article_id: article.id,
-        school_id: draft.school_id,
-        display_order: 1,
-      });
+        school_id,
+        display_order: i + 1,
+      }));
+      const { error: relErr } = await supabase.from('article_schools').insert(relRows);
+      if (relErr) {
+        console.error('[transfer] article_schools insert error:', relErr);
+      }
     }
 
     await supabase

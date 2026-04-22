@@ -1,7 +1,8 @@
 import { callLLM } from './llm-client';
+import { defaultOpenAiEconomyModel } from './openai-model-defaults';
 
 const EXPANDER_MODEL =
-  process.env.SEO_QUERY_EXPANDER_MODEL || 'gpt-5.4-mini';
+  process.env.SEO_QUERY_EXPANDER_MODEL || defaultOpenAiEconomyModel();
 
 /** PostgREST .or() 内で問題になる文字を除去 */
 export function sanitizeSearchTermForOr(term: string): string {

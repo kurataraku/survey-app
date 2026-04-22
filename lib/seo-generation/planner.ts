@@ -1,4 +1,6 @@
 import { callLLM, resolveModel } from './llm-client';
+import { parseJsonObjectFromLlmText } from './llm-json-parse';
+import { defaultOpenAiEconomyModel } from './openai-model-defaults';
 import type { OutlineSection } from './types';
 import { inferPrefecturesFromKeyword } from '@/lib/seo-generation/keyword-region';
 
@@ -19,7 +21,7 @@ interface PlannerOutput {
 export async function runPlanner(input: PlannerInput): Promise<PlannerOutput> {
   const { provider, model } = resolveModel(
     'SEO_PLANNER_MODEL',
-    'gpt-5.4-mini',
+    defaultOpenAiEconomyModel(),
     'openai'
   );
 
@@ -83,8 +85,9 @@ ${
     : ''
 }
 
-## 出力形式
-以下のJSON形式で記事の企画を出力してください。他の文章は一切書かないでください。
+## 出力形式（厳守）
+- **出力は JSON オブジェクトのみ**（前後に説明文・マークダウン・コードフェンスを付けない）
+- **先頭文字は \`{\`、末尾は \`}\` のみ**（\`\`\`json は禁止）
 
 {
   "intent": "検索意図の具体的な説明（「〜を知りたい」「〜を比較したい」など読者の動機を含む1-2文）",
@@ -140,7 +143,7 @@ ${
     systemPrompt: `あなたは通信制高校メディア「通信制高校リアルレビュー」の編集長兼SEOストラテジストです。
 在校生・卒業生の口コミデータと学校情報を最大限活用する記事構成を企画します。
 読者は通信制高校を検討中の中高生とその保護者であり、信頼性の高い具体的な情報を求めています。
-構造化されたJSON出力のみ行ってください。`,
+構造化されたJSON出力のみ行ってください。前置き・後書き・\`\`\` は禁止です。`,
     userPrompt: prompt,
     temperature: 0.5,
     maxTokens: 3000,
@@ -155,10 +158,17 @@ ${
   };
 
   try {
-    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-    parsed = JSON.parse(jsonMatch ? jsonMatch[0] : response.content);
-  } catch {
-    throw new Error('Plannerの出力JSONパースに失敗: ' + response.content.slice(0, 200));
+    parsed = parseJsonObjectFromLlmText<{
+      intent: string;
+      audience: string;
+      title: string;
+      outline: OutlineSection[];
+    }>(response.content);
+  } catch (e) {
+    const hint = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Plannerの出力JSONパースに失敗: ${hint}\n---先頭400字---\n${response.content.slice(0, 400)}`
+    );
   }
 
   if (!parsed.title || !parsed.outline || parsed.outline.length === 0) {

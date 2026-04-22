@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiPath, appPath } from '@/lib/base-path';
 import Button from '@/components/ui/Button';
 import ProgressBar from '@/components/ui/ProgressBar';
+import { postSeoGenerationStep } from '@/lib/seo-generation/resume-generation';
 import type { DraftType, GenerationStep } from '@/lib/seo-generation/types';
 
 interface SchoolOption {
@@ -49,6 +51,8 @@ export default function NewSeoDraftPage() {
   const [currentProgress, setCurrentProgress] = useState(0);
   const [stepLog, setStepLog] = useState<StepLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** 作成成功後に離脱・エラーしたとき、詳細で再開するための下書き ID */
+  const [interruptDraftId, setInterruptDraftId] = useState<string | null>(null);
 
   useEffect(() => {
     if (draftType === 'school') {
@@ -89,18 +93,9 @@ export default function NewSeoDraftPage() {
     setStepLog((prev) => [...prev, { id: logId, step, label, status: 'running' }]);
 
     try {
-      const res = await fetch(apiPath(`/api/admin/seo-drafts/${draftId}/${step}`), {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const data = await postSeoGenerationStep(draftId, step);
       const elapsed = Date.now() - start;
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `${step}失敗`);
-      }
-
-      const data = await res.json();
       setStepLog((prev) =>
         prev.map((l) => (l.id === logId ? { ...l, status: 'done', elapsed } : l))
       );
@@ -127,6 +122,7 @@ export default function NewSeoDraftPage() {
 
     setIsGenerating(true);
     setError(null);
+    setInterruptDraftId(null);
     setStepLog([]);
     setCurrentProgress(0);
 
@@ -149,6 +145,7 @@ export default function NewSeoDraftPage() {
 
       const draft = await createRes.json();
       const draftId = draft.id;
+      setInterruptDraftId(draftId);
 
       // Phase 1: plan → research → [research-web] → write
       await runStep(draftId, 'plan');
@@ -385,10 +382,22 @@ export default function NewSeoDraftPage() {
               {error && (
                 <div className="rounded-md bg-red-50 border border-red-200 p-4">
                   <p className="text-sm text-red-700">{error}</p>
+                  {interruptDraftId && (
+                    <p className="mt-3 text-sm">
+                      <Link
+                        href={appPath(`/admin/seo-drafts/${interruptDraftId}#seo-generation-resume`)}
+                        className="font-medium text-blue-700 hover:text-blue-900 underline"
+                      >
+                        この下書きの詳細を開いて「生成を再開」
+                      </Link>
+                      <span className="text-gray-600">（別タブ推奨）</span>
+                    </p>
+                  )}
                   <button
                     onClick={() => {
                       setIsGenerating(false);
                       setError(null);
+                      setInterruptDraftId(null);
                       setStepLog([]);
                     }}
                     className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
@@ -398,8 +407,23 @@ export default function NewSeoDraftPage() {
                 </div>
               )}
 
+              {isGenerating && interruptDraftId && !error && (
+                <p className="text-xs text-gray-500 mt-2">
+                  別ページへ移っても下書きは保存されます。再開は{' '}
+                  <Link
+                    href={appPath(`/admin/seo-drafts/${interruptDraftId}#seo-generation-resume`)}
+                    className="text-blue-600 hover:text-blue-800 underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    下書き詳細の「生成を再開」
+                  </Link>
+                  から行えます。
+                </p>
+              )}
+
               <p className="text-xs text-gray-400">
-                ※ ページを離れると生成が中断されます。途中結果はDBに保存されています。
+                ※ ページを離れると生成が中断されます。途中結果はDBに保存され、下書き詳細の「生成を再開」から続きを実行できます。
               </p>
             </div>
           )}

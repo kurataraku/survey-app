@@ -1,4 +1,5 @@
 import { callLLM, resolveModel } from './llm-client';
+import { defaultOpenAiPremiumModel } from './openai-model-defaults';
 import type { OutlineSection, SeoMeta, SeoDraftEvidence } from './types';
 import { inferPrefecturesFromKeyword } from '@/lib/seo-generation/keyword-region';
 import { collectReviewSchoolNames } from '@/lib/seo-generation/quote-guards';
@@ -97,7 +98,7 @@ function formatEvidence(
 export async function runWriter(input: WriterInput): Promise<WriterOutput> {
   const { provider, model } = resolveModel(
     'SEO_WRITER_MODEL',
-    process.env.ANTHROPIC_API_KEY ? 'claude-opus-4-20250514' : 'gpt-5.4',
+    process.env.ANTHROPIC_API_KEY ? 'claude-opus-4-20250514' : defaultOpenAiPremiumModel(),
     process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai'
   );
 

@@ -7,11 +7,14 @@ interface MarkdownRendererProps {
   content: string;
 }
 
-export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  // HTMLタグが含まれているかチェック（リッチテキストエディタで作成されたコンテンツ）
-  const hasHtmlTags = /<[a-z][\s\S]*>/i.test(content);
+/** 角括弧URL `<https://...>` は Markdown でもよく使われ、`<[a-z]` 判定で誤って HTML 扱いになるため除外しない */
+const RICH_HTML_OPEN_TAG =
+  /<(p|div|span|br|strong|em|b|i|u|ul|ol|li|h[1-6]|table|thead|tbody|tr|td|th|a|img|section|article|figure|figcaption)\b/i;
 
-  if (hasHtmlTags) {
+export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const looksLikeSavedRichHtml = RICH_HTML_OPEN_TAG.test(content);
+
+  if (looksLikeSavedRichHtml) {
     // HTMLコンテンツとして表示
     return (
       <div
@@ -77,6 +80,24 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto mb-4">
               {children}
             </pre>
+          ),
+          table: ({ children }) => (
+            <div className="overflow-x-auto mb-4">
+              <table className="min-w-full border-collapse border border-gray-300 text-sm text-gray-800">
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-gray-100">{children}</thead>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+          tr: ({ children }) => <tr className="border-b border-gray-200">{children}</tr>,
+          th: ({ children }) => (
+            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border border-gray-300 px-3 py-2 align-top">{children}</td>
           ),
         }}
       >

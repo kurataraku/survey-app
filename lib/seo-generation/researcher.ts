@@ -1,4 +1,5 @@
 import { callLLM, resolveModel } from './llm-client';
+import { defaultOpenAiEconomyModel } from './openai-model-defaults';
 import {
   collectAllData,
   type CollectedReview,
@@ -133,7 +134,7 @@ export async function runResearcher(
 ): Promise<ResearcherOutput> {
   const { provider, model } = resolveModel(
     'SEO_RESEARCHER_MODEL',
-    process.env.ANTHROPIC_API_KEY ? 'claude-sonnet-4-20250514' : 'gpt-5.4',
+    process.env.ANTHROPIC_API_KEY ? 'claude-sonnet-4-20250514' : defaultOpenAiEconomyModel(),
     process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai'
   );
 

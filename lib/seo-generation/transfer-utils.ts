@@ -72,6 +72,33 @@ export function cleanMdBody(raw: string): string {
   return s.trim();
 }
 
+/**
+ * 根拠カード（review）の学校ページ URL から schools.slug を抽出する。
+ * 転送時に article_schools を自動作成するために使う（並びは evidence の SELECT 順に依存）。
+ */
+export function schoolSlugsFromReviewEvidenceUrls(
+  evidence: Array<{ kind: string; url: string | null }>
+): string[] {
+  const slugRe = /\/schools\/([^/?#]+)/;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of evidence) {
+    if (e.kind !== 'review' || !e.url) continue;
+    const m = e.url.match(slugRe);
+    if (!m) continue;
+    let slug = m[1];
+    try {
+      slug = decodeURIComponent(slug);
+    } catch {
+      /* そのまま */
+    }
+    if (seen.has(slug)) continue;
+    seen.add(slug);
+    out.push(slug);
+  }
+  return out;
+}
+
 export function mdToHtml(md: string): string {
   let h = md;
   // Headings (h3 before h2 before h1 to avoid partial matches)

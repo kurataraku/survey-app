@@ -1,4 +1,5 @@
 import { callLLM, resolveModel } from './llm-client';
+import { defaultOpenAiEconomyModel } from './openai-model-defaults';
 import type { QualityScore, QualityIssue, SeoDraftEvidence } from './types';
 import {
   analyzeProgrammaticQuoteGuards,
@@ -118,7 +119,7 @@ function analyzeArticleMetrics(bodyMd: string, keyword: string): ArticleMetrics 
 export async function runVerifier(input: VerifierInput): Promise<VerifierOutput> {
   const { provider, model } = resolveModel(
     'SEO_VERIFIER_MODEL',
-    'gpt-5.4',
+    defaultOpenAiEconomyModel(),
     'openai'
   );
 

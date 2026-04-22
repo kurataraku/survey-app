@@ -52,25 +52,94 @@ function openAiChatUsesMaxCompletionTokens(model: string): boolean {
   return false;
 }
 
+/**
+ * GPT-5 / o 系では `temperature` を 1 以外にすると 400 になる（デフォルト 1 のみ許可）。
+ */
+function openAiEffectiveTemperature(model: string, requested?: number): number {
+  const m = model.toLowerCase();
+  if (m.startsWith('gpt-5') || m.startsWith('o1') || m.startsWith('o3') || m.startsWith('o4')) {
+    return 1;
+  }
+  return requested ?? 0.5;
+}
+
+/** reasoning + 本文の合算が max に達し、visible が空になるのを防ぐ */
+function openAiChatDefaultMaxTokens(model: string, requested: number): number {
+  const m = model.toLowerCase();
+  if (m.startsWith('gpt-5') && requested < 8000) {
+    return 8000;
+  }
+  return requested;
+}
+
+/**
+ * reasoning_effort の許容値はモデル世代で異なる。
+ * - `gpt-5.2` / `gpt-5.4` など `gpt-5.{数字}`: none, low, …（minimal は不可）
+ * - `gpt-5-mini` / `gpt-5-nano` 等: minimal, low, …（none は不可）
+ */
+function openAiReasoningEffort(
+  model: string
+): 'none' | 'minimal' | undefined {
+  const m = model.toLowerCase();
+  if (!m.startsWith('gpt-5')) return undefined;
+  if (/^gpt-5\.\d/.test(m)) return 'none';
+  return 'minimal';
+}
+
+function extractOpenAiAssistantText(message: { content?: unknown } | undefined): string {
+  if (!message) return '';
+  const c = message.content;
+  if (c == null) return '';
+  if (typeof c === 'string') return c;
+  if (Array.isArray(c)) {
+    return c
+      .map((part: unknown) => {
+        if (
+          part &&
+          typeof part === 'object' &&
+          'type' in part &&
+          (part as { type: string }).type === 'text' &&
+          'text' in part
+        ) {
+          return String((part as { text: string }).text);
+        }
+        return '';
+      })
+      .join('');
+  }
+  return '';
+}
+
 async function callOpenAI(options: LLMCallOptions): Promise<LLMResponse> {
   const client = getOpenAI();
-  const maxVal = options.maxTokens ?? 2000;
-  const completion = await client.chat.completions.create({
+  const baseMax = options.maxTokens ?? 2000;
+  const maxVal = openAiChatUsesMaxCompletionTokens(options.model)
+    ? openAiChatDefaultMaxTokens(options.model, baseMax)
+    : baseMax;
+
+  const payload = {
+    stream: false as const,
     model: options.model,
     messages: [
-      { role: 'system', content: options.systemPrompt },
-      { role: 'user', content: options.userPrompt },
+      { role: 'system' as const, content: options.systemPrompt },
+      { role: 'user' as const, content: options.userPrompt },
     ],
-    temperature: options.temperature ?? 0.5,
+    temperature: openAiEffectiveTemperature(options.model, options.temperature),
     ...(openAiChatUsesMaxCompletionTokens(options.model)
       ? { max_completion_tokens: maxVal }
       : { max_tokens: maxVal }),
     ...(options.jsonMode
       ? { response_format: { type: 'json_object' as const } }
       : {}),
-  });
+    ...((() => {
+      const effort = openAiReasoningEffort(options.model);
+      return effort ? { reasoning_effort: effort } : {};
+    })()),
+  };
 
-  const content = completion.choices[0]?.message?.content || '';
+  const completion = await client.chat.completions.create(payload);
+
+  const content = extractOpenAiAssistantText(completion.choices[0]?.message);
   return {
     content,
     tokensUsed: {
