@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
-// 動的バリデーション用のヘルパー関数
-const getCommentMinLength = (overallSatisfaction: number | undefined, field: 'good' | 'bad'): number => {
+/** 総合満足度に応じた口コミ本文の最小文字数（アンケート・管理画面編集で共通） */
+export function getCommentMinLength(
+  overallSatisfaction: number | undefined,
+  field: 'good' | 'bad'
+): number {
   if (!overallSatisfaction) return 70; // デフォルト値
   
   if (overallSatisfaction >= 4) {
@@ -14,7 +17,7 @@ const getCommentMinLength = (overallSatisfaction: number | undefined, field: 'go
     // 3：両方 70字以上必須
     return 70;
   }
-};
+}
 
 // ベーススキーマ（条件分岐なし）
 const baseSchema = z.object({

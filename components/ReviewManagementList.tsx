@@ -61,9 +61,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          is_public: !currentIsPublic,
-        }),
+        body: JSON.stringify({ is_public: !currentIsPublic }),
       });
 
       if (!response.ok) {
@@ -97,6 +95,8 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
       : [];
     
     setEditFormData({
+      good_comment: review.good_comment ?? '',
+      bad_comment: review.bad_comment ?? '',
       reason_for_choosing: Array.isArray(answers.reason_for_choosing) ? answers.reason_for_choosing : [],
       attendance_frequency: answers.attendance_frequency || '',
       campus_prefecture: campusPrefectureArray,
@@ -108,12 +108,14 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
 
     setUpdatingId(editingReview.id);
     try {
-      const response = await fetch(`/api/admin/reviews/${editingReview.id}`, {
+      const response = await fetch(apiPath(`/api/admin/reviews/${editingReview.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          good_comment: editFormData.good_comment,
+          bad_comment: editFormData.bad_comment,
           answers: {
             reason_for_choosing: editFormData.reason_for_choosing,
             attendance_frequency: editFormData.attendance_frequency,
@@ -123,7 +125,10 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
       });
 
       if (!response.ok) {
-        throw new Error('口コミの更新に失敗しました');
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(
+          typeof errJson.error === 'string' ? errJson.error : '口コミの更新に失敗しました'
+        );
       }
 
       // リストを更新
@@ -133,7 +138,7 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
       alert('口コミを更新しました');
     } catch (error) {
       console.error('口コミ更新エラー:', error);
-      alert('口コミの更新に失敗しました');
+      alert(error instanceof Error ? error.message : '口コミの更新に失敗しました');
     } finally {
       setUpdatingId(null);
     }
@@ -302,8 +307,39 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold mb-4">口コミ編集</h3>
-            
+
             <div className="space-y-4">
+              <div>
+                <label htmlFor="edit-good-comment" className="block text-sm font-medium text-gray-700 mb-1">
+                  良かった点
+                </label>
+                <textarea
+                  id="edit-good-comment"
+                  name="edit-good-comment"
+                  rows={5}
+                  value={editFormData.good_comment ?? ''}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, good_comment: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-bad-comment" className="block text-sm font-medium text-gray-700 mb-1">
+                  改善してほしい点・合わなかった点
+                </label>
+                <textarea
+                  id="edit-bad-comment"
+                  name="edit-bad-comment"
+                  rows={5}
+                  value={editFormData.bad_comment ?? ''}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, bad_comment: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
               <div>
                 <label htmlFor="reason-for-choosing" className="block text-sm font-medium text-gray-700 mb-1">
                   通信制を選んだ理由

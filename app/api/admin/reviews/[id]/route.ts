@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
+import { getCommentMinLength } from '@/lib/schema';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     // Next.js 16ではparamsがPromiseの可能性がある
     const resolvedParams = params instanceof Promise ? await params : params;
@@ -24,12 +30,17 @@ export async function PUT(
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await request.json();
-    const { is_public, answers } = body;
+    const { answers, good_comment, bad_comment, is_public } = body as {
+      answers?: Record<string, unknown>;
+      good_comment?: string;
+      bad_comment?: string;
+      is_public?: boolean;
+    };
 
     // 口コミの存在確認
     const { data: existingReview } = await supabase
       .from('survey_responses')
-      .select('id, answers')
+      .select('id, answers, overall_satisfaction, good_comment, bad_comment')
       .eq('id', id)
       .single();
 
@@ -41,13 +52,68 @@ export async function PUT(
     }
 
     // 更新するデータを準備
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     // answers JSONBの更新
     if (answers !== undefined) {
       // 既存のanswersとマージ（部分更新をサポート）
-      const existingAnswers = existingReview.answers || {};
+      const existingAnswers = (existingReview.answers || {}) as Record<string, unknown>;
       updateData.answers = { ...existingAnswers, ...answers };
+    }
+
+    const nextGood =
+      good_comment !== undefined
+        ? String(good_comment).trim()
+        : String(existingReview.good_comment ?? '').trim();
+    const nextBad =
+      bad_comment !== undefined
+        ? String(bad_comment).trim()
+        : String(existingReview.bad_comment ?? '').trim();
+
+    if (good_comment !== undefined || bad_comment !== undefined) {
+      if (good_comment !== undefined && nextGood.length === 0) {
+        return NextResponse.json(
+          { error: '良かった点は空にできません' },
+          { status: 400 }
+        );
+      }
+      if (bad_comment !== undefined && nextBad.length === 0) {
+        return NextResponse.json(
+          { error: '改善してほしい点は空にできません' },
+          { status: 400 }
+        );
+      }
+      const overallRaw = existingReview.overall_satisfaction;
+      const overall =
+        typeof overallRaw === 'number'
+          ? overallRaw
+          : overallRaw != null
+            ? parseInt(String(overallRaw), 10)
+            : undefined;
+      const minGood = getCommentMinLength(overall, 'good');
+      if (nextGood.length < minGood) {
+        return NextResponse.json(
+          { error: `良かった点は${minGood}文字以上入力してください` },
+          { status: 400 }
+        );
+      }
+      const minBad = getCommentMinLength(overall, 'bad');
+      if (nextBad.length < minBad) {
+        return NextResponse.json(
+          { error: `改善してほしい点/合わない点は${minBad}文字以上入力してください` },
+          { status: 400 }
+        );
+      }
+      if (good_comment !== undefined) {
+        updateData.good_comment = nextGood;
+      }
+      if (bad_comment !== undefined) {
+        updateData.bad_comment = nextBad;
+      }
+    }
+
+    if (typeof is_public === 'boolean') {
+      updateData.is_public = is_public;
     }
 
     // 更新データが空の場合はエラー
