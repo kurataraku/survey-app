@@ -53,28 +53,39 @@ export const metadata: Metadata = {
   },
 };
 
-const organizationSchema = {
-  "@context": "https://schema.org",
-  "@type": "Organization" as const,
-  name: "通信制高校リアルレビュー",
-  url: appBaseUrl,
-  logo: `${appBaseUrl}/logo-service.png`,
-  description: "通信制高校の口コミ・評判を集めたメディアサイト",
-};
+const orgId = `${appBaseUrl}/#organization`;
+const websiteId = `${appBaseUrl}/#website`;
 
-const websiteSchema = {
+/** Google サイト名用: ブランド名を WebSite / Organization の name に、法人名は legalName のみ */
+const siteNameGraphSchema = {
   "@context": "https://schema.org",
-  "@type": "WebSite" as const,
-  name: "通信制高校リアルレビュー",
-  url: appBaseUrl,
-  potentialAction: {
-    "@type": "SearchAction" as const,
-    target: {
-      "@type": "EntryPoint" as const,
-      urlTemplate: `${appBaseUrl}/schools?q={search_term_string}`,
+  "@graph": [
+    {
+      "@type": "Organization" as const,
+      "@id": orgId,
+      name: "通信制高校リアルレビュー",
+      legalName: "株式会社キャリアエッセンス",
+      url: appBaseUrl,
+      logo: `${appBaseUrl}/logo-service.png`,
+      description: "通信制高校の口コミ・評判を集めたメディアサイト",
     },
-    "query-input": "required name=search_term_string",
-  },
+    {
+      "@type": "WebSite" as const,
+      "@id": websiteId,
+      name: "通信制高校リアルレビュー",
+      url: appBaseUrl,
+      inLanguage: "ja",
+      publisher: { "@id": orgId },
+      potentialAction: {
+        "@type": "SearchAction" as const,
+        target: {
+          "@type": "EntryPoint" as const,
+          urlTemplate: `${appBaseUrl}/schools?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
 };
 
 export default function SurveyLayout({
@@ -82,8 +93,7 @@ export default function SurveyLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <>
-      <StructuredData data={organizationSchema} />
-      <StructuredData data={websiteSchema} />
+      <StructuredData data={siteNameGraphSchema} />
       <Header />
       <main className="flex-grow">{children}</main>
       <Footer />
