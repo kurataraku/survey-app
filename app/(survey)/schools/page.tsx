@@ -55,6 +55,17 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
             initialMinReviewCount={Number.isNaN(minReviewCount) ? null : minReviewCount}
             initialSort={sort}
           />
+          {prefecture.trim() !== '' && (
+            <p className="text-sm text-gray-600 mb-4">
+              <Link
+                href={appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}`)}
+                className="text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                {prefecture}の通信制高校（口コミの多い学校・評判のピックアップ付き）
+              </Link>
+              を見る
+            </p>
+          )}
           {data.total > 0 && (
             <p className="text-gray-600 mb-4">{data.total}件の学校が見つかりました</p>
           )}

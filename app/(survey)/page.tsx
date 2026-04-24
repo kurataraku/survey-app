@@ -136,7 +136,7 @@ export default async function Home() {
             {majorPrefectures.map((pref) => (
               <Link
                 key={pref}
-                href={`${appPath('/schools')}?prefecture=${encodeURIComponent(pref)}`}
+                href={appPath(`/schools/prefecture/${encodeURIComponent(pref)}`)}
                 className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
               >
                 {pref.replace(/[都道府県]$/, '')}
