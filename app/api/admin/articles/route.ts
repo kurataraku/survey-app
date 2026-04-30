@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { generateSlug } from '@/lib/utils';
 import { requireAdmin } from '@/lib/auth/admin';
+import { revalidateArticleCaches } from '@/lib/articles/revalidateArticleCaches';
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request);
@@ -163,6 +164,10 @@ export async function POST(request: NextRequest) {
         { error: '記事の作成に失敗しました', details: insertError.message },
         { status: 500 }
       );
+    }
+
+    if (article?.is_public && article.slug) {
+      revalidateArticleCaches(article.slug);
     }
 
     return NextResponse.json(article, { status: 201 });

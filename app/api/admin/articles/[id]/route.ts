@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
+import { revalidateArticleCaches } from '@/lib/articles/revalidateArticleCaches';
 
 export async function GET(
   request: NextRequest,
@@ -111,7 +112,7 @@ export async function PUT(
     // 既存の記事を取得（公開状態を確認するため）
     const { data: existingArticle } = await supabase
       .from('articles')
-      .select('is_public, published_at')
+      .select('is_public, published_at, slug')
       .eq('id', id)
       .single();
 
@@ -179,6 +180,12 @@ export async function PUT(
         { error: '記事の更新に失敗しました', details: updateError.message },
         { status: 500 }
       );
+    }
+
+    if (article?.slug) {
+      revalidateArticleCaches(article.slug, {
+        previousSlug: existingArticle?.slug ?? null,
+      });
     }
 
     return NextResponse.json(article);
