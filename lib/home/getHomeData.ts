@@ -48,6 +48,10 @@ export interface HomeData {
     published_at: string | null;
     category: 'interview' | 'useful_info';
   }>;
+  /** 公開中・active な学校の総数（ヒーローのバッジ表示などに使用） */
+  totalSchoolCount: number;
+  /** 公開中の口コミ総数（ヒーローのバッジ表示などに使用） */
+  totalReviewCount: number;
 }
 
 const emptyHomeData: HomeData = {
@@ -55,6 +59,8 @@ const emptyHomeData: HomeData = {
   popularSchools: [],
   latestReviews: [],
   latestArticles: [],
+  totalSchoolCount: 0,
+  totalReviewCount: 0,
 };
 
 /**
@@ -295,11 +301,16 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
       .order('published_at', { ascending: false })
       .limit(3);
 
+    const totalSchoolCount = allSchools.length;
+    const totalReviewCount = allReviewsStats.length;
+
     return {
       topRankedSchools: rankedSchools,
       popularSchools,
       latestReviews,
       latestArticles: articlesData || [],
+      totalSchoolCount,
+      totalReviewCount,
     };
   } catch (err) {
     console.error('[getHomeData]', err);

@@ -17,6 +17,8 @@ export async function GET() {
         popularSchools: [],
         latestReviews: [],
         latestArticles: [],
+        totalSchoolCount: 0,
+        totalReviewCount: 0,
         error: 'サーバーエラーが発生しました',
       },
       { status: 200 }
