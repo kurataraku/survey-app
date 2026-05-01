@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getExportCsvFormatGuideRowLine } from '@/lib/csv-import';
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,8 +78,8 @@ export async function GET(request: NextRequest) {
       'メールアドレス',
     ];
 
-    // CSV行を生成
-    const csvRows = [headers.join(',')];
+    // CSV行を生成（2行目は各列の入力形式ガイド。管理画面の一括インポート時は自動スキップ）
+    const csvRows = [headers.join(','), getExportCsvFormatGuideRowLine()];
 
     for (const row of data) {
       const answers = row.answers || {};

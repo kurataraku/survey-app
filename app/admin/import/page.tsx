@@ -8,6 +8,7 @@ import {
   getTemplateCsvContent,
   VALIDATION_FIELD_LABELS,
   VALIDATION_FIELD_COLUMN,
+  SURVEY_CSV_IMPORT_HELP_BULLETS,
   type ParseCsvResult,
   type SurveyImportRow,
   type RowValidationError,
@@ -127,9 +128,21 @@ export default function AdminImportPage() {
           </Link>
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">CSVアンケート一括インポート</h1>
-        <p className="text-gray-600 text-sm mb-8">
+        <p className="text-gray-600 text-sm mb-4">
           エクスポートCSVと同じ形式のファイルをアップロードし、アンケートを一括で登録します。学校名はシステムに登録済みの名前と完全一致している必要があります。
         </p>
+
+        <div className="mb-8 rounded-lg border border-blue-200 bg-blue-50/80 p-4 text-sm text-gray-800">
+          <p className="font-semibold text-gray-900 mb-2">入力形式の見方</p>
+          <ul className="list-disc list-inside space-y-1.5 text-gray-700">
+            {SURVEY_CSV_IMPORT_HELP_BULLETS.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-gray-600">
+            公開サイトの「CSVダウンロード」で取得したファイルも、2行目に列ごとの説明が入ります。テンプレートCSVをダウンロードした場合も、2行目が入力ガイドです。
+          </p>
+        </div>
 
         {errorMessage && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">

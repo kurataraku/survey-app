@@ -5,6 +5,7 @@
 
 import Papa from 'papaparse';
 import type { z } from 'zod';
+import { questions } from '@/lib/questions';
 
 /** エクスポートCSVと同じヘッダー（テンプレート・マッピング用） */
 export const EXPORT_CSV_HEADERS = [
@@ -38,6 +39,77 @@ export const EXPORT_CSV_HEADERS = [
   '改善してほしい点/合わない点（自由記述）',
   'メールアドレス',
 ] as const;
+
+/** 先頭セルがこの文字列で始まる行は「入力形式の説明」行としてインポート時に無視する */
+export const CSV_IMPORT_SKIPPABLE_GUIDE_ROW_PREFIX = '#入力形式';
+
+function questionOptionValues(questionId: string): string {
+  const q = questions.find((x) => x.id === questionId);
+  if (!q?.options?.length) return '';
+  return q.options.map((o) => o.value).join('；');
+}
+
+/**
+ * エクスポートCSVの2行目に挿入する「入力形式」行（列数は EXPORT_CSV_HEADERS と一致）
+ */
+export function buildExportCsvFormatGuideCells(): string[] {
+  const v = questionOptionValues;
+  return [
+    `${CSV_IMPORT_SKIPPABLE_GUIDE_ROW_PREFIX}（説明のみ・DBには保存されません。この行は削除しても構いません）`,
+    '空欄で可（新規行では未使用）',
+    '学校マスタの「名前」と完全一致（前後スペース不可）',
+    v('respondent_role'),
+    v('status'),
+    '「卒業した」のとき必須。それ以外は空で可。選択肢: ' + v('graduation_path'),
+    '進路が「その他」のとき必須。それ以外は空で可',
+    '1つ以上。複数は半角;または全角；＋空白で区切り。各文はアンケート選択肢と同一: ' + v('reason_for_choosing'),
+    '任意（自由記述）',
+    v('enrollment_type'),
+    '4桁の西暦年（例:2024）',
+    v('attendance_frequency') + '（※チルダは「〜」U+301C。週3~4等は週3〜4に直すと確実）',
+    '都道府県名＋県/府/道/都（例:東京都）。アンケートのプルダウンと同一表記',
+    '1つ以上。;区切り。値は次と完全一致: ' + v('teaching_style'),
+    '1つ以上。;区切り。「その他」含むときは「その他（生徒の雰囲気）」列も必須。値: ' + v('student_atmosphere'),
+    '「生徒の雰囲気」にその他を含むとき必須',
+    '1〜5の整数（文字列の1〜5でも可）',
+    '1〜5の整数',
+    '1〜5の整数',
+    '1〜5の整数',
+    '1〜5の整数',
+    '1〜6の整数（6=独自授業を受講していない等）',
+    '1〜5の整数',
+    '1〜6の整数（6=評価できない等）',
+    '1〜6の整数（6=わからない等）',
+    '1〜5の整数（総合満足度）',
+    '必須。総合満足度により最低文字数が変動（例:4〜5点なら100字以上／1〜2点なら30字以上など）',
+    '必須。総合満足度により最低文字数が変動（上記と逆のパターンあり）',
+    '必須。有効なメール形式（全角＠は半角に自動置換されます）',
+  ];
+}
+
+/** CSVセルをRFC風にエスケープ（カンマ・改行・ダブルクォート対応） */
+export function escapeCsvCell(value: string): string {
+  const str = String(value ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+/** エクスポート用: 入力形式行を1行のCSV文字列として返す（BOMなし） */
+export function getExportCsvFormatGuideRowLine(): string {
+  return buildExportCsvFormatGuideCells().map(escapeCsvCell).join(',');
+}
+
+/** 管理画面・公開ページ向けのインポート注意事項（箇条書き） */
+export const SURVEY_CSV_IMPORT_HELP_BULLETS: string[] = [
+  '文字コードはUTF-8（BOM付き推奨）。エクスポートCSVの2行目は「入力形式」説明行のため、インポート時は自動で無視されます（削除しても構いません）。',
+  'ヘッダー行（1行目）の列名・列順はテンプレートCSVと同一にしてください。学校名はDB登録名と一字一句一致させてください。',
+  '複数選択の列（通信制を選んだ理由・授業スタイル・生徒の雰囲気）は、値を半角セミコロン「;」または全角「；」＋空白でつなぎます。各値はフォーム送信時の内部値（画面ラベルと異なる短い表記のことがあります）と完全一致させてください。2行目の説明に列ごとの候補が並びます。',
+  '状況が「卒業した」のときのみ「卒業後の進路」が必須です。進路が「その他」のときは「卒業後の進路（その他）」も必須です。',
+  '「生徒の雰囲気」に「その他」を含める場合、「その他（生徒の雰囲気）」列が必須です。',
+  '総合満足度の点数に応じて、「良かった点」「改善してほしい点」の最低文字数が変わります（バリデーションエラーに表示されます）。',
+];
 
 /** バリデーションの path（フィールド名）→ 表示用の列名 */
 export const VALIDATION_FIELD_LABELS: Record<string, string> = {
@@ -304,6 +376,11 @@ function isHeaderLine(values: string[]): boolean {
   return v0 === 'ID' || (v3 === 'あなたの立場' && values.length >= 10);
 }
 
+/** エクスポート時に挿入した「#入力形式…」説明行をデータとして読まない */
+function isFormatGuideRow(values: string[]): boolean {
+  return normCell(values[0] ?? '').startsWith(CSV_IMPORT_SKIPPABLE_GUIDE_ROW_PREFIX);
+}
+
 /**
  * CSV文字列をパースし、インポート用行の配列に変換する
  */
@@ -339,6 +416,8 @@ export function parseCsvToImportRows(csvText: string): ParseCsvResult {
 
     const isEmptyRow = values.every((cell) => !String(cell).trim());
     if (isEmptyRow) continue;
+
+    if (isFormatGuideRow(values)) continue;
 
     if (isHeaderRow(values)) continue; // ヘッダー行の重複をスキップ（2行目がヘッダーなど）
 
@@ -405,5 +484,7 @@ export function validateImportRows<Schema extends z.ZodTypeAny>(
  */
 export function getTemplateCsvContent(): string {
   const bom = '\uFEFF';
-  return bom + EXPORT_CSV_HEADERS.join(',') + '\n';
+  const headerLine = EXPORT_CSV_HEADERS.join(',');
+  const guideLine = getExportCsvFormatGuideRowLine();
+  return `${bom}${headerLine}\n${guideLine}\n`;
 }

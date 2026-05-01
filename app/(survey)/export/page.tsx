@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { apiPath } from '@/lib/base-path';
+import { apiPath, appPath } from '@/lib/base-path';
+import Link from 'next/link';
+import { SURVEY_CSV_IMPORT_HELP_BULLETS } from '@/lib/csv-import';
 
 export default function ExportPage() {
   const [isDownloading, setIsDownloading] = useState(false);
@@ -51,8 +53,28 @@ export default function ExportPage() {
             通信制高校リアルレビュー アンケートCSVダウンロード
           </h1>
           <p className="text-sm text-zinc-600">
-            Supabaseに保存されたアンケート回答を、設問順のカラム構成でCSVとしてダウンロードできます。
+            Supabaseに保存されたアンケート回答を、設問順のカラム構成でCSVとしてダウンロードできます。2行目に各列の入力ルール（選択肢・区切り方など）を記載しています。
           </p>
+        </div>
+
+        <div className="rounded-xl bg-amber-50/80 border border-amber-200/80 p-4 text-sm text-amber-950 space-y-2">
+          <p className="font-medium text-amber-950">一括で新規登録する場合</p>
+          <p className="text-xs sm:text-sm text-amber-900/90 leading-relaxed">
+            このページのCSVは<strong>ダウンロード（閲覧・バックアップ）</strong>用です。編集してシステムへ取り込むときは、管理者向けの
+            <Link href={appPath('/admin/import')} className="text-amber-900 underline font-medium hover:no-underline">
+              CSVアンケート一括インポート
+            </Link>
+            からテンプレートを取得し、同じ列構成でアップロードしてください。取り込み時は2行目の「#入力形式…」行が自動的に無視されます。
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-zinc-50 border border-zinc-200 p-4 text-sm text-zinc-700 space-y-2">
+          <p className="font-medium text-zinc-900">インポート時の共通ルール（抜粋）</p>
+          <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-zinc-700">
+            {SURVEY_CSV_IMPORT_HELP_BULLETS.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
         </div>
 
         <div className="rounded-xl bg-zinc-50 border border-zinc-200 p-4 text-sm text-zinc-700 space-y-2">
@@ -87,7 +109,7 @@ export default function ExportPage() {
 
         <div className="border-t border-zinc-200 pt-4 mt-2">
           <p className="text-xs text-zinc-500">
-            CSVはUTF-8（BOM付き）で出力されます。Excelで開く際に文字化けする場合は、「データ &gt; テキスト/CSVからインポート」機能を利用し、文字コードにUTF-8を指定してください。
+            CSVはUTF-8（BOM付き）で出力されます。Excelで開く際に文字化けする場合は、「データ {'>'} テキスト/CSVから」で取り込み、文字コードにUTF-8を指定してください。
           </p>
         </div>
       </div>
