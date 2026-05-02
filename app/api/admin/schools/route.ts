@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
+import { normalizeText } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAdminOrAgent(request);
@@ -148,6 +149,15 @@ export async function POST(request: NextRequest) {
       ? prefectures
       : [prefecture];
 
+    const nameNormalized = normalizeText(String(name));
+
+    if (!nameNormalized) {
+      return NextResponse.json(
+        { error: '学校名を正しく入力してください（有効な文字が含まれている必要があります）' },
+        { status: 400 }
+      );
+    }
+
     // 学校名の重複チェック
     const { data: nameConflict } = await supabase
       .from('schools')
@@ -158,6 +168,19 @@ export async function POST(request: NextRequest) {
     if (nameConflict) {
       return NextResponse.json(
         { error: 'この学校名は既に使用されています' },
+        { status: 400 }
+      );
+    }
+
+    const { data: normalizedConflict } = await supabase
+      .from('schools')
+      .select('id')
+      .eq('name_normalized', nameNormalized)
+      .maybeSingle();
+
+    if (normalizedConflict) {
+      return NextResponse.json(
+        { error: 'この学校名は既存校と正規化後に同一になるため登録できません（表記を変えてください）' },
         { status: 400 }
       );
     }
@@ -176,9 +199,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 学校情報を作成
-    const insertData: any = {
+    // 学校情報を作成（DBの name_normalized NOT NULL / status 既定値に整合）
+    const insertData: Record<string, unknown> = {
       name,
+      name_normalized: nameNormalized,
       prefecture,
       prefectures: prefecturesArray,
       slug,
