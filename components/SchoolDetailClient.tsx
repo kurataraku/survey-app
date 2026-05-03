@@ -27,6 +27,24 @@ const DECISION_LEAD_MAX_CHARS = 300;
 const FEW_REVIEWS_THRESHOLD = 5;
 const GRAPH_HIDDEN_THRESHOLD = 1;
 
+const SCHOOL_REVIEWS_LIST_CTA_TITLE = '口コミ一覧（絞り込み）';
+const SCHOOL_REVIEWS_LIST_CTA_SUBTITLE = '通学頻度・進路・キャンパスから探せます';
+
+function SchoolHubReviewsListCta({ encodedSlug }: { encodedSlug: string }) {
+  return (
+    <Link
+      href={appPath(`/schools/${encodedSlug}/reviews`)}
+      className="inline-flex w-full flex-col items-center justify-center gap-1 px-6 py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
+      aria-label={`${SCHOOL_REVIEWS_LIST_CTA_TITLE}。${SCHOOL_REVIEWS_LIST_CTA_SUBTITLE}`}
+    >
+      <span className="font-semibold">{SCHOOL_REVIEWS_LIST_CTA_TITLE}</span>
+      <span className="text-xs font-normal text-white/90 leading-snug text-center">
+        {SCHOOL_REVIEWS_LIST_CTA_SUBTITLE}
+      </span>
+    </Link>
+  );
+}
+
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
   encodedSlug: string;
@@ -337,12 +355,7 @@ export default function SchoolDetailClient({
 
       {/* 口コミ一覧への導線（ページ上部に1回のみ） */}
       <div className="mb-6">
-        <Link
-          href={appPath(`/schools/${encodedSlug}/reviews`)}
-          className="inline-block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
-        >
-          条件で絞り込む（口コミ一覧へ）
-        </Link>
+        <SchoolHubReviewsListCta encodedSlug={encodedSlug} />
       </div>
 
       {/* 口コミサマリー（良い点・改善してほしい点の傾向）— LLM要約3箇条ずつ */}
@@ -824,12 +837,7 @@ export default function SchoolDetailClient({
 
       {/* ページ最下部：口コミ一覧への導線（同上） */}
       <div className="mt-8">
-        <Link
-          href={appPath(`/schools/${encodedSlug}/reviews`)}
-          className="inline-block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:from-blue-700 hover:to-blue-600 font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2 transition-all duration-200"
-        >
-          条件で絞り込む（口コミ一覧へ）
-        </Link>
+        <SchoolHubReviewsListCta encodedSlug={encodedSlug} />
       </div>
     </>
   );
