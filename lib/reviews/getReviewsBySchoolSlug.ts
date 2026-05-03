@@ -1,9 +1,13 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import {
+  publicSurveyResponsesOrFilter,
+  shouldIncludeSurveyOnSchoolHubPage,
+} from '@/lib/reviews/schoolReviewLinkage';
 
 export interface ReviewListItem {
   id: string;
-  school_id: string;
+  school_id: string | null;
   school_name: string;
   school_slug: string | null;
   overall_satisfaction: number;
@@ -76,10 +80,10 @@ export const getReviewsBySchoolSlug = cache(
     const decodedSlug = decodeURIComponent(schoolSlug);
     const offset = (page - 1) * limit;
 
-    // 学校IDと名前を取得（status='active'のみ）
+    // 学校ID・名前・slugを取得（status='active'のみ）
     const { data: school } = await supabase
       .from('schools')
-      .select('id, name')
+      .select('id, name, slug')
       .eq('slug', decodedSlug)
       .eq('is_public', true)
       .eq('status', 'active')
@@ -99,17 +103,9 @@ export const getReviewsBySchoolSlug = cache(
 
     const schoolId = school.id;
     const schoolName = school.name;
+    const schoolPageSlug = school.slug;
 
-    let countQuery = supabase
-      .from('survey_responses')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_public', true)
-      .not('school_id', 'is', null)
-      .eq('school_id', schoolId);
-
-    let reviewsQuery = supabase
-      .from('survey_responses')
-      .select(`
+    const reviewSelect = `
         id,
         school_id,
         school_name,
@@ -123,32 +119,18 @@ export const getReviewsBySchoolSlug = cache(
         graduation_path,
         answers,
         schools(id, name, slug, status)
-      `)
-      .eq('is_public', true)
-      .not('school_id', 'is', null)
-      .eq('school_id', schoolId);
+      `;
 
-    if (role) {
-      countQuery = countQuery.eq('respondent_role', role);
-      reviewsQuery = reviewsQuery.eq('respondent_role', role);
-    }
+    const attachOptionalFilters = (q: any) => {
+      let out = q;
+      if (role) out = out.eq('respondent_role', role);
+      if (graduationPath) out = out.eq('graduation_path', graduationPath);
+      if (enrollmentType) out = out.eq('answers->>enrollment_type', enrollmentType);
+      if (attendanceFrequency) out = out.eq('answers->>attendance_frequency', attendanceFrequency);
+      return out;
+    };
 
-    if (graduationPath) {
-      countQuery = countQuery.eq('graduation_path', graduationPath);
-      reviewsQuery = reviewsQuery.eq('graduation_path', graduationPath);
-    }
-
-    if (enrollmentType) {
-      countQuery = countQuery.eq('answers->>enrollment_type', enrollmentType);
-      reviewsQuery = reviewsQuery.eq('answers->>enrollment_type', enrollmentType);
-    }
-
-    if (attendanceFrequency) {
-      countQuery = countQuery.eq('answers->>attendance_frequency', attendanceFrequency);
-      reviewsQuery = reviewsQuery.eq('answers->>attendance_frequency', attendanceFrequency);
-    }
-
-    let orderColumn = 'created_at';
+    let orderColumn: 'created_at' | 'overall_satisfaction' = 'created_at';
     let orderAscending = false;
 
     if (sort === 'oldest') {
@@ -161,19 +143,24 @@ export const getReviewsBySchoolSlug = cache(
       orderAscending = true;
     }
 
-    const { count: totalCountBeforeFilter } = await countQuery;
-
-    const { data: allReviewsData, error: allReviewsError } = await reviewsQuery.order(
-      orderColumn,
-      { ascending: orderAscending }
+    const listQuery = attachOptionalFilters(
+      supabase
+        .from('survey_responses')
+        .select(reviewSelect)
+        .eq('is_public', true)
+        .or(publicSurveyResponsesOrFilter(schoolId, schoolName))
     );
 
-    if (allReviewsError) {
-      console.error('レビュー取得エラー:', allReviewsError);
+    const { data: rawRows, error: listErr } = await listQuery.order(orderColumn, {
+      ascending: orderAscending,
+    });
+
+    if (listErr) {
+      console.error('レビュー取得エラー:', listErr);
       return {
         reviews: [],
         total: 0,
-        totalBeforeFilter: totalCountBeforeFilter || 0,
+        totalBeforeFilter: 0,
         page,
         totalPages: 0,
         limit,
@@ -181,12 +168,25 @@ export const getReviewsBySchoolSlug = cache(
       };
     }
 
-    const filteredReviews = (allReviewsData || []).filter((review: Record<string, unknown>) => {
-      const rawSchools = (review as { schools?: unknown }).schools;
-      const school = Array.isArray(rawSchools) ? rawSchools[0] : rawSchools;
-      const s = school as { status?: string } | null;
-      if (!s || s.status !== 'active') return false;
+    type HubReviewRow = Parameters<typeof shouldIncludeSurveyOnSchoolHubPage>[0];
+    const hubFiltered = (rawRows ?? []).filter((r: HubReviewRow) =>
+      shouldIncludeSurveyOnSchoolHubPage(r, schoolId, schoolName)
+    );
 
+    const totalCountBeforeFilter = hubFiltered.length;
+
+    const merged = [...hubFiltered].sort((a, b) => {
+      if (orderColumn === 'created_at') {
+        const cmp = String(a.created_at ?? '').localeCompare(String(b.created_at ?? ''));
+        return orderAscending ? cmp : -cmp;
+      }
+      const na = Number(a.overall_satisfaction ?? 0);
+      const nb = Number(b.overall_satisfaction ?? 0);
+      const cmp = na - nb;
+      return orderAscending ? cmp : -cmp;
+    });
+
+    const filteredReviews = merged.filter((review: Record<string, unknown>) => {
       if (reasonForChoosingArray && reasonForChoosingArray.length > 0) {
         const answers = (review.answers as Record<string, unknown>) || {};
         const reviewReasons = Array.isArray(answers.reason_for_choosing)
@@ -220,14 +220,14 @@ export const getReviewsBySchoolSlug = cache(
           .eq('review_id', review.id);
 
         const rawSchools = (review as { schools?: unknown }).schools;
-        const school = Array.isArray(rawSchools) ? rawSchools[0] : rawSchools;
-        const s = school as { slug?: string | null } | null;
+        const schoolJoin = Array.isArray(rawSchools) ? rawSchools[0] : rawSchools;
+        const s = schoolJoin as { slug?: string | null } | null;
 
         return {
-          id: review.id,
-          school_id: review.school_id,
-          school_name: review.school_name,
-          school_slug: s?.slug ?? null,
+          id: review.id as string,
+          school_id: (review.school_id as string | null) ?? null,
+          school_name: review.school_name as string,
+          school_slug: s?.slug ?? schoolPageSlug,
           overall_satisfaction: review.overall_satisfaction,
           good_comment: review.good_comment,
           bad_comment: review.bad_comment,

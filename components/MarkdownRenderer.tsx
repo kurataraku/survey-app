@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { normalizeMarkdownHref } from '@/lib/links/normalizeMarkdownHref';
 
 interface MarkdownRendererProps {
   content: string;
@@ -56,16 +58,29 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           strong: ({ children }) => (
             <strong className="font-semibold text-gray-900">{children}</strong>
           ),
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 underline"
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children }) => {
+            const normalized = normalizeMarkdownHref(href ?? undefined);
+            if (normalized.internal) {
+              return (
+                <Link
+                  href={normalized.href}
+                  className="text-blue-600 hover:text-blue-700 underline"
+                >
+                  {children}
+                </Link>
+              );
+            }
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-700 underline"
+              >
+                {children}
+              </a>
+            );
+          },
           blockquote: ({ children }) => (
             <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-600 my-4">
               {children}

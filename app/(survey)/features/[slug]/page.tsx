@@ -5,6 +5,9 @@ import SchoolCardServer from '@/components/SchoolCardServer';
 import { getArticleBySlug } from '@/lib/articles/getArticleBySlug';
 import { getArticleSlugs } from '@/lib/articles/getArticleSlugs';
 import { appPath } from '@/lib/base-path';
+import StructuredData from '@/components/StructuredData';
+import SurveyCtaLink from '@/components/SurveyCtaLink';
+import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
 import type { ArticleSchool } from '@/lib/types/articles';
 
 export const revalidate = 3600;
@@ -50,8 +53,45 @@ export default async function ArticleDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const appBase = getAppBaseUrl().replace(/\/$/, '');
+  const siteOrigin = getSiteUrl().replace(/\/$/, '');
+  const canonical = `${appBase}/features/${encodeURIComponent(article.slug)}`;
+  const imageUrl = article.featured_image_url
+    ? article.featured_image_url.startsWith('http')
+      ? article.featured_image_url
+      : article.featured_image_url.startsWith('/')
+        ? `${siteOrigin}${article.featured_image_url}`
+        : article.featured_image_url
+    : undefined;
+
+  const articleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    description: article.meta_description || article.excerpt || undefined,
+    datePublished: article.published_at || article.created_at,
+    dateModified: article.updated_at,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+    author: {
+      '@type': 'Organization',
+      name: '通信制高校リアルレビュー',
+      url: appBase,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: '通信制高校リアルレビュー',
+      url: appBase,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${appBase}/logo-service.png`,
+      },
+    },
+    ...(imageUrl ? { image: [imageUrl] } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <StructuredData data={articleJsonLd} />
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-6">
           <Link
@@ -127,6 +167,16 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           >
             特集ページ一覧を見る →
           </Link>
+          <p className="mt-6 text-sm text-gray-600">
+            ご自身の体験を共有すると、後から検討する方の参考になります。
+          </p>
+          <SurveyCtaLink
+            eventName="cta_survey"
+            eventParams={{ source: 'feature_article_footer', article_slug: article.slug }}
+            className="mt-2 inline-block text-rose-600 font-semibold text-sm hover:underline"
+          >
+            口コミを投稿する →
+          </SurveyCtaLink>
         </div>
       </div>
     </div>

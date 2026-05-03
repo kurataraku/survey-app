@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  publicSurveyResponsesOrFilter,
+  shouldIncludeSurveyOnSchoolHubPage,
+} from '@/lib/reviews/schoolReviewLinkage';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,13 +37,15 @@ export async function GET(request: NextRequest) {
       ? reasonForChoosing.split(',').filter((r) => r.trim() !== '')
       : undefined;
 
-    // 学校slugが指定されている場合、学校IDを取得（status='active'のみ）
+    // 学校slugが指定されている場合、学校ID・名前を取得（status='active'のみ）
     let schoolId: string | null = null;
+    let schoolNameForPage: string | null = null;
+    let pageSchoolSlug: string | null = null;
     if (schoolSlug) {
       const decodedSlug = decodeURIComponent(schoolSlug);
       const { data: school } = await supabase
         .from('schools')
-        .select('id')
+        .select('id, name, slug')
         .eq('slug', decodedSlug)
         .eq('is_public', true)
         .eq('status', 'active') // 承認済み（active）のみ
@@ -47,6 +53,8 @@ export async function GET(request: NextRequest) {
       
       if (school) {
         schoolId = school.id;
+        schoolNameForPage = school.name;
+        pageSchoolSlug = school.slug;
       } else {
         // 学校が見つからない場合は空の結果を返す
         return NextResponse.json({
@@ -59,13 +67,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // クエリビルダーを作成
-    // pending状態の学校の口コミを除外するため、school_idが存在し、かつschoolsテーブルでstatus='active'の学校のみを対象とする
+    const schoolScopeOr =
+      schoolId && schoolNameForPage
+        ? publicSurveyResponsesOrFilter(schoolId, schoolNameForPage)
+        : null;
+
+    // クエリビルダーを作成（全校一覧は school_id 必須。学校指定時は管理画面と同スコープの OR + サーバ側で重複除外）
     let countQuery = supabase
       .from('survey_responses')
       .select('*', { count: 'exact', head: true })
-      .eq('is_public', true)
-      .not('school_id', 'is', null); // school_idがnullの口コミは除外
+      .eq('is_public', true);
 
     let reviewsQuery = supabase
       .from('survey_responses')
@@ -84,14 +95,14 @@ export async function GET(request: NextRequest) {
         answers,
         schools(id, name, slug, status)
       `)
-      .eq('is_public', true)
-      .not('school_id', 'is', null); // school_idがnullの口コミは除外
+      .eq('is_public', true);
 
-    // 学校でフィルタリング（school_idを使用）
-    if (schoolId) {
-      // school_idでフィルタリング
-      countQuery = countQuery.eq('school_id', schoolId);
-      reviewsQuery = reviewsQuery.eq('school_id', schoolId);
+    if (schoolScopeOr) {
+      countQuery = countQuery.or(schoolScopeOr);
+      reviewsQuery = reviewsQuery.or(schoolScopeOr);
+    } else {
+      countQuery = countQuery.not('school_id', 'is', null);
+      reviewsQuery = reviewsQuery.not('school_id', 'is', null);
     }
 
     // フィルタリング: 通常カラム
@@ -134,9 +145,6 @@ export async function GET(request: NextRequest) {
       orderAscending = true;
     }
 
-    // 総件数を取得（フィルタ適用前）
-    const { count: totalCountBeforeFilter } = await countQuery;
-
     // レビュー一覧を取得（フィルタ適用前、全件取得してアプリ側でフィルタリング）
     // 理由: JSONB配列の複雑なフィルタリング（reason_for_choosing）を確実に処理するため
     const { data: allReviewsData, error: allReviewsError } = await reviewsQuery
@@ -150,12 +158,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    let hubScoped = allReviewsData || [];
+    if (schoolId && schoolNameForPage) {
+      hubScoped = hubScoped.filter((review: any) =>
+        shouldIncludeSurveyOnSchoolHubPage(review, schoolId, schoolNameForPage)
+      );
+    }
+
+    const totalCountBeforeFilter = schoolId && schoolNameForPage
+      ? hubScoped.length
+      : (await countQuery).count ?? 0;
+
     // アプリ側でフィルタリング（reason_for_choosingのOR条件、都道府県の配列対応、pending状態の学校の口コミ除外など）
-    let filteredReviews = (allReviewsData || []).filter((review: any) => {
-      // pending状態の学校の口コミを除外
-      const school = Array.isArray(review.schools) ? review.schools[0] : review.schools;
-      if (!school || school.status !== 'active') {
-        return false; // 学校が存在しない、またはstatusが'active'でない場合は除外
+    let filteredReviews = hubScoped.filter((review: any) => {
+      if (!schoolId || !schoolNameForPage) {
+        const school = Array.isArray(review.schools) ? review.schools[0] : review.schools;
+        if (!school || school.status !== 'active') {
+          return false;
+        }
       }
 
       // reason_for_choosingのフィルタリング（OR条件）
@@ -211,7 +231,7 @@ export async function GET(request: NextRequest) {
           id: review.id,
           school_id: review.school_id,
           school_name: review.school_name,
-          school_slug: school?.slug || null,
+          school_slug: school?.slug || pageSchoolSlug || null,
           overall_satisfaction: review.overall_satisfaction,
           good_comment: review.good_comment,
           bad_comment: review.bad_comment,

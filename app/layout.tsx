@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, M_PLUS_2 } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { GoogleAnalyticsInit } from "@/components/GoogleAnalyticsInit";
+import { AnalyticsEngagement } from "@/components/AnalyticsEngagement";
 import { getAppBaseUrl } from "@/lib/env-check";
 import "./globals.css";
 
@@ -45,6 +48,9 @@ export default function RootLayout({
       >
         <GoogleAnalyticsInit />
         <GoogleAnalytics />
+        <AnalyticsEngagement />
+        <Analytics />
+        <SpeedInsights />
         {children}
       </body>
     </html>

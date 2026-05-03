@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
 import { revalidateArticleCaches } from '@/lib/articles/revalidateArticleCaches';
+import { publicFeatureArticleUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
 
 export async function GET(
   request: NextRequest,
@@ -123,6 +124,8 @@ export async function PUT(
       );
     }
 
+    const wasPublic = existingArticle.is_public === true;
+
     // スラッグの重複チェック（自分自身を除く）
     if (slug) {
       const { data: slugConflict } = await supabase
@@ -186,6 +189,10 @@ export async function PUT(
       revalidateArticleCaches(article.slug, {
         previousSlug: existingArticle?.slug ?? null,
       });
+    }
+
+    if (article?.is_public && !wasPublic && article.slug) {
+      await submitIndexNowUrls([publicFeatureArticleUrl(article.slug)]);
     }
 
     return NextResponse.json(article);

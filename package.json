@@ -16,7 +16,8 @@
     "setup:initial-owner": "tsx scripts/setup-initial-owner.ts",
     "send-password-reset": "tsx scripts/send-password-reset.ts",
     "set-password-directly": "tsx scripts/set-password-directly.ts",
-    "debug:merge": "tsx scripts/debug-merge.ts"
+    "debug:merge": "tsx scripts/debug-merge.ts",
+    "seo:coverage": "tsx scripts/seo-coverage.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -24,6 +25,8 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@types/papaparse": "^5.5.2",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "openai": "^6.16.0",

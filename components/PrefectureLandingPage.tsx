@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SchoolCardServer from '@/components/SchoolCardServer';
+import PrefectureLandingFaq from '@/components/PrefectureLandingFaq';
 import { appPath } from '@/lib/base-path';
 import type { SearchSchool } from '@/lib/schools/searchSchools';
 import { PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING } from '@/lib/schools/prefecture-landing-constants';
@@ -119,6 +120,8 @@ export default function PrefectureLandingPage({
         )}
 
         {children}
+
+        {hasSchools && <PrefectureLandingFaq prefecture={prefecture} />}
       </div>
     </div>
   );

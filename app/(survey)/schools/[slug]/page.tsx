@@ -10,6 +10,7 @@ import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
 import SchoolPageBreadcrumbs from '@/components/SchoolPageBreadcrumbs';
 import SchoolEducationalOrganizationJsonLd from '@/components/SchoolEducationalOrganizationJsonLd';
+import SchoolRelatedArticlesServer from '@/components/SchoolRelatedArticlesServer';
 import { FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
 import { parseAiSummarySections } from '@/lib/schools/parseAiSummarySections';
 import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints';
@@ -176,6 +177,8 @@ export default async function SchoolDetailPage({ params }: PageProps) {
             <SchoolFeaturedReviewsServer latestReviews={school.latest_reviews} />
           )}
         </SchoolDetailClient>
+
+        <SchoolRelatedArticlesServer schoolId={school.id} />
       </div>
     </div>
   );

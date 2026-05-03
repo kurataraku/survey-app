@@ -1,6 +1,10 @@
 import { cache } from 'react';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { unstable_cache } from 'next/cache';
+import {
+  publicSurveyResponsesOrFilter,
+  shouldIncludeSurveyOnSchoolHubPage,
+} from '@/lib/reviews/schoolReviewLinkage';
 
 export interface SchoolWithStats {
   id: string;
@@ -148,8 +152,11 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
     return null;
   }
 
+  const reviewSelect =
+    'id, school_id, school_name, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers, schools(id, status)';
+
   // 2. AI要約・SEO本文・良い点・改善点傾向・口コミデータ・グローバル平均を並列取得
-  const [aiSummaryResult, seoSectionsResult, reviewTendencyResult, allReviewsDataResult, globalAverages] =
+  const [aiSummaryResult, seoSectionsResult, reviewTendencyResult, rawReviewsResult, globalAverages] =
     await Promise.all([
       supabase
         .from('school_ai_summaries')
@@ -175,19 +182,23 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
         .maybeSingle(),
       supabase
         .from('survey_responses')
-        .select(
-          'id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers'
-        )
-        .eq('school_id', school.id),
+        .select(reviewSelect)
+        .eq('is_public', true)
+        .or(publicSurveyResponsesOrFilter(school.id, school.name)),
       getCachedGlobalAverages(),
     ]);
 
   const resolvedAiSummary = aiSummaryResult.data;
   const seoSectionsRows = seoSectionsResult.data ?? [];
   const reviewTendencyRow = reviewTendencyResult.data;
-  const { data: allReviewsData } = allReviewsDataResult;
 
-  const reviews = allReviewsData ?? [];
+  if (rawReviewsResult.error) {
+    console.error('[getSchoolWithStats] survey_responses:', rawReviewsResult.error);
+  }
+
+  const reviews = (rawReviewsResult.data ?? []).filter((r) =>
+    shouldIncludeSurveyOnSchoolHubPage(r, school.id, school.name)
+  );
   const reviewCount = reviews.length;
 
   // overall_satisfactionの平均と外れ値件数を計算

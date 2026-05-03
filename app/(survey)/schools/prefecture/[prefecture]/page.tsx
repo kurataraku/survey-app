@@ -9,6 +9,8 @@ import { prefectures } from '@/lib/prefectures';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
+import StructuredData from '@/components/StructuredData';
+import { buildPrefectureLandingJsonLd } from '@/lib/prefectures/prefecture-landing-schema';
 
 export const revalidate = 3600;
 
@@ -75,7 +77,20 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
   const introLead = getPrefectureIntroLead(prefecture);
   const hasSchools = data.total > 0;
 
+  const prefectureJsonLd =
+    hasSchools
+      ? buildPrefectureLandingJsonLd({
+          prefecture,
+          page,
+          pageSize: 20,
+          schools: data.schools.map((s) => ({ id: s.id, name: s.name, slug: s.slug })),
+          total: data.total,
+        })
+      : null;
+
   return (
+    <>
+      {prefectureJsonLd && <StructuredData data={prefectureJsonLd} />}
     <PrefectureLandingPage
       prefecture={prefecture}
       introLead={introLead}
@@ -142,5 +157,6 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
         </>
       )}
     </PrefectureLandingPage>
+    </>
   );
 }

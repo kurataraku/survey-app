@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { prefectures } from '@/lib/prefectures';
 import { normalizeSearchQuery } from '@/lib/utils';
 import { appPath, BASE_PATH, apiPath } from '@/lib/base-path';
+import { trackEvent } from '@/lib/analytics/track';
 
 interface SchoolSuggestion {
   id: string;
@@ -84,6 +85,12 @@ export default function HomeHero() {
       params.append('q', normalizeSearchQuery(searchQuery.trim()));
     }
     if (selectedPrefecture) params.append('prefecture', selectedPrefecture);
+    const qLen = searchQuery.trim().length;
+    trackEvent('hero_search_submit', {
+      has_query: qLen > 0,
+      query_length_bucket: qLen === 0 ? '0' : qLen <= 3 ? '1-3' : qLen <= 10 ? '4-10' : '11+',
+      prefecture_selected: Boolean(selectedPrefecture),
+    });
     router.push(`${appPath('/schools')}?${params.toString()}`);
   };
 
@@ -93,6 +100,7 @@ export default function HomeHero() {
     const params = new URLSearchParams();
     params.append('q', normalizeSearchQuery(suggestion.name));
     if (selectedPrefecture) params.append('prefecture', selectedPrefecture);
+    trackEvent('hero_autocomplete_pick', { source: 'hero' });
     router.push(`${appPath('/schools')}?${params.toString()}`);
   };
 
@@ -260,6 +268,7 @@ export default function HomeHero() {
             </p>
             <Link
               href={appPath('/survey')}
+              onClick={() => trackEvent('cta_survey', { source: 'hero' })}
               className="group inline-flex items-center gap-1.5 pl-5 pr-4 py-2.5 bg-white border-2 border-rose-500 text-rose-600 rounded-full text-sm font-bold shadow-[0_4px_14px_rgba(244,63,94,0.18)] hover:bg-rose-500 hover:text-white hover:shadow-[0_6px_20px_rgba(244,63,94,0.32)] transition-all duration-200"
             >
               <svg

@@ -5,6 +5,7 @@ import { getRankingsByType } from '@/lib/rankings/getRankingsByType';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
+import StructuredData from '@/components/StructuredData';
 
 export const revalidate = 3600;
 
@@ -118,9 +119,25 @@ export default async function RankingsTypePage({ params, searchParams }: PagePro
   }
 
   const startRank = (page - 1) * 20 + 1;
+  const appBase = getAppBaseUrl().replace(/\/$/, '');
+  const itemListJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `通信制高校 ${config.title}`,
+    numberOfItems: result.schools.filter((s) => s.slug).length,
+    itemListElement: result.schools
+      .filter((school) => school.slug)
+      .map((school, index) => ({
+        '@type': 'ListItem' as const,
+        position: startRank + index,
+        name: school.name,
+        url: `${appBase}/schools/${school.slug}`,
+      })),
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      <StructuredData data={itemListJsonLd} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link href={appPath('/rankings')} className="text-blue-600 hover:text-blue-700 mb-4 inline-block">

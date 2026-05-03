@@ -5,6 +5,7 @@ import StructuredData from "@/components/StructuredData";
 import { getAppBaseUrl } from "@/lib/env-check";
 
 const appBaseUrl = getAppBaseUrl();
+const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
 
 export const metadata: Metadata = {
   title: {
@@ -51,6 +52,9 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  ...(googleSiteVerification
+    ? { verification: { google: googleSiteVerification } }
+    : {}),
 };
 
 const orgId = `${appBaseUrl}/#organization`;

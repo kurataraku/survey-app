@@ -7,6 +7,7 @@
  *   npx tsx scripts/agent-setup.ts --school-id=xxx --publish=true
  *   npx tsx scripts/agent-setup.ts --all --dry-run
  *   npx tsx scripts/agent-setup.ts --all --delta=10
+ *   npx tsx scripts/agent-setup.ts --all --sleep-ms=300
  */
 
 import * as fs from 'fs';
@@ -26,6 +27,8 @@ interface CliArgs {
   delta: number;
   limit: number;
   baseUrl: string;
+  /** 各校処理のあとに API へ送る間隔（ms）。レート制限対策 */
+  sleepMs: number;
 }
 
 function parseArgs(): CliArgs {
@@ -39,6 +42,7 @@ function parseArgs(): CliArgs {
     delta: 5,
     limit: 10,
     baseUrl: process.env.AGENT_BASE_URL || 'http://localhost:3000/tsushin-kuchikomi',
+    sleepMs: 0,
   };
 
   for (const arg of args) {
@@ -60,6 +64,8 @@ function parseArgs(): CliArgs {
       parsed.limit = parseInt(arg.split('=')[1], 10) || 10;
     } else if (arg.startsWith('--base-url=')) {
       parsed.baseUrl = arg.split('=')[1];
+    } else if (arg.startsWith('--sleep-ms=')) {
+      parsed.sleepMs = parseInt(arg.split('=')[1], 10) || 0;
     }
   }
 
@@ -110,7 +116,16 @@ async function callSetupApi(
 async function callBatchApi(
   baseUrl: string,
   apiKey: string,
-  options: { steps: string[]; publish: boolean; dryRun: boolean; delta: number; limit: number; offset: number; filter?: Record<string, string> }
+  options: {
+    steps: string[];
+    publish: boolean;
+    dryRun: boolean;
+    delta: number;
+    limit: number;
+    offset: number;
+    sleepMs: number;
+    filter?: Record<string, string>;
+  }
 ): Promise<any> {
   const url = `${baseUrl}/api/admin/agent/schools/batch-setup`;
   const response = await fetch(url, {
@@ -127,6 +142,7 @@ async function callBatchApi(
       review_delta_threshold: options.delta,
       limit: options.limit,
       offset: options.offset,
+      sleep_ms: options.sleepMs,
     }),
   });
 
@@ -293,7 +309,7 @@ async function main() {
   console.log('='.repeat(50));
   console.log(`Mode: ${args.all ? 'all schools' : `school ${args.schoolId}`}`);
   console.log(`Steps: ${args.steps.join(', ')}`);
-  console.log(`Publish: ${args.publish} | Dry run: ${args.dryRun} | Delta: ${args.delta}`);
+  console.log(`Publish: ${args.publish} | Dry run: ${args.dryRun} | Delta: ${args.delta} | Sleep: ${args.sleepMs}ms`);
   console.log(`Base URL: ${args.baseUrl}`);
 
   if (!args.all && !args.schoolId) {
@@ -334,6 +350,7 @@ async function main() {
           delta: args.delta,
           limit: args.limit,
           offset,
+          sleepMs: args.sleepMs,
           filter: { status: 'active' },
         });
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendApprovedEmail, sendCampaignGrantEmail } from '@/lib/email/sender';
 import { issueQuoCardPay } from '@/lib/quocard/client';
+import { publicReviewUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
+import { resolveSchoolIdFromSchoolName } from '@/lib/reviews/schoolReviewLinkage';
 
 function getSupabase() {
   return createClient(
@@ -17,10 +19,33 @@ export async function POST(
   const { id } = await params;
   const supabase = getSupabase();
 
-  // 口コミを承認
+  const { data: before, error: beforeErr } = await supabase
+    .from('survey_responses')
+    .select('school_id, school_name')
+    .eq('id', id)
+    .single();
+
+  if (beforeErr || !before) {
+    return NextResponse.json({ error: '承認に失敗しました' }, { status: 500 });
+  }
+
+  let schoolIdToSet = before.school_id as string | null;
+  if (!schoolIdToSet) {
+    schoolIdToSet = await resolveSchoolIdFromSchoolName(supabase, before.school_name);
+  }
+
+  const updatePayload: {
+    moderation_status: string;
+    is_public: boolean;
+    school_id?: string;
+  } = { moderation_status: 'approved', is_public: true };
+  if (schoolIdToSet) {
+    updatePayload.school_id = schoolIdToSet;
+  }
+
   const { data: review, error } = await supabase
     .from('survey_responses')
-    .update({ moderation_status: 'approved', is_public: true })
+    .update(updatePayload)
     .eq('id', id)
     .select('id, email, school_name, is_duplicate_email')
     .single();
@@ -72,6 +97,8 @@ export async function POST(
       });
     }
   }
+
+  await submitIndexNowUrls([publicReviewUrl(id)]);
 
   return NextResponse.json({ success: true });
 }

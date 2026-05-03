@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
+import { postgrestEqString } from '@/lib/reviews/schoolReviewLinkage';
 
 export async function GET(
   request: NextRequest,
@@ -48,11 +49,11 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = (page - 1) * limit;
 
-    // 口コミ検索クエリを構築（school_nameで検索）
+    // school_id 優先 + 校名一致（レガシー・誤紐づけ含む）。承認時に school_id を補完するが過去データ用に OR を維持
     let query = supabase
       .from('survey_responses')
       .select('*', { count: 'exact' })
-      .eq('school_name', school.name);
+      .or(`school_id.eq.${schoolId},school_name.eq.${postgrestEqString(school.name)}`);
 
     // ページネーションとソート
     query = query

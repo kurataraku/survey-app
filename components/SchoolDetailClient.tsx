@@ -20,6 +20,7 @@ import {
   stripTuitionCommuteMarkdownSection,
 } from '@/lib/schools/parseAiSummarySections';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
+import SurveyCtaLink from '@/components/SurveyCtaLink';
 
 const CONCLUSION_MAX_CHARS = 350;
 const DECISION_LEAD_MAX_CHARS = 300;
@@ -387,12 +388,13 @@ export default function SchoolDetailClient({
             <p className="text-gray-600 mb-4">
               口コミ集計グラフは{school.review_count}件のため表示していません。
             </p>
-            <Link
-              href={appPath('/survey')}
+            <SurveyCtaLink
+              eventName="cta_survey_from_school"
+              eventParams={{ school_slug: school.slug ?? encodedSlug, placement: 'graph_empty' }}
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
             >
               口コミを投稿する
-            </Link>
+            </SurveyCtaLink>
           </div>
         ) : (
           <Tabs
@@ -696,12 +698,13 @@ export default function SchoolDetailClient({
 
       <div id="section-reviews" className="mb-8">
         {!school.latest_reviews?.length && (
-          <Link
-            href={appPath('/survey')}
+          <SurveyCtaLink
+            eventName="cta_survey_from_school"
+            eventParams={{ school_slug: school.slug ?? encodedSlug, placement: 'no_featured_reviews' }}
             className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-sm"
           >
             口コミを投稿する
-          </Link>
+          </SurveyCtaLink>
         )}
       </div>
 

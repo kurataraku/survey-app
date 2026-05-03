@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     const dryRun: boolean = body.dry_run ?? false;
     const limit: number = Math.min(body.limit ?? 10, 50);
     const offset: number = body.offset ?? 0;
+    const sleepMs: number = Math.min(Math.max(Number(body.sleep_ms) || 0, 0), 10_000);
 
     const supabase = createAdminSupabaseClient();
 
@@ -111,6 +112,10 @@ export async function POST(request: NextRequest) {
           school_name: school.name,
           error: e instanceof Error ? e.message : String(e),
         });
+      }
+
+      if (sleepMs > 0) {
+        await new Promise((r) => setTimeout(r, sleepMs));
       }
     }
 
