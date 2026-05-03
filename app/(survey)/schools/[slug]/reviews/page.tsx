@@ -58,10 +58,15 @@ export async function generateMetadata({
   );
   const canonical = useHubCanonical ? hubCanonical : listCanonical;
 
+  const pageNum = parseInt(getStr(resolvedSearch.page) || '1', 10);
+  const robots =
+    pageNum > 1 ? ({ index: false as const, follow: true as const } satisfies Metadata['robots']) : undefined;
+
   return {
     title,
     description,
     alternates: { canonical },
+    ...(robots ? { robots } : {}),
     openGraph: {
       title,
       description,

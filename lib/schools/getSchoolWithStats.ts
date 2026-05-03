@@ -289,7 +289,7 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
 
   const latestReviews = reviewsWithLikes
     .sort((a, b) => (b.like_count || 0) - (a.like_count || 0))
-    .slice(0, 3)
+    .slice(0, 5)
     .map((r) => ({
       id: r.id,
       overall_satisfaction: r.overall_satisfaction,

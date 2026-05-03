@@ -639,7 +639,7 @@ export default function SchoolDetailClient({
                         {review.good_comment && (
                           <div className="p-3 bg-green-50/50 rounded-lg border-l-4 border-green-500">
                             <p className="text-xs font-semibold text-green-700 mb-2">良い点</p>
-                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
+                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">
                               {review.good_comment}
                             </p>
                           </div>
@@ -649,7 +649,7 @@ export default function SchoolDetailClient({
                             <p className="text-xs font-semibold text-rose-700 mb-2">
                               改善してほしい点
                             </p>
-                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-2">
+                            <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">
                               {review.bad_comment}
                             </p>
                           </div>

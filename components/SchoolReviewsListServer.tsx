@@ -34,7 +34,7 @@ export default function SchoolReviewsListServer({
   return (
     <>
       <div className="space-y-4 mb-8">
-        {reviews.map((review) => (
+        {reviews.map((review, index) => (
           <SchoolReviewCard
             key={review.id}
             id={review.id}
@@ -47,6 +47,7 @@ export default function SchoolReviewsListServer({
             attendanceFrequency={review.attendance_frequency}
             likeCount={review.like_count}
             createdAt={review.created_at}
+            bodyExpanded={page === 1 && index < 3}
           />
         ))}
       </div>

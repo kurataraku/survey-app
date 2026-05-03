@@ -25,13 +25,13 @@ function formatDate(dateString: string) {
   });
 }
 
-/** 注目の口コミ（いいね数順・最大3件）— Server Component でSSR保証 */
+/** 注目の口コミ（いいね数順・最大5件）— Server Component でSSR保証 */
 export default function SchoolFeaturedReviewsServer({
   latestReviews,
 }: SchoolFeaturedReviewsServerProps) {
   const featuredReviews = [...latestReviews]
     .sort((a, b) => (b.like_count ?? 0) - (a.like_count ?? 0))
-    .slice(0, 3);
+    .slice(0, 5);
 
   if (featuredReviews.length === 0) return null;
 
@@ -76,7 +76,7 @@ export default function SchoolFeaturedReviewsServer({
             {review.good_comment && (
               <div className="mb-4 p-3 bg-green-50/50 rounded-lg border-l-4 border-green-500">
                 <p className="text-xs font-semibold text-green-700 mb-2">良い点</p>
-                <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
+                <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">
                   {review.good_comment}
                 </p>
               </div>
@@ -84,7 +84,7 @@ export default function SchoolFeaturedReviewsServer({
             {review.bad_comment && (
               <div className="mb-4 p-3 bg-rose-50/50 rounded-lg border-l-4 border-rose-500">
                 <p className="text-xs font-semibold text-rose-700 mb-2">改善してほしい点</p>
-                <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
+                <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">
                   {review.bad_comment}
                 </p>
               </div>

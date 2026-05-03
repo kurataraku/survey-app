@@ -358,7 +358,7 @@ export default function SchoolDetailByIdClient({
                     <p className="text-xs font-semibold text-green-500 mb-1">
                       良い点
                     </p>
-                    <p className="text-gray-700 line-clamp-2">
+                    <p className="text-gray-700 line-clamp-4 leading-relaxed">
                       {review.good_comment}
                     </p>
                   </div>
@@ -368,7 +368,7 @@ export default function SchoolDetailByIdClient({
                     <p className="text-xs font-semibold text-rose-500 mb-1">
                       改善してほしい点
                     </p>
-                    <p className="text-gray-700 line-clamp-2">
+                    <p className="text-gray-700 line-clamp-4 leading-relaxed">
                       {review.bad_comment}
                     </p>
                   </div>

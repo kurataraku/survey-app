@@ -12,6 +12,8 @@ interface SchoolReviewCardProps {
   attendanceFrequency: string | null;
   likeCount: number;
   createdAt: string;
+  /** 1ページ目の先頭数件など、本文をクランプせず全文表示する */
+  bodyExpanded?: boolean;
 }
 
 function formatDate(dateString: string) {
@@ -57,7 +59,11 @@ export default function SchoolReviewCard({
   attendanceFrequency,
   likeCount,
   createdAt,
+  bodyExpanded = false,
 }: SchoolReviewCardProps) {
+  const bodyClass = bodyExpanded
+    ? 'text-gray-700 text-sm leading-relaxed whitespace-pre-wrap'
+    : 'text-gray-700 line-clamp-4 text-sm leading-relaxed';
   return (
     <article className="p-5 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-gray-300 transition-colors">
       <div className="flex justify-between items-start mb-3">
@@ -88,13 +94,13 @@ export default function SchoolReviewCard({
         {goodComment && (
           <div>
             <p className="text-xs font-semibold text-green-500 mb-1">良い点</p>
-            <p className="text-gray-700 line-clamp-2 text-sm">{goodComment}</p>
+            <p className={bodyClass}>{goodComment}</p>
           </div>
         )}
         {badComment && (
           <div>
             <p className="text-xs font-semibold text-rose-500 mb-1">改善してほしい点</p>
-            <p className="text-gray-700 line-clamp-2 text-sm">{badComment}</p>
+            <p className={bodyClass}>{badComment}</p>
           </div>
         )}
       </div>
