@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
-import { generateSlug } from '@/lib/utils';
-import { callOpenAIForPrefecture, callOpenAIForMeta, callOpenAIForSummary, type MetaGenerationAlert } from '@/lib/openai/client';
+import { hasJapaneseSlug } from '@/lib/utils';
+import { callOpenAIForPrefecture, callOpenAIForMeta, callOpenAIForSummary, callOpenAIForSlug } from '@/lib/openai/client';
 import { callOpenAIForSeoSection } from '@/lib/openai/client';
 import { callOpenAIForFaq } from '@/lib/openai/client';
 import { callOpenAIForReviewTendency } from '@/lib/openai/client';
@@ -193,21 +193,42 @@ export async function POST(
     let totalOpenAITokens = 0;
     let totalPerplexityTokens = 0;
 
-    if (reviewCount === 0) {
-      for (const step of steps) {
-        results[step] = { status: 'skipped', reason: 'no_reviews' };
+    // --- A2: slug（口コミ不要のため no_reviews チェックより前に実行）---
+    if (steps.includes('slug')) {
+      // ASCII-only なスラグが既にある場合はスキップ（手動設定済みを保護）
+      if (school.slug && !hasJapaneseSlug(school.slug)) {
+        results.slug = { status: 'skipped', reason: 'already_set', value: school.slug };
+      } else {
+        try {
+          let slug = await callOpenAIForSlug(school.name);
+          totalOpenAITokens += 80;
+          const { data: conflict } = await supabase
+            .from('schools')
+            .select('id')
+            .eq('slug', slug)
+            .neq('id', schoolId)
+            .single();
+
+          if (conflict) {
+            slug = `${slug}-${schoolId.slice(0, 6)}`;
+            alerts.push({
+              code: 'ALERT-07',
+              message: `slug 重複のためサフィックス付与: ${slug}`,
+              severity: 'info',
+            });
+          }
+
+          if (!dryRun) {
+            await supabase.from('schools').update({ slug }).eq('id', schoolId);
+          }
+          results.slug = { status: 'ok', value: slug };
+        } catch (e) {
+          results.slug = { status: 'error', reason: e instanceof Error ? e.message : String(e) };
+        }
       }
-      return NextResponse.json({
-        school_id: schoolId,
-        school_name: school.name,
-        review_count: 0,
-        results,
-        alerts,
-        tokens_used: { openai: 0, perplexity: 0 },
-      });
     }
 
-    // --- A1: prefecture ---
+    // --- A1: prefecture（口コミ不要。slug と同様、no_reviews 早期リターンより前で実行）---
     if (steps.includes('prefecture')) {
       if (school.prefecture) {
         results.prefecture = { status: 'skipped', reason: 'already_set', value: school.prefecture };
@@ -253,33 +274,20 @@ export async function POST(
       }
     }
 
-    // --- A2: slug ---
-    if (steps.includes('slug')) {
-      if (school.slug) {
-        results.slug = { status: 'skipped', reason: 'already_set', value: school.slug };
-      } else {
-        let slug = generateSlug(school.name);
-        const { data: conflict } = await supabase
-          .from('schools')
-          .select('id')
-          .eq('slug', slug)
-          .neq('id', schoolId)
-          .single();
-
-        if (conflict) {
-          slug = `${slug}-${schoolId.slice(0, 6)}`;
-          alerts.push({
-            code: 'ALERT-07',
-            message: `slug 重複のためサフィックス付与: ${slug}`,
-            severity: 'info',
-          });
+    if (reviewCount === 0) {
+      for (const step of steps) {
+        if (!(step in results)) {
+          results[step] = { status: 'skipped', reason: 'no_reviews' };
         }
-
-        if (!dryRun) {
-          await supabase.from('schools').update({ slug }).eq('id', schoolId);
-        }
-        results.slug = { status: 'ok', value: slug };
       }
+      return NextResponse.json({
+        school_id: schoolId,
+        school_name: school.name,
+        review_count: 0,
+        results,
+        alerts,
+        tokens_used: { openai: totalOpenAITokens, perplexity: 0 },
+      });
     }
 
     // --- A3: intro (Perplexity → schools.intro) ---
