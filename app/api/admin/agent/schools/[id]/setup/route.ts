@@ -274,23 +274,7 @@ export async function POST(
       }
     }
 
-    if (reviewCount === 0) {
-      for (const step of steps) {
-        if (!(step in results)) {
-          results[step] = { status: 'skipped', reason: 'no_reviews' };
-        }
-      }
-      return NextResponse.json({
-        school_id: schoolId,
-        school_name: school.name,
-        review_count: 0,
-        results,
-        alerts,
-        tokens_used: { openai: totalOpenAITokens, perplexity: 0 },
-      });
-    }
-
-    // --- A3: intro (Perplexity → schools.intro) ---
+    // --- A3: intro（口コミ不要。学校名のみで Perplexity → schools.intro）---
     if (steps.includes('intro')) {
       const { data: schoolForIntro } = await supabase
         .from('schools')
@@ -329,6 +313,22 @@ export async function POST(
           results.intro = { status: 'error', reason: msg };
         }
       }
+    }
+
+    if (reviewCount === 0) {
+      for (const step of steps) {
+        if (!(step in results)) {
+          results[step] = { status: 'skipped', reason: 'no_reviews' };
+        }
+      }
+      return NextResponse.json({
+        school_id: schoolId,
+        school_name: school.name,
+        review_count: 0,
+        results,
+        alerts,
+        tokens_used: { openai: totalOpenAITokens, perplexity: totalPerplexityTokens },
+      });
     }
 
     // --- 口コミデータの事前取得（summary, meta, SEO, FAQ, 傾向で共有） ---
