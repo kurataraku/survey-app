@@ -247,6 +247,21 @@ export async function GET(
       'tuition_rating'
     );
 
+    const validGlobalOverall =
+      allGlobalReviews && allGlobalReviews.length > 0
+        ? allGlobalReviews
+            .map((r) => r.overall_satisfaction)
+            .filter(
+              (v): v is number =>
+                v !== null &&
+                v !== undefined &&
+                v !== 6 &&
+                typeof v === 'number' &&
+                v >= 1 &&
+                v <= 5
+            )
+        : [];
+
     const averageOrNull = (values: number[]) =>
       values.length > 0
         ? parseFloat(
@@ -268,6 +283,7 @@ export async function GET(
     );
     const globalCampusLifeRatingAvg = averageOrNull(globalCampusLifeRatings);
     const globalTuitionRatingAvg = averageOrNull(globalTuitionRatings);
+    const globalOverallSatisfactionAvg = averageOrNull(validGlobalOverall);
 
     // 統計情報を取得するために全口コミを取得（この学校のみ、school_idでフィルタリング）
     const { data: allReviewsForStats } = await supabase
@@ -479,6 +495,7 @@ export async function GET(
       campus_life_rating_avg: campusLifeRatingAvg,
       // サイト全体の平均（レーダーチャート用）
       global_averages: {
+        overall_satisfaction_avg: globalOverallSatisfactionAvg,
         flexibility_rating_avg: globalFlexibilityRatingAvg,
         staff_rating_avg: globalStaffRatingAvg,
         support_rating_avg: globalSupportRatingAvg,

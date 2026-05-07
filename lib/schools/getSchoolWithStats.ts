@@ -34,6 +34,7 @@ export interface SchoolWithStats {
   campus_life_rating_avg?: number | null;
   prefectures?: string[] | null;
   global_averages?: {
+    overall_satisfaction_avg: number | null;
     flexibility_rating_avg: number | null;
     staff_rating_avg: number | null;
     support_rating_avg: number | null;
@@ -99,7 +100,18 @@ async function getGlobalAverages() {
       ? parseFloat((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2))
       : null;
 
+  const validGlobalOverall =
+    allGlobalReviews && allGlobalReviews.length > 0
+      ? allGlobalReviews
+          .map((r) => r.overall_satisfaction)
+          .filter(
+            (v): v is number =>
+              v !== null && v !== undefined && v !== 6 && typeof v === 'number' && v >= 1 && v <= 5
+          )
+      : [];
+
   return {
+    overall_satisfaction_avg: averageOrNull(validGlobalOverall),
     flexibility_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'flexibility_rating')),
     staff_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'staff_rating')),
     support_rating_avg: averageOrNull(toValidRatings(allGlobalReviews, 'support_rating')),

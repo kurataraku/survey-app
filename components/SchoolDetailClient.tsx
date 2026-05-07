@@ -20,15 +20,16 @@ import {
   stripTuitionCommuteMarkdownSection,
 } from '@/lib/schools/parseAiSummarySections';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
+import {
+  SCHOOL_REVIEWS_LIST_CTA_SUBTITLE,
+  SCHOOL_REVIEWS_LIST_CTA_TITLE,
+} from '@/lib/schools/school-reviews-list-copy';
 import SurveyCtaLink from '@/components/SurveyCtaLink';
 
 const CONCLUSION_MAX_CHARS = 350;
 const DECISION_LEAD_MAX_CHARS = 300;
 const FEW_REVIEWS_THRESHOLD = 5;
 const GRAPH_HIDDEN_THRESHOLD = 1;
-
-const SCHOOL_REVIEWS_LIST_CTA_TITLE = '口コミ一覧（絞り込み）';
-const SCHOOL_REVIEWS_LIST_CTA_SUBTITLE = '通学頻度・進路・キャンパスから探せます';
 
 function SchoolHubReviewsListCta({ encodedSlug }: { encodedSlug: string }) {
   return (
@@ -129,6 +130,7 @@ export default function SchoolDetailClient({
           showTuitionCommuteTrend ? fvSummary.tuitionCommuteBullets.slice(0, 3) : []
         }
         tuitionAttendStatsHint={showTuitionCommuteTrend ? tuitionAttendStatsHint : null}
+        globalAverages={school.global_averages}
       />
 
       {/* 口コミ要約の詳細（FVと役割分担。全文・箇条書きは折りたたみ） */}
@@ -347,7 +349,7 @@ export default function SchoolDetailClient({
               href={appPath(`/schools/${encodedSlug}/reviews`)}
               className="text-blue-600 hover:underline"
             >
-              口コミ一覧（絞り込み）
+              {SCHOOL_REVIEWS_LIST_CTA_TITLE}
             </Link>
           </li>
         </ul>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { appPath } from '@/lib/base-path';
 import { getAppBaseUrl } from '@/lib/env-check';
 import StructuredData from '@/components/StructuredData';
+import { SCHOOL_REVIEWS_LIST_BREADCRUMB_JSONLD_NAME } from '@/lib/schools/school-reviews-list-copy';
 
 type Variant = 'hub' | 'reviews';
 
@@ -50,7 +51,7 @@ export default function SchoolPageBreadcrumbs({
             {
               '@type': 'ListItem' as const,
               position: 4,
-              name: '口コミ一覧（絞り込み）',
+              name: SCHOOL_REVIEWS_LIST_BREADCRUMB_JSONLD_NAME,
               item: listUrl,
             },
           ]

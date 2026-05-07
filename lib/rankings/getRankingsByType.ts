@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { MIN_PUBLIC_REVIEWS_FOR_SCORE_RANKINGS } from '@/lib/rankings/constants';
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
 
 export interface RankingSchool {
@@ -182,31 +183,33 @@ export const getRankingsByType = cache(async (
     };
   });
 
+  const minReviews = MIN_PUBLIC_REVIEWS_FOR_SCORE_RANKINGS;
+
   let rankedSchools: RankingSchool[];
   switch (type) {
     case 'overall':
       rankedSchools = schoolsWithStats
-        .filter((s) => s.overall_avg !== null && s.review_count >= 1)
+        .filter((s) => s.overall_avg !== null && s.review_count >= minReviews)
         .sort((a, b) => (b.overall_avg ?? 0) - (a.overall_avg ?? 0));
       break;
     case 'staff':
       rankedSchools = schoolsWithStats
-        .filter((s) => s.staff_avg !== null && s.review_count >= 1)
+        .filter((s) => s.staff_avg !== null && s.review_count >= minReviews)
         .sort((a, b) => (b.staff_avg ?? 0) - (a.staff_avg ?? 0));
       break;
     case 'atmosphere':
       rankedSchools = schoolsWithStats
-        .filter((s) => s.atmosphere_avg !== null && s.review_count >= 1)
+        .filter((s) => s.atmosphere_avg !== null && s.review_count >= minReviews)
         .sort((a, b) => (b.atmosphere_avg ?? 0) - (a.atmosphere_avg ?? 0));
       break;
     case 'credit':
       rankedSchools = schoolsWithStats
-        .filter((s) => s.credit_avg !== null && s.review_count >= 1)
+        .filter((s) => s.credit_avg !== null && s.review_count >= minReviews)
         .sort((a, b) => (b.credit_avg ?? 0) - (a.credit_avg ?? 0));
       break;
     case 'tuition':
       rankedSchools = schoolsWithStats
-        .filter((s) => s.tuition_avg !== null && s.review_count >= 1)
+        .filter((s) => s.tuition_avg !== null && s.review_count >= minReviews)
         .sort((a, b) => (b.tuition_avg ?? 0) - (a.tuition_avg ?? 0));
       break;
     case 'review-count':

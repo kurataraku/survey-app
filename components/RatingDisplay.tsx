@@ -22,6 +22,7 @@ interface RatingDisplayProps {
     tuition: number;
   };
   globalAverages?: {
+    overall_satisfaction_avg?: number | null;
     flexibility_rating_avg: number | null;
     staff_rating_avg: number | null;
     support_rating_avg: number | null;

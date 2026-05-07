@@ -10,6 +10,7 @@ import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import SchoolPageBreadcrumbs from '@/components/SchoolPageBreadcrumbs';
 import { isDefaultSchoolReviewsIndex } from '@/lib/schools/school-reviews-seo';
+import { schoolReviewsListPageHeading } from '@/lib/schools/school-reviews-list-copy';
 
 /** 常にサーバーでレンダリングし、口コミ本文を初期HTMLに含める（クローラー対応） */
 export const dynamic = 'force-dynamic';
@@ -47,8 +48,9 @@ export async function generateMetadata({
     return { title: '学校が見つかりません' };
   }
 
-  const title = `${school.name}の口コミ一覧（絞り込み） | 通信制高校リアルレビュー`;
-  const description = `${school.name}の口コミを条件で絞り込みできます。学校ページの口コミ・評判まとめとあわせてご利用ください。`;
+  const heading = schoolReviewsListPageHeading(school.name);
+  const title = `${heading} | 通信制高校リアルレビュー`;
+  const description = `${school.name}の口コミを、通学頻度・進路・キャンパスなどの条件から探せます。学校ページの口コミ・評判まとめとあわせてご利用ください。`;
 
   const appBaseUrl = getAppBaseUrl();
   const hubCanonical = `${appBaseUrl}/schools/${resolvedParams.slug}`;
@@ -158,7 +160,7 @@ export default async function SchoolReviewsPage({ params, searchParams }: PagePr
             {school.name}の口コミ・評判（まとめ）へ戻る
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">
-            {data.schoolName || school.name}の口コミ一覧（絞り込み）
+            {schoolReviewsListPageHeading(data.schoolName || school.name)}
           </h1>
           {data.total > 0 && <p className="text-sm text-gray-600">{data.total}件の口コミ</p>}
         </div>

@@ -5,7 +5,8 @@ import { getAppBaseUrl } from '@/lib/env-check';
 
 export const metadata: Metadata = {
   title: 'ランキング | 通信制高校リアルレビュー',
-  description: '総合評判・口コミ数・先生対応など、様々な指標で通信制高校をランキング形式で確認できます。',
+  description:
+    '総合評判・口コミ数・先生対応など、様々な指標で通信制高校をランキング形式で確認できます。評価系ランキングは口コミ3件以上の学校のみ対象（口コミ数ランキングは1件以上）。',
   alternates: { canonical: `${getAppBaseUrl()}/rankings` },
 };
 
@@ -59,6 +60,9 @@ export default function RankingsPage() {
           </h1>
           <p className="text-gray-600">
             様々な指標で通信制高校をランキング形式で確認できます。
+            <span className="block mt-2 text-sm text-gray-500">
+              総合・各評価のランキングは口コミが3件以上ある学校のみを対象としています。口コミ数ランキングは1件以上から掲載します。
+            </span>
           </p>
         </div>
 

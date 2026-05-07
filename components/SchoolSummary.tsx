@@ -8,6 +8,20 @@ import { appPath } from '@/lib/base-path';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 import { CheckCircle2, XCircle, Bus } from 'lucide-react';
 
+function ratingVsGlobalLabel(
+  value: number | null,
+  globalAvg: number | null | undefined
+): { text: string; className: string } | null {
+  if (value === null || value === undefined) return null;
+  if (globalAvg === null || globalAvg === undefined) return null;
+  const diff = value - globalAvg;
+  const text =
+    diff > 0 ? `(+${diff.toFixed(1)})` : diff < 0 ? `(${diff.toFixed(1)})` : `(±0.0)`;
+  const className =
+    diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-500';
+  return { text, className };
+}
+
 interface SchoolSummaryProps {
   name: string;
   prefecture: string;
@@ -29,6 +43,13 @@ interface SchoolSummaryProps {
   tuitionCommuteBullets?: string[];
   /** 統計から生成した学費・通学の一文 */
   tuitionAttendStatsHint?: string | null;
+  /** サイト全体平均（詳細評価と同基準の差分表示用） */
+  globalAverages?: {
+    overall_satisfaction_avg?: number | null;
+    staff_rating_avg?: number | null;
+    atmosphere_fit_rating_avg?: number | null;
+    credit_rating_avg?: number | null;
+  };
 }
 
 export default function SchoolSummary({
@@ -47,6 +68,7 @@ export default function SchoolSummary({
   notFitsBullets = [],
   tuitionCommuteBullets = [],
   tuitionAttendStatsHint = null,
+  globalAverages,
 }: SchoolSummaryProps) {
   void _latestReviews;
 
@@ -74,6 +96,14 @@ export default function SchoolSummary({
   const hasDecisionBlock =
     fitsBullets.length > 0 || notFitsBullets.length > 0 || showTuitionCommuteTrend;
 
+  const overallDiff = ratingVsGlobalLabel(overallAvg, globalAverages?.overall_satisfaction_avg);
+  const staffDiff = ratingVsGlobalLabel(staffRatingAvg, globalAverages?.staff_rating_avg);
+  const atmosphereDiff = ratingVsGlobalLabel(
+    atmosphereFitRatingAvg,
+    globalAverages?.atmosphere_fit_rating_avg
+  );
+  const creditDiff = ratingVsGlobalLabel(creditRatingAvg, globalAverages?.credit_rating_avg);
+
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden relative mb-8">
       <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-100 via-blue-50 to-blue-100" />
@@ -95,11 +125,24 @@ export default function SchoolSummary({
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-6 pb-6 border-b border-gray-200">
           {overallAvg !== null ? (
             <>
-              <div className="flex items-center gap-3">
-                <StarRatingDisplay value={overallAvg} size="lg" showLabel />
-                <div className="text-3xl md:text-4xl font-bold text-gray-900">
-                  {overallAvg.toFixed(1)}
-                  <span className="text-lg md:text-xl font-normal text-gray-600 ml-1">/ 5.0</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <StarRatingDisplay value={overallAvg} size="lg" />
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <div className="text-3xl md:text-4xl font-bold text-gray-900 tabular-nums">
+                    {overallAvg.toFixed(1)}
+                    <span className="text-lg md:text-xl font-normal text-gray-600 ml-1">/ 5.0</span>
+                  </div>
+                  {overallDiff ? (
+                    <span className="inline-flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-xs font-normal text-gray-500">全体平均比</span>
+                      <span
+                        className={`text-base md:text-lg font-semibold tabular-nums ${overallDiff.className}`}
+                        title="サイト全体の口コミ平均との差"
+                      >
+                        {overallDiff.text}
+                      </span>
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="text-base text-gray-600 sm:ml-auto">
@@ -202,11 +245,22 @@ export default function SchoolSummary({
           <div className="text-center p-6 bg-blue-50/80 rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow">
             <p className="text-xs md:text-sm text-gray-600 mb-3">先生・職員の対応</p>
             {staffRatingAvg !== null ? (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
                 <StarRatingDisplay value={staffRatingAvg} size="sm" />
-                <span className="text-base md:text-lg font-semibold text-gray-900">
+                <span className="text-base md:text-lg font-semibold text-gray-900 tabular-nums">
                   {staffRatingAvg.toFixed(1)}
                 </span>
+                {staffDiff ? (
+                  <span className="inline-flex items-baseline gap-1 flex-wrap justify-center">
+                    <span className="text-[10px] sm:text-xs font-normal text-gray-500">全体平均比</span>
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${staffDiff.className}`}
+                      title="サイト全体平均との差"
+                    >
+                      {staffDiff.text}
+                    </span>
+                  </span>
+                ) : null}
               </div>
             ) : (
               <span className="text-xs text-gray-400">評価なし</span>
@@ -215,11 +269,22 @@ export default function SchoolSummary({
           <div className="text-center p-6 bg-green-50/80 rounded-2xl border border-green-100 shadow-sm hover:shadow-md transition-shadow">
             <p className="text-xs md:text-sm text-gray-600 mb-3">在校生の雰囲気</p>
             {atmosphereFitRatingAvg !== null ? (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
                 <StarRatingDisplay value={atmosphereFitRatingAvg} size="sm" />
-                <span className="text-base md:text-lg font-semibold text-gray-900">
+                <span className="text-base md:text-lg font-semibold text-gray-900 tabular-nums">
                   {atmosphereFitRatingAvg.toFixed(1)}
                 </span>
+                {atmosphereDiff ? (
+                  <span className="inline-flex items-baseline gap-1 flex-wrap justify-center">
+                    <span className="text-[10px] sm:text-xs font-normal text-gray-500">全体平均比</span>
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${atmosphereDiff.className}`}
+                      title="サイト全体平均との差"
+                    >
+                      {atmosphereDiff.text}
+                    </span>
+                  </span>
+                ) : null}
               </div>
             ) : (
               <span className="text-xs text-gray-400">評価なし</span>
@@ -228,11 +293,22 @@ export default function SchoolSummary({
           <div className="text-center p-6 bg-amber-50/80 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
             <p className="text-xs md:text-sm text-gray-600 mb-3">単位取得のしやすさ</p>
             {creditRatingAvg !== null ? (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
                 <StarRatingDisplay value={creditRatingAvg} size="sm" />
-                <span className="text-base md:text-lg font-semibold text-gray-900">
+                <span className="text-base md:text-lg font-semibold text-gray-900 tabular-nums">
                   {creditRatingAvg.toFixed(1)}
                 </span>
+                {creditDiff ? (
+                  <span className="inline-flex items-baseline gap-1 flex-wrap justify-center">
+                    <span className="text-[10px] sm:text-xs font-normal text-gray-500">全体平均比</span>
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${creditDiff.className}`}
+                      title="サイト全体平均との差"
+                    >
+                      {creditDiff.text}
+                    </span>
+                  </span>
+                ) : null}
               </div>
             ) : (
               <span className="text-xs text-gray-400">評価なし</span>
