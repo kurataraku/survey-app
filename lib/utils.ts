@@ -132,6 +132,11 @@ export function generateSlug(text: string): string {
   return slug;
 }
 
+/** スラグに日本語（非 ASCII）文字が含まれているか判定 */
+export function hasJapaneseSlug(slug: string): boolean {
+  return /[^\x00-\x7F]/.test(slug);
+}
+
 
 
 

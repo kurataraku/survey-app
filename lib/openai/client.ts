@@ -1030,3 +1030,36 @@ export async function callOpenAIForPrefecture(
     return { prefecture: '', confidence: 'low', reasoning: 'JSONパース失敗: ' + raw.slice(0, 100) };
   }
 }
+
+export async function callOpenAIForSlug(schoolName: string): Promise<string> {
+  const client = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4.1';
+
+  const prompt = `以下の通信制高校名を URL スラグ形式に変換してください。
+
+ルール:
+- ヘボン式ローマ字に変換し、末尾に「-kuchikomi」を付ける
+- 小文字、ハイフン区切り、英数字のみ
+- 「高等学校」は「koukou」、「高等部」は「kotobu」、「高等学院」は「gakuin」のように学校種別を端的に表現する
+- 「県立」「市立」「私立」などは省略可
+- スラグのみを返す（説明不要）
+
+例:
+第一学院高等学校 → daiichi-gakuin-kuchikomi
+N高等学校 → n-koukou-kuchikomi
+佐賀県立佐賀北高等学校 → saga-kita-koukou-kuchikomi
+
+学校名: ${schoolName}`;
+
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0,
+    max_tokens: 80,
+  });
+
+  const raw = (completion.choices[0]?.message?.content || '').trim().toLowerCase();
+  // 余分な文字を除去してスラグとして安全な文字列だけ残す
+  const slug = raw.replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || 'unknown-kuchikomi';
+}
