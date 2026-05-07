@@ -30,6 +30,15 @@ export async function POST(request: NextRequest) {
       query = query.eq('status', filter.status);
     }
 
+    // intro 再実行時など、未設定の校だけ対象にして Vercel 往復を減らす（Perplexity は setup 側でも already_set で抑止済み）
+    const introMissing =
+      filter.intro_missing === true ||
+      filter.intro_missing === 'true' ||
+      filter.intro_missing === '1';
+    if (introMissing) {
+      query = query.or('intro.is.null,intro.eq.');
+    }
+
     query = query.range(offset, offset + limit - 1);
 
     const { data: schools, error: schoolsError, count: totalCount } = await query;

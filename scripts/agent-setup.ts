@@ -8,6 +8,7 @@
  *   npx tsx scripts/agent-setup.ts --all --dry-run
  *   npx tsx scripts/agent-setup.ts --all --delta=10
  *   npx tsx scripts/agent-setup.ts --all --sleep-ms=300
+ *   npx tsx scripts/agent-setup.ts --all --steps=intro --intro-missing-only --publish=false
  */
 
 import * as fs from 'fs';
@@ -29,6 +30,8 @@ interface CliArgs {
   baseUrl: string;
   /** 各校処理のあとに API へ送る間隔（ms）。レート制限対策 */
   sleepMs: number;
+  /** schools.intro が null / 空の校のみバッチ対象（再実行時の無駄往復削減） */
+  introMissingOnly: boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -43,6 +46,7 @@ function parseArgs(): CliArgs {
     limit: 10,
     baseUrl: process.env.AGENT_BASE_URL || 'http://localhost:3000/tsushin-kuchikomi',
     sleepMs: 0,
+    introMissingOnly: false,
   };
 
   for (const arg of args) {
@@ -66,6 +70,8 @@ function parseArgs(): CliArgs {
       parsed.baseUrl = arg.split('=')[1];
     } else if (arg.startsWith('--sleep-ms=')) {
       parsed.sleepMs = parseInt(arg.split('=')[1], 10) || 0;
+    } else if (arg === '--intro-missing-only') {
+      parsed.introMissingOnly = true;
     }
   }
 
@@ -124,7 +130,7 @@ async function callBatchApi(
     limit: number;
     offset: number;
     sleepMs: number;
-    filter?: Record<string, string>;
+    filter?: Record<string, string | boolean>;
   }
 ): Promise<any> {
   const url = `${baseUrl}/api/admin/agent/schools/batch-setup`;
@@ -310,6 +316,9 @@ async function main() {
   console.log(`Mode: ${args.all ? 'all schools' : `school ${args.schoolId}`}`);
   console.log(`Steps: ${args.steps.join(', ')}`);
   console.log(`Publish: ${args.publish} | Dry run: ${args.dryRun} | Delta: ${args.delta} | Sleep: ${args.sleepMs}ms`);
+  if (args.introMissingOnly) {
+    console.log('Filter: intro 未設定の校のみ（batch-setup intro_missing）');
+  }
   console.log(`Base URL: ${args.baseUrl}`);
 
   if (!args.all && !args.schoolId) {
@@ -343,6 +352,11 @@ async function main() {
 
     while (true) {
       try {
+        const batchFilter: Record<string, string | boolean> = { status: 'active' };
+        if (args.introMissingOnly) {
+          batchFilter.intro_missing = true;
+        }
+
         const batchResult = await callBatchApi(args.baseUrl, apiKey, {
           steps: args.steps,
           publish: args.publish,
@@ -351,7 +365,7 @@ async function main() {
           limit: args.limit,
           offset,
           sleepMs: args.sleepMs,
-          filter: { status: 'active' },
+          filter: batchFilter,
         });
 
         if (batchIndex === 0) {
