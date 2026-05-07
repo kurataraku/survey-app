@@ -24,7 +24,8 @@ export async function POST(request: NextRequest) {
     let query = supabase
       .from('schools')
       .select('id, name', { count: 'exact' })
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .order('id', { ascending: true });
 
     if (filter.status) {
       query = query.eq('status', filter.status);
@@ -36,7 +37,9 @@ export async function POST(request: NextRequest) {
       filter.intro_missing === 'true' ||
       filter.intro_missing === '1';
     if (introMissing) {
-      query = query.or('intro.is.null,intro.eq.');
+      // or(intro.is.null,intro.eq.) + range で高オフセット時に PostgREST が失敗することがあるため、
+      // 「未設定 = intro IS NULL」のみ列挙（空文字は normalize-school-intro-empty-to-null.sql で NULL 化してから再実行）
+      query = query.is('intro', null);
     }
 
     query = query.range(offset, offset + limit - 1);
