@@ -97,6 +97,53 @@ export default async function Home() {
             </div>
           </section>
         )}
+        {/* シミュレーターバナー */}
+        <section className="mb-12">
+          <Link
+            href={appPath('/simulator')}
+            className="group block relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 p-8 md:p-10 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
+          >
+            {/* 装飾円 */}
+            <div className="pointer-events-none absolute -top-12 -right-12 w-56 h-56 rounded-full bg-white/10" />
+            <div className="pointer-events-none absolute -bottom-8 -left-8 w-40 h-40 rounded-full bg-white/10" />
+
+            <div className="relative flex flex-col md:flex-row md:items-center gap-6">
+              {/* テキスト */}
+              <div className="flex-1 min-w-0">
+                <div className="inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full mb-3 tracking-wide">
+                  <span>🎮</span>
+                  <span>通信制高校えらび診断ナビ</span>
+                </div>
+                <h2 className="text-white font-black text-2xl md:text-3xl leading-snug mb-2">
+                  選ぶだけで、<br className="hidden sm:block" />
+                  合う学校へナビゲート。
+                </h2>
+                <p className="text-white/85 text-sm md:text-base font-medium mb-4 leading-relaxed">
+                  7つの場面でA/Bを選んで進めるだけ。<br className="hidden sm:block" />
+                  ゲーム感覚で進むうちに、お子さんに合う学校タイプへたどり着きます。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {['🎮 A/B選ぶだけ', '✅ 無料・登録不要', '⏱ 約5分'].map(tag => (
+                    <span key={tag} className="bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* CTAボタン */}
+              <div className="shrink-0">
+                <div className="inline-flex items-center gap-2 bg-white text-sky-600 font-black text-base px-7 py-4 rounded-2xl shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-200">
+                  <span>無料で診断スタート</span>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </Link>
+        </section>
+
         {data.latestArticles.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">

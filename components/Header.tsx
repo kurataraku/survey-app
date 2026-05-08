@@ -19,11 +19,12 @@ export default function Header() {
   };
 
   const navItems = [
-    { href: appPath('/'), label: 'ホーム' },
-    { href: appPath('/schools'), label: '学校検索' },
-    { href: appPath('/rankings'), label: 'ランキング' },
-    { href: appPath('/features'), label: '特集' },
-    { href: appPath('/survey'), label: '口コミ投稿' },
+    { href: appPath('/'), label: 'ホーム', special: false },
+    { href: appPath('/schools'), label: '学校検索', special: false },
+    { href: appPath('/rankings'), label: 'ランキング', special: false },
+    { href: appPath('/features'), label: '特集', special: false },
+    { href: appPath('/simulator'), label: '診断ナビ', special: true },
+    { href: appPath('/survey'), label: '口コミ投稿', special: false },
   ];
 
   const isActive = (href: string) => {
@@ -53,20 +54,35 @@ export default function Header() {
           </div>
 
           {/* デスクトップナビゲーション */}
-          <nav className="hidden md:flex items-center space-x-8">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-2 text-base font-medium transition-colors ${
-                  isActive(item.href)
-                    ? 'text-blue-500 border-b-2 border-blue-500'
-                    : 'text-gray-700 hover:text-blue-500'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+          <nav className="hidden md:flex items-center space-x-6">
+            {navItems.map((item) =>
+              item.special ? (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-black transition-all ${
+                    isActive(item.href)
+                      ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md scale-105'
+                      : 'bg-gradient-to-r from-sky-400 to-indigo-500 text-white shadow-sm hover:shadow-md hover:scale-105 active:scale-95'
+                  }`}
+                >
+                  <span className="text-base leading-none">🎮</span>
+                  {item.label}
+                </Link>
+              ) : (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-3 py-2 text-base font-medium transition-colors ${
+                    isActive(item.href)
+                      ? 'text-blue-500 border-b-2 border-blue-500'
+                      : 'text-gray-700 hover:text-blue-500'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              )
+            )}
           </nav>
 
           {/* モバイルメニューボタン */}
@@ -103,8 +119,23 @@ export default function Header() {
         {/* モバイルメニュー */}
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-200">
-            <nav className="flex flex-col space-y-2">
-              {navItems.map((item) => (
+            {/* 診断バナー（モバイルメニュー最上部） */}
+            <Link
+              href={appPath('/simulator')}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="flex items-center gap-3 mx-0 mb-3 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 text-white shadow-sm active:scale-[0.98] transition-all"
+            >
+              <span className="text-2xl leading-none">🎯</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-[15px] leading-tight">通信制高校えらび診断ナビ</p>
+                <p className="text-white/80 text-xs font-medium mt-0.5">A/Bを選んで進めるだけ。合う学校へナビゲートします</p>
+              </div>
+              <svg className="w-5 h-5 text-white/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <nav className="flex flex-col space-y-1">
+              {navItems.filter(item => !item.special).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

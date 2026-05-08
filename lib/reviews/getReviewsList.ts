@@ -6,6 +6,7 @@ export interface ReviewListItem {
   school_id: string | null;
   school_name: string;
   school_slug: string | null;
+  school_prefecture: string | null;
   overall_satisfaction: number;
   good_comment: string;
   bad_comment: string;
@@ -19,6 +20,13 @@ export interface GetReviewsListParams {
   page?: number;
   limit?: number;
   sort?: string;
+  attendanceFrequency?: string;
+  prefecture?: string;
+  overallRating?: number;
+  staffRating?: number;
+  atmosphereRating?: number;
+  creditRating?: number;
+  tuitionRating?: number;
 }
 
 export interface GetReviewsListResult {
@@ -32,7 +40,7 @@ export interface GetReviewsListResult {
 export const getReviewsList = cache(async (
   params: GetReviewsListParams = {}
 ): Promise<GetReviewsListResult> => {
-  const { page = 1, limit = 20, sort = 'newest' } = params;
+  const { page = 1, limit = 20, sort = 'newest', attendanceFrequency, prefecture, overallRating, staffRating, atmosphereRating, creditRating, tuitionRating } = params;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -50,25 +58,36 @@ export const getReviewsList = cache(async (
   else if (sort === 'rating_desc') { orderColumn = 'overall_satisfaction'; orderAscending = false; }
   else if (sort === 'rating_asc') { orderColumn = 'overall_satisfaction'; orderAscending = true; }
 
-  const { data: allReviewsData, error } = await supabase
+  let queryBuilder = supabase
     .from('survey_responses')
     .select(`
       id, school_id, school_name, overall_satisfaction, good_comment, bad_comment,
       created_at, enrollment_year, attendance_frequency, answers,
-      schools(id, name, slug, status)
+      schools(id, name, slug, status, prefecture)
     `)
     .eq('is_public', true)
     .not('school_id', 'is', null)
     .order(orderColumn, { ascending: orderAscending });
+
+  if (attendanceFrequency) queryBuilder = queryBuilder.eq('attendance_frequency', attendanceFrequency);
+  if (overallRating)    queryBuilder = queryBuilder.eq('overall_satisfaction', overallRating);
+  if (staffRating)      queryBuilder = queryBuilder.eq('staff_rating', staffRating);
+  if (atmosphereRating) queryBuilder = queryBuilder.eq('atmosphere_fit_rating', atmosphereRating);
+  if (creditRating)     queryBuilder = queryBuilder.eq('credit_rating', creditRating);
+  if (tuitionRating)    queryBuilder = queryBuilder.eq('tuition_rating', tuitionRating);
+
+  const { data: allReviewsData, error } = await queryBuilder;
 
   if (error) {
     console.error('[getReviewsList]', error);
     return { reviews: [], total: 0, page, totalPages: 0, limit };
   }
 
-  const filtered = (allReviewsData || []).filter((r: { schools: { status?: string } | { status?: string }[] | null }) => {
+  const filtered = (allReviewsData || []).filter((r: { schools: { status?: string; prefecture?: string } | { status?: string; prefecture?: string }[] | null }) => {
     const school = Array.isArray(r.schools) ? r.schools[0] : r.schools;
-    return school && school.status === 'active';
+    if (!school || school.status !== 'active') return false;
+    if (prefecture && school.prefecture !== prefecture) return false;
+    return true;
   });
 
   const total = filtered.length;
@@ -94,7 +113,8 @@ export const getReviewsList = cache(async (
       id: r.id as string,
       school_id: r.school_id as string | null,
       school_name: (r.school_name as string) || '',
-      school_slug: (school as { slug?: string } | null)?.slug ?? null,
+      school_slug: (school as { slug?: string; prefecture?: string } | null)?.slug ?? null,
+      school_prefecture: (school as { slug?: string; prefecture?: string } | null)?.prefecture ?? null,
       overall_satisfaction: (r.overall_satisfaction as number) ?? 0,
       good_comment: (r.good_comment as string) || '',
       bad_comment: (r.bad_comment as string) || '',

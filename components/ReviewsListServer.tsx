@@ -7,16 +7,25 @@ interface ReviewsListServerProps {
   reviews: ReviewListItem[];
   page: number;
   totalPages: number;
+  attendanceFrequency?: string;
+  sort?: string;
 }
 
-/**
- * サイト全体の口コミ一覧 — Server Component でSSR保証
- * 口コミ本文（良い点・悪い点）を初期HTMLに確実に含め、クローラーがインデックスできるようにする
- */
+function buildPageUrl(page: number, attendanceFrequency?: string, sort?: string): string {
+  const params = new URLSearchParams();
+  if (page > 1) params.set('page', String(page));
+  if (attendanceFrequency) params.set('attendance_frequency', attendanceFrequency);
+  if (sort && sort !== 'newest') params.set('sort', sort);
+  const qs = params.toString();
+  return appPath(`/reviews${qs ? `?${qs}` : ''}`);
+}
+
 export default function ReviewsListServer({
   reviews,
   page,
   totalPages,
+  attendanceFrequency,
+  sort,
 }: ReviewsListServerProps) {
   if (reviews.length === 0) {
     return (
@@ -50,7 +59,7 @@ export default function ReviewsListServer({
         <div className="flex justify-center gap-2">
           {page > 1 ? (
             <Link
-              href={page === 2 ? appPath('/reviews') : appPath(`/reviews?page=${page - 1}`)}
+              href={buildPageUrl(page - 1, attendanceFrequency, sort)}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               前へ
@@ -65,7 +74,7 @@ export default function ReviewsListServer({
           </span>
           {page < totalPages ? (
             <Link
-              href={appPath(`/reviews?page=${page + 1}`)}
+              href={buildPageUrl(page + 1, attendanceFrequency, sort)}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               次へ
