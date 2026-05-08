@@ -39,3 +39,18 @@ export function publicReviewUrl(reviewId: string): string {
 export function publicFeatureArticleUrl(slug: string): string {
   return `${getAppBaseUrl().replace(/\/$/, '')}/features/${encodeURIComponent(slug)}`;
 }
+
+/** 学校詳細（公開サイト）の絶対URL */
+export function publicSchoolUrl(slug: string): string {
+  return `${getAppBaseUrl().replace(/\/$/, '')}/schools/${encodeURIComponent(slug)}`;
+}
+
+/** 都道府県別学校一覧の絶対URL */
+export function publicPrefectureSchoolsUrl(prefecture: string): string {
+  return `${getAppBaseUrl().replace(/\/$/, '')}/schools/prefecture/${encodeURIComponent(prefecture)}`;
+}
+
+/** ランキング一覧（/rankings/[type]）の絶対URL */
+export function publicRankingUrl(rankingType: string): string {
+  return `${getAppBaseUrl().replace(/\/$/, '')}/rankings/${encodeURIComponent(rankingType)}`;
+}

@@ -17,7 +17,9 @@
     "send-password-reset": "tsx scripts/send-password-reset.ts",
     "set-password-directly": "tsx scripts/set-password-directly.ts",
     "debug:merge": "tsx scripts/debug-merge.ts",
-    "seo:coverage": "tsx scripts/seo-coverage.ts"
+    "seo:coverage": "tsx scripts/seo-coverage.ts",
+    "publish:draft-summaries": "tsx scripts/publish-draft-summaries.ts",
+    "indexnow:schools": "tsx scripts/indexnow-submit-schools.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
