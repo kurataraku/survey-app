@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import RankingCardServer from '@/components/RankingCardServer';
 import { getRankingsByType } from '@/lib/rankings/getRankingsByType';
+import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
@@ -72,7 +73,10 @@ export default async function RankingsTypePage({ params, searchParams }: PagePro
   const type = resolvedParams.type;
   const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
 
-  const result = await getRankingsByType(type, { page, limit: 20 });
+  const [result, globalAverages] = await Promise.all([
+    getRankingsByType(type, { page, limit: 40 }),
+    getCachedGlobalAverages(),
+  ]);
 
   if ('error' in result) {
     if (result.error === '無効なランキングタイプです' || result.error.includes('進学実績')) {
@@ -158,10 +162,21 @@ export default async function RankingsTypePage({ params, searchParams }: PagePro
               name={school.name}
               prefecture={school.prefecture}
               slug={school.slug}
+              highlights={school.highlights}
+              intro={school.intro}
               reviewCount={school.review_count}
               value={school[config.valueKey] as number | null}
               valueLabel={config.valueLabel}
               valueType={config.valueType}
+              staffAvg={school.staff_avg}
+              atmosphereAvg={school.atmosphere_avg}
+              creditAvg={school.credit_avg}
+              tuitionAvg={school.tuition_avg}
+              overallAvg={school.overall_avg}
+              latestGoodComment={school.latest_good_comment}
+              latestBadComment={school.latest_bad_comment}
+              globalAverages={globalAverages}
+              reviewTendency={school.review_tendency}
             />
           ))}
         </div>

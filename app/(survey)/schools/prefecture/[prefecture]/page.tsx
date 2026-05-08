@@ -4,6 +4,7 @@ import PrefectureLandingPage from '@/components/PrefectureLandingPage';
 import SchoolCardServer from '@/components/SchoolCardServer';
 import { searchSchools } from '@/lib/schools/searchSchools';
 import { getPrefectureLandingHighlights } from '@/lib/schools/getPrefectureLandingHighlights';
+import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { getPrefectureIntroLead } from '@/lib/regions/prefecture-intros';
 import { prefectures } from '@/lib/prefectures';
 import { appPath } from '@/lib/base-path';
@@ -55,13 +56,10 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
     notFound();
   }
 
-  const [highlights, data] = await Promise.all([
+  const [highlights, data, globalAverages] = await Promise.all([
     getPrefectureLandingHighlights(prefecture),
-    searchSchools({
-      prefecture,
-      page,
-      limit: 20,
-    }),
+    searchSchools({ prefecture, page, limit: 40 }),
+    getCachedGlobalAverages(),
   ]);
 
   const totalPages = data.total_pages;
@@ -108,7 +106,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
       ) : (
         <>
           <p className="text-gray-600 mb-4">全{data.total}校（{page}ページ目）</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="space-y-4 mb-8">
             {data.schools.map((school) => (
               <SchoolCardServer
                 key={school.id}
@@ -117,8 +115,18 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
                 prefecture={school.prefecture}
                 hidePrefectureUnderFilter
                 slug={school.slug}
+                highlights={school.highlights}
+                intro={school.intro}
                 reviewCount={school.review_count}
                 overallAvg={school.overall_avg}
+                latestGoodComment={school.latest_good_comment}
+                latestBadComment={school.latest_bad_comment}
+                globalAverages={globalAverages}
+                staffAvg={school.staff_avg}
+                atmosphereAvg={school.atmosphere_avg}
+                creditAvg={school.credit_avg}
+                tuitionAvg={school.tuition_avg}
+                reviewTendency={school.review_tendency}
               />
             ))}
           </div>

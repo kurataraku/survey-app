@@ -100,14 +100,14 @@ async function getGlobalAverages() {
       ? parseFloat((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2))
       : null;
 
+  const parseOverall = (v: unknown): number | null => {
+    const n = typeof v === 'string' ? parseInt(v, 10) : typeof v === 'number' ? v : NaN;
+    return !isNaN(n) && n >= 1 && n <= 5 && n !== 6 ? n : null;
+  };
+
   const validGlobalOverall =
     allGlobalReviews && allGlobalReviews.length > 0
-      ? allGlobalReviews
-          .map((r) => r.overall_satisfaction)
-          .filter(
-            (v): v is number =>
-              v !== null && v !== undefined && v !== 6 && typeof v === 'number' && v >= 1 && v <= 5
-          )
+      ? allGlobalReviews.map((r) => parseOverall(r.overall_satisfaction)).filter((v): v is number => v !== null)
       : [];
 
   return {
@@ -128,10 +128,10 @@ async function getGlobalAverages() {
   };
 }
 
-const getCachedGlobalAverages = unstable_cache(
+export const getCachedGlobalAverages = unstable_cache(
   getGlobalAverages,
-  ['global-averages'],
-  { revalidate: 3600 } // 1時間
+  ['global-averages-v2'],
+  { revalidate: 3600 }
 );
 
 /**

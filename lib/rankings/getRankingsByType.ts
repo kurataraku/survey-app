@@ -7,12 +7,17 @@ export interface RankingSchool {
   name: string;
   prefecture: string;
   slug: string | null;
+  highlights: string[] | null;
+  intro: string | null;
   review_count: number;
   overall_avg: number | null;
   staff_avg: number | null;
   atmosphere_avg: number | null;
   credit_avg: number | null;
   tuition_avg: number | null;
+  latest_good_comment: string | null;
+  latest_bad_comment: string | null;
+  review_tendency: { good: string[]; improvement: string[] } | null;
 }
 
 export interface GetRankingsResult {
@@ -52,7 +57,7 @@ export const getRankingsByType = cache(async (
 
   const { data: allSchools } = await supabase
     .from('schools')
-    .select('id, name, prefecture, slug')
+    .select('id, name, prefecture, slug, highlights, intro')
     .eq('is_public', true);
 
   if (!allSchools || allSchools.length === 0) {
@@ -61,12 +66,22 @@ export const getRankingsByType = cache(async (
 
   const schoolIds = allSchools.map((s) => s.id);
 
-  const { data: allReviews, error: reviewsError } = await supabase
-    .from('survey_responses')
-    .select('school_id, overall_satisfaction, answers')
-    .in('school_id', schoolIds)
-    .eq('is_public', true)
-    .not('school_id', 'is', null);
+  const [reviewsResult, tendencyResult] = await Promise.all([
+    supabase
+      .from('survey_responses')
+      .select('school_id, overall_satisfaction, answers, good_comment, bad_comment, created_at')
+      .in('school_id', schoolIds)
+      .eq('is_public', true)
+      .not('school_id', 'is', null),
+    supabase
+      .from('school_ai_summaries')
+      .select('school_id, summary_text')
+      .in('school_id', schoolIds)
+      .eq('kind', 'review_tendency')
+      .is('topic', null)
+      .eq('status', 'published'),
+  ]);
+  const { data: allReviews, error: reviewsError } = reviewsResult;
 
   if (reviewsError) {
     console.error('[getRankingsByType] 口コミデータ取得エラー:', reviewsError);
@@ -81,6 +96,8 @@ export const getRankingsByType = cache(async (
       atmosphere_ratings: number[];
       credit_ratings: number[];
       tuition_ratings: number[];
+      latestComment: { text: string; ts: string } | null;
+      latestBadComment: { text: string; ts: string } | null;
     }
   >();
 
@@ -92,6 +109,8 @@ export const getRankingsByType = cache(async (
       atmosphere_ratings: [],
       credit_ratings: [],
       tuition_ratings: [],
+      latestComment: null,
+      latestBadComment: null,
     });
   });
 
@@ -135,17 +154,43 @@ export const getRankingsByType = cache(async (
           if (!isNaN(r) && r >= 1 && r <= 5 && r !== 6) stats.tuition_ratings.push(r);
         }
       }
+
+      if (review.good_comment?.trim()) {
+        if (!stats.latestComment || review.created_at > stats.latestComment.ts) {
+          stats.latestComment = { text: review.good_comment.trim(), ts: review.created_at };
+        }
+      }
+      if (review.bad_comment?.trim()) {
+        if (!stats.latestBadComment || review.created_at > stats.latestBadComment.ts) {
+          stats.latestBadComment = { text: review.bad_comment.trim(), ts: review.created_at };
+        }
+      }
+    }
+  }
+
+  // AI要約（review_tendency）のパース
+  const tendencyMap = new Map<string, { good: string[]; improvement: string[] }>();
+  if (tendencyResult.data) {
+    for (const t of tendencyResult.data) {
+      try {
+        const parsed = JSON.parse(t.summary_text) as { good_points?: string[]; improvement_points?: string[] };
+        const good = Array.isArray(parsed.good_points) ? parsed.good_points.slice(0, 2) : [];
+        const improvement = Array.isArray(parsed.improvement_points) ? parsed.improvement_points.slice(0, 2) : [];
+        if (good.length > 0 || improvement.length > 0) tendencyMap.set(t.school_id, { good, improvement });
+      } catch {}
     }
   }
 
   const schoolsWithStats: RankingSchool[] = allSchools.map((school) => {
     const stats = statsMap.get(school.id) ?? {
       review_count: 0,
-      overall_ratings: [],
-      staff_ratings: [],
-      atmosphere_ratings: [],
-      credit_ratings: [],
-      tuition_ratings: [],
+      overall_ratings: [] as number[],
+      staff_ratings: [] as number[],
+      atmosphere_ratings: [] as number[],
+      credit_ratings: [] as number[],
+      tuition_ratings: [] as number[],
+      latestComment: null as { text: string; ts: string } | null,
+      latestBadComment: null as { text: string; ts: string } | null,
     };
 
     const overallAvg =
@@ -174,12 +219,17 @@ export const getRankingsByType = cache(async (
       name: school.name,
       prefecture: school.prefecture,
       slug: school.slug,
+      highlights: school.highlights ?? null,
+      intro: school.intro ?? null,
       review_count: stats.review_count,
       overall_avg: overallAvg != null ? parseFloat(overallAvg.toFixed(2)) : null,
       staff_avg: staffAvg != null ? parseFloat(staffAvg.toFixed(2)) : null,
       atmosphere_avg: atmosphereAvg != null ? parseFloat(atmosphereAvg.toFixed(2)) : null,
       credit_avg: creditAvg != null ? parseFloat(creditAvg.toFixed(2)) : null,
       tuition_avg: tuitionAvg != null ? parseFloat(tuitionAvg.toFixed(2)) : null,
+      latest_good_comment: stats.latestComment?.text ?? null,
+      latest_bad_comment: stats.latestBadComment?.text ?? null,
+      review_tendency: tendencyMap.get(school.id) ?? null,
     };
   });
 
