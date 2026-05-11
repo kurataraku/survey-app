@@ -19,7 +19,8 @@
     "debug:merge": "tsx scripts/debug-merge.ts",
     "seo:coverage": "tsx scripts/seo-coverage.ts",
     "publish:draft-summaries": "tsx scripts/publish-draft-summaries.ts",
-    "indexnow:schools": "tsx scripts/indexnow-submit-schools.ts"
+    "indexnow:schools": "tsx scripts/indexnow-submit-schools.ts",
+    "list:schools-unpublished-reviews": "tsx scripts/list-schools-unpublished-reviews.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
