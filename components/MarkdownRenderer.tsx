@@ -4,6 +4,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { normalizeMarkdownHref } from '@/lib/links/normalizeMarkdownHref';
+import { normalizeLoosePipeTablesMd } from '@/lib/seo-generation/transfer-utils';
 
 interface MarkdownRendererProps {
   content: string;
@@ -31,6 +32,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   }
 
   // Markdownコンテンツとして表示（既存のコンテンツとの互換性）
+  const mdForRender = normalizeLoosePipeTablesMd(content);
   return (
     <div className="prose prose-lg max-w-none">
       <ReactMarkdown
@@ -116,7 +118,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           ),
         }}
       >
-        {content}
+        {mdForRender}
       </ReactMarkdown>
     </div>
   );

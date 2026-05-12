@@ -126,6 +126,74 @@ function isMdTableSeparatorRow(line: string): boolean {
   });
 }
 
+function mdTableColumnCount(line: string): number {
+  return splitMdTableRow(line).length;
+}
+
+function buildGfmTableSeparatorLine(columnCount: number): string {
+  if (columnCount < 2) return '';
+  return `| ${Array.from({ length: columnCount }, () => '---').join(' | ')} |`;
+}
+
+/**
+ * LLM がよく省略する「区切り行（| --- |）」を、連続する縦棒行ブロックにだけ差し込む。
+ * remark-gfm / mdToHtml の表検出の前提に揃える。
+ */
+export function normalizeLoosePipeTablesMd(md: string): string {
+  const lines = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const expanded: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const ln0 = lines[i];
+    if (!ln0.trim() || !looksLikeMdTableRow(ln0)) {
+      expanded.push(ln0);
+      i++;
+      continue;
+    }
+
+    const ln1 = i + 1 < lines.length ? lines[i + 1] : '';
+    if (ln1.trim() && isMdTableSeparatorRow(ln1)) {
+      let j = i;
+      for (; j < lines.length; j++) {
+        const L = lines[j];
+        if (!L.trim()) break;
+        if (!looksLikeMdTableRow(L) && !isMdTableSeparatorRow(L)) break;
+        expanded.push(L);
+      }
+      i = j;
+      continue;
+    }
+
+    const col0 = mdTableColumnCount(ln0);
+    if (col0 < 2) {
+      expanded.push(ln0);
+      i++;
+      continue;
+    }
+
+    let k = i;
+    while (k < lines.length && lines[k].trim() && looksLikeMdTableRow(lines[k])) {
+      if (isMdTableSeparatorRow(lines[k])) break;
+      if (mdTableColumnCount(lines[k]) !== col0) break;
+      k++;
+    }
+    const blockLen = k - i;
+    if (blockLen >= 3) {
+      expanded.push(lines[i]);
+      expanded.push(buildGfmTableSeparatorLine(col0));
+      for (let t = i + 1; t < k; t++) expanded.push(lines[t]);
+      i = k;
+      continue;
+    }
+
+    expanded.push(ln0);
+    i++;
+  }
+
+  return expanded.join('\n');
+}
+
 function formatTableCellInlineMd(cell: string): string {
   let s = cell.trim();
   s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -139,7 +207,7 @@ function formatTableCellInlineMd(cell: string): string {
 }
 
 function convertPipeTablesToHtml(md: string): string {
-  const text = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const text = normalizeLoosePipeTablesMd(md);
   const lines = text.split('\n');
   const out: string[] = [];
   let i = 0;
