@@ -99,8 +99,104 @@ export function schoolSlugsFromReviewEvidenceUrls(
   return out;
 }
 
+/**
+ * GitHub Flavored Markdown 形式の表（| 区切り + 区切り行）を HTML に変換する。
+ * 転送先の articles.content は簡易 mdToHtml 経由のため、プレビュー（remark-gfm）と同様に表を残す。
+ * 出力は1行の <table> ブロック（段落ラッパーとの干渉を避ける）。
+ */
+function splitMdTableRow(line: string): string[] {
+  const t = line.trim();
+  let s = t;
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|')) s = s.slice(0, -1);
+  return s.split('|').map((cell) => cell.trim());
+}
+
+function looksLikeMdTableRow(line: string): boolean {
+  const t = line.trim();
+  return t.length > 0 && t.includes('|');
+}
+
+function isMdTableSeparatorRow(line: string): boolean {
+  const cells = splitMdTableRow(line);
+  if (cells.length === 0) return false;
+  return cells.every((cell) => {
+    const c = cell.replace(/\s/g, '');
+    return /^:?-{3,}:?$/.test(c) || /^:?={3,}:?$/.test(c);
+  });
+}
+
+function formatTableCellInlineMd(cell: string): string {
+  let s = cell.trim();
+  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  s = s.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+  return s;
+}
+
+function convertPipeTablesToHtml(md: string): string {
+  const text = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const row0 = lines[i];
+    const row1 = i + 1 < lines.length ? lines[i + 1] : '';
+    if (
+      row0.trim() &&
+      row1.trim() &&
+      looksLikeMdTableRow(row0) &&
+      isMdTableSeparatorRow(row1)
+    ) {
+      const headerCells = splitMdTableRow(row0);
+      if (headerCells.length === 0 || headerCells.every((c) => !c)) {
+        out.push(row0);
+        i++;
+        continue;
+      }
+      i += 2;
+      const bodyRows: string[][] = [];
+      while (i < lines.length) {
+        const ln = lines[i];
+        if (!ln.trim()) break;
+        if (!looksLikeMdTableRow(ln)) break;
+        if (isMdTableSeparatorRow(ln)) {
+          i++;
+          continue;
+        }
+        bodyRows.push(splitMdTableRow(ln));
+        i++;
+      }
+      const th = headerCells
+        .map((c) => `<th>${formatTableCellInlineMd(c)}</th>`)
+        .join('');
+      const colCount = headerCells.length;
+      const trs = bodyRows
+        .map((cells) => {
+          const padded = [...cells];
+          while (padded.length < colCount) padded.push('');
+          const slice = padded.slice(0, colCount);
+          const tds = slice
+            .map((c) => `<td>${formatTableCellInlineMd(c)}</td>`)
+            .join('');
+          return `<tr>${tds}</tr>`;
+        })
+        .join('');
+      out.push(`<table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`);
+    } else {
+      out.push(row0);
+      i++;
+    }
+  }
+  return out.join('\n');
+}
+
 export function mdToHtml(md: string): string {
-  let h = md;
+  let h = convertPipeTablesToHtml(md);
   // Headings (h3 before h2 before h1 to avoid partial matches)
   h = h.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   h = h.replace(/^## (.+)$/gm, '<h2>$1</h2>');
