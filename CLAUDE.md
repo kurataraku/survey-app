@@ -20,6 +20,9 @@ npm run check-env
 # SEOカバレッジ（公開校・AI要約・記事件数のJSON出力）
 npm run seo:coverage
 
+# 学校タグ highlights を OpenAI で一括生成（初回は --dry-run --limit=5 推奨）
+npm run generate:highlights -- --all --sleep-ms=150
+
 # SSR整合性チェック単体
 npm run verify-ssr
 

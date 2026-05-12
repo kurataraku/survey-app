@@ -148,6 +148,7 @@ export default async function SchoolReviewsPage({ params, searchParams }: PagePr
           schoolName={school.name}
           encodedSlug={resolvedParams.slug}
           variant="reviews"
+          listingPrefecture={school.prefecture}
         />
         <div className="mb-3">
           <Link

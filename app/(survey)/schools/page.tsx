@@ -89,6 +89,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
                   name={school.name}
                   prefecture={school.prefecture}
                   matchedPrefecture={prefecture.trim() !== '' ? prefecture : undefined}
+                  prefectures={school.prefectures ?? undefined}
                   hidePrefectureUnderFilter={Boolean(prefecture.trim())}
                   slug={school.slug}
                   highlights={school.highlights}

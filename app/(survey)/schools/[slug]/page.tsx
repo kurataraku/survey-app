@@ -148,6 +148,7 @@ export default async function SchoolDetailPage({ params }: PageProps) {
           schoolName={school.name}
           encodedSlug={encodedSlug}
           variant="hub"
+          listingPrefecture={school.prefecture}
         />
         <div className="mb-4">
           <Link

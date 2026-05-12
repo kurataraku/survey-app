@@ -7,6 +7,8 @@ export interface SearchSchool {
   id: string;
   name: string;
   prefecture: string;
+  /** DBの prefectures（対応都道府県）。一覧カードの所在地表示に利用 */
+  prefectures: string[] | null;
   slug: string | null;
   highlights: string[] | null;
   intro: string | null;
@@ -43,6 +45,7 @@ type SchoolEntry = {
   id: string;
   name: string;
   prefecture: string;
+  prefectures: string[] | null;
   status: string;
   slug: string | null;
   highlights: string[] | null;
@@ -183,6 +186,7 @@ async function fetchSearchSchoolsWithStats(
       id: school.id,
       name: school.name,
       prefecture: school.prefecture,
+      prefectures: school.prefectures,
       slug: school.slug,
       highlights: school.highlights,
       intro: school.intro,
@@ -234,6 +238,7 @@ export const getSearchSchoolsByIds = cache(async (ids: string[]): Promise<Map<st
       id: row.id,
       name: row.name,
       prefecture: pref,
+      prefectures: Array.isArray(row.prefectures) ? row.prefectures : null,
       status: row.status,
       slug: row.slug,
       highlights: row.highlights ?? null,
@@ -296,7 +301,16 @@ export const searchSchools = cache(async (
     for (const school of schoolsByName) {
       if (school.status === 'active') {
         const pref = school.prefecture || (Array.isArray(school.prefectures) && school.prefectures[0]) || '不明';
-        schoolMap.set(school.id, { id: school.id, name: school.name, prefecture: pref, status: school.status, slug: school.slug, highlights: school.highlights ?? null, intro: school.intro ?? null });
+        schoolMap.set(school.id, {
+          id: school.id,
+          name: school.name,
+          prefecture: pref,
+          prefectures: Array.isArray(school.prefectures) ? school.prefectures : null,
+          status: school.status,
+          slug: school.slug,
+          highlights: school.highlights ?? null,
+          intro: school.intro ?? null,
+        });
       }
     }
   }
@@ -323,7 +337,16 @@ export const searchSchools = cache(async (
       aliasSchools?.forEach((school) => {
         if (school.status === 'active') {
           const pref = school.prefecture || (Array.isArray(school.prefectures) && school.prefectures[0]) || '不明';
-          schoolMap.set(school.id, { id: school.id, name: school.name, prefecture: pref, status: school.status, slug: school.slug, highlights: school.highlights ?? null, intro: school.intro ?? null });
+          schoolMap.set(school.id, {
+          id: school.id,
+          name: school.name,
+          prefecture: pref,
+          prefectures: Array.isArray(school.prefectures) ? school.prefectures : null,
+          status: school.status,
+          slug: school.slug,
+          highlights: school.highlights ?? null,
+          intro: school.intro ?? null,
+        });
         }
       });
     }

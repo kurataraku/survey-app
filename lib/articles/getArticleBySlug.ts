@@ -10,6 +10,7 @@ function searchSchoolFallback(
     id: school.id,
     name: school.name,
     prefecture: school.prefecture,
+    prefectures: null,
     slug: school.slug,
     highlights: null,
     intro: null,

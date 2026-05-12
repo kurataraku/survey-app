@@ -10,12 +10,15 @@ interface SchoolPageBreadcrumbsProps {
   schoolName: string;
   encodedSlug: string;
   variant: Variant;
+  /** 設定時は「○○の通信制高校」へのパンくずを学校一覧と学校名の間に挿入（都道府県LPへの導線） */
+  listingPrefecture?: string | null;
 }
 
 export default function SchoolPageBreadcrumbs({
   schoolName,
   encodedSlug,
   variant,
+  listingPrefecture,
 }: SchoolPageBreadcrumbsProps) {
   const base = getAppBaseUrl();
   const hubPath = `/schools/${encodedSlug}`;
@@ -23,6 +26,12 @@ export default function SchoolPageBreadcrumbs({
   const listUrl = `${base}${hubPath}/reviews`;
 
   const hubLabel = `${schoolName}の口コミ・評判`;
+  const pref =
+    listingPrefecture && listingPrefecture.trim() !== '' && listingPrefecture !== '不明'
+      ? listingPrefecture.trim()
+      : null;
+  const prefPath = pref ? `/schools/prefecture/${encodeURIComponent(pref)}` : null;
+  const prefLabel = pref ? `${pref}の通信制高校` : null;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -40,9 +49,19 @@ export default function SchoolPageBreadcrumbs({
         name: '学校一覧',
         item: `${base}/schools`,
       },
+      ...(pref && prefPath
+        ? [
+            {
+              '@type': 'ListItem' as const,
+              position: 3,
+              name: prefLabel,
+              item: `${base}${prefPath}`,
+            },
+          ]
+        : []),
       {
         '@type': 'ListItem',
-        position: 3,
+        position: pref && prefPath ? 4 : 3,
         name: hubLabel,
         item: hubUrl,
       },
@@ -50,7 +69,7 @@ export default function SchoolPageBreadcrumbs({
         ? [
             {
               '@type': 'ListItem' as const,
-              position: 4,
+              position: pref && prefPath ? 5 : 4,
               name: SCHOOL_REVIEWS_LIST_BREADCRUMB_JSONLD_NAME,
               item: listUrl,
             },
@@ -80,6 +99,18 @@ export default function SchoolPageBreadcrumbs({
           <li aria-hidden className="text-gray-400">
             /
           </li>
+          {pref && prefPath && prefLabel && (
+            <>
+              <li>
+                <Link href={appPath(prefPath)} className="text-blue-600 hover:underline">
+                  {prefLabel}
+                </Link>
+              </li>
+              <li aria-hidden className="text-gray-400">
+                /
+              </li>
+            </>
+          )}
           <li>
             {variant === 'hub' ? (
               <span className="text-gray-800 font-medium">{hubLabel}</span>

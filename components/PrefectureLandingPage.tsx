@@ -112,6 +112,7 @@ export default function PrefectureLandingPage({
                       name={school.name}
                       prefecture={school.prefecture}
                       matchedPrefecture={prefecture}
+                      prefectures={school.prefectures ?? undefined}
                       hidePrefectureUnderFilter
                       slug={school.slug}
                       highlights={school.highlights ?? undefined}
