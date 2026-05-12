@@ -1,15 +1,22 @@
 import Link from 'next/link';
+import type { ComponentProps } from 'react';
 import SchoolCardServer from '@/components/SchoolCardServer';
 import PrefectureLandingFaq from '@/components/PrefectureLandingFaq';
 import { appPath } from '@/lib/base-path';
 import type { SearchSchool } from '@/lib/schools/searchSchools';
 import { PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING } from '@/lib/schools/prefecture-landing-constants';
 
+type SchoolCardGlobalAverages = NonNullable<
+  ComponentProps<typeof SchoolCardServer>['globalAverages']
+>;
+
 interface PrefectureLandingPageProps {
   prefecture: string;
   introLead: string;
   topByReviews: SearchSchool[];
   topByRating: SearchSchool[];
+  /** 項目別評価のサイト平均との差表示用（トップの注目の学校と同様） */
+  globalAverages: SchoolCardGlobalAverages | null;
   /** 一覧＋ページネーション */
   children: React.ReactNode;
   hasSchools: boolean;
@@ -46,6 +53,7 @@ export default function PrefectureLandingPage({
   introLead,
   topByReviews,
   topByRating,
+  globalAverages,
   children,
   hasSchools,
 }: PrefectureLandingPageProps) {
@@ -81,6 +89,13 @@ export default function PrefectureLandingPage({
                     slug={school.slug}
                     reviewCount={school.review_count}
                     overallAvg={school.overall_avg}
+                    staffAvg={school.staff_avg ?? undefined}
+                    atmosphereAvg={school.atmosphere_avg ?? undefined}
+                    creditAvg={school.credit_avg ?? undefined}
+                    tuitionAvg={school.tuition_avg ?? undefined}
+                    latestGoodComment={school.latest_good_comment ?? undefined}
+                    latestBadComment={school.latest_bad_comment ?? undefined}
+                    globalAverages={globalAverages ?? undefined}
                   />
                 ))}
               </div>
@@ -107,6 +122,13 @@ export default function PrefectureLandingPage({
                       slug={school.slug}
                       reviewCount={school.review_count}
                       overallAvg={school.overall_avg}
+                      staffAvg={school.staff_avg ?? undefined}
+                      atmosphereAvg={school.atmosphere_avg ?? undefined}
+                      creditAvg={school.credit_avg ?? undefined}
+                      tuitionAvg={school.tuition_avg ?? undefined}
+                      latestGoodComment={school.latest_good_comment ?? undefined}
+                      latestBadComment={school.latest_bad_comment ?? undefined}
+                      globalAverages={globalAverages ?? undefined}
                     />
                   ))}
                 </div>

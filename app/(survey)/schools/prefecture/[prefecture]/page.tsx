@@ -94,6 +94,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
       introLead={introLead}
       topByReviews={highlights.topByReviews}
       topByRating={highlights.topByRating}
+      globalAverages={globalAverages}
       hasSchools={hasSchools}
     >
       {!hasSchools ? (
