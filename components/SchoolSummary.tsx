@@ -110,16 +110,21 @@ export default function SchoolSummary({
 
       <div className="p-6 md:p-8 pt-8">
         <div className="mb-5">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight tracking-tight">
-            {name}の口コミ・評判
-          </h1>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {displayPrefectures.map((pref, index) => (
-              <Badge key={index} variant="primary" size="md">
-                {pref}
-              </Badge>
-            ))}
-          </div>
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 leading-tight tracking-tight">
+          {reviewCount === 0 ? `${name}の学校情報・口コミ` : `${name}の口コミ・評判`}
+        </h1>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {displayPrefectures.map((pref, index) => (
+            <Badge key={index} variant="primary" size="md">
+              {pref}
+            </Badge>
+          ))}
+        </div>
+        {reviewCount === 0 && (
+          <p className="text-sm text-gray-600 leading-relaxed max-w-2xl mt-3">
+            口コミはまだありません。掲載の学校概要やページ内の説明・よくある質問を参考にし、学費・サポート・通学形態は必ず学校公式サイトで最新情報をご確認ください。
+          </p>
+        )}
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-6 pb-6 border-b border-gray-200">

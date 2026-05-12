@@ -77,6 +77,13 @@ const IconChart = () => (
   </svg>
 );
 
+const IconClipboard = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+  </svg>
+);
+
 export default function SchoolCardServer({
   id,
   name,
@@ -107,7 +114,9 @@ export default function SchoolCardServer({
   const allPrefectures = Array.from(allPrefecturesSet);
 
   let displayPrefectures: string[] = [];
-  if (!hidePrefectureUnderFilter && allPrefectures.length > 0) {
+  if (hidePrefectureUnderFilter && matchedPrefecture && isValidPrefecture(matchedPrefecture)) {
+    displayPrefectures = [matchedPrefecture];
+  } else if (!hidePrefectureUnderFilter && allPrefectures.length > 0) {
     if (matchedPrefecture && allPrefectures.includes(matchedPrefecture)) {
       displayPrefectures = [matchedPrefecture, ...allPrefectures.filter((p) => p !== matchedPrefecture).slice(0, 4)];
     } else {
@@ -165,7 +174,10 @@ export default function SchoolCardServer({
         {(displayPrefectures.length > 0 || visibleTags.length > 0) && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {displayPrefectures.length > 0 && (
-              <span className="text-xs text-gray-500">📍 {displayPrefectures.join('、')}</span>
+              <span className="text-xs text-gray-500">
+                {hidePrefectureUnderFilter ? '一覧条件: ' : '📍 '}
+                {displayPrefectures.join('、')}
+              </span>
             )}
             {visibleTags.map((tag) => (
               <span key={tag} className="bg-slate-100 text-slate-600 text-xs font-medium px-2.5 py-0.5 rounded-full">
@@ -183,7 +195,26 @@ export default function SchoolCardServer({
               icon={<IconBook />}
               label="学校紹介"
             />
-            <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">{intro}</p>
+            <p
+              className={`text-sm text-gray-700 leading-relaxed ${reviewCount === 0 ? 'line-clamp-4' : 'line-clamp-2'}`}
+            >
+              {intro}
+            </p>
+          </div>
+        )}
+
+        {reviewCount === 0 && (
+          <div>
+            <SectionBadge
+              color="bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-200"
+              icon={<IconClipboard />}
+              label="比較するときの確認ポイント"
+            />
+            <ul className="text-xs text-gray-700 space-y-1.5 list-disc pl-4 leading-relaxed">
+              <li>学費・就学支援は必ず学校公式サイトの最新情報で確認してください。</li>
+              <li>通学型・オンライン型、サポートの有無は募集要項・資料請求で確認してください。</li>
+              <li>詳細ページの学校概要・よくある質問もあわせてご覧ください。</li>
+            </ul>
           </div>
         )}
 

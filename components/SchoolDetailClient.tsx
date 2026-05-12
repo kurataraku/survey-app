@@ -80,6 +80,11 @@ export default function SchoolDetailClient({
       });
   }, [school.faq_items]);
 
+  const emptySeoOrFaqHint =
+    school.review_count === 0
+      ? '学校概要や公式サイトの最新情報とあわせてご確認ください。'
+      : 'まだ口コミが十分に集まっていません。';
+
   useEffect(() => {
     const syncTabFromHash = () => {
       if (typeof window === 'undefined') return;
@@ -132,6 +137,35 @@ export default function SchoolDetailClient({
         tuitionAttendStatsHint={showTuitionCommuteTrend ? tuitionAttendStatsHint : null}
         globalAverages={school.global_averages}
       />
+
+      {(school.intro ||
+        (school.review_count === 0 && school.prefecture && school.prefecture !== '不明')) && (
+        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <School className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">学校概要</h2>
+          </div>
+          {school.intro ? (
+            <p className="text-sm text-gray-700 leading-relaxed">{school.intro}</p>
+          ) : (
+            <p className="text-sm text-gray-700 leading-relaxed">
+              掲載中の学校紹介文はまだありません。公式サイトで概要を確認するか、下の「評判の詳細・よくある質問」をご覧ください。
+            </p>
+          )}
+          {school.prefecture && school.prefecture !== '不明' && (
+            <p className="mt-4 text-sm">
+              <Link
+                href={appPath(`/schools/prefecture/${encodeURIComponent(school.prefecture)}`)}
+                className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              >
+                {school.prefecture}の通信制高校一覧を見る
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* 口コミ要約の詳細（FVと役割分担。全文・箇条書きは折りたたみ） */}
       {school.ai_summary && (() => {
@@ -288,9 +322,14 @@ export default function SchoolDetailClient({
               <h2 className="text-xl font-bold text-gray-900">口コミ要約（詳細）</h2>
             </div>
             <div className="prose prose-sm max-w-prose text-gray-700 leading-relaxed">
-              {isFewReviews && (
+              {isFewReviews && school.review_count > 0 && (
                 <p className="text-sm text-amber-700 bg-amber-50/80 rounded-lg px-3 py-2 mb-4">
                   口コミは{school.review_count}件のため、傾向の参考としてご覧ください。
+                </p>
+              )}
+              {school.review_count === 0 && (
+                <p className="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2 mb-4 border border-slate-200">
+                  口コミがまだないため、次の文章は学校の紹介・参考情報です。最終的な判断は公式サイトや説明会でご確認ください。
                 </p>
               )}
               {showDetails ? (
@@ -304,20 +343,7 @@ export default function SchoolDetailClient({
             </div>
           </div>
         );
-      })()}
-
-      {/* 学校概要（公式サイト情報） */}
-      {school.intro && (
-        <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-emerald-50 rounded-lg">
-              <School className="w-5 h-5 text-emerald-600" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900">学校概要</h2>
-          </div>
-          <p className="text-sm text-gray-700 leading-relaxed">{school.intro}</p>
-        </div>
-      )}
+      })(      )}
 
       {/* 目次（アンカー） */}
       <nav id="page-toc" className="bg-white rounded-2xl shadow-md p-4 md:p-6 mb-8 border border-gray-200" aria-label="ページ目次">
@@ -390,7 +416,33 @@ export default function SchoolDetailClient({
             </div>
           </>
         ) : school.review_count === 0 ? (
-          <p className="text-gray-500 text-sm">口コミがまだありません。</p>
+          <div className="space-y-3 text-sm text-gray-700 leading-relaxed">
+            <p className="text-gray-600">
+              口コミがまだないため、傾向の一覧はありません。学校選びでは次の点を公式情報とあわせて確認すると比較しやすくなります。
+            </p>
+            <ul className="list-disc pl-5 space-y-1.5">
+              <li>学費総額・分割納入・就学支援金の対象可否</li>
+              <li>通学型・オンライン型、スクーリングや課外の頻度</li>
+              <li>担任・サポート、不登校支援の有無と窓口</li>
+              <li>単位取得や進路指導のサポート体制</li>
+            </ul>
+            <p className="text-gray-600">
+              {school.prefecture && school.prefecture !== '不明' ? (
+                <>
+                  ページ下部の「評判の詳細・よくある質問」や、
+                  <Link
+                    href={appPath(`/schools/prefecture/${encodeURIComponent(school.prefecture)}`)}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    {school.prefecture}の通信制高校一覧
+                  </Link>
+                  もあわせてご覧ください。
+                </>
+              ) : (
+                <>ページ下部の「評判の詳細・よくある質問」もあわせてご覧ください。</>
+              )}
+            </p>
+          </div>
         ) : (
           <p className="text-gray-500 text-sm">要約はまだ公開されていません。口コミ一覧をご覧ください。</p>
         )}
@@ -410,6 +462,16 @@ export default function SchoolDetailClient({
             >
               口コミを投稿する
             </SurveyCtaLink>
+            {school.review_count === 0 && school.prefecture && school.prefecture !== '不明' && (
+              <p className="mt-5 text-sm text-gray-600">
+                <Link
+                  href={appPath(`/schools/prefecture/${encodeURIComponent(school.prefecture)}`)}
+                  className="text-blue-600 hover:underline font-medium"
+                >
+                  {school.prefecture}の通信制高校を一覧で比較する
+                </Link>
+              </p>
+            )}
           </div>
         ) : (
           <Tabs
@@ -748,7 +810,7 @@ export default function SchoolDetailClient({
                       {!openSeoAccordion[key] ? (
                         <>
                           <p className="text-slate-600 text-sm leading-relaxed line-clamp-3 whitespace-pre-wrap">
-                            {school.seo_sections[key].trim() || 'まだ口コミが十分に集まっていません。'}
+                            {school.seo_sections[key].trim() || emptySeoOrFaqHint}
                           </p>
                           <span className="mt-2 inline-block text-sm font-medium text-blue-600">続きを読む</span>
                         </>
@@ -793,7 +855,7 @@ export default function SchoolDetailClient({
                       <p className="text-slate-600 text-sm leading-relaxed line-clamp-3">
                         {faqItemsForDisplay[0]
                           ? `${faqItemsForDisplay[0].displayQuestion}${faqItemsForDisplay[0].answer ? ` — ${faqItemsForDisplay[0].answer.slice(0, 60)}…` : ''}`
-                          : 'まだ口コミが十分に集まっていません。'}
+                          : emptySeoOrFaqHint}
                       </p>
                       <span className="mt-2 inline-block text-sm font-medium text-blue-600">続きを読む</span>
                     </>
@@ -807,7 +869,7 @@ export default function SchoolDetailClient({
                             <div key={i} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
                               <h4 className="text-sm font-semibold text-gray-900 mb-1">{item.displayQuestion}</h4>
                               <p className={`text-gray-700 text-sm leading-relaxed ${expanded ? '' : 'line-clamp-2'}`}>
-                                {item.answer.trim() || 'まだ口コミが十分に集まっていません。'}
+                                {item.answer.trim() || emptySeoOrFaqHint}
                               </p>
                               <button
                                 type="button"

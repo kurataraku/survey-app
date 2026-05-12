@@ -13,7 +13,10 @@ type SchoolCardGlobalAverages = NonNullable<
 interface PrefectureLandingPageProps {
   prefecture: string;
   introLead: string;
-  topByReviews: SearchSchool[];
+  /** 都道府県内の掲載校総数 */
+  totalSchools: number;
+  /** 口コミが1件以上ある学校数 */
+  schoolsWithReviewsCount: number;
   topByRating: SearchSchool[];
   /** 項目別評価のサイト平均との差表示用（トップの注目の学校と同様） */
   globalAverages: SchoolCardGlobalAverages | null;
@@ -28,7 +31,6 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
     { href: appPath(`/schools?prefecture=${prefParam}`), label: '条件を変えて検索' },
     { href: appPath('/rankings'), label: 'ランキング一覧' },
     { href: appPath('/rankings/overall'), label: '総合評判' },
-    { href: appPath('/rankings/review-count'), label: '口コミ数' },
     { href: appPath('/rankings/tuition'), label: '学費満足度' },
     { href: appPath('/reviews'), label: '最新口コミ' },
   ];
@@ -51,7 +53,8 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
 export default function PrefectureLandingPage({
   prefecture,
   introLead,
-  topByReviews,
+  totalSchools,
+  schoolsWithReviewsCount,
   topByRating,
   globalAverages,
   children,
@@ -69,44 +72,31 @@ export default function PrefectureLandingPage({
 
         {hasSchools && (
           <>
-            <p className="text-gray-600 text-sm sm:text-base leading-relaxed max-w-3xl mb-8">{introLead}</p>
+            <p className="text-gray-600 text-sm sm:text-base leading-relaxed max-w-3xl mb-4">{introLead}</p>
 
-            <section className="mb-10" aria-labelledby="pref-highlights-reviews">
-              <h2 id="pref-highlights-reviews" className="text-xl font-bold text-gray-900 mb-4">
-                口コミが多い通信制高校
+            <p className="text-sm text-gray-700 mb-6 rounded-lg border border-gray-200 bg-white px-4 py-3 max-w-3xl">
+              <span className="font-medium text-gray-900">掲載校</span> {totalSchools}校
+              <span className="mx-2 text-gray-300">｜</span>
+              <span className="font-medium text-gray-900">口コミ掲載あり</span> {schoolsWithReviewsCount}校
+            </p>
+
+            <section
+              className="mb-10 rounded-xl border border-gray-200 bg-white p-5 md:p-6 max-w-3xl"
+              aria-labelledby="pref-guide-heading"
+            >
+              <h2 id="pref-guide-heading" className="text-lg font-bold text-gray-900 mb-3">
+                {prefecture}で通信制高校を選ぶときのポイント
               </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                {prefecture}で回答件数が多く、参考になりやすい学校です。
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {topByReviews.map((school) => (
-                  <SchoolCardServer
-                    key={school.id}
-                    id={school.id}
-                    name={school.name}
-                    prefecture={school.prefecture}
-                    hidePrefectureUnderFilter
-                    slug={school.slug}
-                    highlights={school.highlights ?? undefined}
-                    intro={school.intro ?? undefined}
-                    reviewCount={school.review_count}
-                    overallAvg={school.overall_avg}
-                    staffAvg={school.staff_avg ?? undefined}
-                    atmosphereAvg={school.atmosphere_avg ?? undefined}
-                    creditAvg={school.credit_avg ?? undefined}
-                    tuitionAvg={school.tuition_avg ?? undefined}
-                    latestGoodComment={school.latest_good_comment ?? undefined}
-                    latestBadComment={school.latest_bad_comment ?? undefined}
-                    reviewTendency={school.review_tendency ?? undefined}
-                    globalAverages={globalAverages ?? undefined}
-                  />
-                ))}
-              </div>
+              <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700 leading-relaxed">
+                <li>学費・サポート・通学やスクーリングの頻度など、優先したい条件を決めてから一覧で比較すると選びやすくなります。</li>
+                <li>口コミが少ない学校でも、学校概要や所在地などの基本情報を確認してから公式サイトで最新情報を照合してください。</li>
+                <li>総合満足度が高い学校は、口コミが一定件数あるうえで平均が高い順に並んでいます（参考情報としてご利用ください）。</li>
+              </ul>
             </section>
 
             <section className="mb-10" aria-labelledby="pref-highlights-rating">
               <h2 id="pref-highlights-rating" className="text-xl font-bold text-gray-900 mb-4">
-                評判が高い通信制高校
+                総合満足度が高い通信制高校
               </h2>
               <p className="text-sm text-gray-600 mb-4">
                 口コミが{PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING}件以上あり、総合満足度の平均が高い順です。
@@ -121,6 +111,7 @@ export default function PrefectureLandingPage({
                       id={school.id}
                       name={school.name}
                       prefecture={school.prefecture}
+                      matchedPrefecture={prefecture}
                       hidePrefectureUnderFilter
                       slug={school.slug}
                       highlights={school.highlights ?? undefined}

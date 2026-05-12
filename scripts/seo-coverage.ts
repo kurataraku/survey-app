@@ -1,8 +1,7 @@
 /**
- * SEO カバレッジ集計（公開校数・AI要約 published 件数・公開記事数）
+ * SEO カバレッジ集計（公開校数・学校紹介 intro の有無・AI要約 published 件数・公開記事数）
  * 使い方: npx tsx scripts/seo-coverage.ts
- */
-import * as path from 'path';
+ */import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
@@ -61,10 +60,20 @@ async function main() {
     .select('id', { count: 'exact', head: true })
     .eq('prefecture', '不明');
 
+  /** 学校紹介（intro）が1文字以上ある公開校（口コミなし校の掲載情報の目安） */
+  const { count: introNonEmpty } = await supabase
+    .from('schools')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active')
+    .eq('is_public', true)
+    .not('intro', 'is', null)
+    .neq('intro', '');
+
   console.log(JSON.stringify(
     {
       timestamp: new Date().toISOString(),
       schools_active_public: activeSchools ?? 0,
+      schools_intro_nonempty: introNonEmpty ?? 0,
       ai_summaries_overall_published: publishedOverall ?? 0,
       ai_summaries_overall_draft: draftOverall ?? 0,
       ai_summaries_seo_rows_published: publishedSeo ?? 0,

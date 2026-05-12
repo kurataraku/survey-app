@@ -6,7 +6,7 @@ export function buildPrefectureFaqItems(prefecture: string): { question: string;
   return [
     {
       question: `${prefecture}で通信制高校を選ぶときのポイントは？`,
-      answer: `${prefecture}内の通信制高校は、学費・サポート体制・通学やスクーリングの頻度、自分のペースで進められるかなど、優先したい条件が人によって異なります。当サイトでは口コミ件数や満足度の傾向も参考にできるので、まずは気になる学校の詳細ページで実際の声を読み比べることをおすすめします。`,
+      answer: `${prefecture}内の通信制高校は、学費・サポート体制・通学やスクーリングの頻度、自分のペースで進められるかなど、優先したい条件が人によって異なります。一覧で学校概要を比較し、気になる学校の詳細ページで口コミや満足度の傾向もあわせて確認することをおすすめします。`,
     },
     {
       question: `${prefecture}の通信制高校は何校ありますか？`,
@@ -28,7 +28,6 @@ export function buildPrefectureFaqItems(prefecture: string): { question: string;
 export function buildPrefectureLandingJsonLd(params: {
   prefecture: string;
   page: number;
-  pageSize: number;
   schools: SchoolRow[];
   total: number;
 }): Record<string, unknown> {
@@ -39,12 +38,11 @@ export function buildPrefectureLandingJsonLd(params: {
       ? `${appBase}/schools/prefecture/${prefEnc}?page=${params.page}`
       : `${appBase}/schools/prefecture/${prefEnc}`;
 
-  const startRank = (params.page - 1) * params.pageSize;
   const itemListElements = params.schools
     .filter((s) => s.slug)
     .map((school, index) => ({
       '@type': 'ListItem' as const,
-      position: startRank + index + 1,
+      position: index + 1,
       name: school.name,
       url: `${appBase}/schools/${school.slug}`,
     }));
@@ -58,7 +56,7 @@ export function buildPrefectureLandingJsonLd(params: {
         '@type': 'CollectionPage',
         name: `${params.prefecture}の通信制高校`,
         url: pageUrl,
-        description: `${params.prefecture}の通信制高校を口コミ・評判から比較できます。`,
+        description: `${params.prefecture}の通信制高校を一覧で比較し、各校の概要や口コミ・評判も確認できます。`,
         isPartOf: { '@type': 'WebSite', name: '通信制高校リアルレビュー', url: appBase },
         numberOfItems: params.total,
       },

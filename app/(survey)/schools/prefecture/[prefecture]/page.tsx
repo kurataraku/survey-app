@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 import StructuredData from '@/components/StructuredData';
 import { buildPrefectureLandingJsonLd } from '@/lib/prefectures/prefecture-landing-schema';
+import { PREFECTURE_LANDING_PAGE_SIZE } from '@/lib/schools/prefecture-landing-constants';
 
 export const revalidate = 3600;
 
@@ -30,15 +31,23 @@ function getStr(v: string | string[] | undefined): string {
   return Array.isArray(v) ? v[0] ?? '' : v;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+function parsePositivePage(v: string | string[] | undefined): number {
+  const raw = parseInt(getStr(v) || '1', 10);
+  return Number.isFinite(raw) && raw >= 1 ? raw : 1;
+}
+
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
   const resolved = params instanceof Promise ? await params : params;
+  const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const prefecture = decodeURIComponent(resolved.prefecture);
   if (!prefectures.includes(prefecture)) {
     return { title: 'ページが見つかりません' };
   }
-  const title = `${prefecture}の通信制高校【口コミ・評判】｜通信制高校リアルレビュー`;
-  const description = `${prefecture}の通信制高校を口コミ・評判から比較できます。口コミが多い学校・評判の高い学校のピックアップと、${prefecture}内の学校一覧です。`;
-  const canonical = `${getAppBaseUrl()}/schools/prefecture/${encodeURIComponent(prefecture)}`;
+  const page = parsePositivePage(resolvedSearch.page);
+  const title = `${prefecture}の通信制高校一覧【比較・口コミ】｜通信制高校リアルレビュー`;
+  const description = `${prefecture}の通信制高校を一覧で比較できます。総合満足度が高い学校のピックアップと、学校概要・口コミ・評判をあわせて確認できます。`;
+  const base = `${getAppBaseUrl()}/schools/prefecture/${encodeURIComponent(prefecture)}`;
+  const canonical = page > 1 ? `${base}?page=${page}` : base;
   return {
     title,
     description,
@@ -50,7 +59,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
   const resolvedParams = params instanceof Promise ? await params : params;
   const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
   const prefecture = decodeURIComponent(resolvedParams.prefecture);
-  const page = parseInt(getStr(resolvedSearch.page) || '1', 10);
+  const page = parsePositivePage(resolvedSearch.page);
 
   if (!prefectures.includes(prefecture)) {
     notFound();
@@ -58,7 +67,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
   const [highlights, data, globalAverages] = await Promise.all([
     getPrefectureLandingHighlights(prefecture),
-    searchSchools({ prefecture, page, limit: 40 }),
+    searchSchools({ prefecture, page, limit: PREFECTURE_LANDING_PAGE_SIZE }),
     getCachedGlobalAverages(),
   ]);
 
@@ -80,7 +89,6 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
       ? buildPrefectureLandingJsonLd({
           prefecture,
           page,
-          pageSize: 20,
           schools: data.schools.map((s) => ({ id: s.id, name: s.name, slug: s.slug })),
           total: data.total,
         })
@@ -92,7 +100,8 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
     <PrefectureLandingPage
       prefecture={prefecture}
       introLead={introLead}
-      topByReviews={highlights.topByReviews}
+      totalSchools={data.total}
+      schoolsWithReviewsCount={highlights.schoolsWithReviewsCount}
       topByRating={highlights.topByRating}
       globalAverages={globalAverages}
       hasSchools={hasSchools}
@@ -114,6 +123,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
                 id={school.id}
                 name={school.name}
                 prefecture={school.prefecture}
+                matchedPrefecture={prefecture}
                 hidePrefectureUnderFilter
                 slug={school.slug}
                 highlights={school.highlights}
