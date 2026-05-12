@@ -2,6 +2,7 @@ import Link from 'next/link';
 import SchoolCardServer from '@/components/SchoolCardServer';
 import SchoolsPageFilters from './SchoolsPageFilters';
 import { searchSchools } from '@/lib/schools/searchSchools';
+import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 import { appPath } from '@/lib/base-path';
 import type { Metadata } from 'next';
@@ -33,15 +34,18 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
   const minReviewCount = resolved.min_review_count ? parseInt(getStr(resolved.min_review_count), 10) : null;
   const sort = getStr(resolved.sort) || DEFAULT_SCHOOL_LIST_SORT;
 
-  const data = await searchSchools({
-    q,
-    page,
-    limit: 20,
-    prefecture,
-    min_rating: Number.isNaN(minRating) ? null : minRating,
-    min_review_count: Number.isNaN(minReviewCount) ? null : minReviewCount,
-    sort,
-  });
+  const [data, globalAverages] = await Promise.all([
+    searchSchools({
+      q,
+      page,
+      limit: 20,
+      prefecture,
+      min_rating: Number.isNaN(minRating) ? null : minRating,
+      min_review_count: Number.isNaN(minReviewCount) ? null : minReviewCount,
+      sort,
+    }),
+    getCachedGlobalAverages(),
+  ]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -86,8 +90,18 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
                   prefecture={school.prefecture}
                   hidePrefectureUnderFilter={Boolean(prefecture.trim())}
                   slug={school.slug}
+                  highlights={school.highlights}
+                  intro={school.intro}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
+                  latestGoodComment={school.latest_good_comment ?? undefined}
+                  latestBadComment={school.latest_bad_comment ?? undefined}
+                  staffAvg={school.staff_avg ?? undefined}
+                  atmosphereAvg={school.atmosphere_avg ?? undefined}
+                  creditAvg={school.credit_avg ?? undefined}
+                  tuitionAvg={school.tuition_avg ?? undefined}
+                  reviewTendency={school.review_tendency ?? undefined}
+                  globalAverages={globalAverages}
                 />
               ))}
             </div>

@@ -87,6 +87,8 @@ export default function PrefectureLandingPage({
                     prefecture={school.prefecture}
                     hidePrefectureUnderFilter
                     slug={school.slug}
+                    highlights={school.highlights ?? undefined}
+                    intro={school.intro ?? undefined}
                     reviewCount={school.review_count}
                     overallAvg={school.overall_avg}
                     staffAvg={school.staff_avg ?? undefined}
@@ -95,6 +97,7 @@ export default function PrefectureLandingPage({
                     tuitionAvg={school.tuition_avg ?? undefined}
                     latestGoodComment={school.latest_good_comment ?? undefined}
                     latestBadComment={school.latest_bad_comment ?? undefined}
+                    reviewTendency={school.review_tendency ?? undefined}
                     globalAverages={globalAverages ?? undefined}
                   />
                 ))}
@@ -120,6 +123,8 @@ export default function PrefectureLandingPage({
                       prefecture={school.prefecture}
                       hidePrefectureUnderFilter
                       slug={school.slug}
+                      highlights={school.highlights ?? undefined}
+                      intro={school.intro ?? undefined}
                       reviewCount={school.review_count}
                       overallAvg={school.overall_avg}
                       staffAvg={school.staff_avg ?? undefined}
@@ -128,6 +133,7 @@ export default function PrefectureLandingPage({
                       tuitionAvg={school.tuition_avg ?? undefined}
                       latestGoodComment={school.latest_good_comment ?? undefined}
                       latestBadComment={school.latest_bad_comment ?? undefined}
+                      reviewTendency={school.review_tendency ?? undefined}
                       globalAverages={globalAverages ?? undefined}
                     />
                   ))}

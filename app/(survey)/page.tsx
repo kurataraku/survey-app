@@ -51,6 +51,8 @@ export default async function Home() {
                   prefecture={school.prefecture}
                   prefectures={school.prefectures || undefined}
                   slug={school.slug}
+                  highlights={school.highlights ?? undefined}
+                  intro={school.intro ?? undefined}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
                   staffAvg={school.staff_avg ?? undefined}
@@ -59,6 +61,7 @@ export default async function Home() {
                   tuitionAvg={school.tuition_avg ?? undefined}
                   latestGoodComment={school.latest_good_comment ?? undefined}
                   latestBadComment={school.latest_bad_comment ?? undefined}
+                  reviewTendency={school.review_tendency ?? undefined}
                   globalAverages={data.schoolCardGlobalAverages ?? undefined}
                 />
               ))}

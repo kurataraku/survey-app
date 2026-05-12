@@ -3,6 +3,7 @@ import Link from 'next/link';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import SchoolCardServer from '@/components/SchoolCardServer';
 import { getArticleBySlug } from '@/lib/articles/getArticleBySlug';
+import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { getArticleSlugs } from '@/lib/articles/getArticleSlugs';
 import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
@@ -47,7 +48,10 @@ export default async function ArticleDetailPage({ params }: PageProps) {
   const encodedSlug = resolved.slug;
   const slug = decodeURIComponent(encodedSlug);
 
-  const article = await getArticleBySlug(slug);
+  const [article, globalAverages] = await Promise.all([
+    getArticleBySlug(slug),
+    getCachedGlobalAverages(),
+  ]);
 
   if (!article) {
     notFound();
@@ -146,8 +150,18 @@ export default async function ArticleDetailPage({ params }: PageProps) {
                       name={school.name}
                       prefecture={school.prefecture}
                       slug={school.slug}
-                      reviewCount={school.review_count || 0}
-                      overallAvg={school.overall_avg || null}
+                      highlights={school.highlights}
+                      intro={school.intro}
+                      reviewCount={school.review_count}
+                      overallAvg={school.overall_avg}
+                      latestGoodComment={school.latest_good_comment ?? undefined}
+                      latestBadComment={school.latest_bad_comment ?? undefined}
+                      staffAvg={school.staff_avg ?? undefined}
+                      atmosphereAvg={school.atmosphere_avg ?? undefined}
+                      creditAvg={school.credit_avg ?? undefined}
+                      tuitionAvg={school.tuition_avg ?? undefined}
+                      reviewTendency={school.review_tendency ?? undefined}
+                      globalAverages={globalAverages}
                     />
                     {articleSchool.note && (
                       <p className="mt-2 text-sm text-gray-600">{articleSchool.note}</p>

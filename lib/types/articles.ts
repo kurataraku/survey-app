@@ -1,3 +1,5 @@
+import type { SearchSchool } from '@/lib/schools/searchSchools';
+
 export type ArticleCategory = 'interview' | 'useful_info';
 
 export interface Article {
@@ -23,14 +25,8 @@ export interface ArticleSchool {
   school_id: string;
   display_order: number;
   note: string | null;
-  school?: {
-    id: string;
-    name: string;
-    prefecture: string;
-    slug: string | null;
-    review_count?: number;
-    overall_avg?: number | null;
-  };
+  /** searchSchools と同様の統計付き（特集カードの厚い表示用） */
+  school?: SearchSchool;
 }
 
 export interface ArticleFormData {

@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
+import { getSearchSchoolsByIds } from '@/lib/schools/searchSchools';
 
 /** 学校カードの「サイト平均との差」表示用（1時間キャッシュ） */
 export type SchoolCardGlobalAverages = {
@@ -10,106 +11,6 @@ export type SchoolCardGlobalAverages = {
   credit_rating_avg: number | null;
   tuition_rating_avg: number | null;
 };
-
-function parseSurveyDimensionRating(val: unknown): number | null {
-  const n = typeof val === 'string' ? parseInt(val, 10) : typeof val === 'number' ? val : NaN;
-  return !isNaN(n) && n >= 1 && n <= 5 && n !== 6 ? n : null;
-}
-
-function averageRatingRounded(values: number[]): number | null {
-  if (values.length === 0) return null;
-  return parseFloat((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2));
-}
-
-type PopularAgg = {
-  staff: number[];
-  atmosphere: number[];
-  credit: number[];
-  tuition: number[];
-  latestGood: { text: string; ts: string } | null;
-  latestBad: { text: string; ts: string } | null;
-};
-
-type PopularSchoolCardExtras = {
-  staff_avg: number | null;
-  atmosphere_avg: number | null;
-  credit_avg: number | null;
-  tuition_avg: number | null;
-  latest_good_comment: string | null;
-  latest_bad_comment: string | null;
-};
-
-function buildPopularSchoolCardExtras(
-  rows: Array<{
-    school_id?: string | null;
-    answers?: unknown;
-    good_comment?: string | null;
-    bad_comment?: string | null;
-    created_at?: string | null;
-  }>
-): Map<string, PopularSchoolCardExtras> {
-  const map = new Map<string, PopularAgg>();
-
-  const ensure = (id: string): PopularAgg => {
-    if (!map.has(id)) {
-      map.set(id, {
-        staff: [],
-        atmosphere: [],
-        credit: [],
-        tuition: [],
-        latestGood: null,
-        latestBad: null,
-      });
-    }
-    return map.get(id)!;
-  };
-
-  for (const r of rows) {
-    const sid = r.school_id;
-    if (!sid) continue;
-    const s = ensure(sid);
-    const ts = r.created_at || '';
-
-    if (r.good_comment?.trim()) {
-      const text = r.good_comment.trim();
-      if (!s.latestGood || ts > s.latestGood.ts) s.latestGood = { text, ts };
-    }
-    if (r.bad_comment?.trim()) {
-      const text = r.bad_comment.trim();
-      if (!s.latestBad || ts > s.latestBad.ts) s.latestBad = { text, ts };
-    }
-
-    try {
-      if (r.answers) {
-        const ans = typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers;
-        const o = ans as Record<string, unknown>;
-        const sr = parseSurveyDimensionRating(o.staff_rating);
-        if (sr !== null) s.staff.push(sr);
-        const ar = parseSurveyDimensionRating(o.atmosphere_fit_rating);
-        if (ar !== null) s.atmosphere.push(ar);
-        const cr = parseSurveyDimensionRating(o.credit_rating);
-        if (cr !== null) s.credit.push(cr);
-        const tr = parseSurveyDimensionRating(o.tuition_rating);
-        if (tr !== null) s.tuition.push(tr);
-      }
-    } catch {
-      // ignore malformed answers
-    }
-  }
-
-  const out = new Map<string, PopularSchoolCardExtras>();
-  for (const [id, agg] of map) {
-    out.set(id, {
-      staff_avg: averageRatingRounded(agg.staff),
-      atmosphere_avg: averageRatingRounded(agg.atmosphere),
-      credit_avg: averageRatingRounded(agg.credit),
-      tuition_avg: averageRatingRounded(agg.tuition),
-      latest_good_comment: agg.latestGood?.text ?? null,
-      latest_bad_comment: agg.latestBad?.text ?? null,
-    });
-  }
-  return out;
-}
 
 export interface HomeData {
   topRankedSchools: Array<{
@@ -135,6 +36,9 @@ export interface HomeData {
     tuition_avg?: number | null;
     latest_good_comment?: string | null;
     latest_bad_comment?: string | null;
+    highlights?: string[] | null;
+    intro?: string | null;
+    review_tendency?: { good: string[]; improvement: string[] } | null;
   }>;
   /** 注目の学校カード用（サイト平均との比較） */
   schoolCardGlobalAverages: SchoolCardGlobalAverages | null;
@@ -415,7 +319,7 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
 
     const popularIds = popularSchools.map((s) => s.id);
 
-    const [articlesResult, schoolCardGlobalAverages, popularReviewsResult] = await Promise.all([
+    const [articlesResult, schoolCardGlobalAverages, popularSnapMap] = await Promise.all([
       supabase
         .from('articles')
         .select('id, title, slug, excerpt, featured_image_url, published_at, category')
@@ -423,42 +327,27 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
         .order('published_at', { ascending: false })
         .limit(3),
       getCachedGlobalAverages(),
-      popularIds.length > 0
-        ? supabase
-            .from('survey_responses')
-            .select('school_id, answers, good_comment, bad_comment, created_at')
-            .in('school_id', popularIds)
-            .eq('is_public', true)
-        : Promise.resolve({ data: [] as unknown[], error: null }),
+      getSearchSchoolsByIds(popularIds),
     ]);
 
-    if (popularReviewsResult.error) {
-      console.error('[getHomeData] popular school reviews:', popularReviewsResult.error);
-    }
-
-    const popularExtras = buildPopularSchoolCardExtras(
-      (popularReviewsResult.data || []) as Array<{
-        school_id?: string | null;
-        answers?: unknown;
-        good_comment?: string | null;
-        bad_comment?: string | null;
-        created_at?: string | null;
-      }>
-    );
-
-    const emptyCardExtra: PopularSchoolCardExtras = {
-      staff_avg: null,
-      atmosphere_avg: null,
-      credit_avg: null,
-      tuition_avg: null,
-      latest_good_comment: null,
-      latest_bad_comment: null,
-    };
-
-    const popularSchoolsEnriched = popularSchools.map((school) => ({
-      ...school,
-      ...(popularExtras.get(school.id) ?? emptyCardExtra),
-    }));
+    const popularSchoolsEnriched = popularSchools.map((row) => {
+      const snap = popularSnapMap.get(row.id);
+      if (snap) {
+        return { ...snap, prefectures: row.prefectures };
+      }
+      return {
+        ...row,
+        staff_avg: null,
+        atmosphere_avg: null,
+        credit_avg: null,
+        tuition_avg: null,
+        latest_good_comment: null,
+        latest_bad_comment: null,
+        highlights: null,
+        intro: null,
+        review_tendency: null,
+      };
+    });
 
     const totalSchoolCount = allSchools.length;
     const totalReviewCount = allReviewsStats.length;
