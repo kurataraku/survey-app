@@ -93,7 +93,6 @@ export default function RankingCardServer({
   atmosphereAvg,
   creditAvg,
   tuitionAvg,
-  overallAvg,
   latestGoodComment,
   latestBadComment,
   reviewTendency,
@@ -119,7 +118,6 @@ export default function RankingCardServer({
 
   const ga = globalAverages;
   const categoryRatings = [
-    { label: '総合', value: overallAvg, globalAvg: ga?.overall_satisfaction_avg ?? null },
     { label: '先生', value: staffAvg, globalAvg: ga?.staff_rating_avg ?? null },
     { label: '雰囲気', value: atmosphereAvg, globalAvg: ga?.atmosphere_fit_rating_avg ?? null },
     { label: '単位取得', value: creditAvg, globalAvg: ga?.credit_rating_avg ?? null },

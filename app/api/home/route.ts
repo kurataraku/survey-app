@@ -19,6 +19,7 @@ export async function GET() {
         latestArticles: [],
         totalSchoolCount: 0,
         totalReviewCount: 0,
+        schoolCardGlobalAverages: null,
         error: 'サーバーエラーが発生しました',
       },
       { status: 200 }

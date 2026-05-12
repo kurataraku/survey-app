@@ -53,6 +53,13 @@ export default async function Home() {
                   slug={school.slug}
                   reviewCount={school.review_count}
                   overallAvg={school.overall_avg}
+                  staffAvg={school.staff_avg ?? undefined}
+                  atmosphereAvg={school.atmosphere_avg ?? undefined}
+                  creditAvg={school.credit_avg ?? undefined}
+                  tuitionAvg={school.tuition_avg ?? undefined}
+                  latestGoodComment={school.latest_good_comment ?? undefined}
+                  latestBadComment={school.latest_bad_comment ?? undefined}
+                  globalAverages={data.schoolCardGlobalAverages ?? undefined}
                 />
               ))}
             </div>
