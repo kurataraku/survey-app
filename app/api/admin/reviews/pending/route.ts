@@ -20,9 +20,12 @@ export async function GET(request: NextRequest) {
       school_id,
       respondent_role,
       status,
+      graduation_path,
+      graduation_path_other,
       overall_satisfaction,
       good_comment,
       bad_comment,
+      answers,
       email,
       is_duplicate_email,
       moderation_status,
@@ -42,7 +45,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // danger_scoreでソート（高い順）
   const sorted = (reviews ?? []).sort((a, b) => {
     const scoreA = (a.review_moderation_results as any)?.[0]?.danger_score ?? -1;
     const scoreB = (b.review_moderation_results as any)?.[0]?.danger_score ?? -1;

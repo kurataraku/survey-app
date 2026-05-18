@@ -3,6 +3,7 @@ import SchoolCardServer from '@/components/SchoolCardServer';
 import ReviewCardServer from '@/components/ReviewCardServer';
 import ArticleCardServer from '@/components/ArticleCardServer';
 import HomeHero from '@/components/HomeHero';
+import HomeCampaignBanner from '@/components/HomeCampaignBanner';
 import { getHomeData } from '@/lib/home/getHomeData';
 import { appPath } from '@/lib/base-path';
 
@@ -24,6 +25,9 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <HomeHero />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-0">
+        <HomeCampaignBanner />
+      </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {data.popularSchools.length > 0 && (
           <section className="mb-12">

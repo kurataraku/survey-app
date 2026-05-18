@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendApprovedEmail, sendCampaignGrantEmail } from '@/lib/email/sender';
-import { issueQuoCardPay } from '@/lib/quocard/client';
+import { requireAdmin } from '@/lib/auth/admin';
+import { sendApprovedEmail } from '@/lib/email/sender';
 import { publicReviewUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
 import { resolveSchoolIdFromSchoolName } from '@/lib/reviews/schoolReviewLinkage';
 
@@ -13,10 +13,16 @@ function getSupabase() {
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAdmin(request);
+  if (authResult instanceof NextResponse) return authResult;
+
   const { id } = await params;
+  const body = await request.json().catch(() => ({}));
+  const giftUrl: string | undefined = body.gift_url || undefined;
+
   const supabase = getSupabase();
 
   const { data: before, error: beforeErr } = await supabase
@@ -54,48 +60,40 @@ export async function POST(
     return NextResponse.json({ error: '承認に失敗しました' }, { status: 500 });
   }
 
-  // メール送信（重複でない場合のみ）
+  console.log('[approve] email:', review.email, 'is_duplicate:', review.is_duplicate_email);
+
   if (review.email && !review.is_duplicate_email) {
-    // アクティブなキャンペーンを確認
     const { data: campaign } = await supabase
       .from('campaigns')
-      .select('id, title, reward_amount')
+      .select('id, reward_amount')
       .eq('is_active', true)
       .lte('starts_at', new Date().toISOString())
       .gte('ends_at', new Date().toISOString())
       .limit(1)
       .single();
 
-    if (campaign) {
-      // QUOカードPay発行
-      const grantResult = await issueQuoCardPay(campaign.reward_amount, review.email);
+    console.log('[approve] campaign:', campaign ? campaign.id : 'none');
 
+    if (campaign) {
+      // gift_url が渡された場合は即 sent、なければ pending（未配布タブに残す）
       await supabase.from('campaign_grants').insert({
         campaign_id: campaign.id,
         survey_response_id: id,
         email: review.email,
-        gift_code: grantResult.gift_code ?? null,
-        sent_at: grantResult.success ? new Date().toISOString() : null,
-        status: grantResult.success ? 'sent' : 'failed',
-        error_message: grantResult.error ?? null,
-      });
-
-      await sendCampaignGrantEmail({
-        to: review.email,
-        schoolName: review.school_name,
-        rewardAmount: campaign.reward_amount,
-        surveyResponseId: id,
-        supabase,
-      });
-    } else {
-      // キャンペーン外: 通常の承認メール
-      await sendApprovedEmail({
-        to: review.email,
-        schoolName: review.school_name,
-        surveyResponseId: id,
-        supabase,
+        gift_code: giftUrl ?? null,
+        sent_at: giftUrl ? new Date().toISOString() : null,
+        status: giftUrl ? 'sent' : 'pending',
+        error_message: null,
       });
     }
+
+    await sendApprovedEmail({
+      to: review.email,
+      schoolName: review.school_name,
+      surveyResponseId: id,
+      giftUrl,
+      supabase,
+    });
   }
 
   await submitIndexNowUrls([publicReviewUrl(id)]);

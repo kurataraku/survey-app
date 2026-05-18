@@ -59,6 +59,18 @@ export default function AdminHeader() {
             </Link>
             <nav className="flex space-x-4">
               <Link
+                href={appPath('/admin/reviews')}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                口コミ管理
+              </Link>
+              <Link
+                href={appPath('/admin/campaigns')}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                キャンペーン
+              </Link>
+              <Link
                 href={appPath('/admin/schools')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
