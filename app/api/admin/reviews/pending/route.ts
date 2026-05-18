@@ -45,11 +45,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const sorted = (reviews ?? []).sort((a, b) => {
-    const scoreA = (a.review_moderation_results as any)?.[0]?.danger_score ?? -1;
-    const scoreB = (b.review_moderation_results as any)?.[0]?.danger_score ?? -1;
-    return scoreB - scoreA;
-  });
-
-  return NextResponse.json({ reviews: sorted, total: count ?? 0, page, limit });
+  return NextResponse.json({ reviews: reviews ?? [], total: count ?? 0, page, limit });
 }

@@ -338,7 +338,7 @@ export default function ReviewModerationPage() {
         {/* 承認待ちタブ */}
         {tab === 'pending' && (
           <>
-            <p className="text-sm text-gray-500 mb-4">承認待ち {total} 件（危険度の高い順）</p>
+            <p className="text-sm text-gray-500 mb-4">承認待ち {total} 件（投稿日時の新しい順）</p>
             {loadingReviews ? (
               <p className="text-gray-500 text-center py-12">読み込み中...</p>
             ) : reviews.length === 0 ? (
