@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { surveySchema, SurveyFormData } from '@/lib/schema';
 import { normalizeAnswers } from '@/lib/normalizeAnswers';
@@ -237,13 +237,20 @@ export async function POST(request: NextRequest) {
 
     if (savedResponse?.id) {
       const moderationUrl = `${process.env.AGENT_BASE_URL ?? ''}/api/admin/reviews/${savedResponse.id}/moderate`;
-      fetch(moderationUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.AGENT_API_KEY ?? '',
-        },
-      }).catch((e) => console.error('[submit] モデレーション起動失敗:', e));
+      const moderationId = savedResponse.id;
+      after(async () => {
+        try {
+          await fetch(moderationUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.AGENT_API_KEY ?? '',
+            },
+          });
+        } catch (e) {
+          console.error('[submit] モデレーション起動失敗:', moderationId, e);
+        }
+      });
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
