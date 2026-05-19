@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
 import { prefectures } from '@/lib/prefectures';
 
-const REVIEW_FETCH_PAGE = 2000;
+const PAGE_SIZE = 1000;
+const REVIEW_LIMIT = 1000;
 
 function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitemap {
   return [
@@ -47,12 +48,6 @@ function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitema
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/survey`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    },
-    {
       url: `${baseUrl}/terms`,
       lastModified: new Date(),
       changeFrequency: 'yearly',
@@ -86,13 +81,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const { data: schools } = await supabase
-    .from('schools')
-    .select('slug, updated_at')
-    .eq('status', 'active')
-    .not('slug', 'is', null);
+  // 学校: 全件取得（ページネーション）
+  let schoolFrom = 0;
+  for (;;) {
+    const { data: schools, error } = await supabase
+      .from('schools')
+      .select('slug, updated_at')
+      .eq('status', 'active')
+      .not('slug', 'is', null)
+      .order('slug')
+      .range(schoolFrom, schoolFrom + PAGE_SIZE - 1);
 
-  if (schools) {
+    if (error || !schools?.length) break;
+
     for (const school of schools) {
       if (!school.slug) continue;
       out.push({
@@ -108,14 +109,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.85,
       });
     }
+
+    if (schools.length < PAGE_SIZE) break;
+    schoolFrom += PAGE_SIZE;
   }
 
-  const { data: articles } = await supabase
-    .from('articles')
-    .select('slug, updated_at')
-    .eq('is_public', true);
+  // 記事: 全件取得（ページネーション）
+  let articleFrom = 0;
+  for (;;) {
+    const { data: articles, error } = await supabase
+      .from('articles')
+      .select('slug, updated_at')
+      .eq('is_public', true)
+      .order('slug')
+      .range(articleFrom, articleFrom + PAGE_SIZE - 1);
 
-  if (articles) {
+    if (error || !articles?.length) break;
+
     for (const article of articles) {
       out.push({
         url: `${baseUrl}/features/${article.slug}`,
@@ -124,24 +134,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.8,
       });
     }
+
+    if (articles.length < PAGE_SIZE) break;
+    articleFrom += PAGE_SIZE;
   }
 
-  let from = 0;
-  while (true) {
-    const { data: reviews, error } = await supabase
-      .from('survey_responses')
-      .select('id, created_at')
-      .eq('is_public', true)
-      .not('school_id', 'is', null)
-      .order('created_at', { ascending: false })
-      .range(from, from + REVIEW_FETCH_PAGE - 1);
+  // 口コミ詳細: 最新 REVIEW_LIMIT 件のみ
+  const { data: reviews, error: reviewError } = await supabase
+    .from('survey_responses')
+    .select('id, created_at')
+    .eq('is_public', true)
+    .not('school_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(REVIEW_LIMIT);
 
-    if (error) {
-      console.error('Sitemap reviews fetch error:', error);
-      break;
-    }
-    if (!reviews?.length) break;
-
+  if (!reviewError && reviews?.length) {
     for (const review of reviews) {
       out.push({
         url: `${baseUrl}/reviews/${review.id}`,
@@ -150,9 +157,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       });
     }
-
-    if (reviews.length < REVIEW_FETCH_PAGE) break;
-    from += REVIEW_FETCH_PAGE;
   }
 
   return out;
