@@ -61,6 +61,7 @@ interface PendingGrant {
   campaign_id: string;
   email: string;
   status: 'pending' | 'sent';
+  gift_code: string | null;
   created_at: string;
   sent_at: string | null;
   survey_responses: { id: string; school_name: string } | null;
@@ -522,6 +523,7 @@ export default function ReviewModerationPage() {
                       <th className="text-left px-4 py-3 font-medium text-gray-600">メールアドレス</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">キャンペーン</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">承認日時</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600">QUOカードPay URL</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">ステータス</th>
                       <th className="px-4 py-3"></th>
                     </tr>
@@ -538,6 +540,17 @@ export default function ReviewModerationPage() {
                         </td>
                         <td className="px-4 py-3 text-gray-500 text-xs">
                           {new Date(grant.created_at).toLocaleString('ja-JP')}
+                        </td>
+                        <td className="px-4 py-3 text-xs max-w-xs">
+                          {grant.gift_code ? (
+                            <a href={grant.gift_code} target="_blank" rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline break-all"
+                            >
+                              {grant.gift_code}
+                            </a>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           {grant.status === 'sent' ? (

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       campaign_id,
       email,
       status,
+      gift_code,
       created_at,
       sent_at,
       survey_responses (
