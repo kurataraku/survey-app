@@ -23,6 +23,7 @@ interface Answers {
   enrollment_type?: string;
   enrollment_year?: string;
   attendance_frequency?: string;
+  campus_prefecture?: string;
   teaching_style?: string[];
   student_atmosphere?: string[];
   atmosphere_other?: string;
@@ -156,6 +157,7 @@ function AnswerDetail({ review }: { review: PendingReview }) {
               {a.enrollment_year && <div className="flex gap-2"><span className="text-gray-500 shrink-0">入学年</span><span className="text-gray-800">{a.enrollment_year}年</span></div>}
               {a.enrollment_type && <div className="flex gap-2"><span className="text-gray-500 shrink-0">入学タイプ</span><span className="text-gray-800">{a.enrollment_type}</span></div>}
               {a.attendance_frequency && <div className="flex gap-2"><span className="text-gray-500 shrink-0">通学頻度</span><span className="text-gray-800">{a.attendance_frequency}</span></div>}
+              {a.campus_prefecture && <div className="flex gap-2"><span className="text-gray-500 shrink-0">都道府県</span><span className="text-gray-800">{a.campus_prefecture}</span></div>}
               {review.graduation_path && <div className="flex gap-2"><span className="text-gray-500 shrink-0">卒業後の進路</span><span className="text-gray-800">{review.graduation_path}{review.graduation_path_other ? `（${review.graduation_path_other}）` : ''}</span></div>}
             </div>
           </div>
