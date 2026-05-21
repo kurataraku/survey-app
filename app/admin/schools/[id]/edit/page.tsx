@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SchoolEditor from '@/components/SchoolEditor';
@@ -9,6 +9,7 @@ import AISummaryEditor from '@/components/AISummaryEditor';
 import SeoSectionsEditor from '@/components/SeoSectionsEditor';
 import { SchoolFormData, School } from '@/lib/types/schools';
 import { apiPath, appPath } from '@/lib/base-path';
+import { normalizeSearchQuery } from '@/lib/utils';
 
 interface PrefectureStat {
   prefecture: string;
@@ -32,8 +33,22 @@ export default function EditSchoolPage() {
   const [newAlias, setNewAlias] = useState('');
   const [isAddingAlias, setIsAddingAlias] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeSearch, setMergeSearch] = useState('');
   const [isMerging, setIsMerging] = useState(false);
   const [allSchools, setAllSchools] = useState<Array<{ id: string; name: string }>>([]);
+
+  const filteredMergeSchools = useMemo(() => {
+    const q = normalizeSearchQuery(mergeSearch.trim());
+    if (!q) return [];
+    return allSchools.filter((s) =>
+      normalizeSearchQuery(s.name).includes(q)
+    );
+  }, [allSchools, mergeSearch]);
+
+  const selectedMergeSchool = useMemo(
+    () => allSchools.find((s) => s.id === mergeTargetId) ?? null,
+    [allSchools, mergeTargetId]
+  );
 
   useEffect(() => {
     fetchSchool();
@@ -439,26 +454,72 @@ export default function EditSchoolPage() {
                   <p className="text-sm text-red-700 mb-4">
                     この学校を他の学校に統合します。統合後、この学校のstatusは「merged」に変更され、すべての口コミデータが統合先の学校に移動します。この操作は取り消せません。
                   </p>
-                  <div className="flex gap-2">
-                    <label htmlFor="merge-target" className="sr-only">
-                      統合先の学校を選択
-                    </label>
-                    <select
-                      id="merge-target"
-                      name="merge-target"
-                      value={mergeTargetId}
-                      onChange={(e) => setMergeTargetId(e.target.value)}
-                      autoComplete="off"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                    >
-                      <option value="">統合先の学校を選択</option>
-                      {allSchools.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-3">
+                    <div>
+                      <label htmlFor="merge-target-search" className="block text-sm font-medium text-red-900 mb-1">
+                        統合先の学校を検索
+                      </label>
+                      <input
+                        id="merge-target-search"
+                        name="merge-target-search"
+                        type="text"
+                        value={mergeSearch}
+                        onChange={(e) => setMergeSearch(e.target.value)}
+                        placeholder="学校名の一部を入力（例: 未来）"
+                        autoComplete="off"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm bg-white"
+                      />
+                    </div>
+
+                    {selectedMergeSchool && (
+                      <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border border-red-300 rounded-lg text-sm">
+                        <span className="text-red-900">
+                          選択中: <span className="font-medium">{selectedMergeSchool.name}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setMergeTargetId('')}
+                          className="shrink-0 text-red-600 hover:text-red-800"
+                        >
+                          解除
+                        </button>
+                      </div>
+                    )}
+
+                    {mergeSearch.trim() ? (
+                      filteredMergeSchools.length > 0 ? (
+                        <ul
+                          className="max-h-48 overflow-y-auto border border-gray-300 rounded-lg bg-white divide-y divide-gray-200"
+                          role="listbox"
+                          aria-label="統合先の学校"
+                        >
+                          {filteredMergeSchools.map((s) => (
+                            <li key={s.id}>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={mergeTargetId === s.id}
+                                onClick={() => setMergeTargetId(s.id)}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-red-50 ${
+                                  mergeTargetId === s.id ? 'bg-red-100 font-medium' : 'text-gray-900'
+                                }`}
+                              >
+                                {s.name}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-red-700">該当する学校がありません</p>
+                      )
+                    ) : (
+                      <p className="text-sm text-red-600">
+                        学校名を入力すると候補が表示されます
+                      </p>
+                    )}
+
                     <button
+                      type="button"
                       onClick={handleMerge}
                       disabled={!mergeTargetId || isMerging}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
