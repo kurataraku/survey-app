@@ -77,6 +77,7 @@ export const getReviewById = cache(
 
     const baseSelect = `
         id,
+        school_id,
         school_name,
         respondent_role,
         status,
@@ -117,14 +118,38 @@ export const getReviewById = cache(
     }
 
     let schoolSlug: string | null = null;
-    if (review.school_name) {
+    let schoolName = review.school_name;
+    if (review.school_id) {
       try {
         const { data: school } = await supabase
           .from('schools')
-          .select('slug, name')
+          .select('slug, name, status, is_public')
+          .eq('id', review.school_id)
+          .single();
+        if (school) {
+          if (requirePublic && (school.status !== 'active' || !school.is_public)) {
+            return null;
+          }
+          schoolSlug = school.slug || null;
+          schoolName = school.name;
+        }
+      } catch {
+        // ignore
+      }
+    } else if (review.school_name) {
+      try {
+        const { data: school } = await supabase
+          .from('schools')
+          .select('slug, name, status, is_public')
           .eq('name', review.school_name)
           .single();
-        if (school) schoolSlug = school.slug || null;
+        if (school) {
+          if (requirePublic && (school.status !== 'active' || !school.is_public)) {
+            return null;
+          }
+          schoolSlug = school.slug || null;
+          schoolName = school.name;
+        }
       } catch {
         // ignore
       }
@@ -215,8 +240,8 @@ export const getReviewById = cache(
 
     return {
       id: review.id,
-      school_id: null,
-      school_name: review.school_name,
+      school_id: review.school_id || null,
+      school_name: schoolName,
       school_slug: schoolSlug,
       respondent_role: review.respondent_role,
       status: review.status,

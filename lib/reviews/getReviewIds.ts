@@ -16,9 +16,11 @@ export const getReviewIds = cache(async (): Promise<{ id: string }[]> => {
 
   const { data, error } = await supabase
     .from('survey_responses')
-    .select('id')
+    .select('id, school_id, schools!inner(status, is_public)')
     .eq('is_public', true)
-    .not('school_id', 'is', null);
+    .not('school_id', 'is', null)
+    .eq('schools.status', 'active')
+    .eq('schools.is_public', true);
 
   if (error) {
     console.error('[getReviewIds]', error);
@@ -26,6 +28,6 @@ export const getReviewIds = cache(async (): Promise<{ id: string }[]> => {
   }
 
   return (data || [])
-    .filter((row): row is { id: string } => !!row?.id)
-    .map((row) => ({ id: row.id }));
+    .filter((row) => !!row?.id)
+    .map((row) => ({ id: row.id as string }));
 });
