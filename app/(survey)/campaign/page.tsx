@@ -192,7 +192,7 @@ export default async function CampaignPage() {
 
         {/* Target summary */}
         <section className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 px-4 py-3 sm:p-8 shadow-sm">
-          <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-2 sm:mb-4 whitespace-nowrap">こんな方にご参加ください</h2>
+          <h2 className="text-base sm:text-xl font-bold text-gray-900 mb-2 sm:mb-4 whitespace-nowrap">参加対象</h2>
           <ul className="space-y-1 sm:space-y-3 text-gray-700 text-xs sm:text-base">
             <li className="flex gap-1.5 sm:gap-2">
               <span className="text-orange-500 font-bold shrink-0">✓</span>
