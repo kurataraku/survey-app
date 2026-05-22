@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { getSearchSchoolsByIds } from '@/lib/schools/searchSchools';
+import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
 /** 学校カードの「サイト平均との差」表示用（1時間キャッシュ） */
 export type SchoolCardGlobalAverages = {
@@ -18,6 +19,8 @@ export interface HomeData {
     name: string;
     prefecture: string;
     prefectures?: string[] | null;
+    institution_type?: SchoolInstitutionType | null;
+    campus_locations?: SchoolCampusLocation[] | null;
     slug: string | null;
     review_count: number;
     overall_avg: number | null;
@@ -27,6 +30,8 @@ export interface HomeData {
     name: string;
     prefecture: string;
     prefectures?: string[] | null;
+    institution_type?: SchoolInstitutionType | null;
+    campus_locations?: SchoolCampusLocation[] | null;
     slug: string | null;
     review_count: number;
     overall_avg: number | null;
@@ -105,12 +110,13 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
       name: string;
       prefecture: string;
       prefectures?: string[] | null;
+      campus_locations?: unknown;
       slug: string | null;
     }> | null = null;
 
     const resultWithPrefectures = await supabase
       .from('schools')
-      .select('id, name, prefecture, prefectures, slug, status')
+      .select('id, name, prefecture, prefectures, campus_locations, slug, status')
       .eq('is_public', true)
       .eq('status', 'active');
 
@@ -191,6 +197,17 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
         school.prefectures && Array.isArray(school.prefectures) && school.prefectures.length > 0
           ? school.prefectures
           : null;
+      const campusLocations = Array.isArray(school.campus_locations)
+        ? school.campus_locations
+            .map((location) => {
+              if (!location || typeof location !== 'object') return null;
+              const record = location as Record<string, unknown>;
+              const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
+              const city = typeof record.city === 'string' ? record.city.trim() : '';
+              return prefecture && city ? { prefecture, city } : null;
+            })
+            .filter((location): location is SchoolCampusLocation => Boolean(location))
+        : null;
       const stats = statsMap.get(school.id) || {
         count: 0,
         sum: 0,
@@ -205,6 +222,7 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
         name: school.name,
         prefecture: school.prefecture,
         prefectures: prefecturesArray,
+        campus_locations: campusLocations && campusLocations.length > 0 ? campusLocations : null,
         slug: school.slug,
         review_count: stats.count,
         overall_avg: overallAvg,
@@ -333,10 +351,12 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
     const popularSchoolsEnriched = popularSchools.map((row) => {
       const snap = popularSnapMap.get(row.id);
       if (snap) {
-        return { ...snap, prefectures: row.prefectures };
+        return { ...snap, prefectures: row.prefectures, campus_locations: row.campus_locations };
       }
       return {
         ...row,
+        institution_type: null,
+        campus_locations: row.campus_locations ?? null,
         staff_avg: null,
         atmosphere_avg: null,
         credit_avg: null,

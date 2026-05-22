@@ -121,6 +121,7 @@ export default function SchoolDetailClient({
         name={school.name}
         prefecture={school.prefecture}
         prefectures={school.prefectures || undefined}
+        campusLocations={school.campus_locations}
         slug={encodedSlug}
         overallAvg={school.overall_avg}
         reviewCount={school.review_count}

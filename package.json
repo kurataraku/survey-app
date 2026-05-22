@@ -21,7 +21,9 @@
     "generate:highlights": "tsx scripts/generate-school-highlights.ts",
     "publish:draft-summaries": "tsx scripts/publish-draft-summaries.ts",
     "indexnow:schools": "tsx scripts/indexnow-submit-schools.ts",
-    "list:schools-unpublished-reviews": "tsx scripts/list-schools-unpublished-reviews.ts"
+    "list:schools-unpublished-reviews": "tsx scripts/list-schools-unpublished-reviews.ts",
+    "classify:institution-types": "tsx scripts/classify-school-institution-types.ts",
+    "populate:campus-locations": "tsx scripts/populate-school-campus-locations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

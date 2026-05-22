@@ -27,6 +27,8 @@ export default function SchoolEditor({
     name: initialData?.name || '',
     prefecture: initialData?.prefecture || '',
     prefectures: initialData?.prefectures || (initialData?.prefecture ? [initialData.prefecture] : []),
+    institution_type: initialData?.institution_type || '',
+    campus_locations: initialData?.campus_locations || [],
     slug: initialData?.slug || '',
     intro: initialData?.intro || '',
     highlights: initialData?.highlights || [],
@@ -161,6 +163,119 @@ export default function SchoolEditor({
         <p className="mt-1 text-sm text-gray-500">
           選択された都道府県: {formData.prefectures?.length || 0}件
         </p>
+      </fieldset>
+
+      <div>
+        <label htmlFor="institution_type" className="block text-sm font-medium text-gray-700 mb-1">
+          設置区分
+        </label>
+        <select
+          id="institution_type"
+          name="institution_type"
+          value={formData.institution_type}
+          onChange={(e) =>
+            setFormData((prev) => ({
+              ...prev,
+              institution_type: e.target.value as SchoolFormData['institution_type'],
+            }))
+          }
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">未設定</option>
+          <option value="public">公立通信制高校</option>
+          <option value="private">私立通信制高校</option>
+          <option value="support">サポート校</option>
+        </select>
+        <p className="mt-1 text-sm text-gray-500">
+          都道府県ページで設置区分ごとの学校表示に使用します。
+        </p>
+      </div>
+
+      <fieldset>
+        <legend className="block text-sm font-medium text-gray-700 mb-2">
+          キャンパス所在地（市区町村）
+        </legend>
+        <p className="text-sm text-gray-500 mb-3">
+          都道府県ページや学校詳細で、市区町村バッジとして表示します。同じ都道府県に複数キャンパスがある場合は複数追加してください。
+        </p>
+        <div className="flex justify-end mb-2">
+          <button
+            type="button"
+            onClick={() =>
+              setFormData((prev) => ({
+                ...prev,
+                campus_locations: [
+                  ...prev.campus_locations,
+                  { prefecture: prev.prefecture || '', city: '' },
+                ],
+              }))
+            }
+            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            追加
+          </button>
+        </div>
+        <div className="space-y-3">
+          {formData.campus_locations.map((location, index) => (
+            <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end border border-gray-200 rounded-lg p-3">
+              <div>
+                <label htmlFor={`campus-location-prefecture-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                  都道府県
+                </label>
+                <select
+                  id={`campus-location-prefecture-${index}`}
+                  value={location.prefecture}
+                  onChange={(e) => {
+                    const next = [...formData.campus_locations];
+                    next[index] = { ...next[index], prefecture: e.target.value };
+                    setFormData((prev) => ({ ...prev, campus_locations: next }));
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">選択してください</option>
+                  {prefectures.map((pref) => (
+                    <option key={pref} value={pref}>
+                      {pref}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor={`campus-location-city-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                  市区町村
+                </label>
+                <input
+                  id={`campus-location-city-${index}`}
+                  type="text"
+                  value={location.city}
+                  onChange={(e) => {
+                    const next = [...formData.campus_locations];
+                    next[index] = { ...next[index], city: e.target.value };
+                    setFormData((prev) => ({ ...prev, campus_locations: next }));
+                  }}
+                  placeholder="例: 新宿区"
+                  autoComplete="address-level2"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    campus_locations: prev.campus_locations.filter((_, i) => i !== index),
+                  }))
+                }
+                className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50"
+              >
+                削除
+              </button>
+            </div>
+          ))}
+          {formData.campus_locations.length === 0 && (
+            <p className="text-sm text-gray-500">所在地は未登録です。追加ボタンで登録できます。</p>
+          )}
+        </div>
       </fieldset>
 
       <div>

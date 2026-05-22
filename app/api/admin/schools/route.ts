@@ -129,6 +129,8 @@ export async function POST(request: NextRequest) {
       name,
       prefecture,
       prefectures,
+      institution_type,
+      campus_locations,
       slug,
       intro,
       highlights,
@@ -148,6 +150,14 @@ export async function POST(request: NextRequest) {
     const prefecturesArray = prefectures && Array.isArray(prefectures) && prefectures.length > 0
       ? prefectures
       : [prefecture];
+    const campusLocationsArray = Array.isArray(campus_locations)
+      ? campus_locations
+          .map((location) => ({
+            prefecture: String(location?.prefecture || '').trim(),
+            city: String(location?.city || '').trim(),
+          }))
+          .filter((location) => location.prefecture && location.city)
+      : [];
 
     const nameNormalized = normalizeText(String(name));
 
@@ -205,6 +215,8 @@ export async function POST(request: NextRequest) {
       name_normalized: nameNormalized,
       prefecture,
       prefectures: prefecturesArray,
+      institution_type: institution_type || null,
+      campus_locations: campusLocationsArray,
       slug,
       intro: intro || null,
       highlights: highlights || null,

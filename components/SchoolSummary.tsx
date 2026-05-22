@@ -7,6 +7,7 @@ import Badge from './ui/Badge';
 import { appPath } from '@/lib/base-path';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 import { CheckCircle2, XCircle, Bus } from 'lucide-react';
+import type { SchoolCampusLocation } from '@/lib/types/schools';
 
 function ratingVsGlobalLabel(
   value: number | null,
@@ -26,6 +27,7 @@ interface SchoolSummaryProps {
   name: string;
   prefecture: string;
   prefectures?: string[];
+  campusLocations?: SchoolCampusLocation[] | null;
   slug: string;
   overallAvg: number | null;
   reviewCount: number;
@@ -56,6 +58,7 @@ export default function SchoolSummary({
   name,
   prefecture,
   prefectures,
+  campusLocations,
   slug,
   overallAvg,
   reviewCount,
@@ -88,6 +91,9 @@ export default function SchoolSummary({
     });
   }
   const displayPrefectures = Array.from(allPrefecturesSet);
+  const campusCities = Array.from(
+    new Set((campusLocations ?? []).map((location) => `${location.prefecture}${location.city}`))
+  );
 
   const showTuitionCommuteTrend =
     reviewCount >= MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND &&
@@ -120,6 +126,21 @@ export default function SchoolSummary({
             </Badge>
           ))}
         </div>
+        {campusCities.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold text-gray-500 mb-1">キャンパス所在地</p>
+            <div className="flex flex-wrap gap-1.5">
+              {campusCities.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-100"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {reviewCount === 0 && (
           <p className="text-sm text-gray-600 leading-relaxed max-w-2xl mt-3">
             口コミはまだありません。掲載の学校概要やページ内の説明・よくある質問を参考にし、学費・サポート・通学形態は必ず学校公式サイトで最新情報をご確認ください。

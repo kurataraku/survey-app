@@ -149,6 +149,8 @@ export default async function ArticleDetailPage({ params }: PageProps) {
                       id={school.id}
                       name={school.name}
                       prefecture={school.prefecture}
+                      institutionType={school.institution_type}
+                      campusLocations={school.campus_locations}
                       prefectures={school.prefectures ?? undefined}
                       slug={school.slug}
                       highlights={school.highlights}

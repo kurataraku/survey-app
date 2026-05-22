@@ -5,6 +5,7 @@ import {
   publicSurveyResponsesOrFilter,
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
+import type { SchoolCampusLocation } from '@/lib/types/schools';
 
 export interface SchoolWithStats {
   id: string;
@@ -33,6 +34,7 @@ export interface SchoolWithStats {
   career_support_rating_avg?: number | null;
   campus_life_rating_avg?: number | null;
   prefectures?: string[] | null;
+  campus_locations?: SchoolCampusLocation[] | null;
   global_averages?: {
     overall_satisfaction_avg: number | null;
     flexibility_rating_avg: number | null;
@@ -163,6 +165,20 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
   if (schoolError || !school) {
     return null;
   }
+
+  const campusLocations = Array.isArray(school.campus_locations)
+    ? school.campus_locations
+        .map((location: unknown) => {
+          if (!location || typeof location !== 'object') return null;
+          const record = location as Record<string, unknown>;
+          const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
+          const city = typeof record.city === 'string' ? record.city.trim() : '';
+          return prefecture && city ? { prefecture, city } : null;
+        })
+        .filter((location: SchoolCampusLocation | null): location is SchoolCampusLocation =>
+          Boolean(location)
+        )
+    : null;
 
   const reviewSelect =
     'id, school_id, school_name, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers, schools(id, status)';
@@ -383,6 +399,7 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
     name: school.name,
     prefecture: school.prefecture,
     prefectures: school.prefectures || (school.prefecture ? [school.prefecture] : []),
+    campus_locations: campusLocations && campusLocations.length > 0 ? campusLocations : null,
     slug: school.slug,
     intro: school.intro,
     highlights: school.highlights,

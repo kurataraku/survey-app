@@ -1,26 +1,51 @@
 import { getAppBaseUrl } from '@/lib/env-check';
+import {
+  getPrefectureLandingCollectionDescription,
+  getPrefectureLandingItemListDescription,
+} from '@/lib/prefectures/prefecture-landing-copy';
 
 type SchoolRow = { id: string; name: string; slug: string | null };
 
-export function buildPrefectureFaqItems(prefecture: string): { question: string; answer: string }[] {
+export type PrefectureFaqStats = {
+  totalSchools?: number;
+  schoolsWithReviewsCount?: number;
+  totalReviewCount?: number;
+  averageOverallSatisfaction?: number | null;
+};
+
+export function buildPrefectureFaqItems(
+  prefecture: string,
+  stats?: PrefectureFaqStats
+): { question: string; answer: string }[] {
   return [
     {
-      question: `${prefecture}で通信制高校を選ぶときのポイントは？`,
-      answer: `${prefecture}内の通信制高校は、学費・サポート体制・通学やスクーリングの頻度、自分のペースで進められるかなど、優先したい条件が人によって異なります。一覧で学校概要を比較し、気になる学校の詳細ページで口コミや満足度の傾向もあわせて確認することをおすすめします。`,
+      question: `${prefecture}で通信制高校を選ぶとき、まず何を比較すればいいですか？`,
+      answer: `${prefecture}の通信制高校は、キャンパスの場所、通学頻度、オンライン学習の有無、先生・職員の対応、学費、卒業までのサポート体制を比べるのがおすすめです。このページでは、口コミの良かった点・改善してほしい点と、項目別の満足度をあわせて確認できます。`,
     },
     {
-      question: `${prefecture}の通信制高校は何校ありますか？`,
-      answer: `掲載校数は随時更新しています。このページの一覧で${prefecture}に所在する通信制高校の件数をご確認いただけます。`,
-    },
-    {
-      question: '不登校・不登校気味でも通える学校はありますか？',
+      question: `${prefecture}の通信制高校は、毎日通う必要がありますか？`,
       answer:
-        '通信制高校には多様な支援スタイルがあります。口コミの「雰囲気」「先生対応」「通いやすさ」などの項目や、学校ごとの紹介文・よくある質問をあわせて確認してください。',
+        '学校やコースによって異なります。週5で通える学校もあれば、週1〜2日、月数回、オンライン中心で学べる学校もあります。口コミでは、実際の通学頻度やキャンパスでの過ごしやすさ、オンライン学習の進めやすさを確認してみてください。',
     },
     {
-      question: '学費や支援制度の情報はどこで見られますか？',
+      question: '公立・私立・サポート校はどう違いますか？',
       answer:
-        '各校の詳細ページでは口コミから見える学費満足度の傾向などを掲載しています。最新の学費表や就学支援金は必ず学校公式サイトでご確認ください。',
+        '公立は学費を抑えやすい一方で、自分で学習を進める力が必要になることがあります。私立は通学コースやオンライン、個別サポートなど選択肢が広い傾向があります。サポート校は、提携する通信制高校の卒業を目指しながら、学習・生活・進路面の支援を受ける施設です。',
+    },
+    {
+      question: `${prefecture}で学費が気になる場合、どこを見ればいいですか？`,
+      answer:
+        '学費は授業料だけでなく、通学コース費、サポート費、教材費、スクーリング費、行事費などを含めて確認する必要があります。このページでは学費満足度の高い学校や、口コミ内の「学費の納得感」に関する声を参考にできます。最終的な金額は必ず学校公式サイトや募集要項で確認してください。',
+    },
+    {
+      question: '口コミを見るときは、どんな点に注目すればいいですか？',
+      answer:
+        `総合満足度だけでなく、良かった点と改善してほしい点の両方を見るのがおすすめです。特に${prefecture}で通学を考える場合は、先生の対応、在校生の雰囲気、単位取得のしやすさ、進路サポート、学費の納得感など、自分が重視したい項目を比べてください。`,
+    },
+    {
+      question: '不登校経験や体調面の不安がある場合、どんな学校を選ぶとよいですか？',
+      answer:
+        '無理なく通える頻度を選べるか、オンライン学習に対応しているか、先生や職員に相談しやすいか、体調に合わせて学習計画を調整できるかを確認すると安心です。口コミでは、先生対応・サポート体制・学校の雰囲気に関する声を重点的に見ると、自分に合う環境を判断しやすくなります。',
     },
   ];
 }
@@ -30,6 +55,7 @@ export function buildPrefectureLandingJsonLd(params: {
   page: number;
   schools: SchoolRow[];
   total: number;
+  stats?: PrefectureFaqStats;
 }): Record<string, unknown> {
   const appBase = getAppBaseUrl().replace(/\/$/, '');
   const prefEnc = encodeURIComponent(params.prefecture);
@@ -47,22 +73,38 @@ export function buildPrefectureLandingJsonLd(params: {
       url: `${appBase}/schools/${school.slug}`,
     }));
 
-  const faqItems = buildPrefectureFaqItems(params.prefecture);
+  const faqItems = buildPrefectureFaqItems(params.prefecture, params.stats);
+
+  const breadcrumbItems = [
+    { '@type': 'ListItem' as const, position: 1, name: 'トップ', item: `${appBase}/` },
+    { '@type': 'ListItem' as const, position: 2, name: '学校一覧', item: `${appBase}/schools` },
+    {
+      '@type': 'ListItem' as const,
+      position: 3,
+      name: `${params.prefecture}の通信制高校`,
+      item: pageUrl,
+    },
+  ];
 
   return {
     '@context': 'https://schema.org',
     '@graph': [
       {
+        '@type': 'BreadcrumbList',
+        itemListElement: breadcrumbItems,
+      },
+      {
         '@type': 'CollectionPage',
-        name: `${params.prefecture}の通信制高校`,
+        name: `${params.prefecture}の通信制高校を口コミで比較`,
         url: pageUrl,
-        description: `${params.prefecture}の通信制高校を一覧で比較し、各校の概要や口コミ・評判も確認できます。`,
+        description: getPrefectureLandingCollectionDescription(params.prefecture),
         isPartOf: { '@type': 'WebSite', name: '通信制高校リアルレビュー', url: appBase },
         numberOfItems: params.total,
       },
       {
         '@type': 'ItemList',
-        name: `${params.prefecture}の通信制高校一覧（${params.page}ページ目）`,
+        name: `${params.prefecture}の通信制高校一覧（口コミ比較・${params.page}ページ目）`,
+        description: getPrefectureLandingItemListDescription(params.prefecture),
         numberOfItems: itemListElements.length,
         itemListElement: itemListElements,
       },

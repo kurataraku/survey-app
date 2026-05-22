@@ -1,8 +1,17 @@
+export type SchoolInstitutionType = 'public' | 'private' | 'support';
+
+export type SchoolCampusLocation = {
+  prefecture: string;
+  city: string;
+};
+
 export interface School {
   id: string;
   name: string;
   prefecture: string;
   prefectures?: string[]; // 複数の都道府県に対応
+  institution_type: SchoolInstitutionType | null;
+  campus_locations?: SchoolCampusLocation[] | null;
   slug: string | null;
   intro: string | null;
   highlights: string[] | null; // JSONB配列
@@ -17,6 +26,8 @@ export interface SchoolFormData {
   name: string;
   prefecture: string;
   prefectures?: string[]; // 複数の都道府県に対応
+  institution_type: SchoolInstitutionType | '';
+  campus_locations: SchoolCampusLocation[];
   slug: string;
   intro: string;
   highlights: string[];

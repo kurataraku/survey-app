@@ -78,6 +78,8 @@ export async function PUT(
       name,
       prefecture,
       prefectures,
+      institution_type,
+      campus_locations,
       slug,
       intro,
       highlights,
@@ -98,6 +100,14 @@ export async function PUT(
     const prefecturesArray = prefectures && Array.isArray(prefectures) && prefectures.length > 0
       ? prefectures
       : [prefecture];
+    const campusLocationsArray = Array.isArray(campus_locations)
+      ? campus_locations
+          .map((location) => ({
+            prefecture: String(location?.prefecture || '').trim(),
+            city: String(location?.city || '').trim(),
+          }))
+          .filter((location) => location.prefecture && location.city)
+      : [];
 
     // 学校名の重複チェック（自分自身を除く）
     const { data: nameConflict } = await supabase
@@ -134,6 +144,8 @@ export async function PUT(
       name,
       prefecture,
       prefectures: prefecturesArray,
+      institution_type: institution_type || null,
+      campus_locations: campusLocationsArray,
       slug,
       intro: intro || null,
       highlights: highlights || null,

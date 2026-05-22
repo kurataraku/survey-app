@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
 import { normalizeText } from '@/lib/utils';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
+import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
 export interface SearchSchool {
   id: string;
@@ -9,6 +10,8 @@ export interface SearchSchool {
   prefecture: string;
   /** DBの prefectures（対応都道府県）。一覧カードの所在地表示に利用 */
   prefectures: string[] | null;
+  institution_type: SchoolInstitutionType | null;
+  campus_locations: SchoolCampusLocation[] | null;
   slug: string | null;
   highlights: string[] | null;
   intro: string | null;
@@ -16,9 +19,15 @@ export interface SearchSchool {
   overall_avg: number | null;
   latest_good_comment: string | null;
   latest_bad_comment: string | null;
+  review_excerpts: Array<{ good: string | null; bad: string | null }>;
+  flexibility_avg: number | null;
   staff_avg: number | null;
+  support_avg: number | null;
   atmosphere_avg: number | null;
   credit_avg: number | null;
+  unique_course_avg: number | null;
+  career_support_avg: number | null;
+  campus_life_avg: number | null;
   tuition_avg: number | null;
   review_tendency: { good: string[]; improvement: string[] } | null;
 }
@@ -28,6 +37,8 @@ export interface SearchSchoolsParams {
   page?: number;
   limit?: number;
   prefecture?: string;
+  campus_prefecture?: string;
+  campus_city?: string;
   min_rating?: number | null;
   min_review_count?: number | null;
   sort?: string;
@@ -46,6 +57,8 @@ type SchoolEntry = {
   name: string;
   prefecture: string;
   prefectures: string[] | null;
+  institution_type: SchoolInstitutionType | null;
+  campus_locations: SchoolCampusLocation[] | null;
   status: string;
   slug: string | null;
   highlights: string[] | null;
@@ -55,6 +68,20 @@ type SchoolEntry = {
 function parseRating(val: unknown): number | null {
   const n = typeof val === 'string' ? parseInt(val, 10) : typeof val === 'number' ? val : NaN;
   return !isNaN(n) && n >= 1 && n <= 5 && n !== 6 ? n : null;
+}
+
+function normalizeCampusLocations(value: unknown): SchoolCampusLocation[] | null {
+  if (!Array.isArray(value)) return null;
+  const locations = value
+    .map((location) => {
+      if (!location || typeof location !== 'object') return null;
+      const record = location as Record<string, unknown>;
+      const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
+      const city = typeof record.city === 'string' ? record.city.trim() : '';
+      return prefecture && city ? { prefecture, city } : null;
+    })
+    .filter((location): location is SchoolCampusLocation => Boolean(location));
+  return locations.length > 0 ? locations : null;
 }
 
 type SupabaseForSchools = ReturnType<typeof createSupabaseClientWithLargeHeaders>;
@@ -88,12 +115,18 @@ async function fetchSearchSchoolsWithStats(
   type StatsEntry = {
     count: number;
     overall: number[];
+    flexibility: number[];
     staff: number[];
+    support: number[];
     atmosphere: number[];
     credit: number[];
+    uniqueCourse: number[];
+    careerSupport: number[];
+    campusLife: number[];
     tuition: number[];
     latestGoodComment: { text: string; ts: string } | null;
     latestBadComment: { text: string; ts: string } | null;
+    latestReviewExcerpts: Array<{ good: string | null; bad: string | null; ts: string }>;
   };
 
   const schoolStats = new Map<string, StatsEntry>();
@@ -101,12 +134,18 @@ async function fetchSearchSchoolsWithStats(
     schoolStats.set(id, {
       count: 0,
       overall: [],
+      flexibility: [],
       staff: [],
+      support: [],
       atmosphere: [],
       credit: [],
+      uniqueCourse: [],
+      careerSupport: [],
+      campusLife: [],
       tuition: [],
       latestGoodComment: null,
       latestBadComment: null,
+      latestReviewExcerpts: [],
     })
   );
 
@@ -128,16 +167,31 @@ async function fetchSearchSchoolsWithStats(
           s.latestBadComment = { text: r.bad_comment.trim(), ts: r.created_at };
         }
       }
+      const good = r.good_comment?.trim() || null;
+      const bad = r.bad_comment?.trim() || null;
+      if (good || bad) {
+        s.latestReviewExcerpts.push({ good, bad, ts: r.created_at });
+      }
 
       if (r.answers) {
         try {
           const ans = typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers;
+          const fr = parseRating(ans.flexibility_rating);
+          if (fr !== null) s.flexibility.push(fr);
           const sr = parseRating(ans.staff_rating);
           if (sr !== null) s.staff.push(sr);
+          const spr = parseRating(ans.support_rating);
+          if (spr !== null) s.support.push(spr);
           const ar = parseRating(ans.atmosphere_fit_rating);
           if (ar !== null) s.atmosphere.push(ar);
           const cr = parseRating(ans.credit_rating);
           if (cr !== null) s.credit.push(cr);
+          const ur = parseRating(ans.unique_course_rating);
+          if (ur !== null) s.uniqueCourse.push(ur);
+          const car = parseRating(ans.career_support_rating);
+          if (car !== null) s.careerSupport.push(car);
+          const clr = parseRating(ans.campus_life_rating);
+          if (clr !== null) s.campusLife.push(clr);
           const tr = parseRating(ans.tuition_rating);
           if (tr !== null) s.tuition.push(tr);
         } catch {
@@ -175,18 +229,30 @@ async function fetchSearchSchoolsWithStats(
       ({
         count: 0,
         overall: [] as number[],
+        flexibility: [] as number[],
         staff: [] as number[],
+        support: [] as number[],
         atmosphere: [] as number[],
         credit: [] as number[],
+        uniqueCourse: [] as number[],
+        careerSupport: [] as number[],
+        campusLife: [] as number[],
         tuition: [] as number[],
         latestGoodComment: null as { text: string; ts: string } | null,
         latestBadComment: null as { text: string; ts: string } | null,
+        latestReviewExcerpts: [] as Array<{ good: string | null; bad: string | null; ts: string }>,
       } satisfies StatsEntry);
+    const reviewExcerpts = [...s.latestReviewExcerpts]
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, 2)
+      .map(({ good, bad }) => ({ good, bad }));
     return {
       id: school.id,
       name: school.name,
       prefecture: school.prefecture,
       prefectures: school.prefectures,
+      institution_type: school.institution_type,
+      campus_locations: school.campus_locations,
       slug: school.slug,
       highlights: school.highlights,
       intro: school.intro,
@@ -194,9 +260,15 @@ async function fetchSearchSchoolsWithStats(
       overall_avg: avg(s.overall),
       latest_good_comment: s.latestGoodComment?.text ?? null,
       latest_bad_comment: s.latestBadComment?.text ?? null,
+      review_excerpts: reviewExcerpts,
+      flexibility_avg: avg(s.flexibility),
       staff_avg: avg(s.staff),
+      support_avg: avg(s.support),
       atmosphere_avg: avg(s.atmosphere),
       credit_avg: avg(s.credit),
+      unique_course_avg: avg(s.uniqueCourse),
+      career_support_avg: avg(s.careerSupport),
+      campus_life_avg: avg(s.campusLife),
       tuition_avg: avg(s.tuition),
       review_tendency: tendencyMap.get(school.id) ?? null,
     };
@@ -224,7 +296,7 @@ export const getSearchSchoolsByIds = cache(async (ids: string[]): Promise<Map<st
   const supabase = createSupabaseClientWithLargeHeaders(supabaseUrl, supabaseServiceKey);
   const { data: rows } = await supabase
     .from('schools')
-    .select('id, name, prefecture, prefectures, status, slug, highlights, intro')
+    .select('*')
     .in('id', uniqueOrdered)
     .eq('status', 'active')
     .eq('is_public', true);
@@ -239,6 +311,8 @@ export const getSearchSchoolsByIds = cache(async (ids: string[]): Promise<Map<st
       name: row.name,
       prefecture: pref,
       prefectures: Array.isArray(row.prefectures) ? row.prefectures : null,
+      institution_type: (row.institution_type as SchoolInstitutionType | null) ?? null,
+      campus_locations: normalizeCampusLocations(row.campus_locations),
       status: row.status,
       slug: row.slug,
       highlights: row.highlights ?? null,
@@ -264,6 +338,8 @@ export const searchSchools = cache(async (
     page = 1,
     limit = 20,
     prefecture = '',
+    campus_prefecture = '',
+    campus_city = '',
     min_rating = null,
     min_review_count = null,
     sort = DEFAULT_SCHOOL_LIST_SORT,
@@ -282,7 +358,7 @@ export const searchSchools = cache(async (
 
   let schoolsQuery = supabase
     .from('schools')
-    .select('id, name, prefecture, prefectures, status, slug, highlights, intro')
+    .select('*')
     .eq('status', 'active')
     .eq('is_public', true);
 
@@ -306,6 +382,8 @@ export const searchSchools = cache(async (
           name: school.name,
           prefecture: pref,
           prefectures: Array.isArray(school.prefectures) ? school.prefectures : null,
+          institution_type: (school.institution_type as SchoolInstitutionType | null) ?? null,
+          campus_locations: normalizeCampusLocations(school.campus_locations),
           status: school.status,
           slug: school.slug,
           highlights: school.highlights ?? null,
@@ -326,7 +404,7 @@ export const searchSchools = cache(async (
       const schoolIds = aliases.map((a: { school_id: string }) => a.school_id);
       let aliasQuery = supabase
         .from('schools')
-        .select('id, name, prefecture, prefectures, status, slug, highlights, intro')
+        .select('*')
         .in('id', schoolIds)
         .eq('status', 'active')
         .eq('is_public', true);
@@ -342,6 +420,8 @@ export const searchSchools = cache(async (
           name: school.name,
           prefecture: pref,
           prefectures: Array.isArray(school.prefectures) ? school.prefectures : null,
+          institution_type: (school.institution_type as SchoolInstitutionType | null) ?? null,
+          campus_locations: normalizeCampusLocations(school.campus_locations),
           status: school.status,
           slug: school.slug,
           highlights: school.highlights ?? null,
@@ -353,6 +433,19 @@ export const searchSchools = cache(async (
   }
 
   let schoolsList = Array.from(schoolMap.values()).filter((s) => s.status === 'active');
+  if (campus_prefecture) {
+    schoolsList = schoolsList.filter((school) =>
+      school.campus_locations?.some((location) => location.prefecture === campus_prefecture)
+    );
+  }
+  if (campus_city) {
+    schoolsList = schoolsList.filter((school) =>
+      school.campus_locations?.some((location) =>
+        (!campus_prefecture || location.prefecture === campus_prefecture) &&
+        location.city === campus_city
+      )
+    );
+  }
   if (schoolsList.length === 0) {
     return { schools: [], total: 0, total_pages: 0, page, limit };
   }
