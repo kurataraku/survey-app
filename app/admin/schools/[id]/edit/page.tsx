@@ -573,11 +573,16 @@ export default function EditSchoolPage() {
               </div>
 
               <SchoolEditor
+                key={school.updated_at}
                 schoolId={id}
                 initialData={{
                   name: school.name,
                   prefecture: school.prefecture,
                   prefectures: school.prefectures || (school.prefecture ? [school.prefecture] : []),
+                  institution_type: school.institution_type || '',
+                  campus_locations: Array.isArray(school.campus_locations)
+                    ? school.campus_locations
+                    : [],
                   slug: school.slug || '',
                   intro: school.intro || '',
                   highlights: school.highlights || [],
