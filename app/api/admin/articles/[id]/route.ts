@@ -231,6 +231,12 @@ export async function DELETE(
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const { data: existingArticle } = await supabase
+      .from('articles')
+      .select('slug')
+      .eq('id', id)
+      .single();
+
     // 記事を削除（CASCADEにより関連するarticle_schoolsも自動削除される）
     const { error: deleteError } = await supabase
       .from('articles')
@@ -243,6 +249,10 @@ export async function DELETE(
         { error: '記事の削除に失敗しました', details: deleteError.message },
         { status: 500 }
       );
+    }
+
+    if (existingArticle?.slug) {
+      revalidateArticleCaches(existingArticle.slug);
     }
 
     return NextResponse.json({ success: true });
