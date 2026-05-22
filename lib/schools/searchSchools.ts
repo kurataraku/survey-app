@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
-import { normalizeText } from '@/lib/utils';
+import { getNormalizedSchoolSearchTerms } from '@/lib/utils';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
@@ -353,7 +353,8 @@ export const searchSchools = cache(async (
   }
 
   const supabase = createSupabaseClientWithLargeHeaders(supabaseUrl, supabaseServiceKey);
-  const normalizedQuery = q ? normalizeText(q) : '';
+  const normalizedTerms = getNormalizedSchoolSearchTerms(q);
+  const filterTerms = normalizedTerms.filter((term) => !/[(),]/.test(term));
   const offset = (page - 1) * limit;
 
   let schoolsQuery = supabase
@@ -362,8 +363,10 @@ export const searchSchools = cache(async (
     .eq('status', 'active')
     .eq('is_public', true);
 
-  if (normalizedQuery) {
-    schoolsQuery = schoolsQuery.ilike('name_normalized', `%${normalizedQuery}%`);
+  if (filterTerms.length > 0) {
+    schoolsQuery = schoolsQuery.or(
+      filterTerms.map((term) => `name_normalized.ilike.%${term}%`).join(',')
+    );
   }
   if (prefecture) {
     schoolsQuery = schoolsQuery.or(`prefecture.eq.${prefecture},prefectures.cs.{${prefecture}}`);
@@ -393,11 +396,11 @@ export const searchSchools = cache(async (
     }
   }
 
-  if (normalizedQuery) {
+  if (filterTerms.length > 0) {
     const { data: aliases } = await supabase
       .from('school_aliases')
       .select('school_id, alias')
-      .ilike('alias_normalized', `%${normalizedQuery}%`)
+      .or(filterTerms.map((term) => `alias_normalized.ilike.%${term}%`).join(','))
       .limit(100);
 
     if (aliases?.length) {

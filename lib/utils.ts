@@ -96,6 +96,39 @@ export function normalizeText(text: string): string {
 }
 
 /**
+ * 学校検索語から、学校名として照合しやすい正規化済み候補を作る。
+ * 例: 「さくら国際高等学校 津島キャンパス（つくし学園高等学校）」
+ *   → 「さくら国際高校」も候補に含める
+ */
+export function getNormalizedSchoolSearchTerms(text: string): string[] {
+  if (!text) return [];
+
+  const terms: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: string) => {
+    const normalized = normalizeText(value);
+    if (normalized.length < 2 || seen.has(normalized)) return;
+    seen.add(normalized);
+    terms.push(normalized);
+  };
+
+  add(text);
+
+  // 空白や区切り文字で学校名とキャンパス名が分かれているケース。
+  text.split(/[\s\u3000/／｜|,，、]+/).forEach(add);
+
+  // 括弧内の運営校・別名が付いているケース。
+  add(text.split(/[（(]/)[0] ?? '');
+  add(text.replace(/[（(].*?[）)]/g, ' '));
+
+  const normalized = normalizeText(text);
+  const schoolNamePrefix = normalized.match(/^(.+?(?:高校|高等学校|高|中等教育学校|専門学校))(?:.+)?$/);
+  if (schoolNamePrefix) add(schoolNamePrefix[1]);
+
+  return terms.slice(0, 8);
+}
+
+/**
  * 文字列からslug（URL用のスラッグ）を生成する関数
  * 学校名や記事タイトルなどに使用可能
  * 

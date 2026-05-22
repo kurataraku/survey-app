@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { normalizeText } from '@/lib/utils';
+import { getNormalizedSchoolSearchTerms } from '@/lib/utils';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 
 export async function GET(request: NextRequest) {
@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // 検索クエリを正規化（qが空の場合は全件検索）
-    const normalizedQuery = q ? normalizeText(q) : '';
+    const normalizedTerms = getNormalizedSchoolSearchTerms(q);
+    const filterTerms = normalizedTerms.filter((term) => !/[(),]/.test(term));
+    const normalizedQuery = normalizedTerms[0] ?? '';
 
     // 1. schoolsテーブルでname_normalizedで検索
     // trigram類似検索を使用（pg_trgm拡張が必要）
@@ -41,8 +43,10 @@ export async function GET(request: NextRequest) {
       .eq('is_public', true);
 
     // 検索クエリがある場合は名前でフィルタリング
-    if (normalizedQuery) {
-      schoolsQuery = schoolsQuery.ilike('name_normalized', `%${normalizedQuery}%`);
+    if (filterTerms.length > 0) {
+      schoolsQuery = schoolsQuery.or(
+        filterTerms.map((term) => `name_normalized.ilike.%${term}%`).join(',')
+      );
     }
 
     // 都道府県でフィルタリング
@@ -91,11 +95,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. school_aliasesテーブルで検索（別名での検索、検索クエリがある場合のみ）
-    if (normalizedQuery) {
+    if (filterTerms.length > 0) {
       const { data: aliases, error: errorAliases } = await supabase
         .from('school_aliases')
         .select('school_id, alias')
-        .ilike('alias_normalized', `%${normalizedQuery}%`)
+        .or(filterTerms.map((term) => `alias_normalized.ilike.%${term}%`).join(','))
         .limit(100);
 
       if (errorAliases) {
@@ -104,7 +108,7 @@ export async function GET(request: NextRequest) {
 
       // school_aliasesから取得したschool_idを使って、schoolsテーブルから詳細を取得
       if (aliases && aliases.length > 0) {
-        const schoolIds = aliases.map((alias: any) => alias.school_id);
+        const schoolIds = aliases.map((alias: { school_id: string }) => alias.school_id);
         let aliasSchoolsQuery = supabase
           .from('schools')
           .select('id, name, prefecture, prefectures, status, slug')
@@ -147,7 +151,7 @@ export async function GET(request: NextRequest) {
 
 
     // 4. 配列に変換（activeのみなので、名前順でソート）
-    let schoolsList = Array.from(schoolMap.values())
+    const schoolsList = Array.from(schoolMap.values())
       .filter((school) => school.status === 'active'); // 念のため、activeのみをフィルタリング
 
     if (schoolsList.length === 0) {
@@ -246,7 +250,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 8. ソート
-    let sortedSchools = [...filteredSchools];
+    const sortedSchools = [...filteredSchools];
     if (sort === 'rating_desc') {
       sortedSchools.sort((a, b) => {
         if (a.overall_avg === null) return 1;
