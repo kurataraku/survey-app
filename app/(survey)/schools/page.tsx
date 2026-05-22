@@ -32,7 +32,6 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
   const prefecture = getStr(resolved.prefecture);
   const campusPrefecture = getStr(resolved.campus_prefecture);
   const campusCity = getStr(resolved.campus_city);
-  const minRating = resolved.min_rating ? parseFloat(getStr(resolved.min_rating)) : null;
   const minReviewCount = resolved.min_review_count ? parseInt(getStr(resolved.min_review_count), 10) : null;
   const sort = getStr(resolved.sort) || DEFAULT_SCHOOL_LIST_SORT;
 
@@ -44,7 +43,6 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
       prefecture,
       campus_prefecture: campusPrefecture,
       campus_city: campusCity,
-      min_rating: Number.isNaN(minRating) ? null : minRating,
       min_review_count: Number.isNaN(minReviewCount) ? null : minReviewCount,
       sort,
     }),
@@ -61,7 +59,6 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
             initialPrefecture={prefecture}
             initialCampusPrefecture={campusPrefecture}
             initialCampusCity={campusCity}
-            initialMinRating={Number.isNaN(minRating) ? null : minRating}
             initialMinReviewCount={Number.isNaN(minReviewCount) ? null : minReviewCount}
             initialSort={sort}
             schools={data.schools}
@@ -121,7 +118,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
               <div className="flex justify-center gap-2">
                 {page > 1 ? (
                   <Link
-                    href={buildSchoolsUrl({ q, prefecture, campusPrefecture, campusCity, minRating, minReviewCount, sort, page: page === 2 ? undefined : page - 1 })}
+                    href={buildSchoolsUrl({ q, prefecture, campusPrefecture, campusCity, minReviewCount, sort, page: page === 2 ? undefined : page - 1 })}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     前へ
@@ -134,7 +131,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
                 </span>
                 {page < data.total_pages ? (
                   <Link
-                    href={buildSchoolsUrl({ q, prefecture, campusPrefecture, campusCity, minRating, minReviewCount, sort, page: page + 1 })}
+                    href={buildSchoolsUrl({ q, prefecture, campusPrefecture, campusCity, minReviewCount, sort, page: page + 1 })}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                   >
                     次へ
@@ -156,7 +153,6 @@ function buildSchoolsUrl(params: {
   prefecture: string;
   campusPrefecture: string;
   campusCity: string;
-  minRating: number | null;
   minReviewCount: number | null;
   sort: string;
   page?: number;
@@ -166,7 +162,6 @@ function buildSchoolsUrl(params: {
   if (params.prefecture) search.set('prefecture', params.prefecture);
   if (params.campusPrefecture) search.set('campus_prefecture', params.campusPrefecture);
   if (params.campusCity) search.set('campus_city', params.campusCity);
-  if (params.minRating != null) search.set('min_rating', params.minRating.toString());
   if (params.minReviewCount != null) search.set('min_review_count', params.minReviewCount.toString());
   if (params.sort && params.sort !== DEFAULT_SCHOOL_LIST_SORT) search.set('sort', params.sort);
   if (params.page != null && params.page > 1) search.set('page', params.page.toString());

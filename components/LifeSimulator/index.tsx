@@ -11,7 +11,11 @@ import StepGuide from './StepGuide';
 
 const TOTAL_STEPS = 5; // 0=opening, 1=schoolType, 2=simulation, 3=result, 4=guide
 
-export default function LifeSimulator() {
+interface LifeSimulatorProps {
+  prefecture?: string;
+}
+
+export default function LifeSimulator({ prefecture }: LifeSimulatorProps) {
   const [state, setState] = useState<SimulatorState>({
     step: 0,
     situation: '',
@@ -164,6 +168,7 @@ export default function LifeSimulator() {
           <StepGuide
             scores={state.scores}
             attendanceStyle={state.attendanceStyle}
+            prefecture={prefecture}
             onRestart={handleRestart}
           />
         )}

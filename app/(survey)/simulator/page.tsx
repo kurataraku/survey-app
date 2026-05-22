@@ -13,6 +13,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function SimulatorPage() {
-  return <LifeSimulator />;
+interface SimulatorPageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
+}
+
+function getStr(v: string | string[] | undefined): string {
+  if (v === undefined) return '';
+  return Array.isArray(v) ? v[0] ?? '' : v;
+}
+
+export default async function SimulatorPage({ searchParams }: SimulatorPageProps) {
+  const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
+  const prefecture = getStr(resolvedSearch.prefecture);
+  return <LifeSimulator prefecture={prefecture || undefined} />;
 }

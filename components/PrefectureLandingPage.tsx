@@ -49,7 +49,7 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
   const prefParam = encodeURIComponent(prefecture);
   const links: { href: string; label: string; description: string }[] = [
     {
-      href: appPath(`/schools?prefecture=${prefParam}`),
+      href: appPath(`/schools?campus_prefecture=${prefParam}`),
       label: `${prefecture}の通信制高校を条件検索で絞り込む`,
       description: '学校名や条件を変えて、同じ地域の学校を探せます。',
     },

@@ -463,6 +463,24 @@ export const searchSchools = cache(async (
     schoolsWithStats.sort((a, b) => (b.overall_avg ?? 0) - (a.overall_avg ?? 0));
   } else if (sort === 'rating_asc') {
     schoolsWithStats.sort((a, b) => (a.overall_avg ?? 0) - (b.overall_avg ?? 0));
+  } else if (sort === 'flexibility_desc') {
+    schoolsWithStats.sort((a, b) => (b.flexibility_avg ?? 0) - (a.flexibility_avg ?? 0));
+  } else if (sort === 'staff_desc') {
+    schoolsWithStats.sort((a, b) => (b.staff_avg ?? 0) - (a.staff_avg ?? 0));
+  } else if (sort === 'support_desc') {
+    schoolsWithStats.sort((a, b) => (b.support_avg ?? 0) - (a.support_avg ?? 0));
+  } else if (sort === 'atmosphere_desc') {
+    schoolsWithStats.sort((a, b) => (b.atmosphere_avg ?? 0) - (a.atmosphere_avg ?? 0));
+  } else if (sort === 'credit_desc') {
+    schoolsWithStats.sort((a, b) => (b.credit_avg ?? 0) - (a.credit_avg ?? 0));
+  } else if (sort === 'unique_course_desc') {
+    schoolsWithStats.sort((a, b) => (b.unique_course_avg ?? 0) - (a.unique_course_avg ?? 0));
+  } else if (sort === 'career_support_desc') {
+    schoolsWithStats.sort((a, b) => (b.career_support_avg ?? 0) - (a.career_support_avg ?? 0));
+  } else if (sort === 'campus_life_desc') {
+    schoolsWithStats.sort((a, b) => (b.campus_life_avg ?? 0) - (a.campus_life_avg ?? 0));
+  } else if (sort === 'tuition_desc') {
+    schoolsWithStats.sort((a, b) => (b.tuition_avg ?? 0) - (a.tuition_avg ?? 0));
   } else if (sort === 'review_count_desc') {
     schoolsWithStats.sort((a, b) => b.review_count - a.review_count);
   } else if (sort === 'review_count_asc') {

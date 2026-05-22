@@ -4,6 +4,7 @@ import ReviewsFilter from '@/components/ReviewsFilter';
 import { getReviewsList } from '@/lib/reviews/getReviewsList';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
+import { getReviewReasonGroup } from '@/lib/reviews/reason-groups';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,6 +30,7 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
   const sort             = getStr(resolved.sort) || 'newest';
   const attendanceFrequency = getStr(resolved.attendance_frequency) || '';
   const prefecture       = getStr(resolved.prefecture) || '';
+  const reasonGroupKey   = getStr(resolved.reason_group) || '';
   const overallRating    = parseInt(getStr(resolved.overall) || '0', 10) || undefined;
   const staffRating      = parseInt(getStr(resolved.staff) || '0', 10) || undefined;
   const atmosphereRating = parseInt(getStr(resolved.atmosphere) || '0', 10) || undefined;
@@ -39,15 +41,20 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
     page, limit: 20, sort,
     attendanceFrequency: attendanceFrequency || undefined,
     prefecture: prefecture || undefined,
+    reasonGroup: reasonGroupKey || undefined,
     overallRating,
     staffRating, atmosphereRating, creditRating, tuitionRating,
   });
 
-  const filterLabel = prefecture
-    ? `「${prefecture}」の口コミ`
-    : attendanceFrequency
-      ? `「${attendanceFrequency}」の口コミ`
-      : '最新口コミ';
+  const reasonGroup = getReviewReasonGroup(reasonGroupKey);
+  const filterParts = [
+    prefecture || null,
+    reasonGroup?.shortLabel ?? null,
+    attendanceFrequency || null,
+  ].filter(Boolean);
+  const filterLabel = filterParts.length > 0
+    ? `「${filterParts.join(' × ')}」の口コミ`
+    : '最新口コミ';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -68,6 +75,8 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
           page={page}
           totalPages={data.totalPages}
           attendanceFrequency={attendanceFrequency}
+          prefecture={prefecture}
+          reasonGroup={reasonGroupKey}
           sort={sort}
         />
       </div>

@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { getReviewReasonsForGroup } from '@/lib/reviews/reason-groups';
 
 export interface ReviewListItem {
   id: string;
@@ -22,6 +23,7 @@ export interface GetReviewsListParams {
   sort?: string;
   attendanceFrequency?: string;
   prefecture?: string;
+  reasonGroup?: string;
   overallRating?: number;
   staffRating?: number;
   atmosphereRating?: number;
@@ -40,7 +42,7 @@ export interface GetReviewsListResult {
 export const getReviewsList = cache(async (
   params: GetReviewsListParams = {}
 ): Promise<GetReviewsListResult> => {
-  const { page = 1, limit = 20, sort = 'newest', attendanceFrequency, prefecture, overallRating, staffRating, atmosphereRating, creditRating, tuitionRating } = params;
+  const { page = 1, limit = 20, sort = 'newest', attendanceFrequency, prefecture, reasonGroup, overallRating, staffRating, atmosphereRating, creditRating, tuitionRating } = params;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -83,10 +85,36 @@ export const getReviewsList = cache(async (
     return { reviews: [], total: 0, page, totalPages: 0, limit };
   }
 
-  const filtered = (allReviewsData || []).filter((r: { schools: { status?: string; prefecture?: string } | { status?: string; prefecture?: string }[] | null }) => {
+  const reasonFilters = getReviewReasonsForGroup(reasonGroup);
+
+  const filtered = (allReviewsData || []).filter((r: { schools: { status?: string; prefecture?: string } | { status?: string; prefecture?: string }[] | null; answers?: unknown }) => {
     const school = Array.isArray(r.schools) ? r.schools[0] : r.schools;
     if (!school || school.status !== 'active') return false;
-    if (prefecture && school.prefecture !== prefecture) return false;
+
+    const answers = typeof r.answers === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(r.answers);
+          } catch {
+            return {};
+          }
+        })()
+      : (r.answers ?? {});
+
+    if (prefecture) {
+      const campusPrefecture = (answers as { campus_prefecture?: unknown }).campus_prefecture;
+      if (Array.isArray(campusPrefecture)) {
+        if (!campusPrefecture.includes(prefecture)) return false;
+      } else if (String(campusPrefecture ?? '').trim() !== prefecture) {
+        return false;
+      }
+    }
+    if (reasonFilters.length > 0) {
+      const reasons = Array.isArray((answers as { reason_for_choosing?: unknown }).reason_for_choosing)
+        ? ((answers as { reason_for_choosing: string[] }).reason_for_choosing)
+        : [];
+      if (!reasonFilters.some((reason) => reasons.includes(reason))) return false;
+    }
     return true;
   });
 

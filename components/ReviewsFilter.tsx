@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { appPath } from '@/lib/base-path';
+import { REVIEW_REASON_GROUPS } from '@/lib/reviews/reason-groups';
 
 const SORT_OPTIONS = [
   { value: 'newest',      label: '新着順' },
@@ -65,6 +66,7 @@ export default function ReviewsFilter() {
   const sort       = searchParams.get('sort') ?? 'newest';
   const attendance = searchParams.get('attendance_frequency') ?? '';
   const prefecture = searchParams.get('prefecture') ?? '';
+  const reasonGroup = searchParams.get('reason_group') ?? '';
   const overall    = searchParams.get('overall') ?? '';
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -142,6 +144,39 @@ export default function ReviewsFilter() {
             ))}
           </select>
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
+        </div>
+      </div>
+
+      {/* 通信制を選んだ理由 */}
+      <div>
+        <p className="text-xs font-black text-gray-400 mb-2 tracking-wide">通信制を選んだ理由</p>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={buildUrl(searchParams, { reason_group: '' })}
+            className={`text-sm font-bold px-4 py-1.5 rounded-full border-2 transition-all ${
+              reasonGroup === ''
+                ? 'bg-gray-200 text-gray-700 border-gray-200'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-sky-400 hover:text-sky-600'
+            }`}
+          >
+            ALL
+          </Link>
+          {REVIEW_REASON_GROUPS.map(group => {
+            const isActive = group.key === reasonGroup;
+            return (
+              <Link
+                key={group.key}
+                href={buildUrl(searchParams, { reason_group: group.key })}
+                className={`text-sm font-bold px-4 py-1.5 rounded-full border-2 transition-all ${
+                  isActive
+                    ? 'bg-sky-500 text-white border-sky-500'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-sky-400 hover:text-sky-600'
+                }`}
+              >
+                {group.shortLabel}
+              </Link>
+            );
+          })}
         </div>
       </div>
 

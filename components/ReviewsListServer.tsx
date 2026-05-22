@@ -8,14 +8,24 @@ interface ReviewsListServerProps {
   page: number;
   totalPages: number;
   attendanceFrequency?: string;
+  prefecture?: string;
+  reasonGroup?: string;
   sort?: string;
 }
 
-function buildPageUrl(page: number, attendanceFrequency?: string, sort?: string): string {
+function buildPageUrl(input: {
+  page: number;
+  attendanceFrequency?: string;
+  prefecture?: string;
+  reasonGroup?: string;
+  sort?: string;
+}): string {
   const params = new URLSearchParams();
-  if (page > 1) params.set('page', String(page));
-  if (attendanceFrequency) params.set('attendance_frequency', attendanceFrequency);
-  if (sort && sort !== 'newest') params.set('sort', sort);
+  if (input.page > 1) params.set('page', String(input.page));
+  if (input.attendanceFrequency) params.set('attendance_frequency', input.attendanceFrequency);
+  if (input.prefecture) params.set('prefecture', input.prefecture);
+  if (input.reasonGroup) params.set('reason_group', input.reasonGroup);
+  if (input.sort && input.sort !== 'newest') params.set('sort', input.sort);
   const qs = params.toString();
   return appPath(`/reviews${qs ? `?${qs}` : ''}`);
 }
@@ -25,6 +35,8 @@ export default function ReviewsListServer({
   page,
   totalPages,
   attendanceFrequency,
+  prefecture,
+  reasonGroup,
   sort,
 }: ReviewsListServerProps) {
   if (reviews.length === 0) {
@@ -59,7 +71,7 @@ export default function ReviewsListServer({
         <div className="flex justify-center gap-2">
           {page > 1 ? (
             <Link
-              href={buildPageUrl(page - 1, attendanceFrequency, sort)}
+              href={buildPageUrl({ page: page - 1, attendanceFrequency, prefecture, reasonGroup, sort })}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               前へ
@@ -74,7 +86,7 @@ export default function ReviewsListServer({
           </span>
           {page < totalPages ? (
             <Link
-              href={buildPageUrl(page + 1, attendanceFrequency, sort)}
+              href={buildPageUrl({ page: page + 1, attendanceFrequency, prefecture, reasonGroup, sort })}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               次へ

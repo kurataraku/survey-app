@@ -1,11 +1,12 @@
-import { buildPrefectureFaqItems } from '@/lib/prefectures/prefecture-landing-schema';
+import { buildPrefectureFaqItems, type PrefectureFaqStats } from '@/lib/prefectures/prefecture-landing-schema';
 
 interface PrefectureLandingFaqProps {
   prefecture: string;
+  stats?: PrefectureFaqStats;
 }
 
-export default function PrefectureLandingFaq({ prefecture }: PrefectureLandingFaqProps) {
-  const items = buildPrefectureFaqItems(prefecture);
+export default function PrefectureLandingFaq({ prefecture, stats }: PrefectureLandingFaqProps) {
+  const items = buildPrefectureFaqItems(prefecture, stats);
 
   return (
     <section className="mt-12 rounded-xl border border-gray-200 bg-white p-6 md:p-8" aria-labelledby="pref-faq-heading">

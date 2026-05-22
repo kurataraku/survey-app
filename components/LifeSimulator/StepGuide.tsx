@@ -2,13 +2,19 @@
 
 import Link from 'next/link';
 import type { AttendanceStyle, SimScore } from '@/lib/simulator/types';
-import { getTopAxis, resultTypes } from '@/lib/simulator/scoring';
-import { getReviewsLink, getRankingLink } from '@/lib/simulator/guide-links';
+import { getTopAxis } from '@/lib/simulator/scoring';
+import {
+  getPrefectureLandingLink,
+  getReviewsLink,
+  getSchoolsLink,
+  getRankingLink,
+} from '@/lib/simulator/guide-links';
 import { appPath } from '@/lib/base-path';
 
 interface Props {
   scores: SimScore;
   attendanceStyle: AttendanceStyle;
+  prefecture?: string;
   onRestart: () => void;
 }
 
@@ -18,35 +24,46 @@ const AXIS_LABEL: Record<string, string> = {
   community: '仲間・行事',
 };
 
-export default function StepGuide({ scores, attendanceStyle, onRestart }: Props) {
+export default function StepGuide({ scores, attendanceStyle, prefecture, onRestart }: Props) {
   const topAxis = getTopAxis(scores);
+  const hasPrefecture = Boolean(prefecture);
 
   const links = [
     {
-      href: getReviewsLink(attendanceStyle),
+      href: getReviewsLink(attendanceStyle, prefecture),
       emoji: '💬',
       title: attendanceStyle === 'commute'
-        ? '通学スタイルで通った生徒の声を読む'
-        : 'オンライン中心で通った生徒の声を読む',
-      desc: '同じ通い方をした在校生・卒業生のリアルな口コミ一覧',
+        ? `${hasPrefecture ? `${prefecture}で` : ''}通学スタイルの口コミを読む`
+        : `${hasPrefecture ? `${prefecture}で` : ''}オンライン中心の口コミを読む`,
+      desc: hasPrefecture
+        ? `${prefecture}の学校に絞って、近い通い方の口コミを確認できます`
+        : '同じ通い方をした在校生・卒業生のリアルな口コミ一覧',
       gradient: 'from-sky-400 to-blue-500',
       bg: 'bg-sky-50 border-sky-100 hover:border-sky-400',
       textColor: 'text-sky-700',
     },
     {
-      href: appPath('/schools'),
+      href: getSchoolsLink(prefecture),
       emoji: '🏫',
-      title: '全国の通信制高校一覧から探す',
-      desc: 'エリア・特色・通学スタイルで条件を絞って比較できます',
+      title: hasPrefecture ? `${prefecture}の学校一覧に戻る` : '全国の通信制高校一覧から探す',
+      desc: hasPrefecture
+        ? '診断で整理した条件をもとに、同じ地域の学校を比較できます'
+        : 'エリア・特色・通学スタイルで条件を絞って比較できます',
       gradient: 'from-violet-400 to-indigo-500',
       bg: 'bg-violet-50 border-violet-100 hover:border-violet-400',
       textColor: 'text-violet-700',
     },
     {
-      href: getRankingLink(topAxis),
+      href: hasPrefecture
+        ? getPrefectureLandingLink(prefecture!, topAxis === 'support' ? 'pref-highlights-rating' : 'pref-highlights-tuition')
+        : getRankingLink(topAxis),
       emoji: '🏆',
-      title: `「${AXIS_LABEL[topAxis]}」を重視する学校ランキング`,
-      desc: 'お子さんが一番大切にしたいポイントで学校を順位比較',
+      title: hasPrefecture
+        ? `${prefecture}の評価が高い学校を見比べる`
+        : `「${AXIS_LABEL[topAxis]}」を重視する学校ランキング`,
+      desc: hasPrefecture
+        ? '地域ページ内の満足度ピックアップに戻って比較できます'
+        : 'お子さんが一番大切にしたいポイントで学校を順位比較',
       gradient: 'from-emerald-400 to-teal-500',
       bg: 'bg-emerald-50 border-emerald-100 hover:border-emerald-400',
       textColor: 'text-emerald-700',
