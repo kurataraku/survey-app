@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
+import { normalizeText } from '@/lib/utils';
 
 export async function GET(
   request: NextRequest,
@@ -124,6 +125,21 @@ export async function PUT(
       );
     }
 
+    const nameNormalized = normalizeText(name);
+    const { data: normalizedConflict } = await supabase
+      .from('schools')
+      .select('id')
+      .eq('name_normalized', nameNormalized)
+      .neq('id', id)
+      .maybeSingle();
+
+    if (normalizedConflict) {
+      return NextResponse.json(
+        { error: 'この学校名は既存校と正規化後に同一になるため登録できません（表記を変えてください）' },
+        { status: 400 }
+      );
+    }
+
     // スラッグの重複チェック（自分自身を除く）
     const { data: slugConflict } = await supabase
       .from('schools')
@@ -142,6 +158,7 @@ export async function PUT(
     // 学校情報を更新
     const updateData: any = {
       name,
+      name_normalized: nameNormalized,
       prefecture,
       prefectures: prefecturesArray,
       institution_type: institution_type || null,
