@@ -52,6 +52,7 @@ interface PendingReview {
   email: string;
   is_duplicate_email: boolean;
   moderation_status: string;
+  rejection_reason?: string | null;
   created_at: string;
   review_moderation_results: ModerationResult[];
 }
@@ -88,6 +89,18 @@ const RATING_LABELS: Record<string, string> = {
   campus_life_rating: '学校生活',
   tuition_rating: '学費',
 };
+
+type RatingKey = keyof Pick<Answers,
+  | 'flexibility_rating'
+  | 'staff_rating'
+  | 'support_rating'
+  | 'atmosphere_fit_rating'
+  | 'credit_rating'
+  | 'unique_course_rating'
+  | 'career_support_rating'
+  | 'campus_life_rating'
+  | 'tuition_rating'
+>;
 
 const DEFAULT_REJECT_REASON = '投稿いただいた内容に不備または不審な点が確認されました。';
 
@@ -182,7 +195,7 @@ function AnswerDetail({ review }: { review: PendingReview }) {
               {Object.entries(RATING_LABELS).map(([key, label]) => (
                 <div key={key} className="flex items-center justify-between gap-2">
                   <span className="text-gray-500">{label}</span>
-                  <RatingDisplay value={(a as any)[key]} />
+                  <RatingDisplay value={a[key as RatingKey]} />
                 </div>
               ))}
             </div>
@@ -194,11 +207,14 @@ function AnswerDetail({ review }: { review: PendingReview }) {
 }
 
 export default function ReviewModerationPage() {
-  const [tab, setTab] = useState<'pending' | 'quocard'>('pending');
+  const [tab, setTab] = useState<'pending' | 'rejected' | 'quocard'>('pending');
 
   const [reviews, setReviews] = useState<PendingReview[]>([]);
   const [total, setTotal] = useState(0);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const [rejectedReviews, setRejectedReviews] = useState<PendingReview[]>([]);
+  const [rejectedTotal, setRejectedTotal] = useState(0);
+  const [loadingRejectedReviews, setLoadingRejectedReviews] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [giftUrl, setGiftUrl] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -211,8 +227,8 @@ export default function ReviewModerationPage() {
   const [loadingGrants, setLoadingGrants] = useState(true);
   const [marking, setMarking] = useState<string | null>(null);
 
-  const loadReviews = useCallback(async () => {
-    setLoadingReviews(true);
+  const loadReviews = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoadingReviews(true);
     const res = await fetch(apiPath('/api/admin/reviews/pending'));
     const json = await res.json();
     setReviews(json.reviews ?? []);
@@ -220,16 +236,28 @@ export default function ReviewModerationPage() {
     setLoadingReviews(false);
   }, []);
 
-  const loadGrants = useCallback(async () => {
-    setLoadingGrants(true);
+  const loadRejectedReviews = useCallback(async () => {
+    setLoadingRejectedReviews(true);
+    const res = await fetch(apiPath('/api/admin/reviews/rejected'));
+    const json = await res.json();
+    setRejectedReviews(json.reviews ?? []);
+    setRejectedTotal(json.total ?? 0);
+    setLoadingRejectedReviews(false);
+  }, []);
+
+  const loadGrants = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoadingGrants(true);
     const res = await fetch(apiPath('/api/admin/reviews/pending-grants'));
     const json = await res.json();
     setGrants(json.grants ?? []);
     setLoadingGrants(false);
   }, []);
 
-  useEffect(() => { loadReviews(); }, [loadReviews]);
-  useEffect(() => { if (tab === 'quocard') loadGrants(); }, [tab, loadGrants]);
+  // Initial/tab-triggered admin data fetches intentionally hydrate client state.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadReviews(false); }, [loadReviews]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (tab === 'quocard') loadGrants(false); }, [tab, loadGrants]);
 
   const approve = async (id: string, url: string) => {
     setProcessing(id);
@@ -257,6 +285,7 @@ export default function ReviewModerationPage() {
     setRejectingId(null);
     setRejectReason(DEFAULT_REJECT_REASON);
     loadReviews();
+    loadRejectedReviews();
   };
 
   const runModerate = async (id: string) => {
@@ -304,7 +333,7 @@ export default function ReviewModerationPage() {
               </button>
             )}
             <button
-              onClick={() => { loadReviews(); if (tab === 'quocard') loadGrants(); }}
+              onClick={() => { loadReviews(); if (tab === 'rejected') loadRejectedReviews(); if (tab === 'quocard') loadGrants(); }}
               className="text-sm text-blue-600 hover:underline"
             >
               更新
@@ -323,6 +352,17 @@ export default function ReviewModerationPage() {
             承認待ち
             {total > 0 && (
               <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">{total}</span>
+            )}
+          </button>
+          <button
+            onClick={() => { setTab('rejected'); loadRejectedReviews(); }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'rejected' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            却下済み
+            {rejectedTotal > 0 && (
+              <span className="ml-1.5 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{rejectedTotal}</span>
             )}
           </button>
           <button
@@ -493,6 +533,82 @@ export default function ReviewModerationPage() {
                             </button>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* 却下済みタブ */}
+        {tab === 'rejected' && (
+          <>
+            <p className="text-sm text-gray-500 mb-4">却下済み {rejectedTotal} 件（投稿日時の新しい順）</p>
+            {loadingRejectedReviews ? (
+              <p className="text-gray-500 text-center py-12">読み込み中...</p>
+            ) : rejectedReviews.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <p className="text-gray-500">却下済みの口コミはありません</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {rejectedReviews.map((review) => {
+                  const mod = review.review_moderation_results?.[0];
+                  return (
+                    <div key={review.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900">{review.school_name}</span>
+                          <span className="text-xs text-gray-500">{review.respondent_role} / {review.status}</span>
+                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">却下済み</span>
+                          <DangerBadge score={mod?.danger_score} />
+                          {review.is_duplicate_email && (
+                            <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded">メール重複</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-400">{new Date(review.created_at).toLocaleString('ja-JP')}</span>
+                      </div>
+
+                      <div className="px-5 py-4 space-y-4">
+                        <div className="bg-red-50 rounded p-3 border border-red-100">
+                          <p className="text-xs font-medium text-red-700 mb-1">却下理由</p>
+                          <p className="text-sm text-red-900 whitespace-pre-wrap break-words">
+                            {review.rejection_reason || '却下理由は保存されていません'}
+                          </p>
+                        </div>
+
+                        {mod && (
+                          <div className="bg-gray-50 rounded p-3 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-gray-600">AI審査:</span>
+                              <FlagBadges flags={mod.flags} />
+                            </div>
+                            <p className="text-xs text-gray-600">{mod.reason}</p>
+                            {mod.similar_response_ids?.length > 0 && (
+                              <p className="text-xs text-orange-600">類似投稿 {mod.similar_response_ids.length} 件検出</p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-500 mb-1">良かった点</p>
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{review.good_comment}</p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-500 mb-1">改善してほしい点</p>
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">{review.bad_comment}</p>
+                          </div>
+                        </div>
+
+                        <AnswerDetail review={review} />
+
+                        <div className="flex gap-4 text-xs text-gray-500">
+                          <span>総合満足度: {review.overall_satisfaction}/5</span>
+                          <span>メール: {review.email}</span>
+                        </div>
                       </div>
                     </div>
                   );
