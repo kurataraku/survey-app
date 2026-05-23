@@ -5,6 +5,7 @@ import { searchSchools } from '@/lib/schools/searchSchools';
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 import { appPath } from '@/lib/base-path';
+import { getPrefecturePath } from '@/lib/prefectures';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 
@@ -66,7 +67,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
           {prefecture.trim() !== '' && (
             <p className="text-sm text-gray-600 mb-4">
               <Link
-                href={appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}`)}
+                href={appPath(getPrefecturePath(prefecture))}
                 className="text-blue-600 hover:text-blue-800 hover:underline"
               >
                 {prefecture}の通信制高校（口コミの多い学校・評判のピックアップ付き）

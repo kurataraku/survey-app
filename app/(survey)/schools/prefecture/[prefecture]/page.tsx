@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect, redirect } from 'next/navigation';
 
 import Link from 'next/link';
 
@@ -14,7 +14,7 @@ import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 
 import { getPrefectureIntroLead } from '@/lib/regions/prefecture-intros';
 
-import { prefectures } from '@/lib/prefectures';
+import { getPrefecturePath, getPrefectureSlug, prefectures, resolvePrefectureParam } from '@/lib/prefectures';
 
 import { appPath } from '@/lib/base-path';
 
@@ -39,7 +39,7 @@ export const revalidate = 3600;
 
 export async function generateStaticParams() {
 
-  return prefectures.map((prefecture) => ({ prefecture }));
+  return prefectures.map((prefecture) => ({ prefecture: getPrefectureSlug(prefecture) }));
 
 }
 
@@ -81,9 +81,9 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
   const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
 
-  const prefecture = decodeURIComponent(resolved.prefecture);
+  const { prefecture } = resolvePrefectureParam(resolved.prefecture);
 
-  if (!prefectures.includes(prefecture)) {
+  if (!prefecture) {
 
     return { title: 'ページが見つかりません' };
 
@@ -103,7 +103,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
   );
 
-  const base = `${getAppBaseUrl()}/schools/prefecture/${encodeURIComponent(prefecture)}`;
+  const base = `${getAppBaseUrl()}${getPrefecturePath(prefecture)}`;
 
   const canonical = page > 1 ? `${base}?page=${page}` : base;
 
@@ -137,15 +137,23 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
   const resolvedSearch = searchParams instanceof Promise ? await searchParams : searchParams ?? {};
 
-  const prefecture = decodeURIComponent(resolvedParams.prefecture);
+  const { prefecture, isLegacyParam } = resolvePrefectureParam(resolvedParams.prefecture);
 
   const page = parsePositivePage(resolvedSearch.page);
 
 
 
-  if (!prefectures.includes(prefecture)) {
+  if (!prefecture) {
 
     notFound();
+
+  }
+
+  if (isLegacyParam) {
+
+    const suffix = page > 1 ? `?page=${page}` : '';
+
+    permanentRedirect(appPath(`${getPrefecturePath(prefecture)}${suffix}`));
 
   }
 
@@ -175,7 +183,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
       const suffix = targetPage > 1 ? `?page=${targetPage}` : '';
 
-      redirect(appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}${suffix}`));
+      redirect(appPath(`${getPrefecturePath(prefecture)}${suffix}`));
 
     }
 
@@ -367,9 +375,9 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
                       page === 2
 
-                        ? appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}`)
+                        ? appPath(getPrefecturePath(prefecture))
 
-                        : appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}?page=${page - 1}`)
+                        : appPath(`${getPrefecturePath(prefecture)}?page=${page - 1}`)
 
                     }
 
@@ -397,7 +405,7 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
                   <Link
 
-                    href={appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}?page=${page + 1}`)}
+                    href={appPath(`${getPrefecturePath(prefecture)}?page=${page + 1}`)}
 
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
 

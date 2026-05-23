@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
-import { prefectures } from '@/lib/prefectures';
+import { getPrefecturePath, prefectures } from '@/lib/prefectures';
 
 const PAGE_SIZE = 1000;
 const REVIEW_LIMIT = 1000;
@@ -12,7 +12,7 @@ function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitema
     { url: baseUrl, lastModified: new Date(), changeFrequency: 'daily', priority: 0.95 },
     { url: `${baseUrl}/schools`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
     ...prefectures.map((pref) => ({
-      url: `${baseUrl}/schools/prefecture/${encodeURIComponent(pref)}`,
+      url: `${baseUrl}${getPrefecturePath(pref)}`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.85,

@@ -1,5 +1,6 @@
 import type { AttendanceStyle, ScoreAxis } from './types';
 import { appPath } from '@/lib/base-path';
+import { getPrefecturePath } from '@/lib/prefectures';
 
 export function getReviewsLink(style: AttendanceStyle, prefecture?: string | null): string {
   const freq = style === 'commute' ? '週3〜4' : 'ほぼオンライン/自宅';
@@ -15,7 +16,7 @@ export function getSchoolsLink(prefecture?: string | null): string {
 
 export function getPrefectureLandingLink(prefecture: string, sectionId?: string): string {
   const hash = sectionId ? `#${sectionId}` : '';
-  return appPath(`/schools/prefecture/${encodeURIComponent(prefecture)}${hash}`);
+  return appPath(`${getPrefecturePath(prefecture)}${hash}`);
 }
 
 export function getRankingLink(axis: ScoreAxis): string {

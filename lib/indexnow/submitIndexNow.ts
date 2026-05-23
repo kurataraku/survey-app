@@ -1,4 +1,5 @@
 import { getAppBaseUrl } from '@/lib/env-check';
+import { getPrefecturePath } from '@/lib/prefectures';
 
 /**
  * IndexNow に URL を通知（INDEXNOW_KEY と INDEXNOW_HOST が設定されているときのみ）。
@@ -47,7 +48,7 @@ export function publicSchoolUrl(slug: string): string {
 
 /** 都道府県別学校一覧の絶対URL */
 export function publicPrefectureSchoolsUrl(prefecture: string): string {
-  return `${getAppBaseUrl().replace(/\/$/, '')}/schools/prefecture/${encodeURIComponent(prefecture)}`;
+  return `${getAppBaseUrl().replace(/\/$/, '')}${getPrefecturePath(prefecture)}`;
 }
 
 /** ランキング一覧（/rankings/[type]）の絶対URL */

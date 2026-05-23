@@ -3,6 +3,7 @@ import {
   getPrefectureLandingCollectionDescription,
   getPrefectureLandingItemListDescription,
 } from '@/lib/prefectures/prefecture-landing-copy';
+import { getPrefecturePath } from '@/lib/prefectures';
 
 type SchoolRow = { id: string; name: string; slug: string | null };
 
@@ -58,11 +59,10 @@ export function buildPrefectureLandingJsonLd(params: {
   stats?: PrefectureFaqStats;
 }): Record<string, unknown> {
   const appBase = getAppBaseUrl().replace(/\/$/, '');
-  const prefEnc = encodeURIComponent(params.prefecture);
   const pageUrl =
     params.page > 1
-      ? `${appBase}/schools/prefecture/${prefEnc}?page=${params.page}`
-      : `${appBase}/schools/prefecture/${prefEnc}`;
+      ? `${appBase}${getPrefecturePath(params.prefecture)}?page=${params.page}`
+      : `${appBase}${getPrefecturePath(params.prefecture)}`;
 
   const itemListElements = params.schools
     .filter((s) => s.slug)

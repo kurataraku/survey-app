@@ -25,6 +25,7 @@ import {
   SCHOOL_REVIEWS_LIST_CTA_TITLE,
 } from '@/lib/schools/school-reviews-list-copy';
 import SurveyCtaLink from '@/components/SurveyCtaLink';
+import { getPrefecturePath } from '@/lib/prefectures';
 
 const CONCLUSION_MAX_CHARS = 350;
 const DECISION_LEAD_MAX_CHARS = 300;
@@ -158,7 +159,7 @@ export default function SchoolDetailClient({
           {school.prefecture && school.prefecture !== '不明' && (
             <p className="mt-4 text-sm">
               <Link
-                href={appPath(`/schools/prefecture/${encodeURIComponent(school.prefecture)}`)}
+                href={appPath(getPrefecturePath(school.prefecture))}
                 className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
               >
                 {school.prefecture}の通信制高校一覧を見る
@@ -432,7 +433,7 @@ export default function SchoolDetailClient({
                 <>
                   ページ下部の「評判の詳細・よくある質問」や、
                   <Link
-                    href={appPath(`/schools/prefecture/${encodeURIComponent(school.prefecture)}`)}
+                    href={appPath(getPrefecturePath(school.prefecture))}
                     className="text-blue-600 hover:underline font-medium"
                   >
                     {school.prefecture}の通信制高校一覧
@@ -466,7 +467,7 @@ export default function SchoolDetailClient({
             {school.review_count === 0 && school.prefecture && school.prefecture !== '不明' && (
               <p className="mt-5 text-sm text-gray-600">
                 <Link
-                  href={appPath(`/schools/prefecture/${encodeURIComponent(school.prefecture)}`)}
+                  href={appPath(getPrefecturePath(school.prefecture))}
                   className="text-blue-600 hover:underline font-medium"
                 >
                   {school.prefecture}の通信制高校を一覧で比較する

@@ -3,6 +3,7 @@ import { appPath } from '@/lib/base-path';
 import { getAppBaseUrl } from '@/lib/env-check';
 import StructuredData from '@/components/StructuredData';
 import { SCHOOL_REVIEWS_LIST_BREADCRUMB_JSONLD_NAME } from '@/lib/schools/school-reviews-list-copy';
+import { getPrefecturePath } from '@/lib/prefectures';
 
 type Variant = 'hub' | 'reviews';
 
@@ -30,7 +31,7 @@ export default function SchoolPageBreadcrumbs({
     listingPrefecture && listingPrefecture.trim() !== '' && listingPrefecture !== '不明'
       ? listingPrefecture.trim()
       : null;
-  const prefPath = pref ? `/schools/prefecture/${encodeURIComponent(pref)}` : null;
+  const prefPath = pref ? getPrefecturePath(pref) : null;
   const prefLabel = pref ? `${pref}の通信制高校` : null;
 
   const jsonLd = {
