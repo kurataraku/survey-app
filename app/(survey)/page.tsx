@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import PrefectureMapLinks from '@/components/PrefectureMapLinks';
 import SchoolCardServer from '@/components/SchoolCardServer';
 import ReviewCardServer from '@/components/ReviewCardServer';
 import ArticleCardServer from '@/components/ArticleCardServer';
@@ -6,20 +7,8 @@ import HomeHero from '@/components/HomeHero';
 import HomeCampaignBanner from '@/components/HomeCampaignBanner';
 import { getHomeData } from '@/lib/home/getHomeData';
 import { appPath } from '@/lib/base-path';
-import { getPrefecturePath } from '@/lib/prefectures';
 
 export const revalidate = 300;
-
-const majorPrefectures = [
-  '東京都',
-  '神奈川県',
-  '埼玉県',
-  '千葉県',
-  '大阪府',
-  '兵庫県',
-  '京都府',
-  '愛知県',
-];
 
 export default async function Home() {
   const data = await getHomeData();
@@ -194,31 +183,7 @@ export default async function Home() {
             </div>
           </section>
         )}
-        <section className="bg-white rounded-lg shadow-sm p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">都道府県別で探す</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            {majorPrefectures.map((pref) => (
-              <Link
-                key={pref}
-                href={appPath(getPrefecturePath(pref))}
-                className="px-4 py-2 bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-center text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-blue-300 transition-colors"
-              >
-                {pref.replace(/[都道府県]$/, '')}
-              </Link>
-            ))}
-          </div>
-          <div className="mt-6 text-center">
-            <Link
-              href={appPath('/schools')}
-              className="text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center gap-1"
-            >
-              すべての都道府県を見る
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-        </section>
+        <PrefectureMapLinks />
       </div>
     </div>
   );
