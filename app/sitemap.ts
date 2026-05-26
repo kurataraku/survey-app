@@ -4,7 +4,63 @@ import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
 import { getPrefecturePath, prefectures } from '@/lib/prefectures';
 
 const PAGE_SIZE = 1000;
-const REVIEW_LIMIT = 1000;
+const MIN_SCHOOL_REVIEWS_FOR_REVIEWS_SITEMAP = 3;
+
+type SitemapSchool = {
+  id: string;
+  name: string;
+  slug: string | null;
+  updated_at: string | null;
+};
+
+type SitemapReviewLink = {
+  school_id: string | null;
+  school_name: string | null;
+  schools: { id: string; status: string | null } | { id: string; status: string | null }[] | null;
+};
+
+function encodePathSegment(segment: string): string {
+  return encodeURIComponent(segment);
+}
+
+function addCount(map: Map<string, number>, key: string) {
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function countReviewsBySchool(schools: SitemapSchool[], reviews: SitemapReviewLink[]) {
+  const counts = new Map<string, number>();
+  const activeSchoolIds = new Set(schools.map((school) => school.id));
+  const schoolsByName = new Map<string, SitemapSchool[]>();
+
+  for (const school of schools) {
+    const list = schoolsByName.get(school.name) ?? [];
+    list.push(school);
+    schoolsByName.set(school.name, list);
+  }
+
+  for (const review of reviews) {
+    const linkedSchool = Array.isArray(review.schools) ? review.schools[0] : review.schools;
+
+    if (review.school_id && activeSchoolIds.has(review.school_id)) {
+      addCount(counts, review.school_id);
+      continue;
+    }
+
+    if (!review.school_name) continue;
+
+    const matchedSchools = schoolsByName.get(review.school_name) ?? [];
+    const pointsToInactiveOrMissingSchool =
+      review.school_id && (!linkedSchool || linkedSchool.status !== 'active');
+
+    if (!review.school_id || pointsToInactiveOrMissingSchool) {
+      for (const school of matchedSchools) {
+        addCount(counts, school.id);
+      }
+    }
+  }
+
+  return counts;
+}
 
 function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitemap {
   return [
@@ -82,36 +138,62 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   // 学校: 全件取得（ページネーション）
+  const allSchools: SitemapSchool[] = [];
   let schoolFrom = 0;
   for (;;) {
     const { data: schools, error } = await supabase
       .from('schools')
-      .select('slug, updated_at')
+      .select('id, name, slug, updated_at')
       .eq('status', 'active')
+      .eq('is_public', true)
       .not('slug', 'is', null)
       .order('slug')
       .range(schoolFrom, schoolFrom + PAGE_SIZE - 1);
 
     if (error || !schools?.length) break;
+    allSchools.push(...schools);
+    if (schools.length < PAGE_SIZE) break;
+    schoolFrom += PAGE_SIZE;
+  }
 
-    for (const school of schools) {
-      if (!school.slug) continue;
+  const allReviewLinks: SitemapReviewLink[] = [];
+  let reviewLinkFrom = 0;
+  for (;;) {
+    const { data: reviews, error } = await supabase
+      .from('survey_responses')
+      .select('school_id, school_name, schools(id, status)')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .range(reviewLinkFrom, reviewLinkFrom + PAGE_SIZE - 1);
+
+    if (error || !reviews?.length) break;
+    allReviewLinks.push(...reviews);
+    if (reviews.length < PAGE_SIZE) break;
+    reviewLinkFrom += PAGE_SIZE;
+  }
+
+  const reviewCountsBySchool = countReviewsBySchool(allSchools, allReviewLinks);
+
+  for (const school of allSchools) {
+    if (!school.slug) continue;
+    const slug = encodePathSegment(school.slug);
+    const lastModified = school.updated_at ? new Date(school.updated_at) : new Date();
+
+    out.push({
+      url: `${baseUrl}/schools/${slug}`,
+      lastModified,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    });
+
+    if ((reviewCountsBySchool.get(school.id) ?? 0) >= MIN_SCHOOL_REVIEWS_FOR_REVIEWS_SITEMAP) {
       out.push({
-        url: `${baseUrl}/schools/${school.slug}`,
-        lastModified: school.updated_at ? new Date(school.updated_at) : new Date(),
-        changeFrequency: 'weekly',
-        priority: 0.9,
-      });
-      out.push({
-        url: `${baseUrl}/schools/${school.slug}/reviews`,
-        lastModified: school.updated_at ? new Date(school.updated_at) : new Date(),
+        url: `${baseUrl}/schools/${slug}/reviews`,
+        lastModified,
         changeFrequency: 'weekly',
         priority: 0.85,
       });
     }
-
-    if (schools.length < PAGE_SIZE) break;
-    schoolFrom += PAGE_SIZE;
   }
 
   // 記事: 全件取得（ページネーション）
@@ -127,8 +209,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (error || !articles?.length) break;
 
     for (const article of articles) {
+      const slug = encodePathSegment(article.slug);
       out.push({
-        url: `${baseUrl}/features/${article.slug}`,
+        url: `${baseUrl}/features/${slug}`,
         lastModified: article.updated_at ? new Date(article.updated_at) : new Date(),
         changeFrequency: 'weekly',
         priority: 0.8,
@@ -137,26 +220,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     if (articles.length < PAGE_SIZE) break;
     articleFrom += PAGE_SIZE;
-  }
-
-  // 口コミ詳細: 最新 REVIEW_LIMIT 件のみ
-  const { data: reviews, error: reviewError } = await supabase
-    .from('survey_responses')
-    .select('id, created_at')
-    .eq('is_public', true)
-    .not('school_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(REVIEW_LIMIT);
-
-  if (!reviewError && reviews?.length) {
-    for (const review of reviews) {
-      out.push({
-        url: `${baseUrl}/reviews/${review.id}`,
-        lastModified: new Date(review.created_at),
-        changeFrequency: 'monthly',
-        priority: 0.7,
-      });
-    }
   }
 
   return out;
