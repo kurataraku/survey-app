@@ -1,8 +1,8 @@
 /** 学校ハブのCTA・目次など、口コミ一覧ページへの導線ラベル */
-export const SCHOOL_REVIEWS_LIST_CTA_TITLE = '条件で口コミを探す';
+export const SCHOOL_REVIEWS_LIST_CTA_TITLE = '口コミ一覧を見る・条件で絞り込む';
 
 export const SCHOOL_REVIEWS_LIST_CTA_SUBTITLE =
-  '通学頻度・進路・キャンパスから探せます';
+  '通学頻度・進路・キャンパスで口コミを探せます';
 
 /** 口コミ一覧ページの h1・metadata.title 用 */
 export function schoolReviewsListPageHeading(schoolName: string): string {

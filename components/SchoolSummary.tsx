@@ -263,7 +263,7 @@ export default function SchoolSummary({
             href={appPath(`/schools/${slug}/reviews`)}
             className="text-blue-600 hover:underline font-medium"
           >
-            条件で口コミを探す
+            口コミ一覧を見る・条件で絞り込む
           </Link>
         </nav>
 

@@ -37,7 +37,12 @@ export default function SchoolFeaturedReviewsServer({
 
   return (
     <div className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
-      <h2 className="text-xl font-bold text-gray-900 mb-6">注目の口コミ</h2>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">実際の口コミ（良い点・気になる点）</h2>
+        <p className="text-sm text-gray-600 leading-relaxed">
+          投稿された口コミから、良い点と改善してほしい点が分かるコメントを抜粋しています。要約や評価だけでなく、生の声もあわせて確認してください。
+        </p>
+      </div>
       <div className="space-y-4">
         {featuredReviews.map((review) => (
           <article

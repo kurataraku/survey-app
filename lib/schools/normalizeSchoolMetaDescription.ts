@@ -8,7 +8,7 @@ export function normalizeSchoolMetaDescription(
   schoolName: string,
   metaDescription: string | null | undefined
 ): string {
-  const fallback = `${schoolName}の口コミ・評判をまとめました。在校生・卒業生・保護者の生の声を掲載しています。`;
+  const fallback = `${schoolName}の口コミ・評判をもとに、良い点・気になる点、学費の確認ポイント、通学頻度・スクーリング、向いている人を整理しています。`;
   const raw = metaDescription?.trim();
   if (!raw) return fallback;
 

@@ -72,7 +72,7 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
       </p>
       <ul className="grid gap-3 md:grid-cols-3">
         {links.map(({ href, label, description }) => (
-          <li key={href}>
+          <li key={`${href}-${label}`}>
             <Link
               href={href}
               className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 p-4 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"

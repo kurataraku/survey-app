@@ -482,8 +482,31 @@ function formatReviewsForPrompt(
   const MAX = 8000;
   let len = 0;
   const parts: string[] = [];
+  const formatAnswerValue = (value: unknown): string | null => {
+    if (value === null || value === undefined || value === '') return null;
+    if (Array.isArray(value)) return value.filter(Boolean).join('、') || null;
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    return null;
+  };
+
   for (const r of reviews) {
-    const block = `【口コミ】満足度${r.overall_satisfaction}/5\n良い点: ${(r.good_comment || '').slice(0, 200)}\n気になる点: ${(r.bad_comment || '').slice(0, 200)}\n`;
+    const answerLines = [
+      ['通学頻度', r.answers?.attendance_frequency],
+      ['授業スタイル', r.answers?.teaching_style],
+      ['生徒の雰囲気', r.answers?.student_atmosphere],
+      ['選んだ理由', r.answers?.reason_for_choosing],
+      ['入学形態', r.answers?.enrollment_type],
+      ['学費の納得感', r.answers?.tuition_rating],
+      ['サポート評価', r.answers?.support_rating],
+      ['学びの柔軟さ', r.answers?.flexibility_rating],
+    ]
+      .map(([label, value]) => {
+        const formatted = formatAnswerValue(value);
+        return formatted ? `${label}: ${formatted}` : null;
+      })
+      .filter(Boolean)
+      .join('\n');
+    const block = `【口コミ】満足度${r.overall_satisfaction}/5\n良い点: ${(r.good_comment || '').slice(0, 200)}\n気になる点: ${(r.bad_comment || '').slice(0, 200)}${answerLines ? `\n回答属性:\n${answerLines}` : ''}\n`;
     if (len + block.length > MAX) break;
     parts.push(block);
     len += block.length;
@@ -500,15 +523,15 @@ function createSeoSectionPrompt(
   const label = SEO_SECTION_LABELS[sectionKey];
   const instructions: Record<SeoSectionKey, string> = {
     good_bad:
-      '口コミの良い評判・悪い評判を項目別（先生対応・雰囲気・単位・学費・柔軟さ・サポートなど）に整理し、傾向として200〜400字でまとめてください。断定は避け、「〜という声がある」「傾向として」と表現してください。',
+      '口コミの良い評判と気になる評判を項目別（先生対応・雰囲気・単位・学費・柔軟さ・サポートなど）に整理し、傾向として200〜400字でまとめてください。断定や煽りは避け、「〜という声がある」「傾向として」と表現してください。',
     tuition:
-      '学費に関する口コミの傾向（納得感・負担感）をまとめつつ、数値（金額・回数）は口コミからは断定せず「公式の案内を確認してください」と促す形にしてください。200〜350字。',
+      '学費に関する口コミの傾向（納得感・負担感）と、確認すべき費用項目をまとめてください。金額は年度・コース・通学頻度・就学支援金で変わるため、口コミや推測から実額を断定しないでください。公式資料や説明会で最新情報を確認するよう促してください。200〜350字。',
     learning:
-      'レポート・単位取得に関する口コミの傾向をまとめてください。公式情報があれば補足。200〜350字。',
+      'コース・学習スタイル・レポート・単位取得に関する口コミや回答属性の傾向をまとめてください。公式情報があれば補足。200〜350字。',
     syllabus:
-      'スクーリング・通学頻度に関する口コミの傾向と、公式情報があればその要点をまとめてください。200〜350字。',
+      'スクーリング・通学頻度に関する口コミや回答属性の傾向と、公式情報があればその要点をまとめてください。200〜350字。',
     flexibility:
-      '不登校や心身の波がある子の「通いやすさ」「学びの柔軟さ」に関する口コミの傾向をまとめてください。200〜350字。',
+      '不登校経験や心身の波がある人の「通いやすさ」「学びの柔軟さ」「相談しやすさ」に関する口コミや回答属性の傾向をまとめてください。200〜350字。',
   };
   return `あなたは通信制高校の口コミ・評判を分析する専門家です。以下の口コミと公式情報のみを根拠に、「${label}」の本文を生成してください。
 
@@ -522,7 +545,7 @@ ${officialText || '（なし）'}
 
 ${instructions[sectionKey]}
 
-注意: 口コミにない内容は書かないでください。数値は公式のみ断定。口コミは「傾向」「〜という声」で表現。出力は本文のみ（見出しやラベルは付けない）。`;
+注意: 口コミにない内容は書かないでください。学費金額は公式情報に明記されている場合以外は書かないでください。数値は公式のみ断定。口コミは「傾向」「〜という声」で表現。出力は本文のみ（見出しやラベルは付けない）。`;
 }
 
 /**
@@ -597,7 +620,7 @@ ${qList}
   ...
 ]
 
-注意: 口コミ・公式にない内容は書かず、「〜という声がある」「傾向として」を使う。口コミが少ない場合は「現時点では限られた声のなかでは〜」と表現。`;
+注意: 口コミ・公式にない内容は書かず、「〜という声がある」「傾向として」を使う。口コミが少ない場合は「現時点では限られた声のなかでは〜」と表現。学費金額は推測せず、年度・コース・通学頻度・就学支援金で変わるため公式資料で確認する必要があると答える。悪い評判は煽らず、注意点として中立的に整理する。`;
 }
 
 /**

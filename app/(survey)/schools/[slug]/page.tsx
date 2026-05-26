@@ -11,6 +11,7 @@ import StructuredData from '@/components/StructuredData';
 import SchoolPageBreadcrumbs from '@/components/SchoolPageBreadcrumbs';
 import SchoolEducationalOrganizationJsonLd from '@/components/SchoolEducationalOrganizationJsonLd';
 import SchoolRelatedArticlesServer from '@/components/SchoolRelatedArticlesServer';
+import SchoolRelatedSchoolsServer from '@/components/SchoolRelatedSchoolsServer';
 import { FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
 import { parseAiSummarySections } from '@/lib/schools/parseAiSummarySections';
 import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints';
@@ -50,7 +51,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  const title = school.ai_summary?.meta_title || `${school.name}の口コミ・評判`;
+  const title =
+    school.ai_summary?.meta_title ||
+    (school.review_count > 0
+      ? `${school.name}の口コミ・評判｜学費・スクーリングも解説`
+      : `${school.name}の学校情報｜学費・スクーリング・口コミ掲載予定`);
   const description = normalizeSchoolMetaDescription(
     school.name,
     school.ai_summary?.meta_description
@@ -59,6 +64,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const keywords = [
     `${school.name} 口コミ`,
     `${school.name} 評判`,
+    `${school.name} 学費`,
+    `${school.name} スクーリング`,
     '通信制高校 口コミ',
     '通信制 口コミ',
   ];
@@ -172,6 +179,14 @@ export default async function SchoolDetailPage({ params }: PageProps) {
           encodedSlug={encodedSlug}
           parsedAiSummary={parsedAiSummary}
           tuitionAttendStatsHint={tuitionAttendStatsHint}
+          relatedSchools={
+            <SchoolRelatedSchoolsServer
+              schoolId={school.id}
+              schoolName={school.name}
+              prefecture={school.prefecture}
+              prefectures={school.prefectures}
+            />
+          }
         >
           {/* 注目の口コミ（良い点・悪い点）— Server Component でSSR保証 */}
           {school.latest_reviews && school.latest_reviews.length > 0 && (

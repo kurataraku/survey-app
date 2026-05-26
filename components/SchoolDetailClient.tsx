@@ -47,11 +47,74 @@ function SchoolHubReviewsListCta({ encodedSlug }: { encodedSlug: string }) {
   );
 }
 
+function getRatingComparison(value: number | null | undefined, globalValue: number | null | undefined) {
+  if (value == null || Number.isNaN(value)) return null;
+  if (globalValue == null || Number.isNaN(globalValue)) return null;
+  const diff = Math.round((value - globalValue) * 10) / 10;
+  if (Math.abs(diff) < 0.05) return 'サイト全体の平均とほぼ同水準です。';
+  return diff > 0
+    ? `サイト全体の平均より${diff.toFixed(1)}高めです。`
+    : `サイト全体の平均より${Math.abs(diff).toFixed(1)}低めです。`;
+}
+
+function getTopEntries(record: Record<string, number> | undefined, limit = 3) {
+  return Object.entries(record ?? {})
+    .filter(([, count]) => count > 0)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, limit);
+}
+
+function formatPercentage(count: number, total: number) {
+  if (total <= 0) return 0;
+  return Math.round((count / total) * 100);
+}
+
+function ResponseDistributionCard({
+  title,
+  items,
+  total,
+}: {
+  title: string;
+  items: Array<{ label: string; count: number }>;
+  total: number;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 ring-1 ring-inset ring-blue-100">
+          口コミ回答者ベース
+        </span>
+      </div>
+      <div className="space-y-3">
+        {items.map(({ label, count }) => {
+          const percentage = formatPercentage(count, total);
+          return (
+            <div key={label}>
+              <div className="flex items-start justify-between gap-3 text-sm text-gray-700 mb-1">
+                <span className="leading-snug">{label}</span>
+                <span className="shrink-0 font-semibold text-gray-900">{percentage}%</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-white overflow-hidden ring-1 ring-inset ring-blue-100">
+                <div className="h-full rounded-full bg-blue-500" style={{ width: `${percentage}%` }} />
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500">回答者の{percentage}%</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
   encodedSlug: string;
   parsedAiSummary: ParsedAiSummarySections;
   tuitionAttendStatsHint: string | null;
+  relatedSchools?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -60,6 +123,7 @@ export default function SchoolDetailClient({
   encodedSlug,
   parsedAiSummary,
   tuitionAttendStatsHint,
+  relatedSchools,
   children,
 }: SchoolDetailClientProps) {
   const [expandedSeoContent, setExpandedSeoContent] = useState<Record<string, boolean>>({});
@@ -114,6 +178,31 @@ export default function SchoolDetailClient({
     if (t.length <= DECISION_LEAD_MAX_CHARS) return t;
     return `${t.slice(0, DECISION_LEAD_MAX_CHARS).trim()}…`;
   }, [parsedAiSummary.overviewPlain]);
+  const topAttendance = useMemo(
+    () => getTopEntries(school.statistics?.attendance_frequency, 3),
+    [school.statistics?.attendance_frequency]
+  );
+  const topTeachingStyles = useMemo(
+    () => getTopEntries(school.statistics?.teaching_style, 3),
+    [school.statistics?.teaching_style]
+  );
+  const topStudentAtmosphere = useMemo(
+    () => getTopEntries(school.statistics?.student_atmosphere, 3),
+    [school.statistics?.student_atmosphere]
+  );
+  const topReasons = useMemo(
+    () => getTopEntries(school.statistics?.reason_for_choosing, 3),
+    [school.statistics?.reason_for_choosing]
+  );
+  const tuitionComparison = getRatingComparison(
+    school.tuition_rating_avg,
+    school.global_averages?.tuition_rating_avg
+  );
+  const goodBadSeo = school.seo_sections?.good_bad;
+  const tuitionSeo = school.seo_sections?.tuition;
+  const syllabusSeo = school.seo_sections?.syllabus;
+  const learningSeo = school.seo_sections?.learning;
+  const flexibilitySeo = school.seo_sections?.flexibility;
 
   return (
     <>
@@ -347,40 +436,51 @@ export default function SchoolDetailClient({
         );
       })(      )}
 
-      {/* 目次（アンカー） */}
-      <nav id="page-toc" className="bg-white rounded-2xl shadow-md p-4 md:p-6 mb-8 border border-gray-200" aria-label="ページ目次">
-        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">目次</h2>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <li><a href="#section-review-summary" className="text-blue-600 hover:underline">良い点・改善してほしい点</a></li>
-          <li>
-            <a
-              href="#section-ratings"
-              className="text-blue-600 hover:underline"
-              onClick={() => setGraphActiveTab('ratings')}
-            >
-              詳細評価
-            </a>
-          </li>
-          <li>
-            <a
-              href="#section-trends"
-              className="text-blue-600 hover:underline"
-              onClick={() => setGraphActiveTab('statistics')}
-            >
-              みんなの傾向
-            </a>
-          </li>
-          <li><a href="#section-featured" className="text-blue-600 hover:underline">注目の口コミ</a></li>
-          <li><a href="#section-seo-body" className="text-blue-600 hover:underline">評判の詳細・よくある質問</a></li>
-          <li>
-            <Link
-              href={appPath(`/schools/${encodedSlug}/reviews`)}
-              className="text-blue-600 hover:underline"
-            >
-              {SCHOOL_REVIEWS_LIST_CTA_TITLE}
-            </Link>
-          </li>
-        </ul>
+      {/* タブ風アンカーナビ（本文は隠さず、目的の情報へすぐ移動できるようにする） */}
+      <nav
+        id="page-toc"
+        className="sticky top-0 z-20 -mx-4 sm:mx-0 mb-8 border-y border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:rounded-2xl sm:border"
+        aria-label="ページ内ナビゲーション"
+      >
+        <div className="flex gap-2 overflow-x-auto pb-1 text-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <a href="#section-featured" className="shrink-0 rounded-full bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm">
+            口コミ
+          </a>
+          <a href="#section-review-summary" className="shrink-0 rounded-full bg-blue-50 px-4 py-2 font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
+            総評
+          </a>
+          <a href="#section-tuition" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
+            学費
+          </a>
+          <a href="#section-attendance" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
+            通学頻度
+          </a>
+          <a href="#section-learning-style" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
+            学習スタイル
+          </a>
+          <a href="#section-fit" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
+            向き不向き
+          </a>
+          <a href="#section-related-schools" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
+            比較
+          </a>
+          <a
+            href="#section-ratings"
+            className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50"
+            onClick={() => setGraphActiveTab('ratings')}
+          >
+            詳細評価
+          </a>
+          <a href="#section-seo-body" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
+            FAQ
+          </a>
+          <Link
+            href={appPath(`/schools/${encodedSlug}/reviews`)}
+            className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-50"
+          >
+            全口コミ
+          </Link>
+        </div>
       </nav>
 
       {/* 口コミ一覧への導線（ページ上部に1回のみ） */}
@@ -388,9 +488,15 @@ export default function SchoolDetailClient({
         <SchoolHubReviewsListCta encodedSlug={encodedSlug} />
       </div>
 
+      {/* 実口コミを早い段階で提示し、AI要約・集計の根拠にアクセスしやすくする */}
+      <div id="section-featured">{children}</div>
+
       {/* 口コミサマリー（良い点・改善してほしい点の傾向）— LLM要約3箇条ずつ */}
       <section id="section-review-summary" className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">良い点・改善してほしい点の傾向</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">口コミから見た総評</h2>
+        {decisionLeadTruncated && (
+          <p className="text-sm text-gray-700 leading-relaxed mb-4">{decisionLeadTruncated}</p>
+        )}
         {school.review_tendency ? (
           <>
             {school.review_count < FEW_REVIEWS_THRESHOLD && (
@@ -400,7 +506,7 @@ export default function SchoolDetailClient({
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="text-sm font-semibold text-green-700 mb-2">良い点</h3>
+                <h3 className="text-sm font-semibold text-green-700 mb-2">評価されている点</h3>
                 <ul className="text-sm text-gray-700 space-y-1">
                   {school.review_tendency.good_points.map((text, i) => (
                     <li key={i}>・{text}</li>
@@ -408,7 +514,7 @@ export default function SchoolDetailClient({
                 </ul>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-rose-700 mb-2">改善してほしい点</h3>
+                <h3 className="text-sm font-semibold text-rose-700 mb-2">気になる点・注意点</h3>
                 <ul className="text-sm text-gray-700 space-y-1">
                   {school.review_tendency.improvement_points.map((text, i) => (
                     <li key={i}>・{text}</li>
@@ -449,6 +555,241 @@ export default function SchoolDetailClient({
           <p className="text-gray-500 text-sm">要約はまだ公開されていません。口コミ一覧をご覧ください。</p>
         )}
       </section>
+
+      <div className="grid gap-8 mb-8">
+        <section id="section-good-reputation" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">良い口コミ・評価されている点</h2>
+          {school.review_tendency?.good_points.length ? (
+            <ul className="space-y-2 text-sm text-gray-700">
+              {school.review_tendency.good_points.map((text, i) => (
+                <li key={i} className="flex gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          ) : goodBadSeo ? (
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{goodBadSeo}</p>
+          ) : school.latest_reviews.some((review) => review.good_comment) ? (
+            <div className="space-y-3">
+              {school.latest_reviews
+                .filter((review) => review.good_comment)
+                .slice(0, 2)
+                .map((review) => (
+                  <blockquote key={review.id} className="rounded-lg border-l-4 border-green-500 bg-green-50/50 p-3 text-sm text-gray-700 leading-relaxed">
+                    {review.good_comment}
+                  </blockquote>
+                ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600">
+              良い点に関する口コミはまだ十分に集まっていません。学校概要や公式情報もあわせて確認してください。
+            </p>
+          )}
+        </section>
+
+        <section id="section-concerns" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">気になる口コミ・注意点</h2>
+          <p className="text-sm text-gray-600 leading-relaxed mb-4">
+            学校名で不安な検索をする場合は、学費、通学頻度、サポート体制、学習ペースが自分に合うかを分けて確認すると判断しやすくなります。
+          </p>
+          {school.review_tendency?.improvement_points.length ? (
+            <ul className="space-y-2 text-sm text-gray-700">
+              {school.review_tendency.improvement_points.map((text, i) => (
+                <li key={i} className="flex gap-2">
+                  <XCircle className="w-4 h-4 text-rose-600 mt-0.5 flex-shrink-0" />
+                  <span>{text}</span>
+                </li>
+              ))}
+            </ul>
+          ) : goodBadSeo ? (
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{goodBadSeo}</p>
+          ) : school.latest_reviews.some((review) => review.bad_comment) ? (
+            <div className="space-y-3">
+              {school.latest_reviews
+                .filter((review) => review.bad_comment)
+                .slice(0, 2)
+                .map((review) => (
+                  <blockquote key={review.id} className="rounded-lg border-l-4 border-rose-500 bg-rose-50/50 p-3 text-sm text-gray-700 leading-relaxed">
+                    {review.bad_comment}
+                  </blockquote>
+                ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600">
+              気になる点に関する口コミはまだ十分に集まっていません。説明会では学費、通学頻度、サポート範囲を具体的に確認しましょう。
+            </p>
+          )}
+        </section>
+
+        <section id="section-tuition" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">学費・費用感</h2>
+          <div className="space-y-4 text-sm text-gray-700 leading-relaxed">
+            {school.tuition_rating_avg != null ? (
+              <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+                <p className="font-semibold text-gray-900 mb-1">口コミでの学費の納得感</p>
+                <p>
+                  平均は{school.tuition_rating_avg.toFixed(1)} / 5.0です。
+                  {tuitionComparison ? ` ${tuitionComparison}` : ''}
+                </p>
+                {school.review_count < FEW_REVIEWS_THRESHOLD && (
+                  <p className="mt-2 text-amber-800">
+                    口コミは{school.review_count}件のため、費用感は参考情報として確認してください。
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-600">
+                学費の納得感に関する口コミ評価はまだ十分に集まっていません。
+              </p>
+            )}
+            {tuitionSeo && <p className="whitespace-pre-wrap">{tuitionSeo}</p>}
+            <div>
+              <h3 className="text-base font-bold text-gray-900 mb-2">確認しておきたい費用項目</h3>
+              <ul className="grid gap-1.5 sm:grid-cols-2 list-disc pl-5">
+                <li>入学金・授業料</li>
+                <li>施設・設備費、教材費</li>
+                <li>スクーリング費、交通費、宿泊費</li>
+                <li>サポート費、オプション講座費</li>
+                <li>就学支援金適用後の実質負担</li>
+                <li>年度途中入学やコース変更時の費用</li>
+              </ul>
+            </div>
+            <p className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-700">
+              通信制高校の費用は、年度、コース、通学頻度、キャンパス、就学支援金、世帯年収などで変わります。このページでは実額を断定せず、最新金額は学校公式サイト、資料請求、説明会で確認する前提で掲載しています。
+            </p>
+          </div>
+        </section>
+
+        <section id="section-attendance" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">口コミ回答者の通学頻度・スクーリング</h2>
+          <p className="text-sm text-gray-600 leading-relaxed mb-4">
+            以下は学校公式の通学条件ではなく、このサイトに口コミを投稿した在校生・卒業生・保護者の回答分布です。実際の登校日数やスクーリング日程は、コース・キャンパス・年度によって変わるため、最新情報は学校公式の案内で確認してください。
+          </p>
+          {topAttendance.length > 0 ? (
+            <div className="space-y-3 mb-4">
+              {topAttendance.map(([label, count]) => (
+                <div key={label}>
+                  <div className="flex justify-between text-sm text-gray-700 mb-1">
+                    <span>{label}</span>
+                    <span>回答者の{formatPercentage(count, school.review_count)}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500"
+                      style={{ width: `${formatPercentage(count, school.review_count)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600 mb-4">
+              口コミ回答では、通学頻度の回答分布はまだ十分に集まっていません。
+            </p>
+          )}
+          {syllabusSeo ? (
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{syllabusSeo}</p>
+          ) : (
+            <p className="text-sm text-gray-700 leading-relaxed">
+              スクーリングや通学頻度は、コースやキャンパスによって変わることがあります。無理なく通えるか、登校日数や会場、オンライン対応の有無を学校公式の資料や説明会で確認しましょう。
+            </p>
+          )}
+        </section>
+
+        <section id="section-learning-style" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">口コミ回答者から見たコース・学習スタイル</h2>
+          <p className="text-sm text-gray-600 leading-relaxed mb-5">
+            以下は学校公式のコース一覧ではなく、このサイトに口コミを投稿した人の回答分布です。学習スタイルや選んだ理由は、在籍コース・時期・キャンパスによって変わる可能性があります。
+          </p>
+          {topTeachingStyles.length > 0 || topStudentAtmosphere.length > 0 || topReasons.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-3 mb-5">
+              <ResponseDistributionCard
+                title="授業スタイル"
+                total={school.review_count}
+                items={topTeachingStyles.map(([label, count]) => ({
+                  label: getQuestionLabel('teaching_style', label),
+                  count,
+                }))}
+              />
+              <ResponseDistributionCard
+                title="生徒の雰囲気"
+                total={school.review_count}
+                items={topStudentAtmosphere.map(([label, count]) => ({
+                  label: getQuestionLabel('student_atmosphere', label),
+                  count,
+                }))}
+              />
+              <ResponseDistributionCard
+                title="選ばれた理由"
+                total={school.review_count}
+                items={topReasons.map(([label, count]) => ({ label, count }))}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-600 mb-4">
+              口コミ回答では、学習スタイルに関する回答分布はまだ十分に集まっていません。
+            </p>
+          )}
+          {learningSeo ? (
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{learningSeo}</p>
+          ) : (
+            <p className="text-sm text-gray-700 leading-relaxed">
+              レポート中心、オンライン中心、通学型、個別サポート型など、学び方は学校やコースによって異なります。入学前に、自分の生活リズムや学習ペースに合うか確認しましょう。
+            </p>
+          )}
+        </section>
+
+        {(fvSummary.fitsBullets.length > 0 || fvSummary.notFitsBullets.length > 0 || flexibilitySeo) && (
+          <section id="section-fit" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">向いている人・向いていない可能性がある人</h2>
+            <p className="text-sm text-gray-600 leading-relaxed mb-4">
+              以下は、このサイトに投稿された口コミをもとにAIが傾向を整理したものです。公式な適性診断ではないため、最終的には説明会や資料でサポート内容・通学条件を確認してください。
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-green-100 bg-green-50/50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-semibold text-green-700">向いている人</h3>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-green-700 ring-1 ring-inset ring-green-100">
+                    口コミのAI分析
+                  </span>
+                </div>
+                {fvSummary.fitsBullets.length > 0 ? (
+                  <ul className="space-y-1.5 text-sm text-gray-700">
+                    {fvSummary.fitsBullets.slice(0, 4).map((text, i) => (
+                      <li key={i}>・{text}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-700">口コミ傾向が集まり次第、向いている人の特徴を整理します。</p>
+                )}
+              </div>
+              <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-semibold text-rose-700">注意したい人</h3>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-rose-700 ring-1 ring-inset ring-rose-100">
+                    口コミのAI分析
+                  </span>
+                </div>
+                {fvSummary.notFitsBullets.length > 0 ? (
+                  <ul className="space-y-1.5 text-sm text-gray-700">
+                    {fvSummary.notFitsBullets.slice(0, 4).map((text, i) => (
+                      <li key={i}>・{text}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-700">通学頻度、サポート範囲、学費の確認ポイントを事前に整理しておくと安心です。</p>
+                )}
+              </div>
+            </div>
+            {flexibilitySeo && (
+              <p className="mt-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{flexibilitySeo}</p>
+            )}
+          </section>
+        )}
+      </div>
+
+      {relatedSchools}
 
       {/* グラフブロック（詳細評価・みんなの傾向）— 全タブをDOMに出力してSSR/SEO対応 */}
       <div id="section-graph" className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
@@ -771,9 +1112,6 @@ export default function SchoolDetailClient({
         />
         )}
       </div>
-
-      {/* 注目の口コミ（children で Server Component を挿入・SSR保証） */}
-      <div id="section-featured">{children}</div>
 
       <div id="section-reviews" className="mb-8">
         {!school.latest_reviews?.length && (
