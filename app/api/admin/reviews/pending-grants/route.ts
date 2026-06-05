@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabase();
 
-  const { data, error } = await supabase
+  // 最初のキャンペーン開始前の記録はキャンペーン対象外のため表示しない
+  const { data: firstCampaign } = await supabase
+    .from('campaigns')
+    .select('starts_at')
+    .order('starts_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  let grantsQuery = supabase
     .from('campaign_grants')
     .select(`
       id,
@@ -35,6 +43,12 @@ export async function GET(request: NextRequest) {
       )
     `)
     .order('created_at', { ascending: false });
+
+  if (firstCampaign?.starts_at) {
+    grantsQuery = grantsQuery.gte('created_at', firstCampaign.starts_at);
+  }
+
+  const { data, error } = await grantsQuery;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ grants: data });
