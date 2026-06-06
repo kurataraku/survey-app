@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
-import {
-  getGrantDisplayCutoffDate,
-  isGrantVisibleOnDisplay,
-} from '@/lib/campaign/grantDisplayCutoff';
+import { CAMPAIGN_ADMIN_VISIBLE_FROM_UTC } from '@/lib/campaign/grantDisplayCutoff';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,28 +17,6 @@ export async function GET(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   const supabase = getSupabase();
-
-  // 表示対象は、すでに開始済みの最新キャンペーンの開始日（JST）以降の配布記録のみ
-  const now = new Date().toISOString();
-  const { data: latestCampaign, error: campaignError } = await supabase
-    .from('campaigns')
-    .select('starts_at')
-    .lte('starts_at', now)
-    .order('starts_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (campaignError) {
-    return NextResponse.json({ error: campaignError.message }, { status: 500 });
-  }
-
-  const cutoffDateJst = getGrantDisplayCutoffDate(latestCampaign?.starts_at);
-  if (!cutoffDateJst) {
-    return NextResponse.json(
-      { grants: [] },
-      { headers: { 'Cache-Control': 'no-store' } }
-    );
-  }
 
   const { data, error } = await supabase
     .from('campaign_grants')
@@ -62,16 +37,13 @@ export async function GET(request: NextRequest) {
         reward_amount
       )
     `)
+    .gte('created_at', CAMPAIGN_ADMIN_VISIBLE_FROM_UTC)
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const grants = (data ?? []).filter((grant) =>
-    isGrantVisibleOnDisplay(grant.created_at, cutoffDateJst)
-  );
-
   return NextResponse.json(
-    { grants },
+    { grants: data ?? [] },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }

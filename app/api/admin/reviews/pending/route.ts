@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { CAMPAIGN_ADMIN_VISIBLE_FROM_UTC } from '@/lib/campaign/grantDisplayCutoff';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const supabase = createClient(
@@ -38,6 +41,7 @@ export async function GET(request: NextRequest) {
       )
     `, { count: 'exact' })
     .eq('moderation_status', 'pending')
+    .gte('created_at', CAMPAIGN_ADMIN_VISIBLE_FROM_UTC)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -45,5 +49,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ reviews: reviews ?? [], total: count ?? 0, page, limit });
+  return NextResponse.json(
+    { reviews: reviews ?? [], total: count ?? 0, page, limit },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 }
