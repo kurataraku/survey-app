@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
+import {
+  getGrantDisplayCutoffDate,
+  isGrantVisibleOnDisplay,
+} from '@/lib/campaign/grantDisplayCutoff';
+
+export const dynamic = 'force-dynamic';
 
 function getSupabase() {
   return createClient(
@@ -15,15 +21,29 @@ export async function GET(request: NextRequest) {
 
   const supabase = getSupabase();
 
-  // 最初のキャンペーン開始前の記録はキャンペーン対象外のため表示しない
-  const { data: firstCampaign } = await supabase
+  // 表示対象は、すでに開始済みの最新キャンペーンの開始日（JST）以降の配布記録のみ
+  const now = new Date().toISOString();
+  const { data: latestCampaign, error: campaignError } = await supabase
     .from('campaigns')
     .select('starts_at')
-    .order('starts_at', { ascending: true })
+    .lte('starts_at', now)
+    .order('starts_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  let grantsQuery = supabase
+  if (campaignError) {
+    return NextResponse.json({ error: campaignError.message }, { status: 500 });
+  }
+
+  const cutoffDateJst = getGrantDisplayCutoffDate(latestCampaign?.starts_at);
+  if (!cutoffDateJst) {
+    return NextResponse.json(
+      { grants: [] },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
+  const { data, error } = await supabase
     .from('campaign_grants')
     .select(`
       id,
@@ -44,12 +64,14 @@ export async function GET(request: NextRequest) {
     `)
     .order('created_at', { ascending: false });
 
-  if (firstCampaign?.starts_at) {
-    grantsQuery = grantsQuery.gte('created_at', firstCampaign.starts_at);
-  }
-
-  const { data, error } = await grantsQuery;
-
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ grants: data });
+
+  const grants = (data ?? []).filter((grant) =>
+    isGrantVisibleOnDisplay(grant.created_at, cutoffDateJst)
+  );
+
+  return NextResponse.json(
+    { grants },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 }
