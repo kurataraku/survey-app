@@ -2,6 +2,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 import {
   getPrefectureLandingCollectionDescription,
   getPrefectureLandingItemListDescription,
+  getPrefectureLandingTitle,
 } from '@/lib/prefectures/prefecture-landing-copy';
 import { getPrefecturePath } from '@/lib/prefectures';
 
@@ -95,7 +96,7 @@ export function buildPrefectureLandingJsonLd(params: {
       },
       {
         '@type': 'CollectionPage',
-        name: `${params.prefecture}の通信制高校を口コミで比較`,
+        name: getPrefectureLandingTitle(params.prefecture),
         url: pageUrl,
         description: getPrefectureLandingCollectionDescription(params.prefecture),
         isPartOf: { '@type': 'WebSite', name: '通信制高校リアルレビュー', url: appBase },

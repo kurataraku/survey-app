@@ -8,6 +8,9 @@ import { getArticleSlugs } from '@/lib/articles/getArticleSlugs';
 import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
 import SurveyCtaLink from '@/components/SurveyCtaLink';
+import ThemeHubNav from '@/components/ThemeHubNav';
+import { getThemeHubsPagePath } from '@/lib/theme-hubs';
+import { GA_EVENTS } from '@/lib/analytics/events';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
 import type { ArticleSchool } from '@/lib/types/articles';
 
@@ -176,19 +179,34 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           </div>
         )}
 
+        <ThemeHubNav
+          heading="ほかのテーマも調べる"
+          hubIds={['tuition', 'public', 'schooling', 'transfer', 'demerit', 'enrollment']}
+          compact
+          className="mb-8"
+        />
+
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">その他の特集ページ</h2>
-          <Link
-            href={appPath('/features')}
-            className="text-blue-600 hover:text-blue-700 underline"
-          >
-            特集ページ一覧を見る →
-          </Link>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <Link
+              href={appPath('/features')}
+              className="text-blue-600 hover:text-blue-700 underline"
+            >
+              特集ページ一覧を見る →
+            </Link>
+            <Link
+              href={getThemeHubsPagePath()}
+              className="text-blue-600 hover:text-blue-700 underline"
+            >
+              選び方ガイドを見る →
+            </Link>
+          </div>
           <p className="mt-6 text-sm text-gray-600">
             ご自身の体験を共有すると、後から検討する方の参考になります。
           </p>
           <SurveyCtaLink
-            eventName="cta_survey"
+            eventName={GA_EVENTS.reviewPostClick}
             eventParams={{ source: 'feature_article_footer', article_slug: article.slug }}
             className="mt-2 inline-block text-rose-600 font-semibold text-sm hover:underline"
           >

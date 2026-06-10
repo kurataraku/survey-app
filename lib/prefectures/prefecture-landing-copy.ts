@@ -5,6 +5,16 @@ export type PrefectureMediaStrengthItem = {
   description: string;
 };
 
+/** 「{県} 通信制高校 おすすめ」系の検索意図に合わせた title（全都道府県共通） */
+export function getPrefectureLandingTitle(prefecture: string): string {
+  return `${prefecture}の通信制高校おすすめ｜口コミ・評判で比較`;
+}
+
+/** ページ上のH1（titleと同じキーワードを含めつつ自然な日本語にする） */
+export function getPrefectureLandingHeading(prefecture: string): string {
+  return `${prefecture}の通信制高校おすすめ比較`;
+}
+
 /** H1直下のリード文 */
 export function getPrefectureLandingSubtitle(prefecture: string): string {
   return `${prefecture}の通信制高校を、口コミと項目別評価から比較できる一覧です。`;

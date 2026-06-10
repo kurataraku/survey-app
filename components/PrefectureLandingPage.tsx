@@ -13,11 +13,15 @@ import {
   buildReasonGroupReviewsPath,
   REVIEW_REASON_GROUPS,
 } from '@/lib/reviews/reason-groups';
+import ThemeHubNav from '@/components/ThemeHubNav';
 import {
+  getPrefectureLandingHeading,
   getPrefectureLandingMediaStrengths,
   getPrefectureLandingMediaStrengthsLead,
   getPrefectureLandingSubtitle,
 } from '@/lib/prefectures/prefecture-landing-copy';
+import RequestNotificationCta from '@/components/RequestNotificationCta';
+import { GA_EVENTS } from '@/lib/analytics/events';
 import { PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING } from '@/lib/schools/prefecture-landing-constants';
 
 type SchoolCardGlobalAverages = NonNullable<
@@ -62,6 +66,11 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
       href: appPath(`/reviews?prefecture=${prefParam}`),
       label: `${prefecture}の通信制高校の口コミを一覧で見る`,
       description: '地域を絞った口コミを新着順で確認できます。',
+    },
+    {
+      href: appPath('/features/topics'),
+      label: '学費・公立・スクーリングなど選び方ガイド',
+      description: '気になるテーマから記事を読み、学校比較につなげられます。',
     },
   ];
   return (
@@ -111,14 +120,12 @@ function formatNationalDiffLabel(
 
 function SummaryStats({
   totalSchools,
-  schoolsWithReviewsCount,
   totalReviewCount,
   averageOverallSatisfaction,
   averageTuitionSatisfaction,
   globalAverages,
 }: {
   totalSchools: number;
-  schoolsWithReviewsCount: number;
   totalReviewCount: number;
   averageOverallSatisfaction: number | null;
   averageTuitionSatisfaction: number | null;
@@ -126,7 +133,6 @@ function SummaryStats({
 }) {
   const cards: StatCard[] = [
     { label: '掲載校数', value: `${totalSchools}校` },
-    { label: '口コミ掲載校数', value: `${schoolsWithReviewsCount}校` },
     {
       label: '口コミ総数',
       value: totalReviewCount > 0 ? `${totalReviewCount}件` : '—',
@@ -379,7 +385,7 @@ export default function PrefectureLandingPage({
             ← 学校検索に戻る
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mt-2">
-            {prefecture}の通信制高校を口コミで比較
+            {getPrefectureLandingHeading(prefecture)}
           </h1>
           <p className="text-sm text-gray-500 mt-2">{getPrefectureLandingSubtitle(prefecture)}</p>
         </div>
@@ -390,7 +396,6 @@ export default function PrefectureLandingPage({
 
             <SummaryStats
               totalSchools={totalSchools}
-              schoolsWithReviewsCount={schoolsWithReviewsCount}
               totalReviewCount={totalReviewCount}
               averageOverallSatisfaction={averageOverallSatisfaction}
               averageTuitionSatisfaction={averageTuitionSatisfaction}
@@ -413,7 +418,7 @@ export default function PrefectureLandingPage({
                 <li>
                   <PrefectureLandingTrackedLink
                     href={appPath(`/simulator?prefecture=${prefParam}`)}
-                    eventName="prefecture_simulator_click"
+                    eventName={GA_EVENTS.diagnosisStartClick}
                     eventParams={{ prefecture, source: 'comparison_nav' }}
                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                   >
@@ -597,6 +602,18 @@ export default function PrefectureLandingPage({
                 ))}
               </ul>
             </section>
+
+            <ThemeHubNav
+              heading={`${prefecture}で気になるテーマから調べる`}
+              hubIds={['tuition', 'public', 'schooling', 'transfer']}
+              className="mb-8"
+            />
+
+            <RequestNotificationCta
+              source="prefecture_landing"
+              prefecture={prefecture}
+              className="mb-8"
+            />
 
             <InternalLinks prefecture={prefecture} />
           </>

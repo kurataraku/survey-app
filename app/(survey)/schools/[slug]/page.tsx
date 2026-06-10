@@ -16,7 +16,10 @@ import { FAQ_OLD_TO_NEW, FAQ_DISPLAY_ORDER } from '@/lib/seo-sections';
 import { parseAiSummarySections } from '@/lib/schools/parseAiSummarySections';
 import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
+import SchoolDetailViewTracker from '@/components/SchoolDetailViewTracker';
+import { getDecliningSchoolMetaOverride } from '@/lib/schools/declining-school-meta';
 import { normalizeSchoolMetaDescription } from '@/lib/schools/normalizeSchoolMetaDescription';
+import { normalizeSchoolMetaTitle } from '@/lib/schools/normalizeSchoolMetaTitle';
 
 // ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
 export const revalidate = 60;
@@ -51,15 +54,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
+  const decliningMeta = getDecliningSchoolMetaOverride(decodedSlug);
   const title =
-    school.ai_summary?.meta_title ||
-    (school.review_count > 0
-      ? `${school.name}の口コミ・評判｜学費・スクーリングも解説`
-      : `${school.name}の学校情報｜学費・スクーリング・口コミ掲載予定`);
-  const description = normalizeSchoolMetaDescription(
-    school.name,
-    school.ai_summary?.meta_description
-  );
+    decliningMeta?.title ??
+    normalizeSchoolMetaTitle(school.name, school.ai_summary?.meta_title, school.review_count);
+  const description =
+    decliningMeta?.description ??
+    normalizeSchoolMetaDescription(school.name, school.ai_summary?.meta_description);
 
   const keywords = [
     `${school.name} 口コミ`,
@@ -148,6 +149,12 @@ export default async function SchoolDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-blue-50/30 py-8">
+      <SchoolDetailViewTracker
+        schoolSlug={school.slug ?? decodedSlug}
+        schoolName={school.name}
+        prefecture={school.prefecture}
+        reviewCount={school.review_count}
+      />
       {faqSchema && <StructuredData data={faqSchema} />}
       <SchoolEducationalOrganizationJsonLd school={school} encodedSlug={encodedSlug} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

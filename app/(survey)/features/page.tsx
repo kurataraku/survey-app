@@ -43,6 +43,26 @@ export default async function FeaturesPage({ searchParams }: PageProps) {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">特集ページ</h1>
 
+          <Link
+            href={appPath('/features/topics')}
+            className="group mb-6 flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-3 md:px-5 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+          >
+            <span className="text-sm text-gray-700 leading-relaxed">
+              <span className="font-semibold text-blue-700">選び方ガイド</span>
+              <span className="mx-1.5 text-gray-400" aria-hidden>|</span>
+              学費・公立・スクーリング・転入など、テーマから記事を探せます
+            </span>
+            <svg
+              className="w-4 h-4 shrink-0 text-blue-600 group-hover:translate-x-0.5 transition-transform"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+
           <div className="flex gap-4 mb-6 border-b border-gray-200">
             <Link
               href={appPath('/features')}

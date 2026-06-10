@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BASE_PATH, appPath } from '@/lib/base-path';
+import { GA_EVENTS } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/track';
 
 export default function Header() {
   const pathname = usePathname();
@@ -60,6 +62,9 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() =>
+                    trackEvent(GA_EVENTS.diagnosisStartClick, { source: 'header_nav' })
+                  }
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-black transition-all ${
                     isActive(item.href)
                       ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md scale-105'
@@ -122,7 +127,10 @@ export default function Header() {
             {/* 診断バナー（モバイルメニュー最上部） */}
             <Link
               href={appPath('/simulator')}
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={() => {
+                trackEvent(GA_EVENTS.diagnosisStartClick, { source: 'header_mobile_banner' });
+                setIsMobileMenuOpen(false);
+              }}
               className="flex items-center gap-3 mx-0 mb-3 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 text-white shadow-sm active:scale-[0.98] transition-all"
             >
               <span className="text-2xl leading-none">🎯</span>

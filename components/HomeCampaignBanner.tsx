@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiPath, appPath } from '@/lib/base-path';
+import { GA_EVENTS } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/track';
 
 interface Campaign {
   id: string;
@@ -28,6 +30,7 @@ export default function HomeCampaignBanner() {
     <section className="mb-8" aria-label="口コミ協力キャンペーン">
       <Link
         href={appPath('/campaign')}
+        onClick={() => trackEvent(GA_EVENTS.ctaCampaignClick, { source: 'home_banner' })}
         className="group block relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 p-4 sm:p-7 md:p-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
       >
         <div

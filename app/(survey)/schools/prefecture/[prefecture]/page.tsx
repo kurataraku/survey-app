@@ -26,7 +26,10 @@ import StructuredData from '@/components/StructuredData';
 
 import { buildPrefectureLandingJsonLd } from '@/lib/prefectures/prefecture-landing-schema';
 
-import { getPrefectureLandingMetaDescription } from '@/lib/prefectures/prefecture-landing-copy';
+import {
+  getPrefectureLandingMetaDescription,
+  getPrefectureLandingTitle,
+} from '@/lib/prefectures/prefecture-landing-copy';
 import { PREFECTURE_LANDING_PAGE_SIZE } from '@/lib/schools/prefecture-landing-constants';
 
 
@@ -93,7 +96,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
   const highlights = await getPrefectureLandingHighlights(prefecture);
 
-  const title = `${prefecture}の通信制高校を口コミで比較`;
+  const title = getPrefectureLandingTitle(prefecture);
 
   const description = getPrefectureLandingMetaDescription(
 

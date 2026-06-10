@@ -5,6 +5,7 @@ import ReviewCardServer from '@/components/ReviewCardServer';
 import ArticleCardServer from '@/components/ArticleCardServer';
 import HomeHero from '@/components/HomeHero';
 import HomeCampaignBanner from '@/components/HomeCampaignBanner';
+import DiagnosisStartLink from '@/components/DiagnosisStartLink';
 import { getHomeData } from '@/lib/home/getHomeData';
 import { appPath } from '@/lib/base-path';
 
@@ -105,8 +106,9 @@ export default async function Home() {
         )}
         {/* シミュレーターバナー */}
         <section className="mb-12">
-          <Link
+          <DiagnosisStartLink
             href={appPath('/simulator')}
+            source="home_simulator_banner"
             className="group block relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 p-8 md:p-10 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01] active:scale-[0.99]"
           >
             {/* 装飾円 */}
@@ -147,7 +149,7 @@ export default async function Home() {
                 </div>
               </div>
             </div>
-          </Link>
+          </DiagnosisStartLink>
         </section>
 
         {data.latestArticles.length > 0 && (

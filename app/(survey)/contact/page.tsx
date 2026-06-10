@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiPath, appPath } from '@/lib/base-path';
+import { GA_EVENTS } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/track';
 
 interface ContactFormData {
   name: string;
@@ -13,8 +15,8 @@ interface ContactFormData {
   page_url: string;
 }
 
-export default function ContactPage() {
-  const router = useRouter();
+function ContactPageContent() {
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState<ContactFormData>({
     name: '',
     email: '',
@@ -27,15 +29,25 @@ export default function ContactPage() {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // 現在のURLを取得
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setFormData((prev) => ({
-        ...prev,
-        page_url: window.location.href,
-      }));
-    }
-  }, []);
+    if (typeof window === 'undefined') return;
+
+    const subjectParam = searchParams.get('subject');
+    const schoolParam = searchParams.get('school');
+    const defaultSubject = subjectParam?.trim() || '';
+    const defaultMessage = defaultSubject.includes('資料請求')
+      ? schoolParam
+        ? `${schoolParam}の資料請求を希望します。資料請求のご案内が可能になりましたら、メールでご連絡をお願いします。`
+        : '資料請求を希望します。気になっている学校：（学校名をご記入ください）'
+      : '';
+
+    setFormData((prev) => ({
+      ...prev,
+      page_url: window.location.href,
+      subject: prev.subject || defaultSubject,
+      message: prev.message || defaultMessage,
+    }));
+  }, [searchParams]);
 
   const validate = (): boolean => {
     const newErrors: Partial<ContactFormData> = {};
@@ -84,6 +96,13 @@ export default function ContactPage() {
 
       if (!response.ok) {
         throw new Error(data.error || '送信に失敗しました');
+      }
+
+      if (formData.subject.includes('資料請求')) {
+        trackEvent(GA_EVENTS.requestNotificationSubmit, {
+          source: searchParams.get('source') ?? 'contact_form',
+          school_name: searchParams.get('school') ?? undefined,
+        });
       }
 
       setSubmitStatus('success');
@@ -300,5 +319,13 @@ export default function ContactPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ContactPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 py-12" />}>
+      <ContactPageContent />
+    </Suspense>
   );
 }

@@ -5,6 +5,20 @@ const nextConfig: NextConfig = {
   experimental: {
     ppr: false,
   },
+  async redirects() {
+    return [
+      {
+        source: "/features/kanto-tsushin-setsumeikai-2024-schedule",
+        destination: "/features/kanto-tsushin-setsumeikai-2026-schedule",
+        permanent: true,
+      },
+      {
+        source: "/tsushin-kuchikomi/features/kanto-tsushin-setsumeikai-2024-schedule",
+        destination: "/tsushin-kuchikomi/features/kanto-tsushin-setsumeikai-2026-schedule",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return {
       beforeFiles: [

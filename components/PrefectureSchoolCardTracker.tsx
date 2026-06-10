@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { GA_EVENTS } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/track';
 
 interface PrefectureSchoolCardTrackerProps {
@@ -22,7 +23,7 @@ export default function PrefectureSchoolCardTracker({
         if (!anchor) return;
         const href = anchor.getAttribute('href') ?? '';
         if (!href.includes('/schools/')) return;
-        trackEvent('prefecture_school_detail_click', {
+        trackEvent(GA_EVENTS.regionSchoolClick, {
           prefecture,
           block: block ?? 'list',
           link_url: href,

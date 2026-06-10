@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import type { AttendanceStyle, SimScore, SimulatorState } from '@/lib/simulator/types';
 import { calcScore, axisMap } from '@/lib/simulator/scoring';
 import StepOpening from './StepOpening';
+import { GA_EVENTS } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/track';
 import StepSchoolType from './StepSchoolType';
 import StepSimulation from './StepSimulation';
 import StepResult from './StepResult';
@@ -142,7 +144,12 @@ export default function LifeSimulator({ prefecture }: LifeSimulatorProps) {
 
       <div className="max-w-lg mx-auto px-4 py-5">
         {state.step === 0 && (
-          <StepOpening onStart={() => goTo(1)} />
+          <StepOpening
+            onStart={() => {
+              trackEvent(GA_EVENTS.diagnosisStartClick, { source: 'simulator_opening' });
+              goTo(1);
+            }}
+          />
         )}
         {state.step === 1 && (
           <StepSchoolType onSelect={handleStyleSelect} />

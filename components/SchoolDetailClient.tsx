@@ -25,6 +25,9 @@ import {
   SCHOOL_REVIEWS_LIST_CTA_TITLE,
 } from '@/lib/schools/school-reviews-list-copy';
 import SurveyCtaLink from '@/components/SurveyCtaLink';
+import ThemeHubNav from '@/components/ThemeHubNav';
+import RequestNotificationCta from '@/components/RequestNotificationCta';
+import { GA_EVENTS } from '@/lib/analytics/events';
 import { getPrefecturePath } from '@/lib/prefectures';
 
 const CONCLUSION_MAX_CHARS = 350;
@@ -791,6 +794,21 @@ export default function SchoolDetailClient({
 
       {relatedSchools}
 
+      <ThemeHubNav
+        heading={`${school.name}を検討中の方がよく見るテーマ`}
+        hubIds={['tuition', 'schooling', 'transfer', 'demerit']}
+        compact
+        className="mb-8"
+      />
+
+      <RequestNotificationCta
+        source="school_detail"
+        schoolName={school.name}
+        schoolSlug={school.slug ?? encodedSlug}
+        prefecture={school.prefecture ?? undefined}
+        className="mb-8"
+      />
+
       {/* グラフブロック（詳細評価・みんなの傾向）— 全タブをDOMに出力してSSR/SEO対応 */}
       <div id="section-graph" className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">
         {school.review_count < GRAPH_HIDDEN_THRESHOLD ? (
@@ -799,7 +817,7 @@ export default function SchoolDetailClient({
               口コミ集計グラフは{school.review_count}件のため表示していません。
             </p>
             <SurveyCtaLink
-              eventName="cta_survey_from_school"
+              eventName={GA_EVENTS.reviewPostClick}
               eventParams={{ school_slug: school.slug ?? encodedSlug, placement: 'graph_empty' }}
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium"
             >
@@ -1116,7 +1134,7 @@ export default function SchoolDetailClient({
       <div id="section-reviews" className="mb-8">
         {!school.latest_reviews?.length && (
           <SurveyCtaLink
-            eventName="cta_survey_from_school"
+            eventName={GA_EVENTS.reviewPostClick}
             eventParams={{ school_slug: school.slug ?? encodedSlug, placement: 'no_featured_reviews' }}
             className="inline-block w-full text-center px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium text-sm"
           >
