@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { prefectures } from '@/lib/prefectures';
@@ -30,12 +30,20 @@ function SchoolsPageContent() {
   const [prefectureFilter, setPrefectureFilter] = useState(searchParams.get('prefecture') || '');
 
   const limit = 20;
+  const fetchRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get('q') || '');
+    setStatusFilter(searchParams.get('status') || '');
+    setPrefectureFilter(searchParams.get('prefecture') || '');
+  }, [searchParams]);
 
   useEffect(() => {
     fetchSchools();
   }, [page, searchQuery, statusFilter, prefectureFilter]);
 
   const fetchSchools = async () => {
+    const requestId = ++fetchRequestIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -65,6 +73,7 @@ function SchoolsPageContent() {
       }
 
       const data = await response.json();
+      if (requestId !== fetchRequestIdRef.current) return;
 
       // 各学校の口コミ数を取得
       const schoolsWithStats = await Promise.all(
@@ -88,14 +97,19 @@ function SchoolsPageContent() {
         })
       );
 
+      if (requestId !== fetchRequestIdRef.current) return;
+
       setSchools(schoolsWithStats);
       setTotal(data.total);
       setTotalPages(data.total_pages);
     } catch (error) {
+      if (requestId !== fetchRequestIdRef.current) return;
       console.error('学校一覧取得エラー:', error);
       alert(error instanceof Error ? error.message : '学校一覧の取得に失敗しました');
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -210,9 +224,14 @@ function SchoolsPageContent() {
             </div>
           </form>
 
-          {total > 0 && (
+          {searchQuery.trim() && !loading && (
             <p className="text-gray-600">
-              {total}件の学校が見つかりました
+              {total > 0 ? `${total}件の学校が見つかりました` : '該当する学校は見つかりませんでした'}
+            </p>
+          )}
+          {!searchQuery.trim() && total > 0 && !loading && (
+            <p className="text-gray-600">
+              {total}件の学校
             </p>
           )}
         </div>

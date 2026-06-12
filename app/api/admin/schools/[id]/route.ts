@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
+import { sanitizeCampusLocationsInput } from '@/lib/schools/campusLocations';
 import { normalizeText } from '@/lib/utils';
 
 export async function GET(
@@ -85,6 +86,7 @@ export async function PUT(
       intro,
       highlights,
       faq,
+      official_url,
       is_public,
       status,
     } = body;
@@ -101,14 +103,7 @@ export async function PUT(
     const prefecturesArray = prefectures && Array.isArray(prefectures) && prefectures.length > 0
       ? prefectures
       : [prefecture];
-    const campusLocationsArray = Array.isArray(campus_locations)
-      ? campus_locations
-          .map((location) => ({
-            prefecture: String(location?.prefecture || '').trim(),
-            city: String(location?.city || '').trim(),
-          }))
-          .filter((location) => location.prefecture && location.city)
-      : [];
+    const campusLocationsArray = sanitizeCampusLocationsInput(campus_locations);
 
     // 学校名の重複チェック（自分自身を除く）
     const { data: nameConflict } = await supabase
@@ -169,6 +164,18 @@ export async function PUT(
       faq: faq || null,
       is_public: is_public !== undefined ? is_public : true,
     };
+
+    // official_url が指定されている場合のみ更新（http/https のみ許可）
+    if (official_url !== undefined) {
+      const trimmedUrl = typeof official_url === 'string' ? official_url.trim() : '';
+      if (trimmedUrl && !/^https?:\/\//i.test(trimmedUrl)) {
+        return NextResponse.json(
+          { error: '公式サイトURLは http:// または https:// で始まる必要があります' },
+          { status: 400 }
+        );
+      }
+      updateData.official_url = trimmedUrl || null;
+    }
     
     // statusが指定されている場合は更新に含める
     if (status !== undefined) {

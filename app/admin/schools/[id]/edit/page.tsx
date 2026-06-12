@@ -7,6 +7,8 @@ import SchoolEditor from '@/components/SchoolEditor';
 import ReviewManagementList from '@/components/ReviewManagementList';
 import AISummaryEditor from '@/components/AISummaryEditor';
 import SeoSectionsEditor from '@/components/SeoSectionsEditor';
+import TuitionEditor from '@/components/TuitionEditor';
+import CourseEditor from '@/components/CourseEditor';
 import { SchoolFormData, School } from '@/lib/types/schools';
 import { apiPath, appPath } from '@/lib/base-path';
 import { normalizeSearchQuery } from '@/lib/utils';
@@ -24,7 +26,7 @@ export default function EditSchoolPage() {
   const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'reviews' | 'ai-summary' | 'seo-sections'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'reviews' | 'ai-summary' | 'seo-sections' | 'tuition' | 'courses'>('basic');
   const [prefectureStats, setPrefectureStats] = useState<PrefectureStat[]>([]);
   const [totalResponses, setTotalResponses] = useState(0);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -338,6 +340,26 @@ export default function EditSchoolPage() {
             >
               評判の詳細・FAQ
             </button>
+            <button
+              onClick={() => setActiveTab('tuition')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'tuition'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              学費目安
+            </button>
+            <button
+              onClick={() => setActiveTab('courses')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'courses'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              コース
+            </button>
           </nav>
         </div>
 
@@ -587,6 +609,7 @@ export default function EditSchoolPage() {
                   intro: school.intro || '',
                   highlights: school.highlights || [],
                   faq: school.faq || [],
+                  official_url: school.official_url || '',
                   is_public: school.is_public,
                 }}
                 onSubmit={handleSubmit}
@@ -597,6 +620,10 @@ export default function EditSchoolPage() {
             <ReviewManagementList schoolId={id} />
           ) : activeTab === 'ai-summary' ? (
             <AISummaryEditor schoolId={id} />
+          ) : activeTab === 'tuition' ? (
+            <TuitionEditor schoolId={id} />
+          ) : activeTab === 'courses' ? (
+            <CourseEditor schoolId={id} />
           ) : (
             <SeoSectionsEditor schoolId={id} />
           )}

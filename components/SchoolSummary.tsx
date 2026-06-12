@@ -7,6 +7,7 @@ import Badge from './ui/Badge';
 import { appPath } from '@/lib/base-path';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 import { CheckCircle2, XCircle, Bus } from 'lucide-react';
+import { formatCampusNearestStations, getCampusNearestStations } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation } from '@/lib/types/schools';
 
 function ratingVsGlobalLabel(
@@ -91,9 +92,7 @@ export default function SchoolSummary({
     });
   }
   const displayPrefectures = Array.from(allPrefecturesSet);
-  const campusCities = Array.from(
-    new Set((campusLocations ?? []).map((location) => `${location.prefecture}${location.city}`))
-  );
+  const visibleCampusLocations = campusLocations ?? [];
 
   const showTuitionCommuteTrend =
     reviewCount >= MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND &&
@@ -126,18 +125,28 @@ export default function SchoolSummary({
             </Badge>
           ))}
         </div>
-        {campusCities.length > 0 && (
+        {visibleCampusLocations.length > 0 && (
           <div className="mt-3">
             <p className="text-xs font-semibold text-gray-500 mb-1">キャンパス所在地</p>
-            <div className="flex flex-wrap gap-1.5">
-              {campusCities.map((label) => (
-                <span
-                  key={label}
-                  className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-100"
-                >
-                  {label}
-                </span>
-              ))}
+            <div className="space-y-1.5">
+              {visibleCampusLocations.map((location, index) => {
+                const nearestStationsLabel = formatCampusNearestStations(
+                  getCampusNearestStations(location)
+                );
+                return (
+                <div key={`${location.prefecture}-${location.city}-${index}`} className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-100">
+                    {location.prefecture}
+                    {location.city}
+                  </span>
+                  {nearestStationsLabel && (
+                    <span className="text-xs text-gray-600">
+                      最寄り駅：{nearestStationsLabel}
+                    </span>
+                  )}
+                </div>
+              );
+              })}
             </div>
           </div>
         )}

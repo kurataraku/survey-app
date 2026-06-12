@@ -3,6 +3,10 @@ export type SchoolInstitutionType = 'public' | 'private' | 'support';
 export type SchoolCampusLocation = {
   prefecture: string;
   city: string;
+  /** 最寄り駅（最大2件。例: ["JR山手線 新宿駅", "丸の内線 新宿三丁目駅"]） */
+  nearest_stations?: string[];
+  /** @deprecated nearest_stations を使用。旧データ読み込み用 */
+  nearest_station?: string;
 };
 
 export interface School {
@@ -16,6 +20,7 @@ export interface School {
   intro: string | null;
   highlights: string[] | null; // JSONB配列
   faq: Array<{ question: string; answer: string }> | null; // JSONB配列
+  official_url?: string | null; // 公式サイトURL（学費AI抽出の起点。管理用）
   is_public: boolean;
   status?: string; // 'active' | 'pending' | 'merged'
   created_at: string;
@@ -32,6 +37,7 @@ export interface SchoolFormData {
   intro: string;
   highlights: string[];
   faq: Array<{ question: string; answer: string }>;
+  official_url?: string;
   is_public: boolean;
 }
 

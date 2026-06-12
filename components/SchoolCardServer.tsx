@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { appPath } from '@/lib/base-path';
+import { buildNearestStationSummary } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
+import type { PublicTuitionEstimate } from '@/lib/types/tuition';
+import { buildTuitionCardSummary } from '@/lib/tuition/format';
+import type { PublicCourseListing } from '@/lib/types/courses';
+import { buildCourseCardSummary } from '@/lib/courses/format';
 
 interface SchoolCardServerProps {
   id: string;
@@ -29,6 +34,10 @@ interface SchoolCardServerProps {
   careerSupportAvg?: number | null;
   campusLifeAvg?: number | null;
   tuitionAvg?: number | null;
+  /** 公開済みの学費目安（参考目安）。未公開なら非表示 */
+  tuitionEstimate?: PublicTuitionEstimate | null;
+  /** 公開済みのコース一覧（公式サイト引用）。未公開なら非表示 */
+  courseListing?: PublicCourseListing | null;
   reviewTendency?: { good: string[]; improvement: string[] } | null;
   primaryMetric?: 'overall' | 'reviews' | 'support' | 'tuition';
   globalAverages?: {
@@ -181,6 +190,8 @@ export default function SchoolCardServer({
   careerSupportAvg,
   campusLifeAvg,
   tuitionAvg,
+  tuitionEstimate,
+  courseListing,
   reviewTendency,
   primaryMetric = 'overall',
   globalAverages,
@@ -255,6 +266,9 @@ export default function SchoolCardServer({
       globalAvg: ga?.overall_satisfaction_avg ?? null,
     };
   })();
+  const tuitionSummary = tuitionEstimate ? buildTuitionCardSummary(tuitionEstimate) : null;
+  const courseSummary = buildCourseCardSummary(courseListing);
+  const nearestStationSummary = buildNearestStationSummary(campusLocations, matchedPrefecture);
   /** ヘッダーに総合があるため、ここでは詳細項目のみ（重複を避ける） */
   const categoryRatings = [
     { label: '柔軟さ', value: flexibilityAvg, globalAvg: ga?.flexibility_rating_avg ?? null },
@@ -328,6 +342,30 @@ export default function SchoolCardServer({
           </div>
         )}
         <CampusLocationBadges locations={campusLocations} matchedPrefecture={matchedPrefecture} />
+
+        {nearestStationSummary && (
+          <p className="text-xs text-gray-600">
+            <span className="font-semibold text-gray-700">最寄り駅：</span>
+            {nearestStationSummary}
+          </p>
+        )}
+
+        {/* 学費目安（参考目安・公開済みデータがある学校のみ） */}
+        {tuitionSummary && (
+          <p className="text-xs text-gray-600">
+            <span className="font-semibold text-gray-700">学費目安：</span>
+            {tuitionSummary}
+          </p>
+        )}
+
+        {/* コース一覧（公式サイト引用・公開済みデータがある学校のみ。学費とは別の行に分ける） */}
+        {courseSummary && (
+          <p className="text-xs text-gray-600">
+            <span className="font-semibold text-gray-700">コース：</span>
+            {courseSummary}
+            <span className="text-gray-400 ml-1">（公式サイトより）</span>
+          </p>
+        )}
 
         {/* 学校紹介 */}
         {intro && (

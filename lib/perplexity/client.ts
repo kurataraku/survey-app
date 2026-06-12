@@ -45,6 +45,18 @@ export interface PerplexityCampusLocationsResult {
   };
 }
 
+export interface PerplexityOfficialUrlResult {
+  officialUrl: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+  citations: string[];
+  tokensUsed: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+}
+
 function getPerplexityApiKey(): string {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey) {
@@ -179,6 +191,104 @@ export async function callPerplexityForSummary(
 
   return {
     summaryText: cleaned,
+    citations,
+    tokensUsed: {
+      prompt: data.usage?.prompt_tokens || 0,
+      completion: data.usage?.completion_tokens || 0,
+      total: data.usage?.total_tokens || 0,
+    },
+  };
+}
+
+/**
+ * 学校の公式サイトURLのみを特定する（金額は一切聞かない）。
+ * 学費抽出のオプトインフォールバック用。結果は人間が確認する前提。
+ */
+export async function callPerplexityForOfficialUrl(
+  schoolName: string
+): Promise<PerplexityOfficialUrlResult> {
+  const apiKey = getPerplexityApiKey();
+  const prompt = `通信制高校・サポート校「${schoolName}」の公式サイトのトップページURLを特定してください。
+
+判定ルール:
+- 学校自身（または運営する学校法人）が運営する公式サイトのみを対象とする
+- まとめサイト・比較サイト・口コミサイト・Wikipediaは公式サイトではない
+- 公式サイトが特定できない場合は official_url を null にする
+
+出力はJSONのみ:
+{
+  "official_url": "https://..." | null,
+  "confidence": "high" | "medium" | "low",
+  "reason": "判定理由を80字以内"
+}`;
+
+  const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'sonar',
+      messages: [
+        {
+          role: 'system',
+          content:
+            '日本の通信制高校・サポート校の公式サイトURLを特定する専門家です。公式サイト以外のURLは返さないでください。',
+        },
+        { role: 'user', content: prompt },
+      ],
+      web_search_options: { search_context_size: 'medium' },
+      temperature: 0.1,
+      max_tokens: 300,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Perplexity APIキーが無効です。Vercelの環境変数 PERPLEXITY_API_KEY を確認してください。'
+      );
+    }
+    const errorBody = await response.text().catch(() => '');
+    const shortBody = errorBody.length > 200 ? errorBody.slice(0, 200) + '...' : errorBody;
+    throw new Error(
+      `Perplexity API エラー (${response.status}): ${shortBody || response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  const citations: string[] = data.citations || [];
+
+  const jsonText = content
+    .trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  let parsed: { official_url?: unknown; confidence?: string; reason?: string };
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    throw new Error(`Perplexity API のJSON解析に失敗しました: ${content.slice(0, 160)}`);
+  }
+
+  const officialUrl =
+    typeof parsed.official_url === 'string' && /^https?:\/\//i.test(parsed.official_url.trim())
+      ? parsed.official_url.trim()
+      : null;
+
+  const confidence =
+    parsed.confidence === 'high' || parsed.confidence === 'medium' || parsed.confidence === 'low'
+      ? parsed.confidence
+      : 'low';
+
+  return {
+    officialUrl,
+    confidence,
+    reason: typeof parsed.reason === 'string' ? parsed.reason.trim().slice(0, 120) : '',
     citations,
     tokensUsed: {
       prompt: data.usage?.prompt_tokens || 0,

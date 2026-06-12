@@ -1,8 +1,13 @@
 import { cache } from 'react';
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
+import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
 import { getNormalizedSchoolSearchTerms } from '@/lib/utils';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
+import type { PublicTuitionEstimate } from '@/lib/types/tuition';
+import { fetchPublicTuitionEstimates } from '@/lib/tuition/getTuitionEstimates';
+import type { PublicCourseListing } from '@/lib/types/courses';
+import { fetchPublicCourseListings } from '@/lib/courses/getCourseListings';
 
 export interface SearchSchool {
   id: string;
@@ -30,6 +35,10 @@ export interface SearchSchool {
   campus_life_avg: number | null;
   tuition_avg: number | null;
   review_tendency: { good: string[]; improvement: string[] } | null;
+  /** 公開済みの学費目安（参考目安）。未公開なら null */
+  tuition_estimate: PublicTuitionEstimate | null;
+  /** 公開済みのコース一覧（公式サイト引用）。未公開なら null */
+  course_listing: PublicCourseListing | null;
 }
 
 export interface SearchSchoolsParams {
@@ -70,20 +79,6 @@ function parseRating(val: unknown): number | null {
   return !isNaN(n) && n >= 1 && n <= 5 && n !== 6 ? n : null;
 }
 
-function normalizeCampusLocations(value: unknown): SchoolCampusLocation[] | null {
-  if (!Array.isArray(value)) return null;
-  const locations = value
-    .map((location) => {
-      if (!location || typeof location !== 'object') return null;
-      const record = location as Record<string, unknown>;
-      const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
-      const city = typeof record.city === 'string' ? record.city.trim() : '';
-      return prefecture && city ? { prefecture, city } : null;
-    })
-    .filter((location): location is SchoolCampusLocation => Boolean(location));
-  return locations.length > 0 ? locations : null;
-}
-
 type SupabaseForSchools = ReturnType<typeof createSupabaseClientWithLargeHeaders>;
 
 /**
@@ -97,7 +92,7 @@ async function fetchSearchSchoolsWithStats(
 
   const schoolIds = schoolsList.map((s) => s.id);
 
-  const [statsResult, tendencyResult] = await Promise.all([
+  const [statsResult, tendencyResult, tuitionEstimates, courseListings] = await Promise.all([
     supabase
       .from('survey_responses')
       .select('school_id, overall_satisfaction, good_comment, bad_comment, created_at, answers')
@@ -110,6 +105,8 @@ async function fetchSearchSchoolsWithStats(
       .eq('kind', 'review_tendency')
       .is('topic', null)
       .eq('status', 'published'),
+    fetchPublicTuitionEstimates(supabase, schoolIds),
+    fetchPublicCourseListings(supabase, schoolIds),
   ]);
 
   type StatsEntry = {
@@ -271,6 +268,8 @@ async function fetchSearchSchoolsWithStats(
       campus_life_avg: avg(s.campusLife),
       tuition_avg: avg(s.tuition),
       review_tendency: tendencyMap.get(school.id) ?? null,
+      tuition_estimate: tuitionEstimates.get(school.id) ?? null,
+      course_listing: courseListings.get(school.id) ?? null,
     };
   });
 }

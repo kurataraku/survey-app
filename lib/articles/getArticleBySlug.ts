@@ -31,6 +31,8 @@ function searchSchoolFallback(
     campus_life_avg: null,
     tuition_avg: null,
     review_tendency: null,
+    tuition_estimate: null,
+    course_listing: null,
   };
 }
 

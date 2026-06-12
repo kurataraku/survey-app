@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getCampusNearestStationSlots } from '@/lib/schools/campusLocations';
 import { SchoolFormData } from '@/lib/types/schools';
 import { generateSlug } from '@/lib/utils';
 import { prefectures } from '@/lib/prefectures';
@@ -33,6 +34,7 @@ export default function SchoolEditor({
     intro: initialData?.intro || '',
     highlights: initialData?.highlights || [],
     faq: initialData?.faq || [],
+    official_url: initialData?.official_url || '',
     is_public: initialData?.is_public !== undefined ? initialData.is_public : true,
   });
 
@@ -196,7 +198,7 @@ export default function SchoolEditor({
           キャンパス所在地（市区町村）
         </legend>
         <p className="text-sm text-gray-500 mb-3">
-          都道府県ページや学校詳細で、市区町村バッジとして表示します。同じ都道府県に複数キャンパスがある場合は複数追加してください。
+          都道府県ページや学校詳細で、市区町村・最寄り駅として表示します。同じ都道府県に複数キャンパスがある場合は複数追加してください。
         </p>
         <div className="flex justify-end mb-2">
           <button
@@ -206,7 +208,7 @@ export default function SchoolEditor({
                 ...prev,
                 campus_locations: [
                   ...prev.campus_locations,
-                  { prefecture: prev.prefecture || '', city: '' },
+                  { prefecture: prev.prefecture || '', city: '', nearest_stations: [] },
                 ],
               }))
             }
@@ -216,8 +218,10 @@ export default function SchoolEditor({
           </button>
         </div>
         <div className="space-y-3">
-          {formData.campus_locations.map((location, index) => (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end border border-gray-200 rounded-lg p-3">
+          {formData.campus_locations.map((location, index) => {
+            const [station1, station2] = getCampusNearestStationSlots(location);
+            return (
+            <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-end border border-gray-200 rounded-lg p-3">
               <div>
                 <label htmlFor={`campus-location-prefecture-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
                   都道府県
@@ -258,6 +262,48 @@ export default function SchoolEditor({
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+              <div className="space-y-2">
+                <div>
+                  <label htmlFor={`campus-location-station-1-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                    最寄り駅（1）
+                  </label>
+                  <input
+                    id={`campus-location-station-1-${index}`}
+                    type="text"
+                    value={station1}
+                    onChange={(e) => {
+                      const next = [...formData.campus_locations];
+                      const [, second] = getCampusNearestStationSlots(next[index]);
+                      const stations = [e.target.value, second].filter((value) => value.trim().length > 0);
+                      next[index] = { ...next[index], nearest_stations: stations };
+                      setFormData((prev) => ({ ...prev, campus_locations: next }));
+                    }}
+                    placeholder="例: JR山手線 新宿駅"
+                    autoComplete="off"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor={`campus-location-station-2-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                    最寄り駅（2）
+                  </label>
+                  <input
+                    id={`campus-location-station-2-${index}`}
+                    type="text"
+                    value={station2}
+                    onChange={(e) => {
+                      const next = [...formData.campus_locations];
+                      const [first] = getCampusNearestStationSlots(next[index]);
+                      const stations = [first, e.target.value].filter((value) => value.trim().length > 0);
+                      next[index] = { ...next[index], nearest_stations: stations };
+                      setFormData((prev) => ({ ...prev, campus_locations: next }));
+                    }}
+                    placeholder="例: 丸の内線 新宿三丁目駅（任意）"
+                    autoComplete="off"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -271,7 +317,8 @@ export default function SchoolEditor({
                 削除
               </button>
             </div>
-          ))}
+          );
+          })}
           {formData.campus_locations.length === 0 && (
             <p className="text-sm text-gray-500">所在地は未登録です。追加ボタンで登録できます。</p>
           )}
@@ -345,6 +392,25 @@ export default function SchoolEditor({
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="学校の紹介文を入力してください（AIで生成ボタンで公式サイトから要約を生成できます）"
         />
+      </div>
+
+      <div>
+        <label htmlFor="official_url" className="block text-sm font-medium text-gray-700 mb-1">
+          公式サイトURL
+        </label>
+        <input
+          type="url"
+          id="official_url"
+          name="official_url"
+          value={formData.official_url || ''}
+          onChange={(e) => setFormData((prev) => ({ ...prev, official_url: e.target.value }))}
+          placeholder="https://example.ac.jp/"
+          autoComplete="url"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <p className="mt-1 text-sm text-gray-500">
+          学費情報のAI抽出の起点として使用します（ユーザー向けページには表示されません）。
+        </p>
       </div>
 
       <div>

@@ -24,6 +24,8 @@ import { getAppBaseUrl } from '@/lib/env-check';
 
 import StructuredData from '@/components/StructuredData';
 
+import TuitionDisclaimer from '@/components/TuitionDisclaimer';
+
 import { buildPrefectureLandingJsonLd } from '@/lib/prefectures/prefecture-landing-schema';
 
 import {
@@ -296,6 +298,10 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
             <p className="text-gray-600 mb-4">全{data.total}校（{page}ページ目）</p>
 
+            {data.schools.some((school) => school.tuition_estimate) && (
+              <TuitionDisclaimer className="mb-4" />
+            )}
+
             <div className="space-y-4 mb-8">
 
               {data.schools.map((school) => (
@@ -355,6 +361,10 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
                   campusLifeAvg={school.campus_life_avg}
 
                   tuitionAvg={school.tuition_avg}
+
+                  tuitionEstimate={school.tuition_estimate}
+
+                  courseListing={school.course_listing}
 
                   reviewTendency={school.review_tendency}
 

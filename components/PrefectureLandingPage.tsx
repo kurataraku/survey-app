@@ -21,6 +21,7 @@ import {
   getPrefectureLandingSubtitle,
 } from '@/lib/prefectures/prefecture-landing-copy';
 import RequestNotificationCta from '@/components/RequestNotificationCta';
+import TuitionDisclaimer from '@/components/TuitionDisclaimer';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING } from '@/lib/schools/prefecture-landing-constants';
 
@@ -264,6 +265,8 @@ function SchoolHighlightGrid({
             careerSupportAvg={school.career_support_avg ?? undefined}
             campusLifeAvg={school.campus_life_avg ?? undefined}
             tuitionAvg={school.tuition_avg ?? undefined}
+            tuitionEstimate={school.tuition_estimate ?? undefined}
+            courseListing={school.course_listing ?? undefined}
             latestGoodComment={school.latest_good_comment ?? undefined}
             latestBadComment={school.latest_bad_comment ?? undefined}
             reviewExcerpts={school.review_excerpts}
@@ -516,6 +519,7 @@ export default function PrefectureLandingPage({
                 primaryMetric="tuition"
                 emptyMessage="学費満足度の口コミが十分にある学校がまだありません。"
               />
+              <TuitionDisclaimer className="mt-4" />
             </section>
 
             <InstitutionTypeSection

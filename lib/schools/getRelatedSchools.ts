@@ -1,4 +1,5 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
 export interface RelatedSchool {
@@ -23,20 +24,6 @@ interface GetRelatedSchoolsParams {
   prefecture: string | null;
   prefectures?: string[] | null;
   limit?: number;
-}
-
-function normalizeCampusLocations(value: unknown): SchoolCampusLocation[] | null {
-  if (!Array.isArray(value)) return null;
-  const locations = value
-    .map((location) => {
-      if (!location || typeof location !== 'object') return null;
-      const record = location as Record<string, unknown>;
-      const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
-      const city = typeof record.city === 'string' ? record.city.trim() : '';
-      return prefecture && city ? { prefecture, city } : null;
-    })
-    .filter((location): location is SchoolCampusLocation => Boolean(location));
-  return locations.length > 0 ? locations : null;
 }
 
 function parseRating(value: unknown): number | null {

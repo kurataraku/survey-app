@@ -366,6 +366,8 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
         highlights: null,
         intro: null,
         review_tendency: null,
+        tuition_estimate: null,
+        course_listing: null,
       };
     });
 

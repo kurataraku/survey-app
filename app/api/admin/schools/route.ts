@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
+import { searchAdminSchools } from '@/lib/schools/adminSearchSchools';
+import { sanitizeCampusLocationsInput } from '@/lib/schools/campusLocations';
 import { normalizeText } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
@@ -28,47 +30,17 @@ export async function GET(request: NextRequest) {
     const prefecture = searchParams.get('prefecture') || '';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = parseInt(searchParams.get('limit') || '20', 10);
-    const offset = (page - 1) * limit;
 
-    // 学校検索クエリを構築（非公開含む）
-    let query = supabase
-      .from('schools')
-      .select('*', { count: 'exact' });
-
-    // 学校名での検索
-    if (q) {
-      query = query.ilike('name', `%${q}%`);
-    }
-
-    // statusフィルタ
-    if (status) {
-      query = query.eq('status', status);
-    }
-
-    // 都道府県フィルタ
-    // prefecturesがJSONB配列の場合、containsではなくeqでprefectureカラムをチェック
-    // prefecturesカラムが存在する場合は、その配列に含まれているか確認
-    if (prefecture) {
-      // prefectureカラムでの検索（後方互換性のため）
-      // 注: prefecturesカラムが存在する場合、そのデータは取得後にフィルタリングする必要があります
-      query = query.eq('prefecture', prefecture);
-    }
-
-    // ページネーションとソート
-    query = query
-      .order('name', { ascending: true })
-      .range(offset, offset + limit - 1);
-
-    const { data: schools, error, count } = await query;
-
-    if (error) {
+    try {
+      const result = await searchAdminSchools(supabase, { q, status, prefecture, page, limit });
+      return NextResponse.json(result);
+    } catch (error) {
       console.error('学校検索エラー:', error);
 
-      const message = error.message || '学校検索に失敗しました';
-      const code = (error as any).code;
-      const hint = (error as any).hint;
+      const message = error instanceof Error ? error.message : '学校検索に失敗しました';
+      const code = (error as { code?: string }).code;
+      const hint = (error as { hint?: string }).hint;
 
-      // 特定の不明なエラー（メッセージが \"{\" だけのケース）は、空結果を返してUIを壊さないようにする
       if (message === '{\"') {
         return NextResponse.json(
           {
@@ -88,14 +60,6 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    return NextResponse.json({
-      schools: schools || [],
-      total: count || 0,
-      page,
-      limit,
-      total_pages: Math.ceil((count || 0) / limit),
-    });
   } catch (error) {
     console.error('APIエラー:', error);
     return NextResponse.json(
@@ -150,14 +114,7 @@ export async function POST(request: NextRequest) {
     const prefecturesArray = prefectures && Array.isArray(prefectures) && prefectures.length > 0
       ? prefectures
       : [prefecture];
-    const campusLocationsArray = Array.isArray(campus_locations)
-      ? campus_locations
-          .map((location) => ({
-            prefecture: String(location?.prefecture || '').trim(),
-            city: String(location?.city || '').trim(),
-          }))
-          .filter((location) => location.prefecture && location.city)
-      : [];
+    const campusLocationsArray = sanitizeCampusLocationsInput(campus_locations);
 
     const nameNormalized = normalizeText(String(name));
 

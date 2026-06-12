@@ -27,13 +27,42 @@ import {
 import SurveyCtaLink from '@/components/SurveyCtaLink';
 import ThemeHubNav from '@/components/ThemeHubNav';
 import RequestNotificationCta from '@/components/RequestNotificationCta';
+import TuitionEstimateBlock from '@/components/TuitionEstimateBlock';
+import TuitionDisclaimer from '@/components/TuitionDisclaimer';
+import CourseListBlock from '@/components/CourseListBlock';
+import { hasDisplayableTuition } from '@/lib/tuition/format';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { getPrefecturePath } from '@/lib/prefectures';
 
 const CONCLUSION_MAX_CHARS = 350;
 const DECISION_LEAD_MAX_CHARS = 300;
 const FEW_REVIEWS_THRESHOLD = 5;
+/** 学費の納得感ブロックで「参考情報」注記を出す口コミ件数の上限 */
+const TUITION_SATISFACTION_FEW_REVIEWS_MAX = 3;
 const GRAPH_HIDDEN_THRESHOLD = 1;
+
+/** セクション末尾に置く口コミ一覧への軽量導線（長いページの途中離脱を防ぐ） */
+function ReviewsListInlineLink({
+  encodedSlug,
+  label = '口コミ一覧を見る',
+}: {
+  encodedSlug: string;
+  label?: string;
+}) {
+  return (
+    <div className="mt-5 pt-3 border-t border-gray-100 text-right">
+      <Link
+        href={appPath(`/schools/${encodedSlug}/reviews`)}
+        className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800"
+      >
+        {label}
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
+    </div>
+  );
+}
 
 function SchoolHubReviewsListCta({ encodedSlug }: { encodedSlug: string }) {
   return (
@@ -449,6 +478,15 @@ export default function SchoolDetailClient({
           <a href="#section-featured" className="shrink-0 rounded-full bg-blue-600 px-4 py-2 font-semibold text-white shadow-sm">
             口コミ
           </a>
+          <Link
+            href={appPath(`/schools/${encodedSlug}/reviews`)}
+            className="shrink-0 inline-flex items-center gap-1 rounded-full bg-white px-4 py-2 font-semibold text-blue-700 ring-1 ring-inset ring-blue-300 hover:bg-blue-50"
+          >
+            口コミ一覧
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
           <a href="#section-review-summary" className="shrink-0 rounded-full bg-blue-50 px-4 py-2 font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
             総評
           </a>
@@ -477,12 +515,6 @@ export default function SchoolDetailClient({
           <a href="#section-seo-body" className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-gray-700 ring-1 ring-inset ring-gray-200 hover:bg-gray-50">
             FAQ
           </a>
-          <Link
-            href={appPath(`/schools/${encodedSlug}/reviews`)}
-            className="shrink-0 rounded-full bg-white px-4 py-2 font-semibold text-blue-700 ring-1 ring-inset ring-blue-200 hover:bg-blue-50"
-          >
-            全口コミ
-          </Link>
         </div>
       </nav>
 
@@ -557,6 +589,12 @@ export default function SchoolDetailClient({
         ) : (
           <p className="text-gray-500 text-sm">要約はまだ公開されていません。口コミ一覧をご覧ください。</p>
         )}
+        {school.review_count > 0 && (
+          <ReviewsListInlineLink
+            encodedSlug={encodedSlug}
+            label="要約のもとになった口コミを一覧で読む"
+          />
+        )}
       </section>
 
       <div className="grid gap-8 mb-8">
@@ -626,8 +664,12 @@ export default function SchoolDetailClient({
         </section>
 
         <section id="section-tuition" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">学費・費用感</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">学費・費用感</h2>
+          {hasDisplayableTuition(school.tuition_estimate ?? null) && (
+            <TuitionDisclaimer variant="lead" className="mb-4" />
+          )}
           <div className="space-y-4 text-sm text-gray-700 leading-relaxed">
+            <TuitionEstimateBlock estimate={school.tuition_estimate ?? null} />
             {school.tuition_rating_avg != null ? (
               <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-4">
                 <p className="font-semibold text-gray-900 mb-1">口コミでの学費の納得感</p>
@@ -635,9 +677,9 @@ export default function SchoolDetailClient({
                   平均は{school.tuition_rating_avg.toFixed(1)} / 5.0です。
                   {tuitionComparison ? ` ${tuitionComparison}` : ''}
                 </p>
-                {school.review_count < FEW_REVIEWS_THRESHOLD && (
+                {school.review_count <= TUITION_SATISFACTION_FEW_REVIEWS_MAX && (
                   <p className="mt-2 text-amber-800">
-                    口コミは{school.review_count}件のため、費用感は参考情報として確認してください。
+                    口コミは{school.review_count}件のため、参考情報として確認してください。
                   </p>
                 )}
               </div>
@@ -658,9 +700,17 @@ export default function SchoolDetailClient({
                 <li>年度途中入学やコース変更時の費用</li>
               </ul>
             </div>
-            <p className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-700">
-              通信制高校の費用は、年度、コース、通学頻度、キャンパス、就学支援金、世帯年収などで変わります。このページでは実額を断定せず、最新金額は学校公式サイト、資料請求、説明会で確認する前提で掲載しています。
-            </p>
+            {!hasDisplayableTuition(school.tuition_estimate ?? null) && (
+              <p className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-700">
+                通信制高校の費用は、年度、コース、通学頻度、キャンパス、就学支援金、世帯年収などで変わります。このページでは実額を断定せず、最新金額は学校公式サイト、資料請求、説明会で確認する前提で掲載しています。
+              </p>
+            )}
+            {school.review_count > 0 && (
+              <ReviewsListInlineLink
+                encodedSlug={encodedSlug}
+                label="在校生・保護者の口コミを一覧で見る"
+              />
+            )}
           </div>
         </section>
 
@@ -701,7 +751,14 @@ export default function SchoolDetailClient({
         </section>
 
         <section id="section-learning-style" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">口コミ回答者から見たコース・学習スタイル</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">コース・学習スタイル</h2>
+          {school.course_listing && school.course_listing.courses.length > 0 && (
+            <CourseListBlock
+              listing={school.course_listing}
+              officialUrl={school.official_url ?? null}
+              className="mb-5"
+            />
+          )}
           <p className="text-sm text-gray-600 leading-relaxed mb-5">
             以下は学校公式のコース一覧ではなく、このサイトに口コミを投稿した人の回答分布です。学習スタイルや選んだ理由は、在籍コース・時期・キャンパスによって変わる可能性があります。
           </p>
@@ -1128,6 +1185,12 @@ export default function SchoolDetailClient({
             },
           ]}
         />
+        )}
+        {school.review_count > 0 && (
+          <ReviewsListInlineLink
+            encodedSlug={encodedSlug}
+            label="すべての口コミを一覧で見る・条件で絞り込む"
+          />
         )}
       </div>
 

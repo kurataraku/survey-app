@@ -5,7 +5,12 @@ import {
   publicSurveyResponsesOrFilter,
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
+import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation } from '@/lib/types/schools';
+import type { PublicTuitionEstimate } from '@/lib/types/tuition';
+import { fetchPublicTuitionEstimates } from '@/lib/tuition/getTuitionEstimates';
+import type { PublicCourseListing } from '@/lib/types/courses';
+import { fetchPublicCourseListings } from '@/lib/courses/getCourseListings';
 
 export interface SchoolWithStats {
   id: string;
@@ -76,6 +81,12 @@ export interface SchoolWithStats {
   faq_items?: Array<{ question: string; answer: string }>;
   /** 公開済み「良い点・改善してほしい点の傾向」（LLM要約3箇条ずつ） */
   review_tendency?: { good_points: string[]; improvement_points: string[] } | null;
+  /** 公開済みの学費目安（参考目安）。未公開なら null */
+  tuition_estimate?: PublicTuitionEstimate | null;
+  /** 公開済みのコース一覧（公式サイト引用）。未公開なら null */
+  course_listing?: PublicCourseListing | null;
+  /** 学校公式サイトURL（コース一覧の出典クレジット用） */
+  official_url?: string | null;
 }
 
 /** サイト全体の評価平均（1時間キャッシュ） */
@@ -166,25 +177,13 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
     return null;
   }
 
-  const campusLocations = Array.isArray(school.campus_locations)
-    ? school.campus_locations
-        .map((location: unknown) => {
-          if (!location || typeof location !== 'object') return null;
-          const record = location as Record<string, unknown>;
-          const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
-          const city = typeof record.city === 'string' ? record.city.trim() : '';
-          return prefecture && city ? { prefecture, city } : null;
-        })
-        .filter((location: SchoolCampusLocation | null): location is SchoolCampusLocation =>
-          Boolean(location)
-        )
-    : null;
+  const campusLocations = normalizeCampusLocations(school.campus_locations);
 
   const reviewSelect =
     'id, school_id, school_name, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers, schools(id, status)';
 
-  // 2. AI要約・SEO本文・良い点・改善点傾向・口コミデータ・グローバル平均を並列取得
-  const [aiSummaryResult, seoSectionsResult, reviewTendencyResult, rawReviewsResult, globalAverages] =
+  // 2. AI要約・SEO本文・良い点・改善点傾向・口コミデータ・グローバル平均・学費目安を並列取得
+  const [aiSummaryResult, seoSectionsResult, reviewTendencyResult, rawReviewsResult, globalAverages, tuitionEstimates, courseListings] =
     await Promise.all([
       supabase
         .from('school_ai_summaries')
@@ -214,6 +213,8 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
         .eq('is_public', true)
         .or(publicSurveyResponsesOrFilter(school.id, school.name)),
       getCachedGlobalAverages(),
+      fetchPublicTuitionEstimates(supabase, [school.id]),
+      fetchPublicCourseListings(supabase, [school.id]),
     ]);
 
   const resolvedAiSummary = aiSummaryResult.data;
@@ -472,5 +473,8 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
         return undefined;
       }
     })(),
+    tuition_estimate: tuitionEstimates.get(school.id) ?? null,
+    course_listing: courseListings.get(school.id) ?? null,
+    official_url: typeof school.official_url === 'string' && school.official_url.trim() ? school.official_url.trim() : null,
   };
 });
