@@ -32,6 +32,15 @@ npx tsx scripts/agent-setup.ts --all --publish=false
 # AIエージェント実行（単一学校）
 npx tsx scripts/agent-setup.ts --school-id=<uuid> --publish=true
 
+# 学費・コースの一括AI抽出（公式URL自動特定込み。すべてdraft保存・公開は人間）
+# 公式URL未登録校もPerplexityで特定して保存（未確認フラグ付き）
+npm run agent:school-info -- --prefecture=東京都 --limit=20 --resolve-url
+# 学費のみ / コースのみ
+npm run agent:school-info -- --prefecture=東京都 --only=tuition
+npm run agent:school-info -- --prefecture=東京都 --only=courses
+# 学費目安のみ一括抽出（従来CLI）
+npm run agent:tuition -- --prefecture=東京都 --limit=20 --use-perplexity
+
 # CSVから学校マスターインポート
 npm run seed:schools
 

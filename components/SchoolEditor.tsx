@@ -15,6 +15,10 @@ interface SchoolEditorProps {
   isSubmitting?: boolean;
   /** 学校ID（指定時のみ「AIで生成」ボタンを表示） */
   schoolId?: string;
+  /** 公式URLが人間確認済みか（false=AI推定など未確認の注意表示） */
+  officialUrlVerified?: boolean;
+  /** 公式URLの取得元（ai=AI推定の注意表示用） */
+  officialUrlSource?: string | null;
 }
 
 export default function SchoolEditor({
@@ -22,6 +26,8 @@ export default function SchoolEditor({
   onSubmit,
   isSubmitting = false,
   schoolId,
+  officialUrlVerified = true,
+  officialUrlSource = null,
 }: SchoolEditorProps) {
   const [generatingIntro, setGeneratingIntro] = useState(false);
   const [formData, setFormData] = useState<SchoolFormData>({
@@ -408,8 +414,17 @@ export default function SchoolEditor({
           autoComplete="url"
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        {formData.official_url && !officialUrlVerified && (
+          <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <span className="font-semibold">
+              {officialUrlSource === 'ai' ? 'AI推定・未確認のURLです' : '未確認のURLです'}
+            </span>
+            <br />
+            このURLが正しい公式サイトか確認し、問題なければそのまま保存してください（保存すると確認済みになります）。誤っていれば正しいURLに直して保存してください。
+          </div>
+        )}
         <p className="mt-1 text-sm text-gray-500">
-          学費情報のAI抽出の起点として使用します（ユーザー向けページには表示されません）。
+          学費・コース情報のAI抽出の起点として使用します（ユーザー向けページには表示されません）。
         </p>
       </div>
 

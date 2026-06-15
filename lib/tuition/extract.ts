@@ -265,11 +265,13 @@ function createExtractionPrompt(schoolName: string, pages: FetchedPage[]): strin
 1. 本文に明記されている金額のみを抽出する。推測・補完・相場からの類推は絶対にしない
 2. 本文に金額の記載がない項目は必ず null にする（0 にしない）
 3. 金額の単位は円（例: 35万円 → 350000）
-4. 複数コースがある場合、サマリーは全コースの最小金額〜最大金額のレンジとする
-5. 就学支援金の適用前/適用後が本文で明確に区別されている場合のみ support_fund を before/after にする。不明なら unknown
-6. 単位制（1単位あたり〇円）のみ記載で年間総額が書かれていない場合、年間額を計算で作らず null にする。その旨を notes に書く
-7. 抽出した金額の根拠となる本文の原文を evidence_excerpts にそのまま引用する（要約・言い換え禁止）
-8. 条件が不明な点・注意点は notes に記録する
+4. first_year_min / first_year_max は「初年度納入金」（入学後1年目に学校へ納める費用の合計・就学支援金適用前）のみを入れる。公式の「1年次」「初年度納入額」「入学時納入金合計」等に準拠する
+5. 複数コースがある場合、サマリー first_year は全コースの初年度納入金の最小〜最大レンジとする。コース別は plans に分ける
+6. annual_min/max, monthly_min/max は常に null（使用しない）
+7. 就学支援金の適用前/適用後が本文で明確に区別されている場合のみ support_fund を before/after にする。不明なら unknown。支援金適用後の金額を first_year に入れない
+8. 単位制（1単位あたり〇円）のみで初年度納入総額が書かれていない場合、総額を計算で作らず null にする。その旨を notes に書く
+9. 抽出した金額の根拠となる本文の原文を evidence_excerpts にそのまま引用する（要約・言い換え禁止）
+10. 条件が不明な点・注意点は notes に記録する
 
 【ページ本文】
 ${pagesText}
@@ -463,10 +465,10 @@ export async function extractTuitionFromOfficialSite(
     display_mode: foundTuitionInfo ? 'amounts' : 'contact_required',
     first_year_min: parsed.first_year_min,
     first_year_max: parsed.first_year_max,
-    annual_min: parsed.annual_min,
-    annual_max: parsed.annual_max,
-    monthly_min: parsed.monthly_min,
-    monthly_max: parsed.monthly_max,
+    annual_min: null,
+    annual_max: null,
+    monthly_min: null,
+    monthly_max: null,
     plans: parsed.plans,
     breakdown: parsed.breakdown,
     support_fund_note: parsed.support_fund_note,
@@ -485,18 +487,10 @@ export async function extractTuitionFromOfficialSite(
   const hasAnyAmount =
     input.first_year_min != null ||
     input.first_year_max != null ||
-    input.annual_min != null ||
-    input.annual_max != null ||
-    input.monthly_min != null ||
-    input.monthly_max != null ||
     input.plans.some(
       (p) =>
         p.first_year_min != null ||
-        p.first_year_max != null ||
-        p.annual_min != null ||
-        p.annual_max != null ||
-        p.monthly_min != null ||
-        p.monthly_max != null
+        p.first_year_max != null
     );
   if (!hasAnyAmount) {
     input.display_mode = 'contact_required';

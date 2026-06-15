@@ -9,7 +9,7 @@ import type {
   TuitionSourceType,
   TuitionSourceUrl,
 } from '@/lib/types/tuition';
-import { buildTuitionRangeLines } from '@/lib/tuition/format';
+import { buildTuitionRangeLines, TUITION_FIRST_YEAR_LABEL } from '@/lib/tuition/format';
 
 interface TuitionEditorProps {
   schoolId: string;
@@ -114,20 +114,20 @@ function formToPayload(form: FormState) {
     display_mode: form.display_mode,
     first_year_min: strToNum(form.first_year_min),
     first_year_max: strToNum(form.first_year_max),
-    annual_min: strToNum(form.annual_min),
-    annual_max: strToNum(form.annual_max),
-    monthly_min: strToNum(form.monthly_min),
-    monthly_max: strToNum(form.monthly_max),
+    annual_min: null,
+    annual_max: null,
+    monthly_min: null,
+    monthly_max: null,
     plans: form.plans.map((p) => ({
       label: p.label || null,
       course_name: p.course_name || null,
       attendance: p.attendance || null,
       first_year_min: strToNum(p.first_year_min),
       first_year_max: strToNum(p.first_year_max),
-      annual_min: strToNum(p.annual_min),
-      annual_max: strToNum(p.annual_max),
-      monthly_min: strToNum(p.monthly_min),
-      monthly_max: strToNum(p.monthly_max),
+      annual_min: null,
+      annual_max: null,
+      monthly_min: null,
+      monthly_max: null,
       support_fund: p.support_fund,
       note: p.note || null,
     })),
@@ -467,27 +467,18 @@ export default function TuitionEditor({ schoolId }: TuitionEditorProps) {
 
           {form.display_mode === 'amounts' && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">費用目安（円・税込相当の総額目安）</p>
+              <p className="text-sm font-medium text-gray-700">
+                {TUITION_FIRST_YEAR_LABEL}（円・税込相当・就学支援金適用前）
+              </p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                入学後1年目に学校へ納める費用の合計。公式の「1年次」「初年度納入額」等に準拠。全コースの最小〜最大を1本で入れる。
+              </p>
               <RangeInputs
-                label="初年度"
+                label={TUITION_FIRST_YEAR_LABEL}
                 minValue={form.first_year_min}
                 maxValue={form.first_year_max}
                 onChangeMin={(v) => setForm((prev) => ({ ...prev, first_year_min: v }))}
                 onChangeMax={(v) => setForm((prev) => ({ ...prev, first_year_max: v }))}
-              />
-              <RangeInputs
-                label="年間"
-                minValue={form.annual_min}
-                maxValue={form.annual_max}
-                onChangeMin={(v) => setForm((prev) => ({ ...prev, annual_min: v }))}
-                onChangeMax={(v) => setForm((prev) => ({ ...prev, annual_max: v }))}
-              />
-              <RangeInputs
-                label="月額"
-                minValue={form.monthly_min}
-                maxValue={form.monthly_max}
-                onChangeMin={(v) => setForm((prev) => ({ ...prev, monthly_min: v }))}
-                onChangeMax={(v) => setForm((prev) => ({ ...prev, monthly_max: v }))}
               />
             </div>
           )}
@@ -557,18 +548,11 @@ export default function TuitionEditor({ schoolId }: TuitionEditorProps) {
                     </select>
                   </div>
                   <RangeInputs
-                    label="初年度"
+                    label={TUITION_FIRST_YEAR_LABEL}
                     minValue={plan.first_year_min}
                     maxValue={plan.first_year_max}
                     onChangeMin={(v) => updatePlan(index, { first_year_min: v })}
                     onChangeMax={(v) => updatePlan(index, { first_year_max: v })}
-                  />
-                  <RangeInputs
-                    label="年間"
-                    minValue={plan.annual_min}
-                    maxValue={plan.annual_max}
-                    onChangeMin={(v) => updatePlan(index, { annual_min: v })}
-                    onChangeMax={(v) => updatePlan(index, { annual_max: v })}
                   />
                   <div className="flex items-center gap-2">
                     <input

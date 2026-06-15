@@ -32,8 +32,10 @@ export function formatTuitionRange(min: number | null, max: number | null): stri
   return null;
 }
 
+/** 公開画面・管理画面で使う学費サマリーのラベル（進学ネット等と同様、初年度納入金のみ掲載） */
+export const TUITION_FIRST_YEAR_LABEL = '初年度納入金';
+
 export interface TuitionRangeLine {
-  /** 例: 初年度 / 年間 / 月額 */
   label: string;
   /** 例: 約35万円〜75万円 */
   value: string;
@@ -57,30 +59,20 @@ export const TUITION_FALLBACK_SHORT: Record<Exclude<TuitionDisplayMode, 'amounts
  */
 export function buildTuitionRangeLines(estimate: PublicTuitionEstimate): TuitionRangeLine[] {
   if (estimate.display_mode !== 'amounts') return [];
-  const lines: TuitionRangeLine[] = [];
   const firstYear = formatTuitionRange(estimate.first_year_min, estimate.first_year_max);
-  if (firstYear) lines.push({ label: '初年度', value: firstYear });
-  const annual = formatTuitionRange(estimate.annual_min, estimate.annual_max);
-  if (annual) lines.push({ label: '年間', value: annual });
-  const monthly = formatTuitionRange(estimate.monthly_min, estimate.monthly_max);
-  if (monthly) lines.push({ label: '月額', value: monthly });
-  return lines;
+  if (!firstYear) return [];
+  return [{ label: TUITION_FIRST_YEAR_LABEL, value: firstYear }];
 }
 
 /**
- * カード用の1行サマリー（例: 「初年度 約35万円〜75万円 / 年間 約25万円〜65万円」）。
+ * カード用の1行サマリー（例: 「約35万円〜75万円」）。ラベルは呼び出し側で付ける。
  * 表示できる内容がなければ null（カード側で行ごと非表示にする）。
  */
 export function buildTuitionCardSummary(estimate: PublicTuitionEstimate): string | null {
   if (estimate.display_mode !== 'amounts') {
     return TUITION_FALLBACK_SHORT[estimate.display_mode];
   }
-  const lines = buildTuitionRangeLines(estimate);
-  if (lines.length === 0) return null;
-  return lines
-    .slice(0, 2)
-    .map((line) => `${line.label} ${line.value}`)
-    .join(' / ');
+  return formatTuitionRange(estimate.first_year_min, estimate.first_year_max);
 }
 
 /** 学費目安として表示可能なデータか（公開ページで描画するかの判定） */

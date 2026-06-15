@@ -597,6 +597,8 @@ export default function EditSchoolPage() {
               <SchoolEditor
                 key={school.updated_at}
                 schoolId={id}
+                officialUrlVerified={school.official_url_verified ?? true}
+                officialUrlSource={school.official_url_source ?? null}
                 initialData={{
                   name: school.name,
                   prefecture: school.prefecture,

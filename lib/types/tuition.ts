@@ -29,7 +29,9 @@ export interface TuitionPlan {
   attendance?: string | null;
   first_year_min?: number | null;
   first_year_max?: number | null;
+  /** @deprecated 初年度納入金のみ掲載。常に null */
   annual_min?: number | null;
+  /** @deprecated 初年度納入金のみ掲載。常に null */
   annual_max?: number | null;
   monthly_min?: number | null;
   monthly_max?: number | null;

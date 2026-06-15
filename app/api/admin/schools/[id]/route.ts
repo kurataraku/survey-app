@@ -175,6 +175,19 @@ export async function PUT(
         );
       }
       updateData.official_url = trimmedUrl || null;
+
+      // 管理画面（人間）からの保存はURLを確認済みとして確定する。
+      // エージェント（AGENT_API_KEY）経由の場合は確定扱いにしない。
+      const isHuman = authResult.adminUser.id !== 'agent';
+      if (trimmedUrl) {
+        if (isHuman) {
+          updateData.official_url_verified = true;
+          updateData.official_url_source = 'manual';
+        }
+      } else {
+        updateData.official_url_verified = false;
+        updateData.official_url_source = null;
+      }
     }
     
     // statusが指定されている場合は更新に含める

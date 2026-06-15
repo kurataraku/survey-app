@@ -21,6 +21,8 @@ export interface School {
   highlights: string[] | null; // JSONB配列
   faq: Array<{ question: string; answer: string }> | null; // JSONB配列
   official_url?: string | null; // 公式サイトURL（学費AI抽出の起点。管理用）
+  official_url_verified?: boolean; // 公式URLを人間が確認済みか（false=AI推定など未確認）
+  official_url_source?: string | null; // 公式URLの取得元: manual / ai
   is_public: boolean;
   status?: string; // 'active' | 'pending' | 'merged'
   created_at: string;

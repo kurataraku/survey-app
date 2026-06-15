@@ -3,7 +3,7 @@ import { appPath } from '@/lib/base-path';
 import { buildNearestStationSummary } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 import type { PublicTuitionEstimate } from '@/lib/types/tuition';
-import { buildTuitionCardSummary } from '@/lib/tuition/format';
+import { buildTuitionCardSummary, TUITION_FIRST_YEAR_LABEL } from '@/lib/tuition/format';
 import type { PublicCourseListing } from '@/lib/types/courses';
 import { buildCourseCardSummary } from '@/lib/courses/format';
 
@@ -353,7 +353,9 @@ export default function SchoolCardServer({
         {/* 学費目安（参考目安・公開済みデータがある学校のみ） */}
         {tuitionSummary && (
           <p className="text-xs text-gray-600">
-            <span className="font-semibold text-gray-700">学費目安：</span>
+            <span className="font-semibold text-gray-700">
+              {tuitionEstimate?.display_mode === 'amounts' ? `${TUITION_FIRST_YEAR_LABEL}：` : '学費目安：'}
+            </span>
             {tuitionSummary}
           </p>
         )}

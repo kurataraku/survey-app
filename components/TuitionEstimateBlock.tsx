@@ -4,6 +4,7 @@ import {
   formatTuitionRange,
   hasDisplayableTuition,
   TUITION_FALLBACK_TEXT,
+  TUITION_FIRST_YEAR_LABEL,
 } from '@/lib/tuition/format';
 interface TuitionEstimateBlockProps {
   estimate: PublicTuitionEstimate | null;
@@ -12,16 +13,9 @@ interface TuitionEstimateBlockProps {
   className?: string;
 }
 
-/** plans の1パターンを「初年度 約35万円〜 / 年間 約25万円〜」形式の文字列に */
+/** plans の1パターンを「約35万円〜75万円」形式の文字列に（初年度納入金のみ） */
 function buildPlanRangeText(plan: PublicTuitionEstimate['plans'][number]): string | null {
-  const parts: string[] = [];
-  const firstYear = formatTuitionRange(plan.first_year_min ?? null, plan.first_year_max ?? null);
-  if (firstYear) parts.push(`初年度 ${firstYear}`);
-  const annual = formatTuitionRange(plan.annual_min ?? null, plan.annual_max ?? null);
-  if (annual) parts.push(`年間 ${annual}`);
-  const monthly = formatTuitionRange(plan.monthly_min ?? null, plan.monthly_max ?? null);
-  if (monthly) parts.push(`月額 ${monthly}`);
-  return parts.length > 0 ? parts.join(' / ') : null;
+  return formatTuitionRange(plan.first_year_min ?? null, plan.first_year_max ?? null);
 }
 
 function buildPlanLabel(plan: PublicTuitionEstimate['plans'][number]): string {
@@ -57,10 +51,15 @@ export default function TuitionEstimateBlock({
 
   return (
     <div className={`rounded-xl border border-gray-200 bg-white p-4 sm:p-5 ${className}`}>
-      <h4 className="text-sm font-bold text-gray-900 mb-3">
-        学費目安
+      <h4 className="text-sm font-bold text-gray-900 mb-1">
+        {TUITION_FIRST_YEAR_LABEL}
         <span className="ml-1.5 text-xs font-medium text-amber-800">（参考）</span>
       </h4>
+      {estimate.display_mode === 'amounts' && rangeLines.length > 0 && (
+        <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+          入学後1年目に学校へ納める費用の合計（就学支援金適用前・公式記載ベース）。教材費等は含まない場合があります。
+        </p>
+      )}
 
       {rangeLines.length > 0 ? (
         <dl className="space-y-1.5 mb-3">
