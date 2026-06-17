@@ -6,7 +6,7 @@ import ArticleCardServer from '@/components/ArticleCardServer';
 import HomeHero from '@/components/HomeHero';
 import HomeCampaignBanner from '@/components/HomeCampaignBanner';
 import DiagnosisStartLink from '@/components/DiagnosisStartLink';
-import { getHomeData } from '@/lib/home/getHomeData';
+import { getHomeData, HOME_TOP_RATED_MIN_REVIEWS } from '@/lib/home/getHomeData';
 import { appPath } from '@/lib/base-path';
 import { getAppBaseUrl } from '@/lib/env-check';
 import {
@@ -145,7 +145,7 @@ export default async function Home() {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {data.popularSchools.slice(0, 3).map((school) => (
+              {data.popularSchools.map((school) => (
                 <SchoolCardServer
                   key={school.id}
                   id={school.id}
@@ -167,6 +167,56 @@ export default async function Home() {
                   latestBadComment={school.latest_bad_comment ?? undefined}
                   reviewTendency={school.review_tendency ?? undefined}
                   globalAverages={data.schoolCardGlobalAverages ?? undefined}
+                  primaryMetric="reviews"
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {data.topRankedSchools.length > 0 && (
+          <section className="mb-12">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">総合満足度が高い学校</h2>
+                <p className="text-sm text-gray-600">
+                  公開口コミが{HOME_TOP_RATED_MIN_REVIEWS}件以上あり、総合満足度の平均が高い順です
+                </p>
+              </div>
+              <Link
+                href={appPath('/rankings/overall')}
+                className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+              >
+                もっと見る
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {data.topRankedSchools.map((school) => (
+                <SchoolCardServer
+                  key={school.id}
+                  id={school.id}
+                  name={school.name}
+                  prefecture={school.prefecture}
+                  institutionType={school.institution_type}
+                  campusLocations={school.campus_locations}
+                  prefectures={school.prefectures || undefined}
+                  slug={school.slug}
+                  highlights={school.highlights ?? undefined}
+                  intro={school.intro ?? undefined}
+                  reviewCount={school.review_count}
+                  overallAvg={school.overall_avg}
+                  staffAvg={school.staff_avg ?? undefined}
+                  atmosphereAvg={school.atmosphere_avg ?? undefined}
+                  creditAvg={school.credit_avg ?? undefined}
+                  tuitionAvg={school.tuition_avg ?? undefined}
+                  latestGoodComment={school.latest_good_comment ?? undefined}
+                  latestBadComment={school.latest_bad_comment ?? undefined}
+                  reviewTendency={school.review_tendency ?? undefined}
+                  globalAverages={data.schoolCardGlobalAverages ?? undefined}
+                  primaryMetric="overall"
                 />
               ))}
             </div>

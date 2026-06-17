@@ -4,6 +4,30 @@ import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { getSearchSchoolsByIds } from '@/lib/schools/searchSchools';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
+/** トップの「総合満足度が高い学校」に載せる最低口コミ件数 */
+export const HOME_TOP_RATED_MIN_REVIEWS = 5;
+
+type HomeSchoolCard = {
+  id: string;
+  name: string;
+  prefecture: string;
+  prefectures?: string[] | null;
+  institution_type?: SchoolInstitutionType | null;
+  campus_locations?: SchoolCampusLocation[] | null;
+  slug: string | null;
+  review_count: number;
+  overall_avg: number | null;
+  staff_avg?: number | null;
+  atmosphere_avg?: number | null;
+  credit_avg?: number | null;
+  tuition_avg?: number | null;
+  latest_good_comment?: string | null;
+  latest_bad_comment?: string | null;
+  highlights?: string[] | null;
+  intro?: string | null;
+  review_tendency?: { good: string[]; improvement: string[] } | null;
+};
+
 /** 学校カードの「サイト平均との差」表示用（1時間キャッシュ） */
 export type SchoolCardGlobalAverages = {
   overall_satisfaction_avg: number | null;
@@ -14,37 +38,8 @@ export type SchoolCardGlobalAverages = {
 };
 
 export interface HomeData {
-  topRankedSchools: Array<{
-    id: string;
-    name: string;
-    prefecture: string;
-    prefectures?: string[] | null;
-    institution_type?: SchoolInstitutionType | null;
-    campus_locations?: SchoolCampusLocation[] | null;
-    slug: string | null;
-    review_count: number;
-    overall_avg: number | null;
-  }>;
-  popularSchools: Array<{
-    id: string;
-    name: string;
-    prefecture: string;
-    prefectures?: string[] | null;
-    institution_type?: SchoolInstitutionType | null;
-    campus_locations?: SchoolCampusLocation[] | null;
-    slug: string | null;
-    review_count: number;
-    overall_avg: number | null;
-    staff_avg?: number | null;
-    atmosphere_avg?: number | null;
-    credit_avg?: number | null;
-    tuition_avg?: number | null;
-    latest_good_comment?: string | null;
-    latest_bad_comment?: string | null;
-    highlights?: string[] | null;
-    intro?: string | null;
-    review_tendency?: { good: string[]; improvement: string[] } | null;
-  }>;
+  topRankedSchools: HomeSchoolCard[];
+  popularSchools: HomeSchoolCard[];
   /** 注目の学校カード用（サイト平均との比較） */
   schoolCardGlobalAverages: SchoolCardGlobalAverages | null;
   latestReviews: Array<{
@@ -230,9 +225,9 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
     });
 
     const rankedSchools = schoolsWithStats
-      .filter((s) => s.overall_avg != null && s.review_count >= 3)
+      .filter((s) => s.overall_avg != null && s.review_count >= HOME_TOP_RATED_MIN_REVIEWS)
       .sort((a, b) => (b.overall_avg ?? 0) - (a.overall_avg ?? 0))
-      .slice(0, 5);
+      .slice(0, 3);
 
     const popularSchools = [...schoolsWithStats]
       .filter((s) => s.review_count > 0)
@@ -335,9 +330,36 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
       .sort((a, b) => b.like_count - a.like_count)
       .slice(0, 3);
 
-    const popularIds = popularSchools.map((s) => s.id);
+    const enrichHomeSchoolCards = (
+      rows: typeof schoolsWithStats,
+      snapMap: Awaited<ReturnType<typeof getSearchSchoolsByIds>>
+    ): HomeSchoolCard[] =>
+      rows.map((row) => {
+        const snap = snapMap.get(row.id);
+        if (snap) {
+          return { ...snap, prefectures: row.prefectures, campus_locations: row.campus_locations };
+        }
+        return {
+          ...row,
+          institution_type: null,
+          campus_locations: row.campus_locations ?? null,
+          staff_avg: null,
+          atmosphere_avg: null,
+          credit_avg: null,
+          tuition_avg: null,
+          latest_good_comment: null,
+          latest_bad_comment: null,
+          highlights: null,
+          intro: null,
+          review_tendency: null,
+        };
+      });
 
-    const [articlesResult, schoolCardGlobalAverages, popularSnapMap] = await Promise.all([
+    const cardSchoolIds = [
+      ...new Set([...popularSchools, ...rankedSchools].map((school) => school.id)),
+    ];
+
+    const [articlesResult, schoolCardGlobalAverages, schoolSnapMap] = await Promise.all([
       supabase
         .from('articles')
         .select('id, title, slug, excerpt, featured_image_url, published_at, category')
@@ -345,37 +367,17 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
         .order('published_at', { ascending: false })
         .limit(3),
       getCachedGlobalAverages(),
-      getSearchSchoolsByIds(popularIds),
+      getSearchSchoolsByIds(cardSchoolIds),
     ]);
 
-    const popularSchoolsEnriched = popularSchools.map((row) => {
-      const snap = popularSnapMap.get(row.id);
-      if (snap) {
-        return { ...snap, prefectures: row.prefectures, campus_locations: row.campus_locations };
-      }
-      return {
-        ...row,
-        institution_type: null,
-        campus_locations: row.campus_locations ?? null,
-        staff_avg: null,
-        atmosphere_avg: null,
-        credit_avg: null,
-        tuition_avg: null,
-        latest_good_comment: null,
-        latest_bad_comment: null,
-        highlights: null,
-        intro: null,
-        review_tendency: null,
-        tuition_estimate: null,
-        course_listing: null,
-      };
-    });
+    const popularSchoolsEnriched = enrichHomeSchoolCards(popularSchools, schoolSnapMap);
+    const topRankedSchoolsEnriched = enrichHomeSchoolCards(rankedSchools, schoolSnapMap);
 
     const totalSchoolCount = allSchools.length;
     const totalReviewCount = allReviewsStats.length;
 
     return {
-      topRankedSchools: rankedSchools,
+      topRankedSchools: topRankedSchoolsEnriched,
       popularSchools: popularSchoolsEnriched,
       latestReviews,
       latestArticles: articlesResult.data || [],
