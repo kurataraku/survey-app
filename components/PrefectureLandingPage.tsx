@@ -20,6 +20,7 @@ import {
   getPrefectureLandingMediaStrengthsLead,
   getPrefectureLandingSubtitle,
 } from '@/lib/prefectures/prefecture-landing-copy';
+import { getPrefectureParentGuidePoints } from '@/lib/prefectures/prefecture-parent-guide';
 import RequestNotificationCta from '@/components/RequestNotificationCta';
 import TuitionDisclaimer from '@/components/TuitionDisclaimer';
 import { GA_EVENTS } from '@/lib/analytics/events';
@@ -185,6 +186,35 @@ function SummaryStats({
   );
 }
 
+function ParentGuideSection({ prefecture }: { prefecture: string }) {
+  const points = getPrefectureParentGuidePoints(prefecture);
+  return (
+    <section
+      className="mb-8 rounded-xl border border-gray-200 bg-white p-5 md:p-6"
+      aria-labelledby="pref-parent-guide-heading"
+    >
+      <h2 id="pref-parent-guide-heading" className="text-xl font-bold text-gray-900 mb-2">
+        {prefecture}で通信制高校を選ぶとき、保護者が確認したい比較ポイント
+      </h2>
+      <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-3xl">
+        口コミだけでなく、通い方・学費・サポート体制など、選校前に押さえておきたい観点を整理しました。
+        詳しいテーマ別ガイドはページ下部のリンクからも確認できます。
+      </p>
+      <ul className="grid gap-4 md:grid-cols-2">
+        {points.map((point) => (
+          <li
+            key={point.title}
+            className="rounded-lg border border-gray-100 bg-gray-50/70 p-4"
+          >
+            <h3 className="text-sm font-bold text-gray-900 mb-1.5">{point.title}</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">{point.description}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function MediaStrengths({ prefecture }: { prefecture: string }) {
   const items = getPrefectureLandingMediaStrengths(prefecture);
   return (
@@ -214,6 +244,28 @@ function MediaStrengths({ prefecture }: { prefecture: string }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function PrefectureIntroSection({
+  prefecture,
+  introLead,
+}: {
+  prefecture: string;
+  introLead: string;
+}) {
+  return (
+    <section
+      className="mt-10 mb-8 rounded-xl border border-gray-200 bg-white p-5 md:p-6"
+      aria-labelledby="pref-intro-heading"
+    >
+      <h2 id="pref-intro-heading" className="text-xl font-bold text-gray-900 mb-3">
+        {prefecture}の通信制高校を口コミで比較するポイント
+      </h2>
+      <p className="text-sm sm:text-base text-gray-600 leading-relaxed max-w-4xl">
+        {introLead}
+      </p>
     </section>
   );
 }
@@ -395,8 +447,6 @@ export default function PrefectureLandingPage({
 
         {hasSchools && (
           <>
-            <p className="text-gray-600 text-sm sm:text-base leading-relaxed max-w-3xl mb-4">{introLead}</p>
-
             <SummaryStats
               totalSchools={totalSchools}
               totalReviewCount={totalReviewCount}
@@ -405,19 +455,22 @@ export default function PrefectureLandingPage({
               globalAverages={globalAverages}
             />
 
-            <MediaStrengths prefecture={prefecture} />
-
             <nav
-              className="mb-8 rounded-xl border border-gray-200 bg-white px-5 py-4"
+              className="mb-6 rounded-xl border border-blue-100 bg-white px-4 py-3 sm:px-5 sm:py-4"
               aria-label={`${prefecture}の通信制高校比較で次に見るページ`}
             >
               <p className="text-sm font-semibold text-gray-900 mb-2">
-                どこから比較するか迷った方へ
+                すぐに学校を比較する
               </p>
-              <p className="text-sm text-gray-600 leading-relaxed mb-3">
+              <p className="hidden sm:block text-sm text-gray-600 leading-relaxed mb-3">
                 {prefecture}の学校を、重視したい条件や口コミの見方から絞り込めます。まずは気になる切り口から確認してください。
               </p>
               <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                <li>
+                  <Link href="#pref-highlights-reviews" className="text-blue-600 hover:text-blue-800 hover:underline font-medium">
+                    口コミが多い学校を見る
+                  </Link>
+                </li>
                 <li>
                   <PrefectureLandingTrackedLink
                     href={appPath(`/simulator?prefecture=${prefParam}`)}
@@ -446,6 +499,11 @@ export default function PrefectureLandingPage({
                 <li>
                   <Link href={appPath(`/reviews?prefecture=${prefParam}`)} className="text-blue-600 hover:text-blue-800 hover:underline">
                     {prefecture}の通信制高校の口コミ一覧を見る
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#pref-school-list" className="text-blue-600 hover:text-blue-800 hover:underline">
+                    学校一覧を見る
                   </Link>
                 </li>
               </ul>
@@ -522,6 +580,10 @@ export default function PrefectureLandingPage({
               <TuitionDisclaimer className="mt-4" />
             </section>
 
+            <ParentGuideSection prefecture={prefecture} />
+
+            <MediaStrengths prefecture={prefecture} />
+
             <InstitutionTypeSection
               prefecture={prefecture}
               type="public"
@@ -541,6 +603,7 @@ export default function PrefectureLandingPage({
               globalAverages={globalAverages}
             />
 
+            <span id="pref-school-list" className="block scroll-mt-40" aria-hidden />
             <h2 className="text-xl font-bold text-gray-900 mb-4">{prefecture}の通信制高校一覧</h2>
           </>
         )}
@@ -548,6 +611,10 @@ export default function PrefectureLandingPage({
         <PrefectureSchoolCardTracker prefecture={prefecture} block="list">
           {children}
         </PrefectureSchoolCardTracker>
+
+        {hasSchools && (
+          <PrefectureIntroSection prefecture={prefecture} introLead={introLead} />
+        )}
 
         {hasSchools && <PrefectureLandingFaq prefecture={prefecture} stats={faqStats} />}
 

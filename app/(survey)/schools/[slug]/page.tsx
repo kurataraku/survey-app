@@ -18,6 +18,7 @@ import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 import SchoolDetailViewTracker from '@/components/SchoolDetailViewTracker';
 import { getDecliningSchoolMetaOverride } from '@/lib/schools/declining-school-meta';
+import { getGscPrioritySchoolMetaOverride } from '@/lib/seo/gsc-priority-school-meta';
 import { normalizeSchoolMetaDescription } from '@/lib/schools/normalizeSchoolMetaDescription';
 import { normalizeSchoolMetaTitle } from '@/lib/schools/normalizeSchoolMetaTitle';
 
@@ -55,12 +56,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const decliningMeta = getDecliningSchoolMetaOverride(decodedSlug);
+  const gscMeta = getGscPrioritySchoolMetaOverride(decodedSlug);
+  const metaOverride = decliningMeta ?? gscMeta;
   const title =
-    decliningMeta?.title ??
+    metaOverride?.title ??
     normalizeSchoolMetaTitle(school.name, school.ai_summary?.meta_title, school.review_count);
   const description =
-    decliningMeta?.description ??
-    normalizeSchoolMetaDescription(school.name, school.ai_summary?.meta_description);
+    metaOverride?.description ??
+    normalizeSchoolMetaDescription(
+      school.name,
+      school.ai_summary?.meta_description,
+      school.review_count
+    );
 
   const keywords = [
     `${school.name} 口コミ`,

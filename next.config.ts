@@ -1,4 +1,20 @@
 import type { NextConfig } from "next";
+import { LEGACY_SCHOOL_SLUG_REDIRECTS } from "./lib/seo/gsc-priority-schools";
+
+const legacySchoolRedirects = Object.entries(LEGACY_SCHOOL_SLUG_REDIRECTS).flatMap(
+  ([fromSlug, toSlug]) => [
+    {
+      source: `/schools/${fromSlug}`,
+      destination: `/schools/${toSlug}`,
+      permanent: true,
+    },
+    {
+      source: `/tsushin-kuchikomi/schools/${fromSlug}`,
+      destination: `/tsushin-kuchikomi/schools/${toSlug}`,
+      permanent: true,
+    },
+  ]
+);
 
 const nextConfig: NextConfig = {
   // 一覧系の初期HTMLにカード本文を含めるため、PPRによるストリーミング分割を無効化
@@ -7,6 +23,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      ...legacySchoolRedirects,
       {
         source: "/features/kanto-tsushin-setsumeikai-2024-schedule",
         destination: "/features/kanto-tsushin-setsumeikai-2026-schedule",

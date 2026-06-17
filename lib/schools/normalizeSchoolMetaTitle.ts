@@ -21,5 +21,5 @@ export function normalizeSchoolMetaTitle(
     return `${schoolName}の口コミ・評判｜学費・スクーリングも解説`;
   }
 
-  return `${schoolName}の学校情報｜学費・スクーリング・口コミ掲載予定`;
+  return `${schoolName}の口コミ・評判・学校情報｜通信制課程の特徴と注意点`;
 }

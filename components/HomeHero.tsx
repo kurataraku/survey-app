@@ -20,7 +20,15 @@ const HERO_IMAGE_SRC = `${BASE_PATH}/hero-illustration-v4.png`;
 const HERO_IMAGE_ALT =
   '保護者と高校生が一緒にタブレットで通信制高校の口コミを読んでいるイラスト';
 
-export default function HomeHero() {
+interface HomeHeroProps {
+  totalSchoolCount?: number;
+  totalReviewCount?: number;
+}
+
+export default function HomeHero({
+  totalSchoolCount = 0,
+  totalReviewCount = 0,
+}: HomeHeroProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPrefecture, setSelectedPrefecture] = useState('');
@@ -150,29 +158,40 @@ export default function HomeHero() {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 md:py-10 lg:py-20 xl:py-24">
         <div className="max-w-sm mx-auto text-center sm:mx-0 sm:text-left sm:max-w-xl lg:max-w-[58%] xl:max-w-[56%]">
           <h1 className="font-bold text-gray-900 leading-[1.2] tracking-tight mb-3 sm:mb-4 md:mb-5 text-balance text-[1.5rem] sm:text-[1.875rem] md:text-[2rem] lg:text-[2.5rem] xl:text-5xl">
-            <span className="block">通信制高校のリアルは、</span>
-            <span className="block">
-              <span className="relative inline-block">
-                <span className="relative z-10 text-blue-700">公式サイト</span>
-                <span
-                  aria-hidden
-                  className="absolute left-0 right-0 bottom-0.5 h-2 bg-yellow-200/70 -z-0"
-                />
-              </span>
-              では見えない
+            <span className="block">通信制高校の</span>
+            <span className="block text-blue-700">口コミ・評判</span>
+            <span className="block text-[1.25rem] sm:text-[1.5rem] md:text-[1.75rem] lg:text-[2rem] xl:text-3xl mt-1">
+              をリアルな声で比較
             </span>
           </h1>
           <p
-            className="text-[0.8125rem] sm:text-sm md:text-[0.95rem] text-slate-700 font-medium leading-[1.75] tracking-[0.02em] mb-4 sm:mb-5 md:mb-7 max-w-xl text-balance"
+            className="text-[0.8125rem] sm:text-sm md:text-[0.95rem] text-slate-700 font-medium leading-[1.75] tracking-[0.02em] mb-3 sm:mb-4 max-w-xl text-balance"
             style={{ fontFamily: "var(--font-mplus-2), var(--font-sans)" }}
           >
             <span className="block">
-              パンフレットや学校HPは「学校が伝えたい情報」
+              パンフレットや学校HPは「学校が伝えたい情報」。
             </span>
             <span className="block text-slate-800/95">
-              だから、実際に通った生徒の声を集めました
+              在校生・卒業生・保護者の口コミから、良かった点と気になる点を確認できます。
             </span>
           </p>
+          {(totalSchoolCount > 0 || totalReviewCount > 0) && (
+            <ul className="flex flex-wrap gap-2 mb-4 sm:mb-5 md:mb-7" aria-label="掲載実績">
+              {totalSchoolCount > 0 && (
+                <li className="inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-white/90 shadow-sm">
+                  掲載校 {totalSchoolCount}校
+                </li>
+              )}
+              {totalReviewCount > 0 && (
+                <li className="inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-white/90 shadow-sm">
+                  公開口コミ {totalReviewCount}件
+                </li>
+              )}
+              <li className="inline-flex items-center rounded-full bg-blue-50/90 px-3 py-1 text-xs font-semibold text-blue-800 ring-1 ring-blue-100">
+                在校生・卒業生・保護者の声
+              </li>
+            </ul>
+          )}
 
           <form
             onSubmit={handleSearch}

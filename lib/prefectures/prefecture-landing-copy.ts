@@ -5,14 +5,14 @@ export type PrefectureMediaStrengthItem = {
   description: string;
 };
 
-/** 「{県} 通信制高校 おすすめ」系の検索意図に合わせた title（全都道府県共通） */
+/** 「{県} 通信制高校 口コミ」系の検索意図に合わせた title（全都道府県共通） */
 export function getPrefectureLandingTitle(prefecture: string): string {
-  return `${prefecture}の通信制高校おすすめ｜口コミ・評判で比較`;
+  return `${prefecture}の通信制高校の口コミ・評判｜比較して選ぶ`;
 }
 
 /** ページ上のH1（titleと同じキーワードを含めつつ自然な日本語にする） */
 export function getPrefectureLandingHeading(prefecture: string): string {
-  return `${prefecture}の通信制高校おすすめ比較`;
+  return `${prefecture}の通信制高校の口コミ・評判`;
 }
 
 /** H1直下のリード文 */
@@ -44,8 +44,8 @@ export function getPrefectureLandingMediaStrengths(
         '総合の満足度だけでなく、先生の対応、学校の雰囲気、学費など、気になる項目ごとに評価を分けて載せています。ひとつの点数だけでなく、自分が大切にしたいところで学校を比べられます。',
     },
     {
-      title: '実際に通った人の口コミで、学校の雰囲気がわかる',
-      description: `在校生・保護者・卒業生など、本当に通った人の口コミを読めます。${prefecture}の学校を並べて見比べながら、口コミの内容や学校の説明もあわせて確認できます。`,
+      title: '自分に近い条件の口コミを探せる',
+      description: `通学頻度、キャンパス所在地、通信制高校を選んだ理由などから、自分の状況に近い人の口コミを確認できます。${prefecture}の学校を比べながら、気になる通い方や背景に合う声を探せます。`,
     },
   ];
 }
