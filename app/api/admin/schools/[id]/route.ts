@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
 import { sanitizeCampusLocationsInput } from '@/lib/schools/campusLocations';
 import { normalizeText } from '@/lib/utils';
+import { syncRagForSchoolIds } from '@/lib/rag/sync';
 
 export async function GET(
   request: NextRequest,
@@ -38,6 +39,14 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    after(async () => {
+      try {
+        await syncRagForSchoolIds([id]);
+      } catch (syncError) {
+        console.error('[admin/schools/:id] RAG同期エラー:', syncError);
+      }
+    });
 
     return NextResponse.json(school);
   } catch (error) {
@@ -151,7 +160,7 @@ export async function PUT(
     }
 
     // 学校情報を更新
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       name,
       name_normalized: nameNormalized,
       prefecture,
@@ -207,7 +216,7 @@ export async function PUT(
       // 現在のstatusが'pending'の場合、school_nameで紐づいている口コミのschool_idを更新
       if (currentSchool && currentSchool.status === 'pending') {
         // school_nameで紐づいているが、school_idがnullの口コミを更新
-        const { data: updatedReviews, error: updateReviewsError } = await supabase
+        const { error: updateReviewsError } = await supabase
           .from('survey_responses')
           .update({ school_id: id })
           .eq('school_name', currentSchool.name)

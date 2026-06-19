@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/admin';
+import { syncRagForSchoolIds } from '@/lib/rag/sync';
 
 type PublishAction = 'publish' | 'unpublish' | 'reject';
 
@@ -81,6 +82,13 @@ export async function POST(
         return NextResponse.json({ error: 'コース一覧の公開に失敗しました' }, { status: 500 });
       }
 
+      after(async () => {
+        try {
+          await syncRagForSchoolIds([schoolId]);
+        } catch (syncError) {
+          console.error('[courses publish] RAG同期エラー:', syncError);
+        }
+      });
       return NextResponse.json({ listing: published });
     }
 
@@ -104,6 +112,13 @@ export async function POST(
         return NextResponse.json({ error: 'コース一覧の非公開化に失敗しました' }, { status: 500 });
       }
 
+      after(async () => {
+        try {
+          await syncRagForSchoolIds([schoolId]);
+        } catch (syncError) {
+          console.error('[courses unpublish] RAG同期エラー:', syncError);
+        }
+      });
       return NextResponse.json({ listing: unpublished });
     }
 
@@ -127,6 +142,13 @@ export async function POST(
       return NextResponse.json({ error: 'コース一覧の却下に失敗しました' }, { status: 500 });
     }
 
+    after(async () => {
+      try {
+        await syncRagForSchoolIds([schoolId]);
+      } catch (syncError) {
+        console.error('[courses reject] RAG同期エラー:', syncError);
+      }
+    });
     return NextResponse.json({ listing: rejected });
   } catch (error) {
     console.error('[courses publish] APIエラー:', error);

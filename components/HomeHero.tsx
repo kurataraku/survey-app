@@ -17,8 +17,6 @@ interface SchoolSuggestion {
 }
 
 const HERO_IMAGE_SRC = `${BASE_PATH}/hero-illustration-v4.png`;
-const HERO_IMAGE_ALT =
-  '保護者と高校生が一緒にタブレットで通信制高校の口コミを読んでいるイラスト';
 
 interface HomeHeroProps {
   totalSchoolCount?: number;
@@ -285,6 +283,30 @@ export default function HomeHero({
             <p className="text-[11px] sm:text-xs font-semibold text-gray-600 tracking-wide">
               在校生・卒業生・保護者のかたへ
             </p>
+            <button
+              type="button"
+              onClick={() => {
+                trackEvent('consultation_ai_open', { source: 'hero' });
+                window.dispatchEvent(new Event('open-consultation-ai'));
+              }}
+              className="group inline-flex items-center gap-1.5 pl-5 pr-4 py-2.5 bg-gradient-to-r from-sky-500 to-indigo-600 text-white rounded-full text-sm font-bold shadow-[0_4px_14px_rgba(37,99,235,0.25)] hover:shadow-[0_8px_22px_rgba(37,99,235,0.35)] transition-all duration-200"
+            >
+              <span className="text-[13px]">💬</span>
+              通信制高校えらび相談AI
+              <svg
+                className="w-3.5 h-3.5 ml-0.5 transition-transform group-hover:translate-x-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
             <Link
               href={appPath('/survey')}
               onClick={() => trackEvent('cta_survey', { source: 'hero' })}

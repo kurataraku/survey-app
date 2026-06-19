@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth/admin';
+import { syncRagForSchoolIds } from '@/lib/rag/sync';
 
 type PublishAction = 'publish' | 'unpublish' | 'reject';
 
@@ -82,6 +83,13 @@ export async function POST(
         return NextResponse.json({ error: '学費目安の公開に失敗しました' }, { status: 500 });
       }
 
+      after(async () => {
+        try {
+          await syncRagForSchoolIds([schoolId]);
+        } catch (syncError) {
+          console.error('[tuition publish] RAG同期エラー:', syncError);
+        }
+      });
       return NextResponse.json({ estimate: published });
     }
 
@@ -105,6 +113,13 @@ export async function POST(
         return NextResponse.json({ error: '学費目安の非公開化に失敗しました' }, { status: 500 });
       }
 
+      after(async () => {
+        try {
+          await syncRagForSchoolIds([schoolId]);
+        } catch (syncError) {
+          console.error('[tuition unpublish] RAG同期エラー:', syncError);
+        }
+      });
       return NextResponse.json({ estimate: unpublished });
     }
 
@@ -128,6 +143,13 @@ export async function POST(
       return NextResponse.json({ error: '学費目安の却下に失敗しました' }, { status: 500 });
     }
 
+    after(async () => {
+      try {
+        await syncRagForSchoolIds([schoolId]);
+      } catch (syncError) {
+        console.error('[tuition reject] RAG同期エラー:', syncError);
+      }
+    });
     return NextResponse.json({ estimate: rejected });
   } catch (error) {
     console.error('[tuition publish] APIエラー:', error);

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StructuredData from "@/components/StructuredData";
+import ConsultationAiFloating from "@/components/ConsultationAiFloating";
 import { getAppBaseUrl } from "@/lib/env-check";
 
 const appBaseUrl = getAppBaseUrl();
@@ -101,6 +102,7 @@ export default function SurveyLayout({
       <Header />
       <main className="flex-grow">{children}</main>
       <Footer />
+      <ConsultationAiFloating />
     </>
   );
 }

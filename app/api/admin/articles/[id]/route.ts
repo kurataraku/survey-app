@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
 import { revalidateArticleCaches } from '@/lib/articles/revalidateArticleCaches';
 import { publicFeatureArticleUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
+import { removeRagForArticleIds, syncRagForArticleIds } from '@/lib/rag/sync';
 
 export async function GET(
   request: NextRequest,
@@ -40,7 +41,7 @@ export async function GET(
     }
 
     // 関連学校を取得
-    const { data: articleSchools, error: schoolsError } = await supabase
+    const { data: articleSchools } = await supabase
       .from('article_schools')
       .select(`
         id,
@@ -158,7 +159,7 @@ export async function PUT(
     }
 
     // 記事を更新
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
     if (slug !== undefined) updateData.slug = slug;
     if (category !== undefined) updateData.category = category;
@@ -194,6 +195,14 @@ export async function PUT(
     if (article?.is_public && !wasPublic && article.slug) {
       await submitIndexNowUrls([publicFeatureArticleUrl(article.slug)]);
     }
+
+    after(async () => {
+      try {
+        await syncRagForArticleIds([id]);
+      } catch (syncError) {
+        console.error('[admin/articles/:id] RAG同期エラー:', syncError);
+      }
+    });
 
     return NextResponse.json(article);
   } catch (error) {
@@ -254,6 +263,14 @@ export async function DELETE(
     if (existingArticle?.slug) {
       revalidateArticleCaches(existingArticle.slug);
     }
+
+    after(async () => {
+      try {
+        await removeRagForArticleIds([id]);
+      } catch (syncError) {
+        console.error('[admin/articles/:id delete] RAG削除エラー:', syncError);
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

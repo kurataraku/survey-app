@@ -5,6 +5,7 @@ import ReviewCardServer from '@/components/ReviewCardServer';
 import ArticleCardServer from '@/components/ArticleCardServer';
 import HomeHero from '@/components/HomeHero';
 import HomeCampaignBanner from '@/components/HomeCampaignBanner';
+import ConsultationAiTopBanner from '@/components/ConsultationAiTopBanner';
 import DiagnosisStartLink from '@/components/DiagnosisStartLink';
 import { getHomeData, HOME_TOP_RATED_MIN_REVIEWS } from '@/lib/home/getHomeData';
 import { appPath } from '@/lib/base-path';
@@ -55,6 +56,7 @@ export default async function Home() {
         <HomeCampaignBanner />
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <ConsultationAiTopBanner />
         <section className="mb-10" aria-labelledby="home-shortcuts-heading">
           <div className="mb-4">
             <h2 id="home-shortcuts-heading" className="text-2xl font-bold text-gray-900 mb-1">

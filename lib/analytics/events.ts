@@ -9,6 +9,9 @@ export const GA_EVENTS = {
   ctaCampaignClick: 'cta_campaign_click',
   ctaSurvey: 'cta_survey',
   ctaSurveyFromSchool: 'cta_survey_from_school',
+  consultationAiOpen: 'consultation_ai_open',
+  consultationAiSend: 'consultation_ai_send',
+  consultationAiSourceClick: 'consultation_ai_source_click',
 } as const;
 
 export type GaEventName = (typeof GA_EVENTS)[keyof typeof GA_EVENTS];

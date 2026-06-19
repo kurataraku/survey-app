@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
 import { sendApprovedEmail } from '@/lib/email/sender';
 import { publicReviewUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
 import { resolveSchoolIdFromSchoolName } from '@/lib/reviews/schoolReviewLinkage';
+import { syncRagForReviewIds, syncRagForSchoolIds } from '@/lib/rag/sync';
 
 function getSupabase() {
   return createClient(
@@ -97,6 +98,17 @@ export async function POST(
   }
 
   await submitIndexNowUrls([publicReviewUrl(id)]);
+
+  after(async () => {
+    try {
+      await syncRagForReviewIds([id]);
+      if (schoolIdToSet) {
+        await syncRagForSchoolIds([schoolIdToSet]);
+      }
+    } catch (syncError) {
+      console.error('[approve] RAG同期エラー:', syncError);
+    }
+  });
 
   return NextResponse.json({ success: true });
 }

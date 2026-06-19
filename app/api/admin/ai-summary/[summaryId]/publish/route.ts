@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { requireAdminOrAgent } from '@/lib/auth/admin';
+import { syncRagForSchoolIds } from '@/lib/rag/sync';
 
 /**
  * 要約を公開状態に切り替える（トランザクション処理）
@@ -86,6 +87,14 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    after(async () => {
+      try {
+        await syncRagForSchoolIds([summary.school_id]);
+      } catch (syncError) {
+        console.error('[ai-summary publish] RAG同期エラー:', syncError);
+      }
+    });
 
     return NextResponse.json({ summary: publishedSummary });
   } catch (error) {

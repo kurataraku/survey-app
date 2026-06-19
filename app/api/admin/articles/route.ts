@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateSlug } from '@/lib/utils';
 import { requireAdmin } from '@/lib/auth/admin';
 import { revalidateArticleCaches } from '@/lib/articles/revalidateArticleCaches';
+import { syncRagForArticleIds } from '@/lib/rag/sync';
 
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request);
@@ -169,6 +169,14 @@ export async function POST(request: NextRequest) {
     if (article?.is_public && article.slug) {
       revalidateArticleCaches(article.slug);
     }
+
+    after(async () => {
+      try {
+        await syncRagForArticleIds([article.id]);
+      } catch (syncError) {
+        console.error('[admin/articles POST] RAG同期エラー:', syncError);
+      }
+    });
 
     return NextResponse.json(article, { status: 201 });
   } catch (error) {

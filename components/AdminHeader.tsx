@@ -94,6 +94,12 @@ export default function AdminHeader() {
               >
                 お問い合わせ
               </Link>
+              <Link
+                href={appPath('/admin/consultation-chats')}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                相談AI
+              </Link>
               {adminUser?.role === 'owner' && (
                 <Link
                   href={appPath('/admin/admin-users')}
