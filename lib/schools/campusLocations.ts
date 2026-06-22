@@ -77,6 +77,105 @@ export function sanitizeCampusLocationsInput(campus_locations: unknown): SchoolC
     .filter((location): location is SchoolCampusLocation => Boolean(location));
 }
 
+function getPrefectureSortIndex(prefecture: string, prefectureOrder: string[]): number {
+  const index = prefectureOrder.indexOf(prefecture);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function findInsertIndexForPrefecture(
+  locations: SchoolCampusLocation[],
+  prefecture: string,
+  prefectureOrder: string[]
+): number {
+  let lastSamePrefectureIndex = -1;
+  for (let i = 0; i < locations.length; i += 1) {
+    if (locations[i].prefecture === prefecture) {
+      lastSamePrefectureIndex = i;
+    }
+  }
+  if (lastSamePrefectureIndex >= 0) return lastSamePrefectureIndex + 1;
+
+  const targetOrder = getPrefectureSortIndex(prefecture, prefectureOrder);
+  for (let i = 0; i < locations.length; i += 1) {
+    const currentOrder = getPrefectureSortIndex(locations[i].prefecture, prefectureOrder);
+    if (currentOrder > targetOrder) return i;
+  }
+  return locations.length;
+}
+
+export function moveCampusLocation(
+  locations: SchoolCampusLocation[],
+  index: number,
+  direction: 'up' | 'down'
+): SchoolCampusLocation[] {
+  if (direction === 'up' && index === 0) return locations;
+  if (direction === 'down' && index >= locations.length - 1) return locations;
+
+  const next = [...locations];
+  const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  return next;
+}
+
+export function sortCampusLocationsByPrefecture(
+  locations: SchoolCampusLocation[],
+  prefectureOrder: string[] = []
+): SchoolCampusLocation[] {
+  if (locations.length <= 1) return locations;
+
+  const groups = new Map<string, SchoolCampusLocation[]>();
+  for (const location of locations) {
+    const key = location.prefecture || '';
+    const group = groups.get(key);
+    if (group) {
+      group.push(location);
+    } else {
+      groups.set(key, [location]);
+    }
+  }
+
+  const sortedKeys = [...groups.keys()].sort((a, b) => {
+    const orderDiff =
+      getPrefectureSortIndex(a, prefectureOrder) - getPrefectureSortIndex(b, prefectureOrder);
+    if (orderDiff !== 0) return orderDiff;
+    return a.localeCompare(b, 'ja');
+  });
+
+  return sortedKeys.flatMap((key) => groups.get(key) ?? []);
+}
+
+export function insertCampusLocationByPrefecture(
+  locations: SchoolCampusLocation[],
+  location: SchoolCampusLocation,
+  prefectureOrder: string[] = []
+): SchoolCampusLocation[] {
+  const insertAt = findInsertIndexForPrefecture(locations, location.prefecture, prefectureOrder);
+  const next = [...locations];
+  next.splice(insertAt, 0, location);
+  return next;
+}
+
+export function updateCampusLocationPrefecture(
+  locations: SchoolCampusLocation[],
+  index: number,
+  prefecture: string,
+  prefectureOrder: string[] = []
+): SchoolCampusLocation[] {
+  const current = locations[index];
+  if (!current || current.prefecture === prefecture) {
+    const next = [...locations];
+    next[index] = { ...current, prefecture };
+    return next;
+  }
+
+  const updated = { ...current, prefecture };
+  const without = locations.filter((_, i) => i !== index);
+  const insertAt = findInsertIndexForPrefecture(without, prefecture, prefectureOrder);
+  const next = [...without];
+  next.splice(insertAt, 0, updated);
+  return next;
+}
+
 export function filterCampusLocationsByPrefecture(
   locations: SchoolCampusLocation[] | null | undefined,
   matchedPrefecture?: string

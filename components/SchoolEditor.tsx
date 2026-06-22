@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { getCampusNearestStationSlots } from '@/lib/schools/campusLocations';
+import {
+  getCampusNearestStationSlots,
+  insertCampusLocationByPrefecture,
+  moveCampusLocation,
+  sortCampusLocationsByPrefecture,
+  updateCampusLocationPrefecture,
+} from '@/lib/schools/campusLocations';
 import { SchoolFormData } from '@/lib/types/schools';
 import { generateSlug } from '@/lib/utils';
 import { prefectures } from '@/lib/prefectures';
@@ -204,18 +210,35 @@ export default function SchoolEditor({
           キャンパス所在地（市区町村）
         </legend>
         <p className="text-sm text-gray-500 mb-3">
-          都道府県ページや学校詳細で、市区町村・最寄り駅として表示します。同じ都道府県に複数キャンパスがある場合は複数追加してください。
+          都道府県ページや学校詳細で、市区町村・最寄り駅として表示します。同じ都道府県に複数キャンパスがある場合は複数追加してください。↑↓で表示順を変更でき、「都道府県でまとめる」で同じ都道府県を隣接させられます。
         </p>
-        <div className="flex justify-end mb-2">
+        <div className="flex justify-end gap-2 mb-2">
           <button
             type="button"
             onClick={() =>
               setFormData((prev) => ({
                 ...prev,
-                campus_locations: [
-                  ...prev.campus_locations,
+                campus_locations: sortCampusLocationsByPrefecture(
+                  prev.campus_locations,
+                  prefectures
+                ),
+              }))
+            }
+            disabled={formData.campus_locations.length < 2}
+            className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            都道府県でまとめる
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setFormData((prev) => ({
+                ...prev,
+                campus_locations: insertCampusLocationByPrefecture(
+                  prev.campus_locations,
                   { prefecture: prev.prefecture || '', city: '', nearest_stations: [] },
-                ],
+                  prefectures
+                ),
               }))
             }
             className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -226,8 +249,18 @@ export default function SchoolEditor({
         <div className="space-y-3">
           {formData.campus_locations.map((location, index) => {
             const [station1, station2] = getCampusNearestStationSlots(location);
+            const previousPrefecture =
+              index > 0 ? formData.campus_locations[index - 1].prefecture : null;
+            const showPrefectureDivider =
+              Boolean(location.prefecture) && location.prefecture !== previousPrefecture;
             return (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-end border border-gray-200 rounded-lg p-3">
+            <div key={index}>
+              {showPrefectureDivider && (
+                <div className="mb-2 pt-1 text-xs font-semibold text-gray-500">
+                  {location.prefecture}
+                </div>
+              )}
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-end border border-gray-200 rounded-lg p-3">
               <div>
                 <label htmlFor={`campus-location-prefecture-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
                   都道府県
@@ -236,9 +269,15 @@ export default function SchoolEditor({
                   id={`campus-location-prefecture-${index}`}
                   value={location.prefecture}
                   onChange={(e) => {
-                    const next = [...formData.campus_locations];
-                    next[index] = { ...next[index], prefecture: e.target.value };
-                    setFormData((prev) => ({ ...prev, campus_locations: next }));
+                    setFormData((prev) => ({
+                      ...prev,
+                      campus_locations: updateCampusLocationPrefecture(
+                        prev.campus_locations,
+                        index,
+                        e.target.value,
+                        prefectures
+                      ),
+                    }));
                   }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -310,18 +349,49 @@ export default function SchoolEditor({
                   />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    campus_locations: prev.campus_locations.filter((_, i) => i !== index),
-                  }))
-                }
-                className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50"
-              >
-                削除
-              </button>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      campus_locations: moveCampusLocation(prev.campus_locations, index, 'up'),
+                    }))
+                  }
+                  disabled={index === 0}
+                  className="px-2 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="上に移動"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      campus_locations: moveCampusLocation(prev.campus_locations, index, 'down'),
+                    }))
+                  }
+                  disabled={index === formData.campus_locations.length - 1}
+                  className="px-2 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="下に移動"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      campus_locations: prev.campus_locations.filter((_, i) => i !== index),
+                    }))
+                  }
+                  className="px-3 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50"
+                >
+                  削除
+                </button>
+              </div>
+            </div>
             </div>
           );
           })}
