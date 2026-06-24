@@ -8,7 +8,9 @@ import {
   getChatOpenAIClient,
 } from '@/lib/chat/config';
 import {
+  fetchActiveSchoolsByCampusArea,
   fetchRagDocumentsBySchoolNames,
+  fetchRagDocumentsBySchoolIds,
   fetchRagDocumentsByKeywords,
   inferReasonGroupFromText,
   rerankForGuardianConsultation,
@@ -51,6 +53,80 @@ type FocusProfile = {
   regex: RegExp;
   instruction: string;
 };
+type AreaProfile = {
+  label: string;
+  prefecture: string;
+  cities: string[];
+  keywords: string[];
+};
+
+const TOKYO_TAMA_CITIES = [
+  '八王子市',
+  '立川市',
+  '武蔵野市',
+  '三鷹市',
+  '青梅市',
+  '府中市',
+  '昭島市',
+  '調布市',
+  '町田市',
+  '小金井市',
+  '小平市',
+  '日野市',
+  '東村山市',
+  '国分寺市',
+  '国立市',
+  '福生市',
+  '狛江市',
+  '東大和市',
+  '清瀬市',
+  '東久留米市',
+  '武蔵村山市',
+  '多摩市',
+  '稲城市',
+  '羽村市',
+  'あきる野市',
+  '西東京市',
+];
+
+const TOKYO_23_WARDS = [
+  '千代田区',
+  '中央区',
+  '港区',
+  '新宿区',
+  '文京区',
+  '台東区',
+  '墨田区',
+  '江東区',
+  '品川区',
+  '目黒区',
+  '大田区',
+  '世田谷区',
+  '渋谷区',
+  '中野区',
+  '杉並区',
+  '豊島区',
+  '北区',
+  '荒川区',
+  '板橋区',
+  '練馬区',
+  '足立区',
+  '葛飾区',
+  '江戸川区',
+];
+
+const TACHIKAWA_NEARBY_CITIES = [
+  '立川市',
+  '国立市',
+  '国分寺市',
+  '昭島市',
+  '日野市',
+  '小平市',
+  '東大和市',
+  '武蔵村山市',
+  '府中市',
+  '八王子市',
+];
 
 function truncate(text: string, maxLength = 360): string {
   if (text.length <= maxLength) return text;
@@ -62,6 +138,56 @@ function estimateDifficultyFromText(text: string): 'low' | 'high' {
   const hit = hardKeywords.some((word) => text.includes(word));
   if (hit || text.length > 140) return 'high';
   return 'low';
+}
+
+function isLowAttendancePreference(text: string): boolean {
+  return (
+    /年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回.*(?:通学|登校|スクーリング)/u.test(text) ||
+    /(?:通学|登校|スクーリング).{0,12}年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回/u.test(text) ||
+    /集中スクーリング|年数回|年に数回|年数日の登校|合宿型スクーリング/u.test(text)
+  );
+}
+
+function isConciseRequest(text: string): boolean {
+  return /簡単に|短く|要約|一言|ひとことで|3行|三行|箇条書きだけ/u.test(text);
+}
+
+function getSearchBasisMessage(messages: Array<z.infer<typeof MessageSchema>>, latest: string): string {
+  if (!isConciseRequest(latest)) return latest;
+  const previousUser = [...messages]
+    .reverse()
+    .filter((message) => message.role === 'user')
+    .map((message) => message.content)
+    .find((content) => content !== latest);
+  return previousUser ?? latest;
+}
+
+function detectAreaProfile(text: string): AreaProfile | null {
+  if (/立川|国立|昭島|日野|国分寺/u.test(text)) {
+    return {
+      label: '立川市近辺',
+      prefecture: '東京都',
+      cities: TACHIKAWA_NEARBY_CITIES,
+      keywords: ['立川', '国立', '国分寺', '昭島', '日野', '多摩', 'キャンパス', '校舎'],
+    };
+  }
+  if (/多摩地区|多摩エリア|多摩地域|多摩の/u.test(text)) {
+    return {
+      label: '多摩地区',
+      prefecture: '東京都',
+      cities: TOKYO_TAMA_CITIES,
+      keywords: ['多摩地区', '多摩', '八王子', '立川', '町田', '府中', 'キャンパス', '校舎'],
+    };
+  }
+  if (/東京都心|都心|23区|二十三区/u.test(text)) {
+    return {
+      label: '東京都心・23区',
+      prefecture: '東京都',
+      cities: TOKYO_23_WARDS,
+      keywords: ['東京都心', '23区', '新宿', '渋谷', '池袋', '秋葉原', 'キャンパス', '校舎'],
+    };
+  }
+  return null;
 }
 
 function detectMentionedSchoolNames(text: string): string[] {
@@ -79,6 +205,26 @@ function detectMentionedSchoolNames(text: string): string[] {
 }
 
 function detectFocusProfile(text: string): FocusProfile | null {
+  if (isLowAttendancePreference(text)) {
+    return {
+      keywords: [
+        '年数回',
+        '年に数回',
+        '年1回',
+        '年2回',
+        '年3回',
+        '集中スクーリング',
+        '合宿型スクーリング',
+        'オンライン',
+        '自宅学習',
+        '通学少ない',
+      ],
+      label: '年数回・低頻度通学',
+      regex: /年数回|年に数回|年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回|集中スクーリング|合宿型スクーリング|オンライン|自宅学習|通学.*少な/u,
+      instruction:
+        '年数回・低頻度通学が主訴です。候補校は、集中スクーリング、オンライン中心、自宅学習、最少登校日数、振替対応に関する根拠がある学校を優先してください。年1〜3回で確実に卒業できると断定せず、公式日程と卒業要件の確認を促してください。',
+    };
+  }
   if (/大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/.test(text)) {
     return {
       keywords: ['大学', '受験', '進学', '指定校', '推薦', '総合型', '模試', '予備校', '進路'],
@@ -119,10 +265,21 @@ function detectFocusProfile(text: string): FocusProfile | null {
 }
 
 function detectChatIntent(text: string): ChatIntent {
-  const wantsSchools =
-    /おすすめ|お勧め|薦め|すすめ|候補|学校.*(教えて|探し|知りたい)|どこ|通える|合う.*学校/.test(
+  const area = detectAreaProfile(text);
+  const hasConcreteSelectionCriteria =
+    Boolean(detectPrefecture(text) || area) &&
+    /週\s*[0-9０-９]|週[一二三四五六七]|\d[-〜~]\d通学|通学|登校|評定|友達|発達|サポート|進学|受験|不登校|安心/u.test(
       text
-    ) || detectMentionedSchoolNames(text).length >= 2;
+    );
+  const lowAttendanceSchoolRequest =
+    isLowAttendancePreference(text) && /高校|学校|探|いい|希望|おすすめ|お勧め/u.test(text);
+  const wantsSchools =
+    /おすすめ|お勧め|薦め|すすめ|候補|学校.*(教えて|探し|探して|知りたい)|高校.*(教えて|探し|探して|知りたい)|探しています|探してます|どこ|通える|合う.*学校|いい高校|いい学校/u.test(
+      text
+    ) ||
+    detectMentionedSchoolNames(text).length >= 2 ||
+    lowAttendanceSchoolRequest ||
+    hasConcreteSelectionCriteria;
   const procedureTerms =
     /退学|転校|転入|編入|新入学|在籍|単位|卒業時期|留年|手続き|書類|成績証明|在学証明|入学時期|受付期間/;
   if (procedureTerms.test(text) && !wantsSchools) return 'procedure_explanation';
@@ -136,6 +293,9 @@ function detectChatIntent(text: string): ChatIntent {
 }
 
 function detectPrefecture(text: string): string | null {
+  const area = detectAreaProfile(text);
+  if (area) return area.prefecture;
+
   const aliases: Array<[string, string]> = [
     ['東京', '東京都'],
     ['神奈川', '神奈川県'],
@@ -208,9 +368,20 @@ function detectPrefecture(text: string): string | null {
 
 function buildSearchQuery(latestUserMessage: string): string {
   const fragments = [latestUserMessage];
+  const area = detectAreaProfile(latestUserMessage);
+  if (area) {
+    fragments.push(
+      `${area.label} ${area.prefecture} ${area.keywords.join(' ')} ${area.cities.slice(0, 12).join(' ')} 通信制高校 キャンパス 校舎`
+    );
+  }
   const mentionedSchools = detectMentionedSchoolNames(latestUserMessage);
   if (mentionedSchools.length > 0) {
     fragments.push(`${mentionedSchools.join(' ')} 比較 違い 口コミ 学習スタイル 進路 サポート`);
+  }
+  if (isLowAttendancePreference(latestUserMessage)) {
+    fragments.push(
+      '年数回 年に数回 年1回 年2回 年3回 通学 登校 集中スクーリング 合宿型スクーリング オンライン 自宅学習 最少登校日数'
+    );
   }
   if (/大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/.test(latestUserMessage)) {
     fragments.push(
@@ -667,18 +838,22 @@ export async function POST(request: NextRequest) {
     if (!latestUserMessage) {
       return NextResponse.json({ error: 'ユーザーメッセージが必要です' }, { status: 400 });
     }
+    const searchBasisMessage = getSearchBasisMessage(messages, latestUserMessage);
+    const conciseRequest = isConciseRequest(latestUserMessage);
 
     const conversationText = messages
       .slice(-8)
       .map((message) => `${message.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${message.content}`)
       .join('\n');
 
-    const intent = detectChatIntent(latestUserMessage);
+    const intent = detectChatIntent(searchBasisMessage);
     const mentionedSchools = detectMentionedSchoolNames(conversationText);
-    const focus = detectFocusProfile(latestUserMessage);
-    const route = await routeQuery(conversationText, latestUserMessage);
+    const focus = detectFocusProfile(searchBasisMessage);
+    const area = detectAreaProfile(searchBasisMessage);
+    const routeRaw = await routeQuery(conversationText, searchBasisMessage);
+    const route = area && !routeRaw.prefecture ? { ...routeRaw, prefecture: area.prefecture } : routeRaw;
 
-    const reasonGroup = route.reason_group ?? inferReasonGroupFromText(latestUserMessage);
+    const reasonGroup = route.reason_group ?? inferReasonGroupFromText(searchBasisMessage);
     logBase = {
       sessionId: parsed.data.session_id,
       source: parsed.data.source,
@@ -692,24 +867,41 @@ export async function POST(request: NextRequest) {
       reasonGroup,
       startedAt,
     };
-    const [docsRaw, mentionedSchoolDocs, focusDocs] = await Promise.all([
+    const [docsRaw, mentionedSchoolDocs, focusDocs, areaSchools] = await Promise.all([
       searchRagDocuments(route.query, {
         prefecture: route.prefecture ?? null,
         reasonGroup,
-        matchCount: 24,
+        matchCount: area ? 32 : 24,
       }),
       fetchRagDocumentsBySchoolNames(mentionedSchools, 4),
       focus
         ? fetchRagDocumentsByKeywords(focus.keywords, {
             prefecture: route.prefecture ?? null,
-            limit: 18,
+            limit: isLowAttendancePreference(searchBasisMessage) ? 28 : 18,
+          })
+        : Promise.resolve([]),
+      area
+        ? fetchActiveSchoolsByCampusArea({
+            prefecture: area.prefecture,
+            cities: area.cities,
+            limit: 24,
           })
         : Promise.resolve([]),
     ]);
+    const areaSchoolDocs =
+      areaSchools.length > 0
+        ? await fetchRagDocumentsBySchoolIds(
+            areaSchools.map((school) => school.id),
+            3
+          )
+        : [];
     const docs = mergeRagRows(
-      mergeRagRows(mentionedSchoolDocs, rerankRowsForFocus(focusDocs, focus)),
+      mergeRagRows(
+        mergeRagRows(mentionedSchoolDocs, areaSchoolDocs),
+        rerankRowsForFocus(focusDocs, focus)
+      ),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
-    ).slice(0, mentionedSchools.length > 0 ? 16 : route.prefecture ? 10 : 8);
+    ).slice(0, mentionedSchools.length > 0 ? 16 : area ? 18 : route.prefecture ? 14 : 10);
 
     if (docs.length === 0) {
       const noEvidenceReply =
@@ -742,14 +934,37 @@ export async function POST(request: NextRequest) {
       .slice(0, 8)
       .map(([school, count]) => `${school} (${count}件の関連根拠)`)
       .join(' / ');
+    const areaHints =
+      area && areaSchools.length > 0
+        ? areaSchools
+            .slice(0, 12)
+            .map((school) => {
+              const locations = school.campusLocations
+                .map((location) => {
+                  const stationText =
+                    location.nearestStations.length > 0
+                      ? `・${location.nearestStations.slice(0, 2).join('／')}`
+                      : '';
+                  return `${location.city}${stationText}`;
+                })
+                .join('、');
+              return `${school.name}（${locations}）`;
+            })
+            .join(' / ')
+        : 'なし';
 
     const model = chooseGenerationModel(route.difficulty);
     const openai = getChatOpenAIClient();
     const focusInstruction = focus
       ? `今回の主訴は「${focus.label}」です。${focus.instruction} 各候補校の説明では、主訴に直接関係する口コミ根拠を最低1つは明記してください。主訴に直接関係する口コミ根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。`
       : 'ユーザーの主訴を読み取り、候補校の説明では口コミ上の具体的な良かった点・注意点を必ず添えてください。';
+    const areaInstruction = area
+      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。`
+      : '';
     const responsePolicy =
-      intent === 'procedure_explanation'
+      conciseRequest
+        ? 'ユーザーは短い回答を求めています。Markdown見出しは使わず、結論1文、候補または要点を3つまで、最後に確認質問1つだけで300字以内にしてください。'
+        : intent === 'procedure_explanation'
         ? 'この質問は学校候補の推薦ではなく、制度・手続きの説明です。学校名や候補校見出しを出さないでください。必ず次のMarkdown見出し構成で回答してください: ## 結論 / ## 退学後の入学と転校扱いの違い / ## 先に確認すること / ## 学校へ問い合わせる時の聞き方。'
         : intent === 'style_comparison'
           ? 'この質問は学校候補の推薦ではなく、オンライン中心と通学型など学び方の比較相談です。学校候補・おすすめ校・参考候補を出してはいけません。本文中でも学校名を挙げず、「公開口コミでは」「保護者口コミでは」のように根拠種別として説明してください。本人の不安・登校頻度・友人関係への希望に寄り添って、どちらを選ぶべきかの考え方を説明してください。必ず次のMarkdown見出し構成で回答してください: ## 結論 / ## オンライン中心が合いやすい場合 / ## 通学型・ハイブリッドが合いやすい場合 / ## 見学時に確認したいこと。'
@@ -758,7 +973,7 @@ export async function POST(request: NextRequest) {
           : mentionedSchools.length >= 2
             ? `ユーザーは ${mentionedSchools.join('、')} で迷っています。新しい学校候補を勝手に追加せず、まず言及された学校同士を比較してください。根拠が薄い学校がある場合は「今回の口コミ根拠は少なめ」と明記しつつ、分かる範囲で比較してください。必ず次のMarkdown見出し構成で回答してください: ## 比較の結論 / ## 学校ごとの向き不向き / ## 選ぶ時の確認ポイント。学校ごとの見出しは ### で実名校を書いてください。`
           : route.prefecture
-            ? `ユーザーは ${route.prefecture} を指定しています。候補校は必ず ${route.prefecture} の検索結果・根拠を最優先してください。${route.prefecture} の根拠がある候補を2〜3校だけ示し、根拠が不足する場合は無理に都外校を混ぜず「この条件では地域内根拠が少ない」と伝えて確認質問をしてください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
+            ? `ユーザーは ${area?.label ?? route.prefecture} を指定しています。候補校は必ず地域内の検索結果・所在地根拠を最優先してください。地域内の候補を原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${area?.label ?? route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : '地域指定がない推薦質問です。通学圏での断定は避けつつ、今回の主訴に関する口コミ根拠が強い学校を「参考候補」として2〜3校示してください。冒頭で「地域未指定のため、通えるかは別途確認が必要ですが、口コミ上の根拠が強い参考候補として挙げます。都道府県を教えてもらえれば地域内候補に絞れます」と明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## 口コミ根拠が強い参考候補 / ## 選んだ理由 / ## 地域指定後に確認したいこと。学校候補の各校名は ### 見出しにしてください。';
 
     const completionMessages = [
@@ -776,20 +991,28 @@ export async function POST(request: NextRequest) {
           '勉強の遅れ・学習不安が主訴の場合は、大学受験実績よりも、基礎からの学び直し、レポート提出の伴走、個別フォロー、少人数、登校頻度の柔軟さを優先して比較してください。' +
           '朝起きられない・午前の登校が難しい相談では、登校頻度の少なさだけでなく、午後登校、オンライン代替、振替スクーリング、体調への配慮、生活リズムの伴走を確認軸にしてください。' +
           focusInstruction +
+          areaInstruction +
           responsePolicy +
           '断定・過剰保証は避け、医療診断や法律助言はしません。' +
-          '回答は簡潔に、800〜1200字程度を目安にしてください。' +
+          (conciseRequest
+            ? '回答は300字以内にしてください。'
+            : '回答は簡潔に、800〜1200字程度を目安にしてください。') +
           '根拠に使ったdoc参照を文中に [doc_n] 形式で付けてください。',
       },
       {
         role: 'user' as const,
         content:
           `会話履歴:\n${conversationText}\n\n` +
+          (searchBasisMessage !== latestUserMessage
+            ? `回答対象にする元の相談:\n${searchBasisMessage}\n\n`
+            : '') +
             `質問タイプ:\n${intent}\n` +
             `今回の主訴:\n${focus ? focus.label : '明確な主訴なし'}\n` +
+            `地域解釈:\n${area ? `${area.label}（${area.prefecture}）` : route.prefecture ?? 'なし'}\n` +
             `ユーザーが言及した学校:\n${mentionedSchools.length > 0 ? mentionedSchools.join(' / ') : 'なし'}\n` +
           `検索ルーター結果:\n${JSON.stringify(route, null, 2)}\n` +
           `関連学校ヒント:\n${schoolHints || 'なし'}\n\n` +
+          `所在地から拾った地域候補:\n${areaHints}\n\n` +
             (intent === 'school_recommendation'
               ? `候補校リスト（###見出しに使える実名校はこの中だけ）:\n${buildCandidateSchoolBlock(
                   docs,

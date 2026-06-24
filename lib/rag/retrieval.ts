@@ -14,6 +14,17 @@ export type RagSearchFilters = {
   matchCount?: number;
 };
 
+export type CampusAreaSchoolMatch = {
+  id: string;
+  name: string;
+  prefecture: string | null;
+  campusLocations: Array<{
+    prefecture: string;
+    city: string;
+    nearestStations: string[];
+  }>;
+};
+
 function getSupabaseServiceClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -91,6 +102,126 @@ export async function fetchRagDocumentsBySchoolNames(
   }
 
   return names.flatMap((name) => (grouped.get(name) ?? []).slice(0, limitPerSchool));
+}
+
+function parseCampusLocations(value: unknown): CampusAreaSchoolMatch['campusLocations'] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((location) => {
+      if (!location || typeof location !== 'object') return null;
+      const record = location as Record<string, unknown>;
+      const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
+      const city = typeof record.city === 'string' ? record.city.trim() : '';
+      if (!prefecture || !city) return null;
+      const nearestStations = Array.isArray(record.nearest_stations)
+        ? record.nearest_stations
+            .map((station) => (typeof station === 'string' ? station.trim() : ''))
+            .filter(Boolean)
+        : typeof record.nearest_station === 'string'
+          ? [record.nearest_station.trim()].filter(Boolean)
+          : [];
+      return { prefecture, city, nearestStations };
+    })
+    .filter((location): location is CampusAreaSchoolMatch['campusLocations'][number] =>
+      Boolean(location)
+    );
+}
+
+export async function fetchActiveSchoolsByCampusArea(options: {
+  prefecture: string;
+  cities: string[];
+  limit?: number;
+}): Promise<CampusAreaSchoolMatch[]> {
+  const cities = [...new Set(options.cities.map((city) => city.trim()).filter(Boolean))];
+  if (!options.prefecture || cities.length === 0) return [];
+
+  const supabase = getSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('schools')
+    .select('id, name, prefecture, prefectures, campus_locations')
+    .eq('status', 'active')
+    .eq('is_public', true)
+    .limit(1500);
+
+  if (error) throw error;
+
+  const citySet = new Set(cities);
+  const matches = (data ?? [])
+    .map((row) => {
+      const record = row as {
+        id: string;
+        name: string;
+        prefecture: string | null;
+        prefectures: string[] | null;
+        campus_locations: unknown;
+      };
+      const campusLocations = parseCampusLocations(record.campus_locations);
+      const matchedLocations = campusLocations.filter(
+        (location) => location.prefecture === options.prefecture && citySet.has(location.city)
+      );
+      if (matchedLocations.length === 0) return null;
+      return {
+        id: record.id,
+        name: record.name,
+        prefecture: record.prefecture,
+        campusLocations: matchedLocations,
+      };
+    })
+    .filter((school): school is CampusAreaSchoolMatch => Boolean(school));
+
+  return matches.slice(0, options.limit ?? 24);
+}
+
+export async function fetchRagDocumentsBySchoolIds(
+  schoolIds: string[],
+  limitPerSchool = 3
+): Promise<RagMatchRow[]> {
+  const ids = [...new Set(schoolIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const supabase = getSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('rag_documents')
+    .select(
+      'id, source_type, source_id, chunk_key, school_id, school_name, prefecture, reason_groups, title, content, metadata, source_url'
+    )
+    .eq('is_public', true)
+    .in('school_id', ids)
+    .limit(ids.length * Math.max(limitPerSchool * 4, 10));
+
+  if (error) throw error;
+
+  const sourcePriority: Partial<Record<RagSourceType, number>> = {
+    review: 1,
+    school_summary: 2,
+    school: 3,
+    faq: 4,
+    course: 5,
+    tuition: 6,
+    seo_section: 7,
+    article: 8,
+  };
+  const grouped = new Map<string, RagMatchRow[]>();
+  for (const row of data ?? []) {
+    const typed = row as Omit<RagMatchRow, 'similarity' | 'score'>;
+    if (!typed.school_id) continue;
+    const rows = grouped.get(typed.school_id) ?? [];
+    rows.push({
+      ...typed,
+      similarity: 1,
+      score: 1.35 - (sourcePriority[typed.source_type] ?? 9) * 0.01,
+    });
+    grouped.set(typed.school_id, rows);
+  }
+
+  return ids.flatMap((id) =>
+    (grouped.get(id) ?? [])
+      .sort(
+        (a, b) =>
+          (sourcePriority[a.source_type] ?? 9) - (sourcePriority[b.source_type] ?? 9)
+      )
+      .slice(0, limitPerSchool)
+  );
 }
 
 export async function fetchRagDocumentsByKeywords(
