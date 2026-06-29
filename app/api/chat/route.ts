@@ -18,6 +18,7 @@ import {
 } from '@/lib/rag/retrieval';
 import type { RagMatchRow } from '@/lib/rag/types';
 import { appPath } from '@/lib/base-path';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -57,6 +58,11 @@ type AreaProfile = {
   label: string;
   prefecture: string;
   cities: string[];
+  keywords: string[];
+};
+type BroadRegionProfile = {
+  label: string;
+  prefectures: string[];
   keywords: string[];
 };
 
@@ -152,14 +158,32 @@ function isConciseRequest(text: string): boolean {
   return /簡単に|短く|要約|一言|ひとことで|3行|三行|箇条書きだけ/u.test(text);
 }
 
-function getSearchBasisMessage(messages: Array<z.infer<typeof MessageSchema>>, latest: string): string {
-  if (!isConciseRequest(latest)) return latest;
-  const previousUser = [...messages]
-    .reverse()
+function isFollowUpRefinement(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    /^(それ|そこ|その|じゃあ|では|なら|あと|他|ほか|別|追加|具体|詳しく|比較|候補|おすすめ|近い|通える|関東|都内|東京都|週|月|年|理系|文系)/u.test(trimmed) ||
+    /^(東京都|神奈川県|埼玉県|千葉県|茨城県|栃木県|群馬県|関東)$/u.test(trimmed) ||
+    /在住|週\s*[0-9０-９一二三四五六七]|年[に\s]*(?:1|2|3|１|２|３|一|二|三).*通学|通学.*(?:希望|できる|少な)|についてどう|は.*(?:どう|強い|合う|向いて)/u.test(trimmed)
+  );
+}
+
+function getRecentUserMessages(messages: Array<z.infer<typeof MessageSchema>>): string[] {
+  return messages
     .filter((message) => message.role === 'user')
-    .map((message) => message.content)
-    .find((content) => content !== latest);
-  return previousUser ?? latest;
+    .map((message) => message.content);
+}
+
+function getSearchBasisMessage(messages: Array<z.infer<typeof MessageSchema>>, latest: string): string {
+  const recentUsers = getRecentUserMessages(messages);
+  const previousUsers = recentUsers.filter((content) => content !== latest);
+  if (previousUsers.length === 0) return latest;
+  if (isConciseRequest(latest)) {
+    return `${previousUsers.slice(-3).join('\n')}\n回答の長さ指定: ${latest}`;
+  }
+  if (isFollowUpRefinement(latest)) {
+    return recentUsers.slice(-4).join('\n追加条件: ');
+  }
+  return latest;
 }
 
 function detectAreaProfile(text: string): AreaProfile | null {
@@ -190,12 +214,37 @@ function detectAreaProfile(text: string): AreaProfile | null {
   return null;
 }
 
+function detectBroadRegionProfile(text: string): BroadRegionProfile | null {
+  if (/関東/u.test(text)) {
+    return {
+      label: '関東',
+      prefectures: ['東京都', '神奈川県', '埼玉県', '千葉県', '茨城県', '栃木県', '群馬県'],
+      keywords: [
+        '関東',
+        '東京',
+        '神奈川',
+        '埼玉',
+        '千葉',
+        '茨城',
+        '栃木',
+        '群馬',
+        'キャンパス',
+        '校舎',
+      ],
+    };
+  }
+  return null;
+}
+
 function detectMentionedSchoolNames(text: string): string[] {
   const aliases: Array<[RegExp, string]> = [
     [/(^|[、,\s])N高(等学校|校)?/i, 'N高等学校'],
     [/(^|[、,\s])S高(等学校|校)?/i, 'S高等学校'],
     [/クラーク|Clark/i, 'クラーク記念国際高等学校'],
     [/鹿島学園/, '鹿島学園高等学校'],
+    [/駿台\s*i|駿台i高等学校|駿台i高等学院/i, '駿台i高等学院'],
+    [/第一高等学院|第一学院|第一学院高等学校/u, '第一学院高等学校'],
+    [/トライ式|トライ式高等学院/u, 'トライ式高等学院'],
   ];
   const names: string[] = [];
   for (const [pattern, schoolName] of aliases) {
@@ -223,6 +272,26 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /年数回|年に数回|年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回|集中スクーリング|合宿型スクーリング|オンライン|自宅学習|通学.*少な/u,
       instruction:
         '年数回・低頻度通学が主訴です。候補校は、集中スクーリング、オンライン中心、自宅学習、最少登校日数、振替対応に関する根拠がある学校を優先してください。年1〜3回で確実に卒業できると断定せず、公式日程と卒業要件の確認を促してください。',
+    };
+  }
+  if (/就職|就活|キャリア|求人|職業|資格|専門職|インターン/.test(text)) {
+    return {
+      keywords: [
+        '就職',
+        '就活',
+        'キャリア',
+        '求人',
+        '職業',
+        '資格',
+        '面接',
+        '履歴書',
+        '企業連携',
+        'インターン',
+      ],
+      label: '就職・キャリア支援',
+      regex: /就職|就活|キャリア|求人|職業|資格|面接|履歴書|企業連携|インターン|専門職/u,
+      instruction:
+        '就職・キャリア支援が主訴です。候補校は、資格取得、職業体験、企業連携、求人紹介、面接・履歴書指導、卒業後の進路相談に関する口コミ根拠がある学校を優先してください。',
     };
   }
   if (/大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/.test(text)) {
@@ -266,19 +335,31 @@ function detectFocusProfile(text: string): FocusProfile | null {
 
 function detectChatIntent(text: string): ChatIntent {
   const area = detectAreaProfile(text);
+  const broadRegion = detectBroadRegionProfile(text);
+  const mentionedSchoolNames = detectMentionedSchoolNames(text);
   const hasConcreteSelectionCriteria =
-    Boolean(detectPrefecture(text) || area) &&
-    /週\s*[0-9０-９]|週[一二三四五六七]|\d[-〜~]\d通学|通学|登校|評定|友達|発達|サポート|進学|受験|不登校|安心/u.test(
+    Boolean(detectPrefecture(text) || area || broadRegion) &&
+    /週\s*[0-9０-９]|週[一二三四五六七]|\d[-〜~]\d通学|通学|登校|評定|友達|発達|サポート|進学|受験|就職|就活|不登校|安心/u.test(
       text
     );
   const lowAttendanceSchoolRequest =
     isLowAttendancePreference(text) && /高校|学校|探|いい|希望|おすすめ|お勧め/u.test(text);
+  const criteriaSchoolRequest =
+    /(?:通信制高校|通信制の高校|高校|学校)/u.test(text) &&
+    /強い|力がある|サポート|交流|同年代|就職|就活|キャリア|進学|受験|不登校|スポーツ|勉強|学習|通学|登校|家から出|合う|向いて/u.test(
+      text
+    );
+  const singleSchoolEvaluation =
+    mentionedSchoolNames.length > 0 &&
+    /どう|考え|強い|評判|口コミ|合う|向いて|有効|比較|知りたい|教えて/u.test(text);
   const wantsSchools =
     /おすすめ|お勧め|薦め|すすめ|候補|学校.*(教えて|探し|探して|知りたい)|高校.*(教えて|探し|探して|知りたい)|探しています|探してます|どこ|通える|合う.*学校|いい高校|いい学校/u.test(
       text
     ) ||
-    detectMentionedSchoolNames(text).length >= 2 ||
+    mentionedSchoolNames.length >= 2 ||
+    singleSchoolEvaluation ||
     lowAttendanceSchoolRequest ||
+    criteriaSchoolRequest ||
     hasConcreteSelectionCriteria;
   const procedureTerms =
     /退学|転校|転入|編入|新入学|在籍|単位|卒業時期|留年|手続き|書類|成績証明|在学証明|入学時期|受付期間/;
@@ -298,6 +379,7 @@ function detectPrefecture(text: string): string | null {
 
   const aliases: Array<[string, string]> = [
     ['東京', '東京都'],
+    ['都内', '東京都'],
     ['神奈川', '神奈川県'],
     ['大阪', '大阪府'],
     ['京都', '京都府'],
@@ -369,9 +451,15 @@ function detectPrefecture(text: string): string | null {
 function buildSearchQuery(latestUserMessage: string): string {
   const fragments = [latestUserMessage];
   const area = detectAreaProfile(latestUserMessage);
+  const broadRegion = detectBroadRegionProfile(latestUserMessage);
   if (area) {
     fragments.push(
       `${area.label} ${area.prefecture} ${area.keywords.join(' ')} ${area.cities.slice(0, 12).join(' ')} 通信制高校 キャンパス 校舎`
+    );
+  }
+  if (broadRegion) {
+    fragments.push(
+      `${broadRegion.label} ${broadRegion.prefectures.join(' ')} ${broadRegion.keywords.join(' ')} 通信制高校 キャンパス 校舎`
     );
   }
   const mentionedSchools = detectMentionedSchoolNames(latestUserMessage);
@@ -386,6 +474,11 @@ function buildSearchQuery(latestUserMessage: string): string {
   if (/大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/.test(latestUserMessage)) {
     fragments.push(
       '大学受験 進学 指定校推薦 総合型選抜 進路指導 模試 予備校 個別指導 受験対策'
+    );
+  }
+  if (/就職|就活|キャリア|求人|職業|資格|専門職|インターン/.test(latestUserMessage)) {
+    fragments.push(
+      '就職 就活 キャリア 求人 職業 資格 面接 履歴書 企業連携 インターン 進路指導'
     );
   }
   if (/退学|転校|転入|編入|新入学|在籍|単位|卒業時期|留年|手続き|書類/.test(latestUserMessage)) {
@@ -779,6 +872,122 @@ type ChatLogBase = {
   startedAt: number;
 };
 
+type ConsultationMonitoringLogRow = {
+  created_at: string | null;
+  user_question: string | null;
+  assistant_reply: string | null;
+  intent: string | null;
+  focus_label: string | null;
+  prefecture: string | null;
+  reason_group: string | null;
+  review_notes: string | null;
+  rag_doc_count: number | null;
+  status: string | null;
+};
+
+function normalizePromptText(value: string | null | undefined, maxLength: number): string {
+  const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function scoreMonitoringLog(
+  row: ConsultationMonitoringLogRow,
+  input: {
+    intent: ChatIntent;
+    focusLabel: string | null;
+    prefecture: string | null;
+    reasonGroup: string | null;
+    latestUserMessage: string;
+  }
+): number {
+  let score = 0;
+  if (row.intent === input.intent) score += 4;
+  if (input.focusLabel && row.focus_label === input.focusLabel) score += 3;
+  if (input.prefecture && row.prefecture === input.prefecture) score += 2;
+  if (input.reasonGroup && row.reason_group === input.reasonGroup) score += 2;
+  if (row.status === 'success') score += 1;
+
+  const rowQuestion = row.user_question ?? '';
+  for (const keyword of ['不登校', '進学', '受験', '朝', '体調', '通学', 'オンライン', '転校', '編入']) {
+    if (input.latestUserMessage.includes(keyword) && rowQuestion.includes(keyword)) score += 1;
+  }
+
+  return score;
+}
+
+async function buildMonitoringInsightBlock(input: {
+  intent: ChatIntent;
+  focus: FocusProfile | null;
+  prefecture: string | null;
+  reasonGroup: string | null;
+  latestUserMessage: string;
+}): Promise<string> {
+  try {
+    const supabase = createAdminSupabaseClient();
+    const { data, error } = await supabase
+      .from('consultation_chat_logs')
+      .select(
+        'created_at,user_question,assistant_reply,intent,focus_label,prefecture,reason_group,review_notes,rag_doc_count,status'
+      )
+      .eq('is_reviewed', true)
+      .not('review_notes', 'is', null)
+      .neq('review_notes', '')
+      .order('created_at', { ascending: false })
+      .limit(40);
+
+    if (error || !data) {
+      if (error) console.error('[api/chat] monitoring insight fetch failed:', error);
+      return '';
+    }
+
+    const ranked = (data as ConsultationMonitoringLogRow[])
+      .map((row) => ({
+        row,
+        score: scoreMonitoringLog(row, {
+          intent: input.intent,
+          focusLabel: input.focus?.label ?? null,
+          prefecture: input.prefecture,
+          reasonGroup: input.reasonGroup,
+          latestUserMessage: input.latestUserMessage,
+        }),
+      }))
+      .filter(({ row, score }) => score >= 4 && Boolean(row.review_notes?.trim()))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    if (ranked.length === 0) return '';
+
+    const items = ranked.map(({ row }, index) => {
+      const conditions = [
+        row.intent ? `intent=${row.intent}` : null,
+        row.focus_label ? `主訴=${row.focus_label}` : null,
+        row.prefecture ? `地域=${row.prefecture}` : null,
+        row.reason_group ? `理由=${row.reason_group}` : null,
+        typeof row.rag_doc_count === 'number' ? `根拠数=${row.rag_doc_count}` : null,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(' / ');
+
+      return [
+        `${index + 1}. ${conditions || '条件なし'}`,
+        `相談: ${normalizePromptText(row.user_question, 180)}`,
+        `以前の回答: ${normalizePromptText(row.assistant_reply, 220)}`,
+        `管理レビュー: ${normalizePromptText(row.review_notes, 260)}`,
+      ].join('\n');
+    });
+
+    return [
+      '過去の管理レビューからの改善メモ:',
+      '以下は同種の相談ログを管理者がレビューした内容です。現在の公開根拠とシステム方針を優先しつつ、同じ失敗を避けるための内部ガイドとして使ってください。ユーザーにはこのメモの存在を説明しないでください。',
+      items.join('\n\n'),
+    ].join('\n');
+  } catch (error) {
+    console.error('[api/chat] monitoring insight unexpected error:', error);
+    return '';
+  }
+}
+
 function scheduleConsultationChatLog(
   request: NextRequest,
   base: ChatLogBase,
@@ -850,6 +1059,7 @@ export async function POST(request: NextRequest) {
     const mentionedSchools = detectMentionedSchoolNames(conversationText);
     const focus = detectFocusProfile(searchBasisMessage);
     const area = detectAreaProfile(searchBasisMessage);
+    const broadRegion = detectBroadRegionProfile(searchBasisMessage);
     const routeRaw = await routeQuery(conversationText, searchBasisMessage);
     const route = area && !routeRaw.prefecture ? { ...routeRaw, prefecture: area.prefecture } : routeRaw;
 
@@ -902,6 +1112,13 @@ export async function POST(request: NextRequest) {
       ),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
     ).slice(0, mentionedSchools.length > 0 ? 16 : area ? 18 : route.prefecture ? 14 : 10);
+    const monitoringInsightBlock = await buildMonitoringInsightBlock({
+      intent,
+      focus,
+      prefecture: route.prefecture ?? null,
+      reasonGroup,
+      latestUserMessage: searchBasisMessage,
+    });
 
     if (docs.length === 0) {
       const noEvidenceReply =
@@ -961,6 +1178,9 @@ export async function POST(request: NextRequest) {
     const areaInstruction = area
       ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。`
       : '';
+    const broadRegionInstruction = broadRegion
+      ? `ユーザーは「${broadRegion.label}」を意図しています。単一都道府県に絞り込まず、${broadRegion.prefectures.join('・')}の学校・キャンパスを関東候補として扱ってください。`
+      : '';
     const responsePolicy =
       conciseRequest
         ? 'ユーザーは短い回答を求めています。Markdown見出しは使わず、結論1文、候補または要点を3つまで、最後に確認質問1つだけで300字以内にしてください。'
@@ -972,6 +1192,8 @@ export async function POST(request: NextRequest) {
           ? 'この質問は一般的な学校選び相談です。ユーザーが明示的に候補校を求めていない場合、実名校を無理に出さないでください。必要なら条件整理と確認ポイントを中心に回答してください。必ず次のMarkdown見出し構成で回答してください: ## 考え方 / ## 選び方のポイント / ## 確認ポイント。'
           : mentionedSchools.length >= 2
             ? `ユーザーは ${mentionedSchools.join('、')} で迷っています。新しい学校候補を勝手に追加せず、まず言及された学校同士を比較してください。根拠が薄い学校がある場合は「今回の口コミ根拠は少なめ」と明記しつつ、分かる範囲で比較してください。必ず次のMarkdown見出し構成で回答してください: ## 比較の結論 / ## 学校ごとの向き不向き / ## 選ぶ時の確認ポイント。学校ごとの見出しは ### で実名校を書いてください。`
+            : broadRegion
+              ? `ユーザーは ${broadRegion.label} を指定しています。候補校は関東圏の検索結果・所在地根拠を優先してください。候補校は原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${broadRegion.label}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
           : route.prefecture
             ? `ユーザーは ${area?.label ?? route.prefecture} を指定しています。候補校は必ず地域内の検索結果・所在地根拠を最優先してください。地域内の候補を原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${area?.label ?? route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : '地域指定がない推薦質問です。通学圏での断定は避けつつ、今回の主訴に関する口コミ根拠が強い学校を「参考候補」として2〜3校示してください。冒頭で「地域未指定のため、通えるかは別途確認が必要ですが、口コミ上の根拠が強い参考候補として挙げます。都道府県を教えてもらえれば地域内候補に絞れます」と明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## 口コミ根拠が強い参考候補 / ## 選んだ理由 / ## 地域指定後に確認したいこと。学校候補の各校名は ### 見出しにしてください。';
@@ -992,11 +1214,12 @@ export async function POST(request: NextRequest) {
           '朝起きられない・午前の登校が難しい相談では、登校頻度の少なさだけでなく、午後登校、オンライン代替、振替スクーリング、体調への配慮、生活リズムの伴走を確認軸にしてください。' +
           focusInstruction +
           areaInstruction +
+          broadRegionInstruction +
           responsePolicy +
           '断定・過剰保証は避け、医療診断や法律助言はしません。' +
           (conciseRequest
             ? '回答は300字以内にしてください。'
-            : '回答は簡潔に、800〜1200字程度を目安にしてください。') +
+            : '回答は簡潔に、600〜900字程度を目安にしてください。') +
           '根拠に使ったdoc参照を文中に [doc_n] 形式で付けてください。',
       },
       {
@@ -1008,15 +1231,22 @@ export async function POST(request: NextRequest) {
             : '') +
             `質問タイプ:\n${intent}\n` +
             `今回の主訴:\n${focus ? focus.label : '明確な主訴なし'}\n` +
-            `地域解釈:\n${area ? `${area.label}（${area.prefecture}）` : route.prefecture ?? 'なし'}\n` +
+            `地域解釈:\n${
+              area
+                ? `${area.label}（${area.prefecture}）`
+                : broadRegion
+                  ? `${broadRegion.label}（${broadRegion.prefectures.join(' / ')}）`
+                  : route.prefecture ?? 'なし'
+            }\n` +
             `ユーザーが言及した学校:\n${mentionedSchools.length > 0 ? mentionedSchools.join(' / ') : 'なし'}\n` +
           `検索ルーター結果:\n${JSON.stringify(route, null, 2)}\n` +
           `関連学校ヒント:\n${schoolHints || 'なし'}\n\n` +
           `所在地から拾った地域候補:\n${areaHints}\n\n` +
+            (monitoringInsightBlock ? `${monitoringInsightBlock}\n\n` : '') +
             (intent === 'school_recommendation'
               ? `候補校リスト（###見出しに使える実名校はこの中だけ）:\n${buildCandidateSchoolBlock(
                   docs,
-                  { focus, nationwideReferenceOnly: !route.prefecture }
+                  { focus, nationwideReferenceOnly: !route.prefecture && !broadRegion }
                 )}\n\n`
               : '') +
           `参照可能な根拠:\n${buildContextBlock(docs)}\n\n` +
