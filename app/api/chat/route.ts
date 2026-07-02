@@ -65,6 +65,11 @@ type BroadRegionProfile = {
   prefectures: string[];
   keywords: string[];
 };
+type InstitutionType = 'public' | 'private' | 'support';
+type SchoolInstitutionInfo = {
+  type: InstitutionType | null;
+  label: string | null;
+};
 
 const TOKYO_TAMA_CITIES = [
   '八王子市',
@@ -590,7 +595,11 @@ function focusHitCount(text: string, regex?: RegExp): number {
 
 function buildCandidateSchoolBlock(
   docs: RagMatchRow[],
-  options: { focus?: FocusProfile | null; nationwideReferenceOnly?: boolean } = {}
+  options: {
+    focus?: FocusProfile | null;
+    nationwideReferenceOnly?: boolean;
+    schoolInstitutionInfo?: Map<string, SchoolInstitutionInfo>;
+  } = {}
 ): string {
   const grouped = new Map<
     string,
@@ -652,6 +661,8 @@ function buildCandidateSchoolBlock(
   return candidates
     .map((candidate, index) => {
       const prefectures = [...candidate.prefectures].join(', ') || '都道府県不明';
+      const institutionLabel = options.schoolInstitutionInfo?.get(candidate.schoolName)?.label ?? null;
+      const profileText = [prefectures, institutionLabel].filter(Boolean).join(' / ');
       const refs = candidate.refs
         .slice(0, 4)
         .map((ref) => `[doc_${ref}]`)
@@ -660,7 +671,7 @@ function buildCandidateSchoolBlock(
         candidate.focusSnippets.length > 0
           ? candidate.focusSnippets.join(' / ')
           : candidate.snippets.join(' / ');
-      return `${index + 1}. ${candidate.schoolName}（${prefectures}） refs: ${refs}\n   ${
+      return `${index + 1}. ${candidate.schoolName}（${profileText}） refs: ${refs}\n   ${
         options.focus ? `${options.focus.label}に関する口コミ根拠` : '根拠要約'
       }: ${snippets}`;
     })
@@ -686,6 +697,63 @@ function mergeRagRows(primary: RagMatchRow[], secondary: RagMatchRow[]): RagMatc
     out.push(row);
   }
   return out;
+}
+
+function normalizeInstitutionType(value: unknown): InstitutionType | null {
+  if (value === 'public' || value === 'private' || value === 'support') return value;
+  return null;
+}
+
+function getInstitutionTypeLabel(type: InstitutionType | null): string | null {
+  if (type === 'public') return '公立通信制';
+  if (type === 'private') return '私立通信制';
+  if (type === 'support') return 'サポート校';
+  return null;
+}
+
+async function fetchSchoolInstitutionInfo(
+  docs: RagMatchRow[]
+): Promise<Map<string, SchoolInstitutionInfo>> {
+  const infoBySchool = new Map<string, SchoolInstitutionInfo>();
+
+  for (const doc of docs) {
+    if (!doc.school_name) continue;
+    const metadataType = normalizeInstitutionType(doc.metadata?.institution_type);
+    if (metadataType && !infoBySchool.has(doc.school_name)) {
+      infoBySchool.set(doc.school_name, {
+        type: metadataType,
+        label: getInstitutionTypeLabel(metadataType),
+      });
+    }
+  }
+
+  const schoolIds = [...new Set(docs.map((doc) => doc.school_id).filter((id): id is string => Boolean(id)))];
+  if (schoolIds.length === 0) return infoBySchool;
+
+  try {
+    const supabase = createAdminSupabaseClient();
+    const { data, error } = await supabase
+      .from('schools')
+      .select('id,name,institution_type')
+      .in('id', schoolIds);
+
+    if (error || !data) {
+      if (error) console.error('[api/chat] school institution fetch failed:', error);
+      return infoBySchool;
+    }
+
+    for (const row of data as Array<{ id: string; name: string; institution_type: string | null }>) {
+      const type = normalizeInstitutionType(row.institution_type);
+      infoBySchool.set(row.name, {
+        type,
+        label: getInstitutionTypeLabel(type),
+      });
+    }
+  } catch (error) {
+    console.error('[api/chat] school institution unexpected error:', error);
+  }
+
+  return infoBySchool;
 }
 
 function buildSchoolLinkMap(docs: RagMatchRow[]): Map<string, string> {
@@ -750,26 +818,41 @@ function injectSchoolLinks(reply: string, schoolLinks: Map<string, string>): str
 
 function extractSchoolCandidates(
   reply: string,
-  schoolLinks: Map<string, string>
-): Array<{ name: string; url: string }> {
-  const resolveSchool = (rawName: string): { name: string; url: string } | null => {
+  schoolLinks: Map<string, string>,
+  schoolInstitutionInfo: Map<string, SchoolInstitutionInfo>
+): Array<{ name: string; url: string; institutionType: InstitutionType | null }> {
+  const resolveSchool = (
+    rawName: string
+  ): { name: string; url: string; institutionType: InstitutionType | null } | null => {
     const normalized = rawName
       .replace(/^\d+[.)]\s*/, '')
       .replace(/[（(].*$/, '')
       .trim();
     const directUrl = schoolLinks.get(normalized);
-    if (directUrl) return { name: normalized, url: directUrl };
+    if (directUrl) {
+      return {
+        name: normalized,
+        url: directUrl,
+        institutionType: schoolInstitutionInfo.get(normalized)?.type ?? null,
+      };
+    }
 
     const matchedName = [...schoolLinks.keys()].find(
       (schoolName) => normalized.includes(schoolName) || schoolName.includes(normalized)
     );
     if (!matchedName) return null;
     const url = schoolLinks.get(matchedName);
-    return url ? { name: matchedName, url } : null;
+    return url
+      ? {
+          name: matchedName,
+          url,
+          institutionType: schoolInstitutionInfo.get(matchedName)?.type ?? null,
+        }
+      : null;
   };
 
   const headingMatches = [...reply.matchAll(/^###\s+(?:\[([^\]]+)\]\([^)]+\)|(.+?))\s*$/gm)];
-  const fromHeadings: Array<{ name: string; url: string }> = [];
+  const fromHeadings: Array<{ name: string; url: string; institutionType: InstitutionType | null }> = [];
 
   for (const match of headingMatches) {
     const rawName = (match[1] ?? match[2] ?? '').trim();
@@ -780,13 +863,17 @@ function extractSchoolCandidates(
   }
 
   const names = [...schoolLinks.keys()].sort((a, b) => b.length - a.length);
-  const picked: Array<{ name: string; url: string }> = [];
+  const picked: Array<{ name: string; url: string; institutionType: InstitutionType | null }> = [];
 
   for (const name of names) {
     if (!reply.includes(name)) continue;
     const url = schoolLinks.get(name);
     if (!url) continue;
-    picked.push({ name, url });
+    picked.push({
+      name,
+      url,
+      institutionType: schoolInstitutionInfo.get(name)?.type ?? null,
+    });
     if (picked.length >= 4) break;
   }
 
@@ -833,12 +920,20 @@ function isModelUnavailableError(error: unknown): boolean {
   return maybeError.code === 'model_not_found' || maybeError.status === 404;
 }
 
-function buildChatPayload(replyRaw: string, docs: RagMatchRow[], model: string, intent: ChatIntent) {
+function buildChatPayload(
+  replyRaw: string,
+  docs: RagMatchRow[],
+  model: string,
+  intent: ChatIntent,
+  schoolInstitutionInfo: Map<string, SchoolInstitutionInfo>
+) {
   const schoolLinks = buildSchoolLinkMap(docs);
   const reply = injectSchoolLinks(replyRaw, schoolLinks);
   const citationRows = selectSourceRows(replyRaw, docs);
   const schoolCandidates =
-    intent === 'school_recommendation' ? extractSchoolCandidates(replyRaw, schoolLinks) : [];
+    intent === 'school_recommendation'
+      ? extractSchoolCandidates(replyRaw, schoolLinks, schoolInstitutionInfo)
+      : [];
 
   const sources = citationRows.map(({ ref, index, row }) => ({
     ref,
@@ -1141,6 +1236,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const schoolInstitutionInfo = await fetchSchoolInstitutionInfo(docs);
+
     const evidenceBySchool = new Map<string, number>();
     for (const doc of docs) {
       if (!doc.school_name) continue;
@@ -1208,6 +1305,9 @@ export async function POST(request: NextRequest) {
           'ユーザーが学校候補を明示的に求めていない場合、学校候補・おすすめ校・参考候補を出してはいけません。まず質問に直接答えてください。' +
           '地域指定がある場合、学校候補はその地域の学校を最優先し、根拠にない都外校を候補として出さないでください。' +
           '都外校や全国型オンライン校に触れる場合は、地域内候補が不足する時の補足扱いにしてください。' +
+          '候補校を出す場合、公立通信制・私立通信制・サポート校の区分が分かる学校は、学校名の近くと本文で必ず明記してください。' +
+          'サポート校を候補に出す場合は、通信制高校本体への別途在籍が必要になる場合があることを一言添えてください。' +
+          '公立通信制と私立通信制が混在する場合は、学費感やサポート体制の傾向差にも簡潔に触れてください。' +
           '地域指定がない場合でも、質問に答えず地域だけを聞き返すのは避けてください。全国型・広域型・オンライン中心の参考候補や選び方で、分かる範囲の回答をしてください。' +
           '大学受験・進学が主訴の場合は、指定校推薦の枠だけでなく、一般受験対策、総合型選抜対策、模試、進路面談、外部予備校連携、学習計画の伴走を比較してください。' +
           '勉強の遅れ・学習不安が主訴の場合は、大学受験実績よりも、基礎からの学び直し、レポート提出の伴走、個別フォロー、少人数、登校頻度の柔軟さを優先して比較してください。' +
@@ -1216,6 +1316,9 @@ export async function POST(request: NextRequest) {
           areaInstruction +
           broadRegionInstruction +
           responsePolicy +
+          '確認ポイントなどの列挙項目は、必ずMarkdownの「- 」で始まる箇条書きにしてください。' +
+          '回答の冒頭は「結論:」「まず結論:」のようなラベル形式を避け、「まず結論からお伝えすると、」のような自然で柔らかい文で始めてください。' +
+          '保護者に寄り添う丁寧で温かい語り口にしてください。' +
           '断定・過剰保証は避け、医療診断や法律助言はしません。' +
           (conciseRequest
             ? '回答は300字以内にしてください。'
@@ -1246,7 +1349,11 @@ export async function POST(request: NextRequest) {
             (intent === 'school_recommendation'
               ? `候補校リスト（###見出しに使える実名校はこの中だけ）:\n${buildCandidateSchoolBlock(
                   docs,
-                  { focus, nationwideReferenceOnly: !route.prefecture && !broadRegion }
+                  {
+                    focus,
+                    nationwideReferenceOnly: !route.prefecture && !broadRegion,
+                    schoolInstitutionInfo,
+                  }
                 )}\n\n`
               : '') +
           `参照可能な根拠:\n${buildContextBlock(docs)}\n\n` +
@@ -1295,7 +1402,7 @@ export async function POST(request: NextRequest) {
                 );
               }
 
-              const payload = buildChatPayload(replyRaw, docs, usedModel, intent);
+              const payload = buildChatPayload(replyRaw, docs, usedModel, intent, schoolInstitutionInfo);
               controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'done', ...payload })}\n`));
               if (logBase) {
                 scheduleConsultationChatLog(request, logBase, {
@@ -1358,7 +1465,7 @@ export async function POST(request: NextRequest) {
       completion.choices[0]?.message?.content?.trim() ??
       'うまく回答を生成できませんでした。もう一度質問を送ってください。';
 
-    const payload = buildChatPayload(replyRaw, docs, usedModel, intent);
+    const payload = buildChatPayload(replyRaw, docs, usedModel, intent, schoolInstitutionInfo);
     if (logBase) {
       scheduleConsultationChatLog(request, logBase, {
         status: 'success',

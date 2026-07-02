@@ -21,6 +21,7 @@ type ChatSource = {
 type SchoolCandidate = {
   name: string;
   url: string;
+  institutionType?: 'public' | 'private' | 'support' | null;
 };
 
 type ChatMessage = {
@@ -65,6 +66,19 @@ function scrollToCitation(anchorId: string) {
   window.setTimeout(() => {
     element.classList.remove('ring-2', 'ring-blue-300');
   }, 1400);
+}
+
+function getInstitutionTypeLabel(type: SchoolCandidate['institutionType']): string | null {
+  if (type === 'public') return '公立';
+  if (type === 'private') return '私立';
+  if (type === 'support') return 'サポート校';
+  return null;
+}
+
+function getInstitutionTypeBadgeClass(type: SchoolCandidate['institutionType']): string {
+  if (type === 'public') return 'border-gray-200 bg-gray-100 text-gray-700';
+  if (type === 'private') return 'border-blue-200 bg-blue-100 text-blue-700';
+  return 'border-amber-200 bg-amber-100 text-amber-800';
 }
 
 export default function ConsultationAiChat({
@@ -274,25 +288,33 @@ export default function ConsultationAiChat({
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                className={`max-w-[92%] rounded-2xl px-4 py-3 ${compact ? 'text-sm' : 'text-[15px]'} leading-relaxed shadow-sm ${
                   message.role === 'user'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-50 text-gray-800 ring-1 ring-gray-100'
                 }`}
               >
                 {message.role === 'assistant' ? (
-                  <div className="prose prose-sm max-w-none prose-p:mb-2 prose-ul:my-2 prose-li:my-1 prose-strong:text-gray-900">
+                  <div className="max-w-none text-inherit prose-strong:text-gray-900">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
                         h2: ({ children }) => (
-                          <h2 className="mb-2 mt-4 border-b-2 border-blue-100 pb-1.5 text-[15px] font-bold text-gray-900 first:mt-0">
+                          <h2 className={`mb-2 mt-4 border-b-2 border-blue-100 pb-1.5 ${compact ? 'text-[15px]' : 'text-base'} font-bold text-gray-900 first:mt-0`}>
                             {children}
                           </h2>
                         ),
                         h3: ({ children }) => (
-                          <h3 className="mb-1.5 mt-3 text-sm font-bold text-blue-900">{children}</h3>
+                          <h3 className={`mb-1.5 mt-3 ${compact ? 'text-sm' : 'text-[15px]'} font-bold text-blue-900`}>{children}</h3>
                         ),
+                        ul: ({ children }) => (
+                          <ul className="my-2 list-disc space-y-1 pl-5 marker:text-blue-500">{children}</ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="my-2 list-decimal space-y-1 pl-5 marker:text-blue-500">{children}</ol>
+                        ),
+                        li: ({ children }) => <li className="pl-1 leading-relaxed">{children}</li>,
+                        p: ({ children }) => <p className="mb-2 leading-relaxed last:mb-0">{children}</p>,
                         a: ({ href, children }) => {
                           if (href?.startsWith('#cite-')) {
                             const anchorId = href.slice(1);
@@ -329,7 +351,7 @@ export default function ConsultationAiChat({
 
                 {message.schoolCandidates && message.schoolCandidates.length > 0 && (
                   <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
-                    <p className="mb-2 text-xs font-bold text-blue-900">学校候補（口コミベース）</p>
+                    <p className={compact ? 'mb-2 text-xs font-bold text-blue-900' : 'mb-2 text-[13px] font-bold text-blue-900'}>学校候補（口コミベース）</p>
                     <ul className="space-y-1.5">
                       {message.schoolCandidates.map((school) => (
                         <li key={`${message.id}-${school.name}`}>
@@ -337,7 +359,7 @@ export default function ConsultationAiChat({
                             href={school.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800 hover:underline"
+                            className={compact ? 'inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800 hover:underline' : 'inline-flex items-center gap-1 text-[13px] font-semibold text-blue-700 hover:text-blue-800 hover:underline'}
                             onClick={() =>
                               trackEvent(GA_EVENTS.consultationAiSourceClick, {
                                 source,
@@ -346,6 +368,13 @@ export default function ConsultationAiChat({
                             }
                           >
                             {school.name}
+                            {getInstitutionTypeLabel(school.institutionType) && (
+                              <span
+                                className={`rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${getInstitutionTypeBadgeClass(school.institutionType)}`}
+                              >
+                                {getInstitutionTypeLabel(school.institutionType)}
+                              </span>
+                            )}
                             <svg
                               className="h-3 w-3"
                               fill="none"
@@ -369,7 +398,7 @@ export default function ConsultationAiChat({
 
                 {message.sources && message.sources.length > 0 && (
                   <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2.5">
-                    <p className="mb-2 text-xs font-bold text-gray-600">根拠として参照した情報</p>
+                    <p className={compact ? 'mb-2 text-xs font-bold text-gray-600' : 'mb-2 text-[13px] font-bold text-gray-600'}>根拠として参照した情報</p>
                     <ul className="space-y-1.5">
                       {message.sources.map((sourceItem) => {
                         const label = sourceItem.schoolName
@@ -381,7 +410,7 @@ export default function ConsultationAiChat({
                             <li
                               key={`${message.id}-${sourceItem.id}`}
                               id={citationId}
-                              className="flex items-start gap-2 rounded-md px-1 py-0.5 text-xs text-gray-500"
+                              className={compact ? 'flex items-start gap-2 rounded-md px-1 py-0.5 text-xs text-gray-500' : 'flex items-start gap-2 rounded-md px-1 py-0.5 text-[13px] text-gray-500'}
                             >
                               <span className="inline-flex min-w-[1.4rem] shrink-0 items-center justify-center rounded-md bg-gray-100 px-1 py-0.5 text-[11px] font-bold text-gray-600">
                                 [{sourceItem.index}]
@@ -403,7 +432,7 @@ export default function ConsultationAiChat({
                               href={sourceItem.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                              className={compact ? 'text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline' : 'text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline'}
                               onClick={() =>
                                 trackEvent(GA_EVENTS.consultationAiSourceClick, {
                                   source,
