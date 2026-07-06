@@ -30,6 +30,7 @@ export interface PerplexityInstitutionTypeResult {
 export interface PerplexityCampusLocation {
   prefecture: string;
   city: string;
+  nearest_stations?: string[];
 }
 
 export interface PerplexityCampusLocationsResult {
@@ -47,6 +48,18 @@ export interface PerplexityCampusLocationsResult {
 
 export interface PerplexityOfficialUrlResult {
   officialUrl: string | null;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+  citations: string[];
+  tokensUsed: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+}
+
+export interface PerplexityNearestStationResult {
+  nearestStation: string | null;
   confidence: 'high' | 'medium' | 'low';
   reason: string;
   citations: string[];
@@ -108,7 +121,7 @@ function createInstitutionTypePrompt(schoolName: string, prefecture?: string | n
 }
 
 function createCampusLocationsPrompt(schoolName: string, prefectures?: string[] | null): string {
-  return `通信制高校・サポート校「${schoolName}」の公式サイトを検索し、キャンパス・本校・学習センター・校舎の所在地を「都道府県」と「市区町村」単位で抽出してください。
+  return `通信制高校・サポート校「${schoolName}」の公式サイトを検索し、キャンパス・本校・学習センター・校舎の所在地を「都道府県」「市区町村」「最寄り駅」単位で抽出してください。
 
 学校名: ${schoolName}
 登録済み対応都道府県: ${prefectures?.length ? prefectures.join('、') : '不明'}
@@ -118,20 +131,33 @@ function createCampusLocationsPrompt(schoolName: string, prefectures?: string[] 
 - 公式情報が見つからない場合、locations は空配列にし、official_found は false にする。
 - 公式サイト・学校法人サイト・自治体/教育委員会/文部科学省などの公的サイトを根拠にできない場合、第三者サイトに所在地があっても locations は空配列にする。
 - 市区町村まで確認できない所在地は locations に入れない。
+- 最寄り駅は公式サイトのアクセス情報・キャンパス一覧で確認できる場合のみ nearest_stations に入れる。
+- 最寄り駅が確認できない場合は nearest_stations を空配列にする。駅名や路線名を推測しない。
+- nearest_stations は1キャンパス最大1件まで。最も近い代表駅を1つだけ入れる。駅名を優先し、路線名が公式に併記されていれば「JR山手線 新宿駅」のように含める。
 - 住所が複数ある場合は、同じ都道府県・市区町村の重複を除いてすべて入れる。
 - 「東京校」「大阪キャンパス」などの名称だけで、市区町村が公式に確認できない場合は入れない。
 - 第三者サイトだけでしか確認できない場合は、locations は空配列にし、official_found は false にする。
 - 政令指定都市の区が分かる場合は「横浜市西区」「大阪市北区」のように市区まで含める。
 
-出力はJSONのみ:
+出力はJSONのみ（前置き文・説明文・コードフェンス禁止）:
 {
   "official_found": true | false,
   "locations": [
-    { "prefecture": "東京都", "city": "新宿区" }
+    { "prefecture": "東京都", "city": "新宿区", "nearest_stations": ["JR山手線 新宿駅"] }
   ],
   "confidence": "high" | "medium" | "low",
   "reason": "公式情報に基づく判断理由を100字以内"
-}`;
+}
+cityには番地・町名以下を入れない。`;
+}
+
+function extractJsonObject(content: string): string {
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  const start = content.indexOf('{');
+  const end = content.lastIndexOf('}');
+  if (start >= 0 && end > start) return content.slice(start, end + 1);
+  return content.trim();
 }
 
 /**
@@ -403,18 +429,19 @@ export async function callPerplexityForCampusLocations(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'sonar',
+      // 所在地は公開データの正確性が重要なため上位モデルを使用
+      model: 'sonar-pro',
       messages: [
         {
           role: 'system',
           content:
-            '日本の通信制高校・サポート校の公式サイトから、キャンパス所在地を都道府県・市区町村単位でJSON抽出する専門家です。公式情報が確認できない場合は空配列を返してください。',
+            '日本の通信制高校・サポート校の公式サイトから、キャンパス所在地と最寄り駅をJSON抽出する専門家です。公式情報が確認できない場合は空配列を返してください。',
         },
         { role: 'user', content: prompt },
       ],
       web_search_options: { search_context_size: 'high' },
       temperature: 0.1,
-      max_tokens: 500,
+      max_tokens: 2500,
     }),
   });
 
@@ -439,12 +466,7 @@ export async function callPerplexityForCampusLocations(
     throw new Error('Perplexity API からのレスポンスが空です');
   }
 
-  const jsonText = content
-    .trim()
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/```$/i, '')
-    .trim();
+  const jsonText = extractJsonObject(content);
 
   let parsed: {
     official_found?: boolean;
@@ -465,18 +487,34 @@ export async function callPerplexityForCampusLocations(
           const record = location as Record<string, unknown>;
           const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
           const city = typeof record.city === 'string' ? record.city.trim() : '';
-          return prefecture && city ? { prefecture, city } : null;
+          const nearestStations = Array.isArray(record.nearest_stations)
+            ? record.nearest_stations
+                .map((station) => (typeof station === 'string' ? station.trim() : ''))
+                .filter(Boolean)
+                .slice(0, 1)
+            : [];
+          return prefecture && city
+            ? {
+                prefecture,
+                city,
+                ...(nearestStations.length > 0 ? { nearest_stations: nearestStations } : {}),
+              }
+            : null;
         })
         .filter((location): location is PerplexityCampusLocation => Boolean(location))
     : [];
 
   const deduped: PerplexityCampusLocation[] = [];
-  const seen = new Set<string>();
   for (const location of locations) {
     const key = `${location.prefecture}::${location.city}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(location);
+    const existing = deduped.find((item) => `${item.prefecture}::${item.city}` === key);
+    if (!existing) {
+      deduped.push(location);
+      continue;
+    }
+    if (!existing.nearest_stations?.length && location.nearest_stations?.length) {
+      existing.nearest_stations = location.nearest_stations.slice(0, 1);
+    }
   }
 
   const confidence =
@@ -489,6 +527,107 @@ export async function callPerplexityForCampusLocations(
     confidence,
     officialFound: parsed.official_found === true,
     reason: typeof parsed.reason === 'string' ? parsed.reason.trim().slice(0, 140) : '',
+    citations,
+    tokensUsed: {
+      prompt: data.usage?.prompt_tokens || 0,
+      completion: data.usage?.completion_tokens || 0,
+      total: data.usage?.total_tokens || 0,
+    },
+  };
+}
+
+/**
+ * 所在地(都道府県+市区町村)が確定しているキャンパス1件について、最寄り駅のみを特定する。
+ * 学校単位の一括抽出より検索が絞られるため、駅情報の再現率が高い。
+ */
+export async function callPerplexityForCampusNearestStation(
+  schoolName: string,
+  prefecture: string,
+  city: string
+): Promise<PerplexityNearestStationResult> {
+  const apiKey = getPerplexityApiKey();
+  const prompt = `通信制高校・サポート校「${schoolName}」の「${prefecture}${city}」にあるキャンパス（本校・学習センター・校舎）の最寄り駅を特定してください。
+
+判定ルール:
+- 学校公式サイト・学校法人サイトのアクセス情報・キャンパス紹介ページを最優先の根拠とする。
+- 公式情報で確認できない場合は nearest_station を null にする。駅名や路線名を推測しない。
+- 最も近い代表駅を1つだけ返す。路線名が公式に併記されていれば「JR山手線 新宿駅」のように含める。
+- バス停は返さない。鉄道駅・地下鉄駅・路面電車停留場のみ。
+- ${prefecture}${city}以外のキャンパスの駅は返さない。
+- 返す駅は${city}内または隣接する市区町村にある駅に限る。明らかに離れた駅しか確認できない場合は null にする。
+
+出力はJSONのみ（前置き文・説明文・コードフェンス禁止）:
+{
+  "nearest_station": "JR山手線 新宿駅" | null,
+  "confidence": "high" | "medium" | "low",
+  "reason": "判断理由を80字以内"
+}`;
+
+  const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'sonar-pro',
+      messages: [
+        {
+          role: 'system',
+          content:
+            '日本の通信制高校・サポート校の公式サイトから、指定キャンパスの最寄り駅をJSON抽出する専門家です。公式情報で確認できない場合はnullを返してください。',
+        },
+        { role: 'user', content: prompt },
+      ],
+      web_search_options: { search_context_size: 'medium' },
+      temperature: 0.1,
+      max_tokens: 300,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        'Perplexity APIキーが無効です。環境変数 PERPLEXITY_API_KEY を確認してください。'
+      );
+    }
+    const errorBody = await response.text().catch(() => '');
+    const shortBody = errorBody.length > 200 ? errorBody.slice(0, 200) + '...' : errorBody;
+    throw new Error(
+      `Perplexity API エラー (${response.status}): ${shortBody || response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  const citations: string[] = data.citations || [];
+
+  if (!content.trim()) {
+    throw new Error('Perplexity API からのレスポンスが空です');
+  }
+
+  let parsed: { nearest_station?: unknown; confidence?: string; reason?: string };
+  try {
+    parsed = JSON.parse(extractJsonObject(content));
+  } catch {
+    throw new Error(`Perplexity API のJSON解析に失敗しました: ${content.slice(0, 160)}`);
+  }
+
+  const rawStation =
+    typeof parsed.nearest_station === 'string' ? parsed.nearest_station.trim() : '';
+  const nearestStation =
+    rawStation !== '' && rawStation.toLowerCase() !== 'null' && rawStation !== '不明'
+      ? rawStation
+      : null;
+  const confidence =
+    parsed.confidence === 'high' || parsed.confidence === 'medium' || parsed.confidence === 'low'
+      ? parsed.confidence
+      : 'low';
+
+  return {
+    nearestStation,
+    confidence,
+    reason: typeof parsed.reason === 'string' ? parsed.reason.trim().slice(0, 120) : '',
     citations,
     tokensUsed: {
       prompt: data.usage?.prompt_tokens || 0,

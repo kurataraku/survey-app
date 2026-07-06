@@ -1,5 +1,6 @@
 /**
- * 公式サイト情報をPerplexityで確認し、schools.campus_locations を暫定登録するCLI
+ * 公式サイト情報をPerplexityで確認し、schools.campus_locations を暫定登録するCLI。
+ * 公開口コミが1件以上ある学校のみ対象（口コミ多い順）。
  *
  * 使い方:
  *   npm run populate:campus-locations -- --dry-run --limit=5
@@ -23,12 +24,24 @@ type SchoolRow = {
   prefecture: string | null;
   prefectures: string[] | null;
   campus_locations: PerplexityCampusLocation[] | null;
+  review_count: number;
 };
 
 type ReviewCandidate = {
   school_name: string;
+  review_count: number;
   reason: string;
   confidence: string;
+  generated_locations: string;
+  citations: string[];
+};
+
+type GeneratedCandidate = {
+  school_name: string;
+  review_count: number;
+  confidence: string;
+  locations: PerplexityCampusLocation[];
+  reason: string;
   citations: string[];
 };
 
@@ -71,12 +84,53 @@ function hasCampusLocations(value: unknown): boolean {
   });
 }
 
+function hasNearestStation(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.some((location) => {
+    if (!location || typeof location !== 'object') return false;
+    const record = location as Record<string, unknown>;
+    if (Array.isArray(record.nearest_stations)) {
+      return record.nearest_stations.some(
+        (station) => typeof station === 'string' && station.trim() !== ''
+      );
+    }
+    return typeof record.nearest_station === 'string' && record.nearest_station.trim() !== '';
+  });
+}
+
+/** 市区町村または最寄り駅が欠けている学校を補完対象にする */
+function needsCampusLocationUpdate(value: unknown): boolean {
+  return !hasCampusLocations(value) || !hasNearestStation(value);
+}
+
+async function fetchPublicReviewCounts(
+  supabase: SupabaseClient,
+  schoolIds: string[]
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const chunkSize = 200;
+  for (let i = 0; i < schoolIds.length; i += chunkSize) {
+    const chunk = schoolIds.slice(i, i + chunkSize);
+    const { data, error } = await supabase
+      .from('survey_responses')
+      .select('school_id')
+      .in('school_id', chunk)
+      .eq('is_public', true);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      if (!row.school_id) continue;
+      counts.set(row.school_id, (counts.get(row.school_id) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
 async function fetchTargetSchools(
   supabase: SupabaseClient,
   opts: { force: boolean; all: boolean; limit: number | null; name: string }
 ): Promise<SchoolRow[]> {
   const pageSize = 1000;
-  const out: SchoolRow[] = [];
+  const out: Array<Omit<SchoolRow, 'review_count'>> = [];
   let from = 0;
 
   for (;;) {
@@ -97,17 +151,37 @@ async function fetchTargetSchools(
       throw error;
     }
     if (!data?.length) break;
-    out.push(...(data as SchoolRow[]));
+    out.push(...(data as Array<Omit<SchoolRow, 'review_count'>>));
     if (data.length < pageSize) break;
     from += pageSize;
   }
 
-  let rows = out;
+  const reviewCounts = await fetchPublicReviewCounts(
+    supabase,
+    out.map((school) => school.id)
+  );
+
+  let rows: SchoolRow[] = out
+    .map((school) => ({
+      ...school,
+      review_count: reviewCounts.get(school.id) || 0,
+    }))
+    .filter((school) => school.review_count > 0);
+
   if (opts.name) {
     const needle = opts.name.toLowerCase();
-    rows = rows.filter((s) => s.name.toLowerCase().includes(needle));
+    // 完全一致があればそれを優先（「未来高等学校」で「飛鳥未来高等学校」を巻き込まないため）
+    const exact = rows.filter((s) => s.name.toLowerCase() === needle);
+    rows = exact.length > 0 ? exact : rows.filter((s) => s.name.toLowerCase().includes(needle));
   }
-  rows = opts.force ? rows : rows.filter((s) => !hasCampusLocations(s.campus_locations));
+  rows = opts.force
+    ? rows
+    : rows.filter((s) => needsCampusLocationUpdate(s.campus_locations));
+
+  rows.sort(
+    (a, b) =>
+      b.review_count - a.review_count || a.name.localeCompare(b.name, 'ja')
+  );
 
   if (!opts.all && opts.limit != null) {
     rows = rows.slice(0, opts.limit);
@@ -123,25 +197,95 @@ function csvEscape(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+/** IDE等でファイルが開かれていてロック中（EBUSY）の場合はタイムスタンプ付き別名で保存する */
+function writeCsvWithFallback(filePath: string, content: string): string {
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+    return filePath;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EBUSY') throw error;
+    const fallbackPath = filePath.replace(/\.csv$/, `-${Date.now()}.csv`);
+    fs.writeFileSync(fallbackPath, content, 'utf8');
+    console.warn(`[WARN] ${path.basename(filePath)} がロック中のため ${path.basename(fallbackPath)} に保存しました`);
+    return fallbackPath;
+  }
+}
+
 function writeReviewCsv(candidates: ReviewCandidate[]) {
   const filePath = path.join(process.cwd(), 'campus-location-review-candidates.csv');
   const rows = [
-    ['school_name', 'reason', 'confidence', 'citations'].map(csvEscape).join(','),
+    ['school_name', 'review_count', 'reason', 'confidence', 'generated_locations', 'citations'].map(csvEscape).join(','),
     ...candidates.map((candidate) =>
       [
         candidate.school_name,
+        String(candidate.review_count),
         candidate.reason,
         candidate.confidence,
+        candidate.generated_locations,
         candidate.citations.join(' / '),
       ].map(csvEscape).join(',')
     ),
   ];
-  fs.writeFileSync(filePath, `${rows.join('\n')}\n`, 'utf8');
-  return filePath;
+  return writeCsvWithFallback(filePath, `${rows.join('\n')}\n`);
+}
+
+function writeGeneratedCsv(candidates: GeneratedCandidate[]) {
+  const filePath = path.join(process.cwd(), 'campus-location-generated-candidates.csv');
+  const rows = [
+    ['school_name', 'review_count', 'confidence', 'locations', 'reason', 'citations'].map(csvEscape).join(','),
+    ...candidates.map((candidate) =>
+      [
+        candidate.school_name,
+        String(candidate.review_count),
+        candidate.confidence,
+        formatLocations(candidate.locations),
+        candidate.reason,
+        candidate.citations.join(' / '),
+      ].map(csvEscape).join(',')
+    ),
+  ];
+  return writeCsvWithFallback(filePath, `${rows.join('\n')}\n`);
 }
 
 function formatLocations(locations: PerplexityCampusLocation[]) {
-  return locations.map((location) => `${location.prefecture}${location.city}`).join('、');
+  return locations
+    .map((location) => {
+      const stations = location.nearest_stations?.length
+        ? `（最寄り: ${location.nearest_stations.join('／')}）`
+        : '';
+      return `${location.prefecture}${location.city}${stations}`;
+    })
+    .join('、');
+}
+
+function normalizeLocation(location: PerplexityCampusLocation): PerplexityCampusLocation | null {
+  const prefecture = location.prefecture?.trim();
+  const city = location.city?.trim();
+  if (!prefecture || !city) return null;
+  const nearestStations = (location.nearest_stations ?? [])
+    .map((station) => station.trim())
+    .filter(Boolean)
+    .slice(0, 1);
+  return nearestStations.length > 0
+    ? { prefecture, city, nearest_stations: nearestStations }
+    : { prefecture, city };
+}
+
+/**
+ * 同一都道府県内で「札幌市」と「札幌市中央区」のように粗い市と区レベルが併存する場合、
+ * 粗い方（他エントリの前方一致になっている方）を除外する
+ */
+function dropCoarseDuplicates(locations: PerplexityCampusLocation[]): PerplexityCampusLocation[] {
+  return locations.filter((location) => {
+    const hasFiner = locations.some(
+      (other) =>
+        other !== location &&
+        other.prefecture === location.prefecture &&
+        other.city !== location.city &&
+        other.city.startsWith(location.city)
+    );
+    return !hasFiner;
+  });
 }
 
 function mergeLocations(
@@ -149,19 +293,20 @@ function mergeLocations(
   generated: PerplexityCampusLocation[]
 ): PerplexityCampusLocation[] {
   const merged: PerplexityCampusLocation[] = [];
-  const seen = new Set<string>();
   for (const location of [...(existing ?? []), ...generated]) {
-    if (!location?.prefecture || !location?.city) continue;
-    const normalized = {
-      prefecture: location.prefecture.trim(),
-      city: location.city.trim(),
-    };
+    const normalized = normalizeLocation(location);
+    if (!normalized) continue;
     const key = `${normalized.prefecture}::${normalized.city}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const current = merged.find((item) => `${item.prefecture}::${item.city}` === key);
+    if (current) {
+      if (!current.nearest_stations?.length && normalized.nearest_stations?.length) {
+        current.nearest_stations = normalized.nearest_stations.slice(0, 1);
+      }
+      continue;
+    }
     merged.push(normalized);
   }
-  return merged;
+  return dropCoarseDuplicates(merged);
 }
 
 async function main() {
@@ -189,6 +334,7 @@ async function main() {
   const supabase = createClient(url, key);
   const schools = await fetchTargetSchools(supabase, args);
   const reviewCandidates: ReviewCandidate[] = [];
+  const generatedCandidates: GeneratedCandidate[] = [];
 
   console.log(
     JSON.stringify(
@@ -197,7 +343,12 @@ async function main() {
         force: args.force,
         merge: args.merge,
         name: args.name || null,
+        require_public_reviews: true,
         target_count: schools.length,
+        targets: schools.map((school) => ({
+          name: school.name,
+          review_count: school.review_count,
+        })),
       },
       null,
       2
@@ -227,29 +378,47 @@ async function main() {
         skip++;
         reviewCandidates.push({
           school_name: school.name,
+          review_count: school.review_count,
           reason:
             result.reason ||
             (result.officialFound
               ? '公式情報は見つかったが、市区町村まで確定できませんでした。'
               : '公式HPが見つからない、または公式情報で所在地を確認できませんでした。'),
           confidence: result.confidence,
+          generated_locations: formatLocations(result.locations),
           citations: result.citations.slice(0, 5),
         });
         console.log(
-          `[SKIP] [${i + 1}/${schools.length}] ${school.name}: ${result.reason || '所在地未確定'}`
+          `[SKIP] [${i + 1}/${schools.length}] ${school.name} (口コミ${school.review_count}件): ${result.reason || '所在地未確定'}`
         );
       } else if (args.dryRun) {
         ok++;
         const mergedLocations = args.merge
           ? mergeLocations(school.campus_locations, result.locations)
           : result.locations;
+        generatedCandidates.push({
+          school_name: school.name,
+          review_count: school.review_count,
+          confidence: result.confidence,
+          locations: mergedLocations,
+          reason: result.reason,
+          citations: result.citations.slice(0, 5),
+        });
         console.log(
-          `[DRY] [${i + 1}/${schools.length}] ${school.name}: ${formatLocations(mergedLocations)} (${result.confidence})`
+          `[DRY] [${i + 1}/${schools.length}] ${school.name} (口コミ${school.review_count}件): ${formatLocations(mergedLocations)} (${result.confidence})`
         );
       } else {
         const mergedLocations = args.merge
           ? mergeLocations(school.campus_locations, result.locations)
           : result.locations;
+        generatedCandidates.push({
+          school_name: school.name,
+          review_count: school.review_count,
+          confidence: result.confidence,
+          locations: mergedLocations,
+          reason: result.reason,
+          citations: result.citations.slice(0, 5),
+        });
         const { error } = await supabase
           .from('schools')
           .update({ campus_locations: mergedLocations })
@@ -257,7 +426,7 @@ async function main() {
         if (error) throw error;
         ok++;
         console.log(
-          `[OK] [${i + 1}/${schools.length}] ${school.name}: ${formatLocations(mergedLocations)} (${result.confidence})`
+          `[OK] [${i + 1}/${schools.length}] ${school.name} (口コミ${school.review_count}件): ${formatLocations(mergedLocations)} (${result.confidence})`
         );
       }
 
@@ -269,11 +438,13 @@ async function main() {
       const message = e instanceof Error ? e.message : String(e);
       reviewCandidates.push({
         school_name: school.name,
+        review_count: school.review_count,
         reason: message,
         confidence: 'error',
+        generated_locations: '',
         citations: [],
       });
-      console.error(`[ERR] ${school.name}:`, message);
+      console.error(`[ERR] ${school.name} (口コミ${school.review_count}件):`, message);
     }
 
     if (args.sleepMs > 0 && i < schools.length - 1) {
@@ -282,6 +453,7 @@ async function main() {
   }
 
   const reviewCsvPath = writeReviewCsv(reviewCandidates);
+  const generatedCsvPath = writeGeneratedCsv(generatedCandidates);
 
   console.log(
     JSON.stringify(
@@ -292,6 +464,8 @@ async function main() {
         err,
         review_candidates: reviewCandidates.length,
         review_csv: reviewCsvPath,
+        generated_candidates: generatedCandidates.length,
+        generated_csv: generatedCsvPath,
         total_tokens: totalTokens,
       },
       null,

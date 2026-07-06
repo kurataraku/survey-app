@@ -25,6 +25,8 @@
     "list:schools-unpublished-reviews": "tsx scripts/list-schools-unpublished-reviews.ts",
     "classify:institution-types": "tsx scripts/classify-school-institution-types.ts",
     "populate:campus-locations": "tsx scripts/populate-school-campus-locations.ts",
+    "populate:campus-stations": "tsx scripts/populate-campus-nearest-stations.ts",
+    "audit:campus-locations": "tsx scripts/audit-campus-location-coverage.ts",
     "agent:tuition": "tsx scripts/agent-tuition.ts",
     "agent:school-info": "tsx scripts/agent-school-info.ts"
   },

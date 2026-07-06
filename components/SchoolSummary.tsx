@@ -24,6 +24,35 @@ function ratingVsGlobalLabel(
   return { text, className };
 }
 
+/** 折りたたまずに表示するキャンパス数の上限 */
+const CAMPUS_LOCATIONS_PREVIEW_LIMIT = 6;
+
+function CampusLocationChips({ locations }: { locations: SchoolCampusLocation[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {locations.map((location, index) => {
+        const nearestStationsLabel = formatCampusNearestStations(
+          getCampusNearestStations(location)
+        );
+        return (
+          <span
+            key={`${location.prefecture}-${location.city}-${index}`}
+            className="inline-flex items-baseline gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs ring-1 ring-inset ring-blue-100"
+          >
+            <span className="font-medium text-blue-700">
+              {location.prefecture}
+              {location.city}
+            </span>
+            {nearestStationsLabel && (
+              <span className="text-gray-500">（{nearestStationsLabel}）</span>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 interface SchoolSummaryProps {
   name: string;
   prefecture: string;
@@ -132,27 +161,33 @@ export default function SchoolSummary({
         </div>
         {visibleCampusLocations.length > 0 && (
           <div className="mt-3">
-            <p className="text-xs font-semibold text-gray-500 mb-1">キャンパス所在地</p>
-            <div className="space-y-1.5">
-              {visibleCampusLocations.map((location, index) => {
-                const nearestStationsLabel = formatCampusNearestStations(
-                  getCampusNearestStations(location)
-                );
-                return (
-                <div key={`${location.prefecture}-${location.city}-${index}`} className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-100">
-                    {location.prefecture}
-                    {location.city}
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">
+              キャンパス所在地
+              {visibleCampusLocations.length > 1 && (
+                <span className="ml-1 font-normal text-gray-400">
+                  全{visibleCampusLocations.length}拠点・（ ）内は最寄り駅
+                </span>
+              )}
+            </p>
+            <CampusLocationChips
+              locations={visibleCampusLocations.slice(0, CAMPUS_LOCATIONS_PREVIEW_LIMIT)}
+            />
+            {visibleCampusLocations.length > CAMPUS_LOCATIONS_PREVIEW_LIMIT && (
+              <details className="group mt-1.5">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 [&::-webkit-details-marker]:hidden">
+                  <span className="group-open:hidden">
+                    残り{visibleCampusLocations.length - CAMPUS_LOCATIONS_PREVIEW_LIMIT}
+                    拠点をすべて表示
                   </span>
-                  {nearestStationsLabel && (
-                    <span className="text-xs text-gray-600">
-                      最寄り駅：{nearestStationsLabel}
-                    </span>
-                  )}
+                  <span className="hidden group-open:inline">拠点の表示を折りたたむ</span>
+                </summary>
+                <div className="mt-1.5">
+                  <CampusLocationChips
+                    locations={visibleCampusLocations.slice(CAMPUS_LOCATIONS_PREVIEW_LIMIT)}
+                  />
                 </div>
-              );
-              })}
-            </div>
+              </details>
+            )}
           </div>
         )}
         {reviewCount === 0 && (

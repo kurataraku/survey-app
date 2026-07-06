@@ -3,7 +3,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 import type { SchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 
 interface Props {
-  school: Pick<SchoolWithStats, 'name' | 'overall_avg' | 'review_count'>;
+  school: Pick<SchoolWithStats, 'name' | 'prefecture' | 'campus_locations' | 'overall_avg' | 'review_count'>;
   encodedSlug: string;
 }
 
@@ -17,6 +17,25 @@ export default function SchoolEducationalOrganizationJsonLd({ school, encodedSlu
     name: school.name,
     url,
   };
+
+  const addresses = (school.campus_locations ?? [])
+    .map((location) => ({
+      '@type': 'PostalAddress',
+      addressCountry: 'JP',
+      addressRegion: location.prefecture,
+      addressLocality: location.city,
+    }))
+    .filter((address) => address.addressRegion && address.addressLocality);
+
+  if (addresses.length > 0) {
+    data.address = addresses.length === 1 ? addresses[0] : addresses;
+  } else if (school.prefecture && school.prefecture !== '不明') {
+    data.address = {
+      '@type': 'PostalAddress',
+      addressCountry: 'JP',
+      addressRegion: school.prefecture,
+    };
+  }
 
   if (school.review_count > 0 && school.overall_avg != null) {
     data.aggregateRating = {

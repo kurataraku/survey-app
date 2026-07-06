@@ -8,6 +8,7 @@ import { appPath } from '@/lib/base-path';
 import type { PrefectureFaqStats } from '@/lib/prefectures/prefecture-landing-schema';
 import type { SearchSchool } from '@/lib/schools/searchSchools';
 import type { PrefectureAttendanceLink } from '@/lib/schools/prefecture-landing-attendance';
+import type { PrefectureLocationInsights } from '@/lib/schools/getPrefectureLocationInsights';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 import {
   buildReasonGroupReviewsPath,
@@ -46,6 +47,7 @@ interface PrefectureLandingPageProps {
   topByTuition: SearchSchool[];
   schoolsByInstitutionType: Record<SchoolInstitutionType, SearchSchool[]>;
   attendanceFrequencyLinks: PrefectureAttendanceLink[];
+  locationInsights: PrefectureLocationInsights;
   globalAverages: SchoolCardGlobalAverages | null;
   children: React.ReactNode;
   hasSchools: boolean;
@@ -97,6 +99,87 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
         ))}
       </ul>
     </nav>
+  );
+}
+
+function LocationInsightsSection({
+  prefecture,
+  insights,
+}: {
+  prefecture: string;
+  insights: PrefectureLocationInsights;
+}) {
+  if (insights.topCities.length === 0 && insights.topStations.length === 0) return null;
+
+  const prefParam = encodeURIComponent(prefecture);
+  const topCityNames = insights.topCities.slice(0, 3).map((item) => item.city).join('・');
+  const topStationNames = insights.topStations.slice(0, 3).map((item) => item.name).join('・');
+
+  return (
+    <section
+      className="mb-8 rounded-xl border border-blue-100 bg-white p-5 md:p-6"
+      aria-labelledby="pref-location-insights-heading"
+    >
+      <h2 id="pref-location-insights-heading" className="text-xl font-bold text-gray-900 mb-2">
+        {prefecture}の通信制高校をエリア・最寄り駅で探す
+      </h2>
+      <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-4xl">
+        {prefecture}では
+        {topCityNames ? `${topCityNames}など` : '複数の市区町村'}
+        にキャンパス所在地が登録されています
+        {topStationNames ? `。最寄り駅では${topStationNames}周辺の情報も確認できます` : ''}
+        。住所やアクセスは学校ごとに変わるため、候補校の公式情報と口コミをあわせて比較してください。
+      </p>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        {insights.topCities.length > 0 && (
+          <div>
+            <h3 className="text-sm font-bold text-gray-900 mb-3">市区町村から探す</h3>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {insights.topCities.map((city) => {
+                const cityParam = encodeURIComponent(city.city);
+                return (
+                  <li key={city.city}>
+                    <Link
+                      href={appPath(`/schools?campus_prefecture=${prefParam}&campus_city=${cityParam}`)}
+                      className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 p-4 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"
+                    >
+                      <span className="block text-sm font-bold text-blue-700 mb-1">
+                        {prefecture}{city.city}の通信制高校
+                      </span>
+                      <span className="block text-xs text-gray-600 leading-relaxed">
+                        掲載校 {city.schoolCount}校
+                        {city.nearestStations.length > 0
+                          ? ` / 最寄り: ${city.nearestStations.join('・')}`
+                          : ''}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {insights.topStations.length > 0 && (
+          <div>
+            <h3 className="text-sm font-bold text-gray-900 mb-3">主な最寄り駅</h3>
+            <ul className="flex flex-wrap gap-2">
+              {insights.topStations.map((station) => (
+                <li
+                  key={station.name}
+                  className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-700"
+                >
+                  {station.name}
+                  <span className="ml-1 text-gray-400">({station.schoolCount}校)</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-gray-500 leading-relaxed">
+              最寄り駅は学校公式サイト等で確認できた範囲を掲載しています。駅名だけでなく、通学頻度やスクーリング場所も学校詳細で確認してください。
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -401,6 +484,7 @@ export default function PrefectureLandingPage({
   topByTuition,
   schoolsByInstitutionType,
   attendanceFrequencyLinks,
+  locationInsights,
   globalAverages,
   children,
   hasSchools,
@@ -581,6 +665,8 @@ export default function PrefectureLandingPage({
             </section>
 
             <ParentGuideSection prefecture={prefecture} />
+
+            <LocationInsightsSection prefecture={prefecture} insights={locationInsights} />
 
             <MediaStrengths prefecture={prefecture} />
 

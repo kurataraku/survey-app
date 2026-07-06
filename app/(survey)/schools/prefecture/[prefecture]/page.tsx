@@ -11,6 +11,7 @@ import { searchSchools } from '@/lib/schools/searchSchools';
 import { getPrefectureLandingHighlights } from '@/lib/schools/getPrefectureLandingHighlights';
 
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
+import { getPrefectureLocationInsights } from '@/lib/schools/getPrefectureLocationInsights';
 
 import { getPrefectureIntroLead } from '@/lib/regions/prefecture-intros';
 
@@ -164,13 +165,15 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
 
 
 
-  const [highlights, data, globalAverages] = await Promise.all([
+  const [highlights, data, globalAverages, locationInsights] = await Promise.all([
 
     getPrefectureLandingHighlights(prefecture),
 
     searchSchools({ prefecture, page, limit: PREFECTURE_LANDING_PAGE_SIZE }),
 
     getCachedGlobalAverages(),
+
+    getPrefectureLocationInsights(prefecture),
 
   ]);
 
@@ -271,6 +274,8 @@ export default async function PrefectureSchoolsPage({ params, searchParams }: Pa
         schoolsByInstitutionType={highlights.schoolsByInstitutionType}
 
         attendanceFrequencyLinks={highlights.attendanceFrequencyLinks}
+
+        locationInsights={locationInsights}
 
         globalAverages={globalAverages}
 
