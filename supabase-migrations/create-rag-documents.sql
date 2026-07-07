@@ -42,6 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_rag_documents_embedding_cosine
   USING hnsw (embedding vector_cosine_ops);
 
 -- updated_at 自動更新
+DROP TRIGGER IF EXISTS update_rag_documents_updated_at ON rag_documents;
 CREATE TRIGGER update_rag_documents_updated_at
   BEFORE UPDATE ON rag_documents
   FOR EACH ROW

@@ -100,6 +100,12 @@ export default function AdminHeader() {
               >
                 相談AI
               </Link>
+              <Link
+                href={appPath('/admin/consultation-ai-logic')}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                AIロジック
+              </Link>
               {adminUser?.role === 'owner' && (
                 <Link
                   href={appPath('/admin/admin-users')}

@@ -43,6 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_consultation_chat_logs_source
 ALTER TABLE consultation_chat_logs ENABLE ROW LEVEL SECURITY;
 
 -- 公開APIはService RoleでINSERT、管理画面はService RoleでSELECT/UPDATE
+DROP POLICY IF EXISTS "管理者のみconsultation_chat_logsを参照可能" ON consultation_chat_logs;
+DROP POLICY IF EXISTS "管理者のみconsultation_chat_logsを更新可能" ON consultation_chat_logs;
+
 CREATE POLICY "管理者のみconsultation_chat_logsを参照可能"
   ON consultation_chat_logs
   FOR SELECT

@@ -9,6 +9,8 @@ import {
 } from '@/lib/chat/config';
 import {
   fetchActiveSchoolsByCampusArea,
+  fetchActiveSchoolsByLocationTerms,
+  fetchActiveSchoolsByPrefectures,
   fetchRagDocumentsBySchoolNames,
   fetchRagDocumentsBySchoolIds,
   fetchRagDocumentsByKeywords,
@@ -17,6 +19,7 @@ import {
   searchRagDocuments,
 } from '@/lib/rag/retrieval';
 import type { RagMatchRow } from '@/lib/rag/types';
+import type { CampusAreaSchoolMatch } from '@/lib/rag/retrieval';
 import { appPath } from '@/lib/base-path';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
@@ -41,6 +44,12 @@ const RouterResultSchema = z.object({
     .optional(),
   school_name: z.string().nullable().optional(),
   difficulty: z.enum(['low', 'high']).default('low'),
+});
+
+const CommuteAreaEstimateSchema = z.object({
+  origin_label: z.string().max(120).optional(),
+  terms: z.array(z.string().min(1).max(80)).max(24).default([]),
+  note: z.string().max(300).optional(),
 });
 
 type ChatIntent =
@@ -70,6 +79,7 @@ type SchoolInstitutionInfo = {
   type: InstitutionType | null;
   label: string | null;
 };
+type CommuteAreaEstimate = z.infer<typeof CommuteAreaEstimateSchema>;
 
 const TOKYO_TAMA_CITIES = [
   '八王子市',
@@ -139,6 +149,37 @@ const TACHIKAWA_NEARBY_CITIES = [
   '八王子市',
 ];
 
+const OSAKA_NANIWA_NEARBY_CITIES = [
+  '大阪市浪速区',
+  '大阪市中央区',
+  '大阪市天王寺区',
+  '大阪市阿倍野区',
+  '大阪市西区',
+  '大阪市北区',
+  '大阪市淀川区',
+];
+
+const NOBORITO_NEARBY_CITIES = [
+  '川崎市多摩区',
+  '川崎市麻生区',
+  '川崎市高津区',
+  '狛江市',
+  '世田谷区',
+  '調布市',
+  '町田市',
+  '横浜市青葉区',
+];
+
+const TABATA_NEARBY_CITIES = [
+  '北区',
+  '荒川区',
+  '豊島区',
+  '文京区',
+  '台東区',
+  '新宿区',
+  '千代田区',
+];
+
 function truncate(text: string, maxLength = 360): string {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength)}...`;
@@ -192,6 +233,30 @@ function getSearchBasisMessage(messages: Array<z.infer<typeof MessageSchema>>, l
 }
 
 function detectAreaProfile(text: string): AreaProfile | null {
+  if (/浪速区|なんば|難波|JR難波|日本橋|天王寺|大阪市内|大阪市中心/u.test(text)) {
+    return {
+      label: '浪速区・なんば周辺',
+      prefecture: '大阪府',
+      cities: OSAKA_NANIWA_NEARBY_CITIES,
+      keywords: ['浪速区', 'なんば', '難波', '天王寺', '大阪市内', 'キャンパス', '校舎'],
+    };
+  }
+  if (/登戸|向ヶ丘遊園|川崎市多摩区|多摩区|生田|狛江/u.test(text)) {
+    return {
+      label: '登戸・川崎市多摩区周辺',
+      prefecture: '神奈川県',
+      cities: NOBORITO_NEARBY_CITIES,
+      keywords: ['登戸', '川崎市多摩区', '向ヶ丘遊園', '狛江', '世田谷', '町田', 'キャンパス', '校舎'],
+    };
+  }
+  if (/田端|西日暮里|日暮里|駒込|巣鴨|王子|赤羽|池袋から|山手線.*北/u.test(text)) {
+    return {
+      label: '田端駅から30分圏',
+      prefecture: '東京都',
+      cities: TABATA_NEARBY_CITIES,
+      keywords: ['田端', '西日暮里', '日暮里', '駒込', '巣鴨', '池袋', '上野', '秋葉原', 'キャンパス', '校舎'],
+    };
+  }
   if (/立川|国立|昭島|日野|国分寺/u.test(text)) {
     return {
       label: '立川市近辺',
@@ -241,6 +306,92 @@ function detectBroadRegionProfile(text: string): BroadRegionProfile | null {
   return null;
 }
 
+function extractLocationTerms(text: string): string[] {
+  const terms = new Set<string>();
+  const normalized = text.replace(/[ 　]/g, '');
+  const locationMatches = normalized.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9]+?(?:市|区|町|村|駅)/gu) ?? [];
+  for (const raw of locationMatches) {
+    const term = raw
+      .replace(/(?:から|より|付近|近辺|周辺|以内|通える|行きやすい|学校|高校|通信制)$/u, '')
+      .trim();
+    if (term.length >= 2 && !/学校|高校|投稿|登校|通学|日帰り|スクーリング/u.test(term)) {
+      terms.add(term);
+    }
+  }
+
+  const stationLikeMatches = normalized.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9]+(?:駅前|駅近)/gu) ?? [];
+  for (const raw of stationLikeMatches) {
+    const term = raw.replace(/駅前|駅近/u, '駅');
+    if (term.length >= 2) terms.add(term);
+  }
+
+  return [...terms].slice(0, 8);
+}
+
+function mergeCampusSchoolMatches(...groups: CampusAreaSchoolMatch[][]): CampusAreaSchoolMatch[] {
+  const merged = new Map<string, CampusAreaSchoolMatch>();
+  for (const group of groups) {
+    for (const school of group) {
+      if (!merged.has(school.id)) merged.set(school.id, school);
+    }
+  }
+  return [...merged.values()];
+}
+
+async function estimateCommuteAreaTerms(input: {
+  locationTerms: string[];
+  prefecture?: string | null;
+  conversationText: string;
+}): Promise<CommuteAreaEstimate> {
+  const baseTerms = [...new Set(input.locationTerms.map((term) => term.trim()).filter(Boolean))];
+  if (baseTerms.length === 0) return { terms: [] };
+
+  const fallback: CommuteAreaEstimate = {
+    origin_label: baseTerms.join('・'),
+    terms: baseTerms,
+    note: '出発地として抽出した地名・駅名のみを使用',
+  };
+
+  try {
+    const openai = getChatOpenAIClient();
+    const response = await openai.chat.completions.create({
+      model: CHAT_MODEL_ROUTER,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'あなたは日本の通学圏を推定する検索補助AIです。' +
+            '厳密な経路検索ではなく、学校キャンパス候補を探すための駅名・市区町村名キーワードだけをJSONで返します。' +
+            '鉄道・バスで概ね60分以内に通学候補になりやすい主要駅・乗換駅・近隣市区町村を推定してください。' +
+            '学校名、説明文、所要時間、断定表現は返してはいけません。' +
+            '出力キーは origin_label, terms, note のみ。terms は最大18件、駅名は「駅」付き、市区町村は正式に近い表記にしてください。',
+        },
+        {
+          role: 'user',
+          content:
+            `抽出済み出発地: ${baseTerms.join(' / ')}\n` +
+            `都道府県ヒント: ${input.prefecture ?? '不明'}\n` +
+            `会話:\n${input.conversationText}`,
+        },
+      ],
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) return fallback;
+    const parsed = CommuteAreaEstimateSchema.parse(JSON.parse(raw));
+    const mergedTerms = [...new Set([...baseTerms, ...parsed.terms].map((term) => term.trim()).filter(Boolean))];
+    return {
+      origin_label: parsed.origin_label || fallback.origin_label,
+      terms: mergedTerms.slice(0, 24),
+      note: parsed.note || 'LLMで概ね1時間圏の検索語を推定',
+    };
+  } catch (error) {
+    console.error('[api/chat] commute area estimation failed:', error);
+    return fallback;
+  }
+}
+
 function detectMentionedSchoolNames(text: string): string[] {
   const aliases: Array<[RegExp, string]> = [
     [/(^|[、,\s])N高(等学校|校)?/i, 'N高等学校'],
@@ -277,6 +428,81 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /年数回|年に数回|年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回|集中スクーリング|合宿型スクーリング|オンライン|自宅学習|通学.*少な/u,
       instruction:
         '年数回・低頻度通学が主訴です。候補校は、集中スクーリング、オンライン中心、自宅学習、最少登校日数、振替対応に関する根拠がある学校を優先してください。年1〜3回で確実に卒業できると断定せず、公式日程と卒業要件の確認を促してください。',
+    };
+  }
+  if (/日帰り.*スクーリング|スクーリング.*日帰り|宿泊なし|宿泊不要|通い.*スクーリング/u.test(text)) {
+    return {
+      keywords: [
+        '日帰りスクーリング',
+        '宿泊なし',
+        '宿泊不要',
+        '通学スクーリング',
+        'スクーリング',
+        '振替',
+        'オンライン代替',
+      ],
+      label: '日帰りスクーリング',
+      regex: /日帰り|宿泊なし|宿泊不要|通学スクーリング|スクーリング|振替|オンライン代替/u,
+      instruction:
+        '日帰りスクーリングが主訴です。候補校は、宿泊を伴わない通学型スクーリング、日帰りで通えるキャンパス、振替・オンライン代替に関する根拠がある学校を優先してください。',
+    };
+  }
+  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の/u.test(text)) {
+    return {
+      keywords: [
+        'イラスト',
+        'デザイン',
+        'マンガ',
+        '漫画',
+        'アニメ',
+        '美術',
+        'クリエイティブ',
+        'ポートフォリオ',
+        '専門コース',
+      ],
+      label: 'イラスト・デザイン',
+      regex: /イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|ポートフォリオ|専門コース/u,
+      instruction:
+        'イラスト・デザインが主訴です。候補校は、マンガ・イラスト・デザイン・アニメ・美術系コース、作品制作、ポートフォリオ指導、専門講師に関する根拠がある学校を優先してください。',
+    };
+  }
+  if (/ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/u.test(text)) {
+    return {
+      keywords: [
+        'ネットコース',
+        'オンライン',
+        '自宅学習',
+        '学費',
+        '安い',
+        '費用',
+        '納得感',
+        '授業料',
+        '通学少ない',
+      ],
+      label: 'ネットコース・学費重視',
+      regex: /ネットコース|オンライン|自宅学習|学費|安い|費用|納得感|授業料|通学少な/u,
+      instruction:
+        'ネットコース・学費重視が主訴です。候補校は、オンライン中心で通学負担が少ないこと、学費の安さ・納得感・追加費用の少なさに関する口コミや学費情報がある学校を優先してください。',
+    };
+  }
+  if (/ギャル|ヤンキー|派手|落ち着い|静か|穏やか|校風|雰囲気/u.test(text)) {
+    return {
+      keywords: [
+        '落ち着いた',
+        '静か',
+        '穏やか',
+        '少人数',
+        '雰囲気',
+        '校風',
+        '服装',
+        '派手',
+        'にぎやか',
+        'マイペース',
+      ],
+      label: '落ち着いた雰囲気',
+      regex: /落ち着|静か|穏やか|少人数|雰囲気|校風|服装|派手|にぎやか|マイペース|ギャル|ヤンキー/u,
+      instruction:
+        '落ち着いた雰囲気が主訴です。候補校は、雰囲気評価が高い、少人数、落ち着いている、派手さ・にぎやかさが強すぎないことに関する口コミ根拠がある学校を優先してください。「ギャル」「ヤンキー」のような表現は決めつけず、服装規定・校風・在校生の雰囲気として丁寧に言い換えてください。',
     };
   }
   if (/就職|就活|キャリア|求人|職業|資格|専門職|インターン/.test(text)) {
@@ -342,29 +568,39 @@ function detectChatIntent(text: string): ChatIntent {
   const area = detectAreaProfile(text);
   const broadRegion = detectBroadRegionProfile(text);
   const mentionedSchoolNames = detectMentionedSchoolNames(text);
+  const asksHowToChooseOnly =
+    /選び方.*知りたい|選ぶ.*ポイント|考え方.*知りたい|流れ.*知りたい|就職率|卒業後.*割合/u.test(
+      text
+    ) && !/おすすめ|お勧め|候補|探|どこ|通える|合う.*学校|学校.*教えて/u.test(text);
   const hasConcreteSelectionCriteria =
     Boolean(detectPrefecture(text) || area || broadRegion) &&
-    /週\s*[0-9０-９]|週[一二三四五六七]|\d[-〜~]\d通学|通学|登校|評定|友達|発達|サポート|進学|受験|就職|就活|不登校|安心/u.test(
+    /週\s*[0-9０-９]|週[一二三四五六七]|\d[-〜~]\d通学|通学|登校|行きやすい|近い|評定|友達|発達|サポート|進学|受験|就職|就活|不登校|安心|イラスト|デザイン|日帰り|スクーリング|ネット|安い|雰囲気|落ち着/u.test(
       text
     );
   const lowAttendanceSchoolRequest =
     isLowAttendancePreference(text) && /高校|学校|探|いい|希望|おすすめ|お勧め/u.test(text);
   const criteriaSchoolRequest =
-    /(?:通信制高校|通信制の高校|高校|学校)/u.test(text) &&
-    /強い|力がある|サポート|交流|同年代|就職|就活|キャリア|進学|受験|不登校|スポーツ|勉強|学習|通学|登校|家から出|合う|向いて/u.test(
+    /(?:通信制高校|通信制の高校|高校|学校|ところ|コース)/u.test(text) &&
+    /強い|力がある|サポート|交流|同年代|就職|就活|キャリア|進学|受験|不登校|スポーツ|勉強|学習|通学|登校|行きやすい|近い|家から出|合う|向いて|イラスト|デザイン|マンガ|ネット|安い|学費|日帰り|スクーリング|ギャル|ヤンキー|落ち着|雰囲気/u.test(
+      text
+    );
+  const featureSchoolRequest =
+    /日帰り.*スクーリング|スクーリング.*日帰り|宿泊なし|イラストを学びたい|デザイン.*学びたい|マンガ.*学びたい|ネットコース.*安い|学費.*安い|ギャル.*少ない|ヤンキー.*少ない|落ち着いた.*高校/u.test(
       text
     );
   const singleSchoolEvaluation =
     mentionedSchoolNames.length > 0 &&
     /どう|考え|強い|評判|口コミ|合う|向いて|有効|比較|知りたい|教えて/u.test(text);
+  if (asksHowToChooseOnly && mentionedSchoolNames.length === 0) return 'general_advice';
   const wantsSchools =
-    /おすすめ|お勧め|薦め|すすめ|候補|学校.*(教えて|探し|探して|知りたい)|高校.*(教えて|探し|探して|知りたい)|探しています|探してます|どこ|通える|合う.*学校|いい高校|いい学校/u.test(
+    /おすすめ|お勧め|薦め|すすめ|候補|学校.*(教えて|探し|探して|知りたい)|高校.*(教えて|探し|探して|知りたい)|探しています|探してます|どこ|通える|行きやすい|近い学校|合う.*学校|いい高校|いい学校/u.test(
       text
     ) ||
     mentionedSchoolNames.length >= 2 ||
     singleSchoolEvaluation ||
     lowAttendanceSchoolRequest ||
     criteriaSchoolRequest ||
+    featureSchoolRequest ||
     hasConcreteSelectionCriteria;
   const procedureTerms =
     /退学|転校|転入|編入|新入学|在籍|単位|卒業時期|留年|手続き|書類|成績証明|在学証明|入学時期|受付期間/;
@@ -457,10 +693,14 @@ function buildSearchQuery(latestUserMessage: string): string {
   const fragments = [latestUserMessage];
   const area = detectAreaProfile(latestUserMessage);
   const broadRegion = detectBroadRegionProfile(latestUserMessage);
+  const locationTerms = extractLocationTerms(latestUserMessage);
   if (area) {
     fragments.push(
       `${area.label} ${area.prefecture} ${area.keywords.join(' ')} ${area.cities.slice(0, 12).join(' ')} 通信制高校 キャンパス 校舎`
     );
+  }
+  if (locationTerms.length > 0) {
+    fragments.push(`${locationTerms.join(' ')} 通信制高校 キャンパス 校舎 最寄り駅 通いやすい`);
   }
   if (broadRegion) {
     fragments.push(
@@ -474,6 +714,26 @@ function buildSearchQuery(latestUserMessage: string): string {
   if (isLowAttendancePreference(latestUserMessage)) {
     fragments.push(
       '年数回 年に数回 年1回 年2回 年3回 通学 登校 集中スクーリング 合宿型スクーリング オンライン 自宅学習 最少登校日数'
+    );
+  }
+  if (/日帰り.*スクーリング|スクーリング.*日帰り|宿泊なし|宿泊不要/.test(latestUserMessage)) {
+    fragments.push(
+      '日帰りスクーリング 宿泊なし 宿泊不要 通学スクーリング 振替スクーリング オンライン代替 登校日数'
+    );
+  }
+  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の/.test(latestUserMessage)) {
+    fragments.push(
+      'イラスト デザイン マンガ 漫画 アニメ 美術 クリエイティブ 専門コース ポートフォリオ 作品制作'
+    );
+  }
+  if (/ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/.test(latestUserMessage)) {
+    fragments.push(
+      'ネットコース オンライン 自宅学習 学費 安い 費用 納得感 授業料 通学少ない'
+    );
+  }
+  if (/ギャル|ヤンキー|派手|落ち着い|静か|穏やか|校風|雰囲気/.test(latestUserMessage)) {
+    fragments.push(
+      '落ち着いた 静か 穏やか 少人数 雰囲気 校風 服装 派手 にぎやか マイペース 在校生'
     );
   }
   if (/大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/.test(latestUserMessage)) {
@@ -980,6 +1240,19 @@ type ConsultationMonitoringLogRow = {
   status: string | null;
 };
 
+type SurveyJoinedSchool = {
+  name: string | null;
+  prefecture: string | null;
+  institution_type: string | null;
+};
+
+type SurveyAtmosphereRow = {
+  school_id: string | null;
+  school_name: string | null;
+  answers: Record<string, unknown> | null;
+  schools: SurveyJoinedSchool | SurveyJoinedSchool[] | null;
+};
+
 function normalizePromptText(value: string | null | undefined, maxLength: number): string {
   const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxLength) return normalized;
@@ -1083,6 +1356,143 @@ async function buildMonitoringInsightBlock(input: {
   }
 }
 
+function getJoinedSchool(row: SurveyAtmosphereRow): SurveyJoinedSchool | null {
+  const school = row.schools;
+  if (!school) return null;
+  return Array.isArray(school) ? school[0] ?? null : school;
+}
+
+function getStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+}
+
+async function buildConditionInsightBlock(input: {
+  focus: FocusProfile | null;
+  prefecture: string | null;
+}): Promise<string> {
+  if (input.focus?.label !== '落ち着いた雰囲気') return '';
+
+  try {
+    const supabase = createAdminSupabaseClient();
+    const { data, error } = await supabase
+      .from('survey_responses')
+      .select('school_id, school_name, answers, schools(name,prefecture,institution_type)')
+      .eq('is_public', true)
+      .limit(1200);
+
+    if (error || !data) {
+      if (error) console.error('[api/chat] atmosphere insight fetch failed:', error);
+      return '';
+    }
+
+    const stats = new Map<
+      string,
+      {
+        schoolName: string;
+        prefecture: string | null;
+        institutionType: InstitutionType | null;
+        total: number;
+        calm: number;
+        lively: number;
+        atmosphereRatings: number[];
+      }
+    >();
+
+    for (const row of data as SurveyAtmosphereRow[]) {
+      const school = getJoinedSchool(row);
+      const schoolName = school?.name ?? row.school_name;
+      if (!schoolName) continue;
+      const answers = row.answers ?? {};
+      const campusPrefecture =
+        typeof answers.campus_prefecture === 'string' ? answers.campus_prefecture : null;
+      const prefecture = campusPrefecture ?? school?.prefecture ?? null;
+      if (input.prefecture && prefecture !== input.prefecture) continue;
+
+      const atmospheres = getStringArray(answers.student_atmosphere);
+      if (atmospheres.length === 0) continue;
+      const current =
+        stats.get(schoolName) ??
+        {
+          schoolName,
+          prefecture,
+          institutionType: normalizeInstitutionType(school?.institution_type),
+          total: 0,
+          calm: 0,
+          lively: 0,
+          atmosphereRatings: [],
+        };
+
+      current.total += 1;
+      if (
+        atmospheres.some((value) =>
+          ['落ち着いて少人数で過ごす', '一人時間を大事にする', 'まじめで授業/行事に積極的'].includes(value)
+        )
+      ) {
+        current.calm += 1;
+      }
+      if (
+        atmospheres.some((value) =>
+          ['にぎやかでルールにしばられずマイペース', 'おしゃれを楽しむ'].includes(value)
+        )
+      ) {
+        current.lively += 1;
+      }
+
+      const rawRating = answers.atmosphere_fit_rating;
+      const rating =
+        typeof rawRating === 'number'
+          ? rawRating
+          : typeof rawRating === 'string'
+            ? Number.parseInt(rawRating, 10)
+            : NaN;
+      if (Number.isFinite(rating) && rating >= 1 && rating <= 5) {
+        current.atmosphereRatings.push(rating);
+      }
+
+      stats.set(schoolName, current);
+    }
+
+    const ranked = [...stats.values()]
+      .filter((item) => item.total >= 2)
+      .sort((a, b) => {
+        const aCalmRate = a.calm / a.total;
+        const bCalmRate = b.calm / b.total;
+        const aLivelyRate = a.lively / a.total;
+        const bLivelyRate = b.lively / b.total;
+        const calmDiff = bCalmRate - aCalmRate;
+        if (Math.abs(calmDiff) > 0.001) return calmDiff;
+        const livelyDiff = aLivelyRate - bLivelyRate;
+        if (Math.abs(livelyDiff) > 0.001) return livelyDiff;
+        return b.total - a.total;
+      })
+      .slice(0, 8);
+
+    if (ranked.length === 0) return '';
+
+    return [
+      'アンケート集計からの補助情報（落ち着いた雰囲気）:',
+      '「ギャルが少ない」などの表現は、見た目で断定せず、在校生の雰囲気回答として「落ち着いて少人数で過ごす」「一人時間を大事にする」比率が高く、「にぎやかでルールにしばられずマイペース」「おしゃれを楽しむ」比率が低い学校を参考にしてください。',
+      ranked
+        .map((item, index) => {
+          const avg =
+            item.atmosphereRatings.length > 0
+              ? (
+                  item.atmosphereRatings.reduce((sum, rating) => sum + rating, 0) /
+                  item.atmosphereRatings.length
+                ).toFixed(1)
+              : '不明';
+          const institution = getInstitutionTypeLabel(item.institutionType);
+          return `${index + 1}. ${item.schoolName}（${[item.prefecture, institution].filter(Boolean).join(' / ') || '所在地要確認'}）: 雰囲気回答${item.total}件、落ち着き系${item.calm}件、にぎやか・おしゃれ系${item.lively}件、雰囲気評価平均${avg}`;
+        })
+        .join('\n'),
+    ].join('\n');
+  } catch (error) {
+    console.error('[api/chat] atmosphere insight unexpected error:', error);
+    return '';
+  }
+}
+
 function scheduleConsultationChatLog(
   request: NextRequest,
   base: ChatLogBase,
@@ -1155,8 +1565,15 @@ export async function POST(request: NextRequest) {
     const focus = detectFocusProfile(searchBasisMessage);
     const area = detectAreaProfile(searchBasisMessage);
     const broadRegion = detectBroadRegionProfile(searchBasisMessage);
+    const locationTerms = extractLocationTerms(searchBasisMessage);
     const routeRaw = await routeQuery(conversationText, searchBasisMessage);
     const route = area && !routeRaw.prefecture ? { ...routeRaw, prefecture: area.prefecture } : routeRaw;
+    const commuteAreaEstimate = await estimateCommuteAreaTerms({
+      locationTerms,
+      prefecture: route.prefecture ?? area?.prefecture ?? null,
+      conversationText,
+    });
+    const commuteLocationTerms = commuteAreaEstimate.terms;
 
     const reasonGroup = route.reason_group ?? inferReasonGroupFromText(searchBasisMessage);
     logBase = {
@@ -1172,11 +1589,11 @@ export async function POST(request: NextRequest) {
       reasonGroup,
       startedAt,
     };
-    const [docsRaw, mentionedSchoolDocs, focusDocs, areaSchools] = await Promise.all([
+    const [docsRaw, mentionedSchoolDocs, focusDocs, areaSchools, broadRegionSchools, genericLocationSchools] = await Promise.all([
       searchRagDocuments(route.query, {
         prefecture: route.prefecture ?? null,
         reasonGroup,
-        matchCount: area ? 32 : 24,
+        matchCount: area || broadRegion || commuteLocationTerms.length > 0 ? 32 : 24,
       }),
       fetchRagDocumentsBySchoolNames(mentionedSchools, 4),
       focus
@@ -1192,11 +1609,29 @@ export async function POST(request: NextRequest) {
             limit: 24,
           })
         : Promise.resolve([]),
+      broadRegion
+        ? fetchActiveSchoolsByPrefectures({
+            prefectures: broadRegion.prefectures,
+            limit: 36,
+          })
+        : Promise.resolve([]),
+      commuteLocationTerms.length > 0
+        ? fetchActiveSchoolsByLocationTerms({
+            terms: commuteLocationTerms,
+            prefecture: route.prefecture ?? area?.prefecture ?? null,
+            limit: 24,
+          })
+        : Promise.resolve([]),
     ]);
+    const locationSchools = mergeCampusSchoolMatches(
+      genericLocationSchools,
+      areaSchools,
+      broadRegionSchools
+    );
     const areaSchoolDocs =
-      areaSchools.length > 0
+      locationSchools.length > 0
         ? await fetchRagDocumentsBySchoolIds(
-            areaSchools.map((school) => school.id),
+            locationSchools.map((school) => school.id),
             3
           )
         : [];
@@ -1206,13 +1641,26 @@ export async function POST(request: NextRequest) {
         rerankRowsForFocus(focusDocs, focus)
       ),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
-    ).slice(0, mentionedSchools.length > 0 ? 16 : area ? 18 : route.prefecture ? 14 : 10);
+    ).slice(
+      0,
+      mentionedSchools.length > 0
+        ? 16
+        : area || broadRegion || genericLocationSchools.length > 0
+          ? 18
+          : route.prefecture
+            ? 14
+            : 10
+    );
     const monitoringInsightBlock = await buildMonitoringInsightBlock({
       intent,
       focus,
       prefecture: route.prefecture ?? null,
       reasonGroup,
       latestUserMessage: searchBasisMessage,
+    });
+    const conditionInsightBlock = await buildConditionInsightBlock({
+      focus,
+      prefecture: route.prefecture ?? null,
     });
 
     if (docs.length === 0) {
@@ -1249,19 +1697,22 @@ export async function POST(request: NextRequest) {
       .map(([school, count]) => `${school} (${count}件の関連根拠)`)
       .join(' / ');
     const areaHints =
-      area && areaSchools.length > 0
-        ? areaSchools
+      (area || broadRegion || commuteLocationTerms.length > 0) && locationSchools.length > 0
+        ? locationSchools
             .slice(0, 12)
             .map((school) => {
-              const locations = school.campusLocations
-                .map((location) => {
-                  const stationText =
-                    location.nearestStations.length > 0
-                      ? `・${location.nearestStations.slice(0, 2).join('／')}`
-                      : '';
-                  return `${location.city}${stationText}`;
-                })
-                .join('、');
+              const locations =
+                school.campusLocations.length > 0
+                  ? school.campusLocations
+                      .map((location) => {
+                        const stationText =
+                          location.nearestStations.length > 0
+                            ? `・${location.nearestStations.slice(0, 2).join('／')}`
+                            : '';
+                        return `${location.prefecture}${location.city}${stationText}`;
+                      })
+                      .join('、')
+                  : school.prefecture ?? '所在地要確認';
               return `${school.name}（${locations}）`;
             })
             .join(' / ')
@@ -1275,6 +1726,10 @@ export async function POST(request: NextRequest) {
     const areaInstruction = area
       ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。`
       : '';
+    const genericLocationInstruction =
+      !area && locationTerms.length > 0
+        ? `ユーザーは「${locationTerms.join('・')}」周辺から通いやすい学校を意図している可能性があります。通学圏推定キーワード（${commuteLocationTerms.join('・') || locationTerms.join('・')}）と所在地から拾った地域候補がある場合は、その候補を優先してください。電車・バスで概ね1時間以内の目安として扱い、実際の所要時間は断定せず、最寄り駅・乗換・徒歩込みで確認するよう促してください。`
+        : '';
     const broadRegionInstruction = broadRegion
       ? `ユーザーは「${broadRegion.label}」を意図しています。単一都道府県に絞り込まず、${broadRegion.prefectures.join('・')}の学校・キャンパスを関東候補として扱ってください。`
       : '';
@@ -1291,6 +1746,8 @@ export async function POST(request: NextRequest) {
             ? `ユーザーは ${mentionedSchools.join('、')} で迷っています。新しい学校候補を勝手に追加せず、まず言及された学校同士を比較してください。根拠が薄い学校がある場合は「今回の口コミ根拠は少なめ」と明記しつつ、分かる範囲で比較してください。必ず次のMarkdown見出し構成で回答してください: ## 比較の結論 / ## 学校ごとの向き不向き / ## 選ぶ時の確認ポイント。学校ごとの見出しは ### で実名校を書いてください。`
             : broadRegion
               ? `ユーザーは ${broadRegion.label} を指定しています。候補校は関東圏の検索結果・所在地根拠を優先してください。候補校は原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${broadRegion.label}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
+            : locationTerms.length > 0
+              ? `ユーザーは ${locationTerms.join('・')} 周辺から通いやすい学校を探しています。通学圏推定キーワードと所在地から拾った地域候補、RAG根拠を優先し、電車・バスで概ね1時間以内に通える可能性がある候補校を原則3校、根拠が少ない場合でも最低2校まで比較してください。所要時間は断定せず、「実際の通学時間は乗換・徒歩込みで確認」と添えてください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。必ず次のMarkdown見出し構成で回答してください: ## ${locationTerms.join('・')}周辺で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
           : route.prefecture
             ? `ユーザーは ${area?.label ?? route.prefecture} を指定しています。候補校は必ず地域内の検索結果・所在地根拠を最優先してください。地域内の候補を原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${area?.label ?? route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : '地域指定がない推薦質問です。通学圏での断定は避けつつ、今回の主訴に関する口コミ根拠が強い学校を「参考候補」として2〜3校示してください。冒頭で「地域未指定のため、通えるかは別途確認が必要ですが、口コミ上の根拠が強い参考候補として挙げます。都道府県を教えてもらえれば地域内候補に絞れます」と明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## 口コミ根拠が強い参考候補 / ## 選んだ理由 / ## 地域指定後に確認したいこと。学校候補の各校名は ### 見出しにしてください。';
@@ -1314,6 +1771,7 @@ export async function POST(request: NextRequest) {
           '朝起きられない・午前の登校が難しい相談では、登校頻度の少なさだけでなく、午後登校、オンライン代替、振替スクーリング、体調への配慮、生活リズムの伴走を確認軸にしてください。' +
           focusInstruction +
           areaInstruction +
+          genericLocationInstruction +
           broadRegionInstruction +
           responsePolicy +
           '確認ポイントなどの列挙項目は、必ずMarkdownの「- 」で始まる箇条書きにしてください。' +
@@ -1339,15 +1797,23 @@ export async function POST(request: NextRequest) {
                 ? `${area.label}（${area.prefecture}）`
                 : broadRegion
                   ? `${broadRegion.label}（${broadRegion.prefectures.join(' / ')}）`
-                  : route.prefecture ?? 'なし'
+                  : locationTerms.length > 0
+                    ? `${locationTerms.join(' / ')} 周辺`
+                    : route.prefecture ?? 'なし'
             }\n` +
             `ユーザーが言及した学校:\n${mentionedSchools.length > 0 ? mentionedSchools.join(' / ') : 'なし'}\n` +
           `検索ルーター結果:\n${JSON.stringify(route, null, 2)}\n` +
           `関連学校ヒント:\n${schoolHints || 'なし'}\n\n` +
+          `通学圏推定（経路APIなし・目安）:\n${
+            commuteLocationTerms.length > 0
+              ? `出発地=${commuteAreaEstimate.origin_label ?? locationTerms.join(' / ')} / 検索語=${commuteLocationTerms.join(' / ')} / 注意=${commuteAreaEstimate.note ?? '所要時間は未検証'}`
+              : 'なし'
+          }\n\n` +
           `所在地から拾った地域候補:\n${areaHints}\n\n` +
+            (conditionInsightBlock ? `${conditionInsightBlock}\n\n` : '') +
             (monitoringInsightBlock ? `${monitoringInsightBlock}\n\n` : '') +
             (intent === 'school_recommendation'
-              ? `候補校リスト（###見出しに使える実名校はこの中だけ）:\n${buildCandidateSchoolBlock(
+              ? `候補校リスト（###見出しに使える実名校は、この候補校リストまたは上の補助情報に出ている学校だけ）:\n${buildCandidateSchoolBlock(
                   docs,
                   {
                     focus,

@@ -172,6 +172,144 @@ export async function fetchActiveSchoolsByCampusArea(options: {
   return matches.slice(0, options.limit ?? 24);
 }
 
+export async function fetchActiveSchoolsByPrefectures(options: {
+  prefectures: string[];
+  limit?: number;
+}): Promise<CampusAreaSchoolMatch[]> {
+  const prefectures = [
+    ...new Set(options.prefectures.map((prefecture) => prefecture.trim()).filter(Boolean)),
+  ];
+  if (prefectures.length === 0) return [];
+
+  const supabase = getSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('schools')
+    .select('id, name, prefecture, prefectures, campus_locations')
+    .eq('status', 'active')
+    .eq('is_public', true)
+    .limit(1500);
+
+  if (error) throw error;
+
+  const prefectureSet = new Set(prefectures);
+  const matches = (data ?? [])
+    .map((row) => {
+      const record = row as {
+        id: string;
+        name: string;
+        prefecture: string | null;
+        prefectures: string[] | null;
+        campus_locations: unknown;
+      };
+      const campusLocations = parseCampusLocations(record.campus_locations);
+      const matchedLocations = campusLocations.filter((location) =>
+        prefectureSet.has(location.prefecture)
+      );
+      const hasPrefecture =
+        (record.prefecture && prefectureSet.has(record.prefecture)) ||
+        (Array.isArray(record.prefectures) &&
+          record.prefectures.some((prefecture) => prefectureSet.has(prefecture)));
+      if (matchedLocations.length === 0 && !hasPrefecture) return null;
+      return {
+        id: record.id,
+        name: record.name,
+        prefecture: record.prefecture,
+        campusLocations: matchedLocations,
+      };
+    })
+    .filter((school): school is CampusAreaSchoolMatch => Boolean(school));
+
+  return matches.slice(0, options.limit ?? 36);
+}
+
+function normalizeLocationTerm(value: string): string {
+  return value
+    .replace(/[ 　]/g, '')
+    .replace(/[「」『』（）()]/g, '')
+    .trim();
+}
+
+function locationMatchesTerm(location: CampusAreaSchoolMatch['campusLocations'][number], term: string): boolean {
+  const normalizedTerm = normalizeLocationTerm(term);
+  if (!normalizedTerm) return false;
+  const stationTerm = normalizedTerm.endsWith('駅')
+    ? normalizedTerm.replace(/駅$/, '')
+    : normalizedTerm;
+  const locationTexts = [
+    location.prefecture,
+    location.city,
+    ...location.nearestStations,
+    ...location.nearestStations.map((station) => station.replace(/駅/g, '')),
+  ].map(normalizeLocationTerm);
+
+  return locationTexts.some(
+    (text) =>
+      text.includes(normalizedTerm) ||
+      normalizedTerm.includes(text) ||
+      (stationTerm.length >= 2 && text.includes(stationTerm))
+  );
+}
+
+export async function fetchActiveSchoolsByLocationTerms(options: {
+  terms: string[];
+  prefecture?: string | null;
+  limit?: number;
+}): Promise<CampusAreaSchoolMatch[]> {
+  const terms = [...new Set(options.terms.map(normalizeLocationTerm).filter((term) => term.length >= 2))];
+  if (terms.length === 0 && !options.prefecture) return [];
+
+  const supabase = getSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('schools')
+    .select('id, name, prefecture, prefectures, campus_locations')
+    .eq('status', 'active')
+    .eq('is_public', true)
+    .limit(1500);
+
+  if (error) throw error;
+
+  const scored = (data ?? [])
+    .map((row) => {
+      const record = row as {
+        id: string;
+        name: string;
+        prefecture: string | null;
+        prefectures: string[] | null;
+        campus_locations: unknown;
+      };
+      const campusLocations = parseCampusLocations(record.campus_locations);
+      const prefectureLocations = options.prefecture
+        ? campusLocations.filter((location) => location.prefecture === options.prefecture)
+        : campusLocations;
+      const matchedLocations = prefectureLocations.filter((location) =>
+        terms.some((term) => locationMatchesTerm(location, term))
+      );
+      const prefectureMatch =
+        Boolean(options.prefecture) &&
+        (record.prefecture === options.prefecture ||
+          campusLocations.some((location) => location.prefecture === options.prefecture) ||
+          (Array.isArray(record.prefectures) &&
+            record.prefectures.some((prefecture) => prefecture === options.prefecture)));
+
+      if (matchedLocations.length === 0 && !prefectureMatch) return null;
+
+      const score = matchedLocations.length * 10 + (prefectureMatch ? 1 : 0);
+      return {
+        school: {
+          id: record.id,
+          name: record.name,
+          prefecture: record.prefecture,
+          campusLocations: matchedLocations.length > 0 ? matchedLocations : prefectureLocations.slice(0, 4),
+        },
+        score,
+      };
+    })
+    .filter((item): item is { school: CampusAreaSchoolMatch; score: number } => Boolean(item))
+    .sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, options.limit ?? 24).map((item) => item.school);
+}
+
 export async function fetchRagDocumentsBySchoolIds(
   schoolIds: string[],
   limitPerSchool = 3
