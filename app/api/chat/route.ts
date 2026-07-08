@@ -14,6 +14,8 @@ import {
   fetchRagDocumentsBySchoolNames,
   fetchRagDocumentsBySchoolIds,
   fetchRagDocumentsByKeywords,
+  interleaveRagDocsBySchoolOrder,
+  rankLocationSchoolMatches,
   inferReasonGroupFromText,
   rerankForGuardianConsultation,
   searchRagDocuments,
@@ -859,6 +861,7 @@ function buildCandidateSchoolBlock(
     focus?: FocusProfile | null;
     nationwideReferenceOnly?: boolean;
     schoolInstitutionInfo?: Map<string, SchoolInstitutionInfo>;
+    locationSchools?: CampusAreaSchoolMatch[];
   } = {}
 ): string {
   const grouped = new Map<
@@ -900,6 +903,33 @@ function buildCandidateSchoolBlock(
     if (current.snippets.length < 2) current.snippets.push(extractRelevantSnippet(doc.content));
     grouped.set(doc.school_name, current);
   });
+
+  if (options.locationSchools?.length) {
+    for (const school of options.locationSchools) {
+      if (grouped.has(school.name)) continue;
+      grouped.set(school.name, {
+        schoolName: school.name,
+        prefectures: new Set(
+          school.campusLocations.map((location) => location.prefecture).filter(Boolean)
+        ),
+        refs: [],
+        score: 0.45,
+        focusHits: 0,
+        focusSnippets: [],
+        snippets: [
+          `キャンパス所在地: ${school.campusLocations
+            .map((location) => {
+              const stationText =
+                location.nearestStations.length > 0
+                  ? `（${location.nearestStations.slice(0, 2).join('／')}）`
+                  : '';
+              return `${location.prefecture}${location.city}${stationText}`;
+            })
+            .join('、')}`,
+        ],
+      });
+    }
+  }
 
   const candidates = [...grouped.values()]
     .filter((candidate) => {
@@ -1716,29 +1746,43 @@ export async function POST(request: NextRequest) {
       areaSchools,
       broadRegionSchools
     );
+    const rankedLocationSchools = rankLocationSchoolMatches(locationSchools, [
+      ...locationTerms,
+      ...(area?.cities ?? []),
+    ]);
     const areaSchoolDocs =
-      locationSchools.length > 0
+      rankedLocationSchools.length > 0
         ? await fetchRagDocumentsBySchoolIds(
-            locationSchools.map((school) => school.id),
+            rankedLocationSchools.map((school) => school.id),
             3
           )
         : [];
+    const balancedAreaDocs =
+      rankedLocationSchools.length > 0
+        ? interleaveRagDocsBySchoolOrder(
+            areaSchoolDocs,
+            rankedLocationSchools.map((school) => school.id),
+            2,
+            Math.min(rankedLocationSchools.length * 2, 22)
+          )
+        : [];
+    const maxDocs =
+      mentionedSchools.length > 0
+        ? 16
+        : rankedLocationSchools.length > 0
+          ? 24
+          : area || broadRegion || genericLocationSchools.length > 0
+            ? 18
+            : route.prefecture
+              ? 14
+              : 10;
     const docs = mergeRagRows(
       mergeRagRows(
-        mergeRagRows(mentionedSchoolDocs, areaSchoolDocs),
+        mergeRagRows(mentionedSchoolDocs, balancedAreaDocs),
         rerankRowsForFocus(focusDocs, focus)
       ),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
-    ).slice(
-      0,
-      mentionedSchools.length > 0
-        ? 16
-        : area || broadRegion || genericLocationSchools.length > 0
-          ? 18
-          : route.prefecture
-            ? 14
-            : 10
-    );
+    ).slice(0, maxDocs);
     const monitoringInsightBlock = await buildMonitoringInsightBlock({
       intent,
       focus,
@@ -1785,9 +1829,8 @@ export async function POST(request: NextRequest) {
       .map(([school, count]) => `${school} (${count}件の関連根拠)`)
       .join(' / ');
     const areaHints =
-      (area || broadRegion || commuteLocationTerms.length > 0) && locationSchools.length > 0
-        ? locationSchools
-            .slice(0, 12)
+      (area || broadRegion || commuteLocationTerms.length > 0) && rankedLocationSchools.length > 0
+        ? rankedLocationSchools
             .map((school) => {
               const locations =
                 school.campusLocations.length > 0
@@ -1812,7 +1855,7 @@ export async function POST(request: NextRequest) {
       ? `今回の主訴は「${focus.label}」です。${focus.instruction} 各候補校の説明では、主訴に直接関係する口コミ根拠を最低1つは明記してください。主訴に直接関係する口コミ根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。`
       : 'ユーザーの主訴を読み取り、候補校の説明では口コミ上の具体的な良かった点・注意点を必ず添えてください。';
     const areaInstruction = area
-      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。`
+      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。全国展開校は本部都道府県とキャンパス所在地が異なる場合があるため、「所在地から拾った地域候補」を優先してください。`
       : '';
     const genericLocationInstruction =
       !area && locationTerms.length > 0
@@ -1835,7 +1878,7 @@ export async function POST(request: NextRequest) {
             : broadRegion
               ? `ユーザーは ${broadRegion.label} を指定しています。候補校は関東圏の検索結果・所在地根拠を優先してください。候補校は原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${broadRegion.label}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : locationTerms.length > 0
-              ? `ユーザーは ${locationTerms.join('・')} 周辺から通いやすい学校を探しています。通学圏推定キーワードと所在地から拾った地域候補、RAG根拠を優先し、電車・バスで概ね1時間以内に通える可能性がある候補校を原則3校、根拠が少ない場合でも最低2校まで比較してください。所要時間は断定せず、「実際の通学時間は乗換・徒歩込みで確認」と添えてください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。必ず次のMarkdown見出し構成で回答してください: ## ${locationTerms.join('・')}周辺で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
+              ? `ユーザーは ${locationTerms.join('・')} 周辺から通いやすい学校を探しています。通学圏推定キーワードと所在地から拾った地域候補、RAG根拠を優先し、電車・バスで概ね1時間以内に通える可能性がある候補校を原則3校、根拠が少ない場合でも最低2校まで比較してください。全国展開校は口コミの都道府県ラベルとキャンパス所在地が異なる場合があるため、所在地候補を優先してください。所要時間は断定せず、「実際の通学時間は乗換・徒歩込みで確認」と添えてください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。必ず次のMarkdown見出し構成で回答してください: ## ${locationTerms.join('・')}周辺で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
           : route.prefecture
             ? `ユーザーは ${area?.label ?? route.prefecture} を指定しています。候補校は必ず地域内の検索結果・所在地根拠を最優先してください。地域内の候補を原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${area?.label ?? route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : '地域指定がない推薦質問です。通学圏での断定は避けつつ、今回の主訴に関する口コミ根拠が強い学校を「参考候補」として2〜3校示してください。冒頭で「地域未指定のため、通えるかは別途確認が必要ですが、口コミ上の根拠が強い参考候補として挙げます。都道府県を教えてもらえれば地域内候補に絞れます」と明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## 口コミ根拠が強い参考候補 / ## 選んだ理由 / ## 地域指定後に確認したいこと。学校候補の各校名は ### 見出しにしてください。';
@@ -1907,6 +1950,7 @@ export async function POST(request: NextRequest) {
                     focus,
                     nationwideReferenceOnly: !route.prefecture && !broadRegion,
                     schoolInstitutionInfo,
+                    locationSchools: rankedLocationSchools,
                   }
                 )}\n\n`
               : '') +

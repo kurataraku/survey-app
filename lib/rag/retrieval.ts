@@ -310,6 +310,65 @@ export async function fetchActiveSchoolsByLocationTerms(options: {
   return scored.slice(0, options.limit ?? 24).map((item) => item.school);
 }
 
+export function rankLocationSchoolMatches(
+  schools: CampusAreaSchoolMatch[],
+  locationTerms: string[]
+): CampusAreaSchoolMatch[] {
+  const terms = [...new Set(locationTerms.map(normalizeLocationTerm).filter((term) => term.length >= 2))];
+  const scoreSchool = (school: CampusAreaSchoolMatch): number => {
+    let score = 0;
+    for (const location of school.campusLocations) {
+      for (const term of terms) {
+        if (locationMatchesTerm(location, term)) score += 20;
+      }
+      if (terms.some((term) => location.city.includes(term) || term.includes(location.city.replace(/[市区町村]$/, '')))) {
+        score += 12;
+      }
+    }
+    return score;
+  };
+
+  return [...schools].sort((a, b) => {
+    const scoreDiff = scoreSchool(b) - scoreSchool(a);
+    if (scoreDiff !== 0) return scoreDiff;
+    return a.name.localeCompare(b.name, 'ja');
+  });
+}
+
+export function interleaveRagDocsBySchoolOrder(
+  docs: RagMatchRow[],
+  orderedSchoolIds: string[],
+  maxPerSchool: number,
+  maxTotal: number
+): RagMatchRow[] {
+  if (orderedSchoolIds.length === 0 || docs.length === 0 || maxTotal <= 0) return [];
+
+  const bySchool = new Map<string, RagMatchRow[]>();
+  for (const doc of docs) {
+    const key = doc.school_id;
+    if (!key) continue;
+    const list = bySchool.get(key) ?? [];
+    list.push(doc);
+    bySchool.set(key, list);
+  }
+
+  const picked: RagMatchRow[] = [];
+  const seen = new Set<string>();
+
+  for (let round = 0; round < maxPerSchool; round++) {
+    for (const schoolId of orderedSchoolIds) {
+      if (picked.length >= maxTotal) return picked;
+      const schoolDocs = bySchool.get(schoolId) ?? [];
+      const doc = schoolDocs[round];
+      if (!doc || seen.has(doc.id)) continue;
+      seen.add(doc.id);
+      picked.push(doc);
+    }
+  }
+
+  return picked;
+}
+
 export async function fetchRagDocumentsBySchoolIds(
   schoolIds: string[],
   limitPerSchool = 3
