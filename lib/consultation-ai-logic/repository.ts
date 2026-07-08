@@ -62,6 +62,10 @@ function isEmptyContent(row: DbRow): boolean {
   );
 }
 
+const OBSOLETE_IMPROVEMENT_CHANGES = new Set([
+  '地域検索のRAG件数を必要最小限に調整（通常20件・地域指定28件）',
+]);
+
 function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
   content: ConsultationAiLogicDocsContent;
   changed: boolean;
@@ -75,6 +79,40 @@ function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
   );
   if (missingHistory.length > 0) {
     next = { ...next, improvement_history: [...next.improvement_history, ...missingHistory] };
+    changed = true;
+  }
+
+  const historyByTitle = new Map(
+    next.improvement_history.map((item) => [item.title, { ...item, changes: [...item.changes] }])
+  );
+  let historyChanged = false;
+  for (const defaultItem of DEFAULT_CONSULTATION_AI_LOGIC_DOCS.improvement_history) {
+    const current = historyByTitle.get(defaultItem.title);
+    if (!current) continue;
+
+    const filteredChanges = current.changes.filter((change) => !OBSOLETE_IMPROVEMENT_CHANGES.has(change));
+    if (filteredChanges.length !== current.changes.length) {
+      current.changes = filteredChanges;
+      historyChanged = true;
+    }
+
+    const existingChanges = new Set(current.changes);
+    for (const change of defaultItem.changes) {
+      if (!existingChanges.has(change)) {
+        current.changes.push(change);
+        historyChanged = true;
+      }
+    }
+    historyByTitle.set(defaultItem.title, current);
+  }
+
+  if (historyChanged) {
+    next = {
+      ...next,
+      improvement_history: next.improvement_history.map(
+        (item) => historyByTitle.get(item.title) ?? item
+      ),
+    };
     changed = true;
   }
 
@@ -126,6 +164,10 @@ function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
   for (const defaultStep of DEFAULT_CONSULTATION_AI_LOGIC_DOCS.logic_flow) {
     const current = logicFlowByTitle.get(defaultStep.title);
     if (!current) continue;
+    if (current.body !== defaultStep.body) {
+      current.body = defaultStep.body;
+      changed = true;
+    }
     const existingExamples = new Set(current.examples);
     for (const example of defaultStep.examples) {
       if (!existingExamples.has(example)) {

@@ -50,12 +50,12 @@ export async function embedQueryText(query: string): Promise<string> {
   return toVectorLiteral(vector);
 }
 
-export async function searchRagDocuments(
+export async function searchRagDocumentsWithEmbedding(
   query: string,
+  queryEmbedding: string,
   filters: RagSearchFilters = {}
 ): Promise<RagMatchRow[]> {
   const supabase = getSupabaseServiceClient();
-  const queryEmbedding = await embedQueryText(query);
   const { data, error } = await supabase.rpc('match_rag_documents', {
     query_embedding: queryEmbedding,
     match_count: filters.matchCount ?? 28,
@@ -67,6 +67,14 @@ export async function searchRagDocuments(
 
   if (error) throw error;
   return (data ?? []) as RagMatchRow[];
+}
+
+export async function searchRagDocuments(
+  query: string,
+  filters: RagSearchFilters = {}
+): Promise<RagMatchRow[]> {
+  const queryEmbedding = await embedQueryText(query);
+  return searchRagDocumentsWithEmbedding(query, queryEmbedding, filters);
 }
 
 export async function fetchRagDocumentsBySchoolNames(

@@ -11,6 +11,7 @@ import {
   fetchActiveSchoolsByCampusArea,
   fetchActiveSchoolsByLocationTerms,
   fetchActiveSchoolsByPrefectures,
+  embedQueryText,
   fetchRagDocumentsBySchoolNames,
   fetchRagDocumentsBySchoolIds,
   fetchRagDocumentsByKeywords,
@@ -18,7 +19,7 @@ import {
   rankLocationSchoolMatches,
   inferReasonGroupFromText,
   rerankForGuardianConsultation,
-  searchRagDocuments,
+  searchRagDocumentsWithEmbedding,
 } from '@/lib/rag/retrieval';
 import type { RagMatchRow } from '@/lib/rag/types';
 import type { CampusAreaSchoolMatch } from '@/lib/rag/retrieval';
@@ -371,12 +372,32 @@ function buildCommuteTermsWithoutLlm(
 function shouldUseCommuteLlm(
   locationTerms: string[],
   area: AreaProfile | null,
-  broadRegion: BroadRegionProfile | null
+  broadRegion: BroadRegionProfile | null,
+  intent: ChatIntent
 ): boolean {
+  if (intent === 'school_fact') return false;
   if (locationTerms.length === 0) return false;
   if (area || broadRegion) return false;
   if (process.env.CHAT_ENABLE_COMMUTE_LLM === 'false') return false;
   return true;
+}
+
+function shouldFetchMonitoringInsight(intent: ChatIntent, conciseRequest: boolean): boolean {
+  if (conciseRequest) return false;
+  return (
+    intent !== 'school_fact' && intent !== 'procedure_explanation' && intent !== 'style_comparison'
+  );
+}
+
+function resolveRagMatchCount(
+  intent: ChatIntent,
+  area: AreaProfile | null,
+  broadRegion: BroadRegionProfile | null,
+  hasCommuteTerms: boolean
+): number {
+  if (intent === 'school_fact') return 12;
+  if (area || broadRegion || hasCommuteTerms) return 32;
+  return 20;
 }
 
 async function estimateCommuteAreaTerms(input: {
@@ -608,7 +629,7 @@ function detectFocusProfile(text: string): FocusProfile | null {
 
 function isSchoolFactQuestion(text: string, mentionedSchoolNames: string[]): boolean {
   if (mentionedSchoolNames.length !== 1) return false;
-  return /(?:ある|ない|どこ|所在地|キャンパス|校舎|拠点|置いて|置い|学習センター|に通える|から通える)/u.test(
+  return /(?:ある|ない|どこ|所在地|住所|電話|窓口|キャンパス|校舎|拠点|置いて|置い|学習センター|に通える|から通える)/u.test(
     text
   );
 }
@@ -1257,6 +1278,22 @@ function selectSourceRows(reply: string, docs: RagMatchRow[]): CitationRow[] {
   return extractCitations(reply, docs);
 }
 
+function sanitizePublicReplyText(text: string): string {
+  return text
+    .replace(/学校マスター/g, '当サイトの学校情報')
+    .replace(/学校DB|DB/g, '当サイトの学校情報')
+    .replace(/RAG/g, '参照情報')
+    .replace(/campus_locations/g, 'キャンパス所在地')
+    .replace(/プロンプト/g, '回答方針')
+    .replace(/登録されています。はい、あります/g, '確認できます')
+    .replace(/登録されています。はい、/g, '確認できます。')
+    .replace(/はい、あります（当サイトの学校情報上は/g, '当サイトの学校情報では')
+    .replace(/はい、あります（/g, '確認できます（')
+    .replace(/正確な番地・電話を公式で確認してお出ししてよいですか[？?]?/g, '番地や電話番号は公式サイトで確認してください。')
+    .replace(/公式で確認してお出ししてよいですか[？?]?/g, '公式サイトで確認してください。')
+    .replace(/確認してお出しします/g, '公式サイトで確認してください');
+}
+
 function isModelUnavailableError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const maybeError = error as { code?: unknown; status?: unknown };
@@ -1367,11 +1404,12 @@ function buildChatPayload(
   schoolInstitutionInfo: Map<string, SchoolInstitutionInfo>
 ) {
   const schoolLinks = buildSchoolLinkMap(docs);
-  const reply = injectSchoolLinks(replyRaw, schoolLinks);
-  const citationRows = selectSourceRows(replyRaw, docs);
+  const sanitizedReplyRaw = sanitizePublicReplyText(replyRaw);
+  const reply = injectSchoolLinks(sanitizedReplyRaw, schoolLinks);
+  const citationRows = selectSourceRows(sanitizedReplyRaw, docs);
   const schoolCandidates =
     intent === 'school_recommendation'
-      ? extractSchoolCandidates(replyRaw, schoolLinks, schoolInstitutionInfo)
+      ? extractSchoolCandidates(sanitizedReplyRaw, schoolLinks, schoolInstitutionInfo)
       : [];
 
   const sources = consolidateChatSources(citationRows, schoolLinks);
@@ -1473,7 +1511,7 @@ async function buildMonitoringInsightBlock(input: {
       .not('review_notes', 'is', null)
       .neq('review_notes', '')
       .order('created_at', { ascending: false })
-      .limit(40);
+      .limit(24);
 
     if (error || !data) {
       if (error) console.error('[api/chat] monitoring insight fetch failed:', error);
@@ -1593,16 +1631,17 @@ async function buildSchoolCampusFactBlock(
       const preview = (matched.length > 0 ? matched : campuses).slice(0, 8);
       const matchNote =
         locationTerms.length > 0 && matched.length > 0
-          ? `→ 質問地域（${locationTerms.join('・')}）に該当するキャンパスあり`
+          ? `→ 回答では「${locationTerms.join('・')}に通えるキャンパスを確認できます」と自然に表現する`
           : locationTerms.length > 0
-            ? `→ 質問地域（${locationTerms.join('・')}）への該当キャンパスは未確認`
+            ? `→ 回答では「${locationTerms.join('・')}に該当するキャンパスは今回の参照情報では確認できません」と表現する`
             : '';
-      return `- ${row.name}: ${preview.join(' / ') || 'キャンパス未登録'}${matchNote ? ` ${matchNote}` : ''}`;
+      return `- ${row.name}: ${preview.join(' / ') || 'キャンパス所在地未確認'}${matchNote ? ` ${matchNote}` : ''}`;
     });
 
     return [
-      '学校マスターのキャンパス所在地（DB登録・最優先で参照）:',
-      '口コミRAGの都道府県ラベルより、この所在地情報を優先してください。',
+      '当サイトで確認しているキャンパス所在地（回答ではこの見出し名は出さない）:',
+      '回答では「学校マスター」「DB」「RAG」「登録されています」などの内部用語を使わず、「当サイトの学校情報では」「確認できます」と自然に言い換えてください。',
+      'この情報には市区町村・最寄り駅までしか含まれない場合があります。番地までの住所や電話番号がない場合は、「番地や電話番号までは今回の参照情報に含まれていません」と正直に伝え、「確認してお出しします」「公式で確認してよいですか」のように、このチャット内で追加調査できる前提の約束をしないでください。',
       ...items,
     ].join('\n');
   } catch (error) {
@@ -1821,16 +1860,47 @@ export async function POST(request: NextRequest) {
     const area = detectAreaProfile(searchBasisMessage);
     const broadRegion = detectBroadRegionProfile(searchBasisMessage);
     const locationTerms = extractLocationTerms(searchBasisMessage);
-    const needsCommuteLlm = shouldUseCommuteLlm(locationTerms, area, broadRegion);
-    const [routeRaw, commuteAreaEstimate] = await Promise.all([
+    const needsCommuteLlm = shouldUseCommuteLlm(locationTerms, area, broadRegion, intent);
+    const speculativeSearchQuery = buildSearchQuery(searchBasisMessage);
+    const fetchMonitoringInsight = shouldFetchMonitoringInsight(intent, conciseRequest);
+    const insightPrefecture = area?.prefecture ?? detectPrefecture(searchBasisMessage) ?? null;
+    const insightReasonGroup = inferReasonGroupFromText(searchBasisMessage);
+    const [
+      routeRaw,
+      commuteAreaEstimate,
+      queryEmbedding,
+      mentionedSchoolDocs,
+      monitoringInsightBlock,
+      conditionInsightBlock,
+      schoolCampusFactBlock,
+    ] = await Promise.all([
       routeQuery(conversationText, searchBasisMessage),
       needsCommuteLlm
         ? estimateCommuteAreaTerms({
             locationTerms,
-            prefecture: area?.prefecture ?? detectPrefecture(searchBasisMessage),
+            prefecture: insightPrefecture,
             conversationText,
           })
         : Promise.resolve(buildCommuteTermsWithoutLlm(locationTerms, area, broadRegion)),
+      embedQueryText(speculativeSearchQuery),
+      fetchRagDocumentsBySchoolNames(mentionedSchools, 4),
+      fetchMonitoringInsight
+        ? buildMonitoringInsightBlock({
+            intent,
+            focus,
+            prefecture: insightPrefecture,
+            reasonGroup: insightReasonGroup,
+            latestUserMessage: searchBasisMessage,
+          })
+        : Promise.resolve(''),
+      buildConditionInsightBlock({
+        focus,
+        prefecture: insightPrefecture,
+      }),
+      buildSchoolCampusFactBlock(mentionedSchools, [
+        ...locationTerms,
+        ...(area?.cities ?? []),
+      ]),
     ]);
     const route = area && !routeRaw.prefecture ? { ...routeRaw, prefecture: area.prefecture } : routeRaw;
     const commuteLocationTerms = commuteAreaEstimate.terms;
@@ -1849,40 +1919,53 @@ export async function POST(request: NextRequest) {
       reasonGroup,
       startedAt,
     };
-    const [docsRaw, mentionedSchoolDocs, focusDocs, areaSchools, broadRegionSchools, genericLocationSchools] = await Promise.all([
-      searchRagDocuments(route.query, {
-        prefecture: route.prefecture ?? null,
-        reasonGroup,
-        matchCount: area || broadRegion || commuteLocationTerms.length > 0 ? 32 : 24,
-      }),
-      fetchRagDocumentsBySchoolNames(mentionedSchools, 4),
-      focus
-        ? fetchRagDocumentsByKeywords(focus.keywords, {
-            prefecture: route.prefecture ?? null,
-            limit: isLowAttendancePreference(searchBasisMessage) ? 28 : 18,
-          })
-        : Promise.resolve([]),
-      area
-        ? fetchActiveSchoolsByCampusArea({
-            prefecture: area.prefecture,
-            cities: area.cities,
-            limit: 24,
-          })
-        : Promise.resolve([]),
-      broadRegion
-        ? fetchActiveSchoolsByPrefectures({
-            prefectures: broadRegion.prefectures,
-            limit: 36,
-          })
-        : Promise.resolve([]),
+
+    const searchQuery = route.query.trim();
+    const searchEmbedding =
+      searchQuery === speculativeSearchQuery.trim()
+        ? queryEmbedding
+        : await embedQueryText(searchQuery);
+    const ragMatchCount = resolveRagMatchCount(
+      intent,
+      area,
+      broadRegion,
       commuteLocationTerms.length > 0
-        ? fetchActiveSchoolsByLocationTerms({
-            terms: commuteLocationTerms,
-            prefecture: route.prefecture ?? area?.prefecture ?? null,
-            limit: 24,
-          })
-        : Promise.resolve([]),
-    ]);
+    );
+
+    const [docsRaw, focusDocs, areaSchools, broadRegionSchools, genericLocationSchools] =
+      await Promise.all([
+        searchRagDocumentsWithEmbedding(searchQuery, searchEmbedding, {
+          prefecture: route.prefecture ?? null,
+          reasonGroup,
+          matchCount: ragMatchCount,
+        }),
+        focus && intent !== 'school_fact'
+          ? fetchRagDocumentsByKeywords(focus.keywords, {
+              prefecture: route.prefecture ?? null,
+              limit: isLowAttendancePreference(searchBasisMessage) ? 28 : 18,
+            })
+          : Promise.resolve([]),
+        area
+          ? fetchActiveSchoolsByCampusArea({
+              prefecture: area.prefecture,
+              cities: area.cities,
+              limit: 24,
+            })
+          : Promise.resolve([]),
+        broadRegion
+          ? fetchActiveSchoolsByPrefectures({
+              prefectures: broadRegion.prefectures,
+              limit: 36,
+            })
+          : Promise.resolve([]),
+        commuteLocationTerms.length > 0
+          ? fetchActiveSchoolsByLocationTerms({
+              terms: commuteLocationTerms,
+              prefecture: route.prefecture ?? area?.prefecture ?? null,
+              limit: 24,
+            })
+          : Promise.resolve([]),
+      ]);
     const locationSchools = mergeCampusSchoolMatches(
       genericLocationSchools,
       areaSchools,
@@ -1892,29 +1975,18 @@ export async function POST(request: NextRequest) {
       ...locationTerms,
       ...(area?.cities ?? []),
     ]);
-    const [areaSchoolDocs, monitoringInsightBlock, conditionInsightBlock, schoolCampusFactBlock] =
-      await Promise.all([
+    const preliminaryDocs = mergeRagRows(
+      mergeRagRows(mentionedSchoolDocs, rerankRowsForFocus(focusDocs, focus)),
+      rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
+    );
+    const [areaSchoolDocs, schoolInstitutionInfo] = await Promise.all([
       rankedLocationSchools.length > 0
         ? fetchRagDocumentsBySchoolIds(
             rankedLocationSchools.map((school) => school.id),
             2
           )
         : Promise.resolve([]),
-      buildMonitoringInsightBlock({
-        intent,
-        focus,
-        prefecture: route.prefecture ?? null,
-        reasonGroup,
-        latestUserMessage: searchBasisMessage,
-      }),
-      buildConditionInsightBlock({
-        focus,
-        prefecture: route.prefecture ?? null,
-      }),
-      buildSchoolCampusFactBlock(mentionedSchools, [
-        ...locationTerms,
-        ...(area?.cities ?? []),
-      ]),
+      fetchSchoolInstitutionInfo(preliminaryDocs),
     ]);
     const balancedAreaDocs =
       rankedLocationSchools.length > 0
@@ -1943,6 +2015,9 @@ export async function POST(request: NextRequest) {
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
     ).slice(0, maxDocs);
 
+    const finalSchoolInstitutionInfo =
+      balancedAreaDocs.length > 0 ? await fetchSchoolInstitutionInfo(docs) : schoolInstitutionInfo;
+
     if (docs.length === 0) {
       const noEvidenceReply =
         '関連する公開口コミがまだ少ないため、現時点では具体校の提案が難しい状況です。' +
@@ -1964,7 +2039,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const schoolInstitutionInfo = await fetchSchoolInstitutionInfo(docs);
+    const schoolInstitutionInfoForPrompt = finalSchoolInstitutionInfo;
 
     const evidenceBySchool = new Map<string, number>();
     for (const doc of docs) {
@@ -2020,7 +2095,7 @@ export async function POST(request: NextRequest) {
         : intent === 'style_comparison'
           ? 'この質問は学校候補の推薦ではなく、オンライン中心と通学型など学び方の比較相談です。学校候補・おすすめ校・参考候補を出してはいけません。本文中でも学校名を挙げず、「公開口コミでは」「保護者口コミでは」のように根拠種別として説明してください。本人の不安・登校頻度・友人関係への希望に寄り添って、どちらを選ぶべきかの考え方を説明してください。必ず次のMarkdown見出し構成で回答してください: ## 結論 / ## オンライン中心が合いやすい場合 / ## 通学型・ハイブリッドが合いやすい場合 / ## 見学時に確認したいこと。'
         : intent === 'school_fact'
-          ? '特定校の所在地・キャンパスの有無についての質問です。学校マスターのキャンパス所在地をRAGの都道府県ラベルより優先してください。DBに該当市区のキャンパスがあれば「はい、あります」と明確に答えてください。ない場合のみ「今回の参照資料では未確認」と述べ、公式サイトでの確認を促してください。必ず次のMarkdown見出し構成で回答してください: ## 結論 / ## 登録されているキャンパス / ## 確認ポイント。'
+          ? '特定校の所在地・キャンパスの有無についての質問です。当サイトで確認しているキャンパス所在地を口コミなどの都道府県ラベルより優先してください。該当市区のキャンパスがあれば「はい、◯◯にキャンパスがあります。」のように一文で自然に答えてください。「登録されています」「学校マスター」「DB」「RAG」は回答に書かないでください。「はい、あります」と「確認できます」を重ねる不自然な繰り返しも禁止です。ない場合のみ「今回の参照情報では確認できません」と述べ、公式サイトでの確認を促してください。必ず次のMarkdown見出し構成で回答してください: ## 結論 / ## 確認できるキャンパス / ## 確認ポイント。'
         : intent === 'general_advice'
           ? 'この質問は一般的な学校選び相談です。ユーザーが明示的に候補校を求めていない場合、実名校を無理に出さないでください。必要なら条件整理と確認ポイントを中心に回答してください。必ず次のMarkdown見出し構成で回答してください: ## 考え方 / ## 選び方のポイント / ## 確認ポイント。'
           : mentionedSchools.length >= 2
@@ -2040,6 +2115,8 @@ export async function POST(request: NextRequest) {
           'あなたは「通信制高校えらび相談AI」です。' +
           '通信制高校選びに悩む保護者に対し、公開口コミと公開情報だけを根拠に回答します。' +
           '不登校や学校生活への不安は主要な背景として扱いますが、回答の主軸は学校選び・比較条件・次の確認事項に置いてください。' +
+          'ユーザー向け回答では「学校マスター」「DB」「RAG」「プロンプト」「内部ガイド」「登録されています」など運営・開発側の用語を使わないでください。必要なら「当サイトの学校情報」「参照情報」「確認できます」と自然に言い換えてください。' +
+          '住所・電話番号・窓口など、参照情報にない詳細を「確認してお出しします」「公式で確認してよいですか」のように約束しないでください。分かる範囲（市区町村・最寄り駅など）を出したうえで、番地や電話番号は公式サイトで確認するよう案内してください。' +
           'ユーザーが学校候補を明示的に求めていない場合、学校候補・おすすめ校・参考候補を出してはいけません。まず質問に直接答えてください。' +
           '地域指定がある場合、学校候補はその地域の学校を最優先し、根拠にない都外校を候補として出さないでください。' +
           '都外校や全国型オンライン校に触れる場合は、地域内候補が不足する時の補足扱いにしてください。' +
@@ -2101,7 +2178,7 @@ export async function POST(request: NextRequest) {
                   {
                     focus,
                     nationwideReferenceOnly: !route.prefecture && !broadRegion,
-                    schoolInstitutionInfo,
+                    schoolInstitutionInfo: schoolInstitutionInfoForPrompt,
                     locationSchools: rankedLocationSchools,
                   }
                 )}\n\n`
@@ -2147,12 +2224,19 @@ export async function POST(request: NextRequest) {
                 const delta = chunk.choices[0]?.delta?.content ?? '';
                 if (!delta) continue;
                 replyRaw += delta;
+                const publicDelta = sanitizePublicReplyText(delta);
                 controller.enqueue(
-                  encoder.encode(`${JSON.stringify({ type: 'delta', content: delta })}\n`)
+                  encoder.encode(`${JSON.stringify({ type: 'delta', content: publicDelta })}\n`)
                 );
               }
 
-              const payload = buildChatPayload(replyRaw, docs, usedModel, intent, schoolInstitutionInfo);
+              const payload = buildChatPayload(
+                replyRaw,
+                docs,
+                usedModel,
+                intent,
+                schoolInstitutionInfoForPrompt
+              );
               controller.enqueue(encoder.encode(`${JSON.stringify({ type: 'done', ...payload })}\n`));
               if (logBase) {
                 scheduleConsultationChatLog(request, logBase, {
@@ -2215,7 +2299,13 @@ export async function POST(request: NextRequest) {
       completion.choices[0]?.message?.content?.trim() ??
       'うまく回答を生成できませんでした。もう一度質問を送ってください。';
 
-    const payload = buildChatPayload(replyRaw, docs, usedModel, intent, schoolInstitutionInfo);
+    const payload = buildChatPayload(
+      replyRaw,
+      docs,
+      usedModel,
+      intent,
+      schoolInstitutionInfoForPrompt
+    );
     if (logBase) {
       scheduleConsultationChatLog(request, logBase, {
         status: 'success',
