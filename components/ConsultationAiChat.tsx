@@ -11,6 +11,7 @@ import { trackEvent } from '@/lib/analytics/track';
 type ChatSource = {
   ref: string;
   index: number;
+  indexes?: number[];
   id: string;
   sourceType: string;
   title: string;
@@ -401,19 +402,21 @@ export default function ConsultationAiChat({
                     <p className={compact ? 'mb-2 text-xs font-bold text-gray-600' : 'mb-2 text-[13px] font-bold text-gray-600'}>根拠として参照した情報</p>
                     <ul className="space-y-1.5">
                       {message.sources.map((sourceItem) => {
-                        const label = sourceItem.schoolName
-                          ? `${sourceItem.title}（${sourceItem.schoolName}）`
-                          : sourceItem.title;
+                        const label = sourceItem.title;
+                        const indexLabel =
+                          sourceItem.indexes && sourceItem.indexes.length > 1
+                            ? sourceItem.indexes.join(',')
+                            : String(sourceItem.index);
                         const citationId = `cite-${message.id}-${sourceItem.ref}`;
                         if (!sourceItem.url) {
                           return (
                             <li
-                              key={`${message.id}-${sourceItem.id}`}
+                              key={`${message.id}-${sourceItem.ref}`}
                               id={citationId}
                               className={compact ? 'flex items-start gap-2 rounded-md px-1 py-0.5 text-xs text-gray-500' : 'flex items-start gap-2 rounded-md px-1 py-0.5 text-[13px] text-gray-500'}
                             >
                               <span className="inline-flex min-w-[1.4rem] shrink-0 items-center justify-center rounded-md bg-gray-100 px-1 py-0.5 text-[11px] font-bold text-gray-600">
-                                [{sourceItem.index}]
+                                [{indexLabel}]
                               </span>
                               <span>{label}</span>
                             </li>
@@ -421,12 +424,12 @@ export default function ConsultationAiChat({
                         }
                         return (
                           <li
-                            key={`${message.id}-${sourceItem.id}`}
+                            key={`${message.id}-${sourceItem.ref}`}
                             id={citationId}
                             className="flex items-start gap-2 rounded-md px-1 py-0.5 transition-shadow"
                           >
                             <span className="inline-flex min-w-[1.4rem] shrink-0 items-center justify-center rounded-md bg-blue-100 px-1 py-0.5 text-[11px] font-bold text-blue-700">
-                              [{sourceItem.index}]
+                              [{indexLabel}]
                             </span>
                             <Link
                               href={sourceItem.url}

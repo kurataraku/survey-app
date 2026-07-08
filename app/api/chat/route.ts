@@ -1180,6 +1180,102 @@ function isModelUnavailableError(error: unknown): boolean {
   return maybeError.code === 'model_not_found' || maybeError.status === 404;
 }
 
+function getSourceTypeLabel(sourceType: string): string {
+  const labels: Record<string, string> = {
+    review: '口コミ',
+    school: '基本情報',
+    school_summary: 'AI要約',
+    tuition: '学費',
+    course: 'コース',
+    faq: 'FAQ',
+    seo_section: '学校情報',
+    article: '記事',
+  };
+  return labels[sourceType] ?? sourceType;
+}
+
+function normalizeSchoolSourceKey(name: string | null | undefined): string | null {
+  if (!name?.trim()) return null;
+  return name.replace(/\s+/g, '').trim();
+}
+
+function buildConsolidatedSourceTitle(
+  schoolName: string | null,
+  sourceTypes: string[],
+  fallbackTitle: string
+): string {
+  const uniqueLabels = [...new Set(sourceTypes.map(getSourceTypeLabel))];
+  if (schoolName) {
+    return uniqueLabels.length > 0 ? `${schoolName}（${uniqueLabels.join('・')}）` : schoolName;
+  }
+  return fallbackTitle;
+}
+
+function pickBestSourceUrl(rows: RagMatchRow[], schoolLinks: Map<string, string>): string | null {
+  for (const row of rows) {
+    if (row.school_name) {
+      const linked = schoolLinks.get(row.school_name);
+      if (linked) return linked;
+    }
+  }
+  for (const row of rows) {
+    if (row.source_url?.includes('/schools/')) return row.source_url;
+  }
+  for (const row of rows) {
+    if (row.source_url) return row.source_url;
+  }
+  return null;
+}
+
+function consolidateChatSources(
+  citationRows: CitationRow[],
+  schoolLinks: Map<string, string>
+): Array<{
+  ref: string;
+  index: number;
+  indexes: number[];
+  id: string;
+  sourceType: string;
+  title: string;
+  schoolName: string | null;
+  url: string | null;
+}> {
+  const groups = new Map<string, CitationRow[]>();
+
+  for (const citation of citationRows) {
+    const schoolKey = normalizeSchoolSourceKey(citation.row.school_name);
+    const groupKey = schoolKey ?? `doc:${citation.row.id}`;
+    const list = groups.get(groupKey) ?? [];
+    list.push(citation);
+    groups.set(groupKey, list);
+  }
+
+  return [...groups.values()]
+    .map((rows) => {
+      const sorted = [...rows].sort((a, b) => a.index - b.index);
+      const indexes = sorted.map((item) => item.index);
+      const first = sorted[0];
+      if (!first) return null;
+
+      const ragRows = sorted.map((item) => item.row);
+      const sourceTypes = [...new Set(ragRows.map((row) => row.source_type))];
+      const schoolName = first.row.school_name;
+
+      return {
+        ref: sorted.map((item) => item.ref).join(','),
+        index: indexes[0] ?? first.index,
+        indexes,
+        id: first.row.id,
+        sourceType: sourceTypes.length === 1 ? sourceTypes[0]! : 'mixed',
+        title: buildConsolidatedSourceTitle(schoolName, sourceTypes, first.row.title),
+        schoolName,
+        url: pickBestSourceUrl(ragRows, schoolLinks),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => a.index - b.index);
+}
+
 function buildChatPayload(
   replyRaw: string,
   docs: RagMatchRow[],
@@ -1195,15 +1291,7 @@ function buildChatPayload(
       ? extractSchoolCandidates(replyRaw, schoolLinks, schoolInstitutionInfo)
       : [];
 
-  const sources = citationRows.map(({ ref, index, row }) => ({
-    ref,
-    index,
-    id: row.id,
-    sourceType: row.source_type,
-    title: row.title,
-    schoolName: row.school_name,
-    url: row.source_url,
-  }));
+  const sources = consolidateChatSources(citationRows, schoolLinks);
 
   return {
     reply,

@@ -5,6 +5,7 @@ import {
 } from '@/lib/consultation-ai-logic/defaults';
 import {
   ConsultationAiLogicDocsContentSchema,
+  type ActiveRuleGroup,
   type ConsultationAiLogicDocsContent,
   type ConsultationAiLogicDocsRecord,
 } from '@/lib/consultation-ai-logic/schema';
@@ -61,6 +62,90 @@ function isEmptyContent(row: DbRow): boolean {
   );
 }
 
+function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
+  content: ConsultationAiLogicDocsContent;
+  changed: boolean;
+} {
+  let changed = false;
+  let next = content;
+
+  const existingHistoryTitles = new Set(next.improvement_history.map((item) => item.title));
+  const missingHistory = DEFAULT_CONSULTATION_AI_LOGIC_DOCS.improvement_history.filter(
+    (item) => !existingHistoryTitles.has(item.title)
+  );
+  if (missingHistory.length > 0) {
+    next = { ...next, improvement_history: [...next.improvement_history, ...missingHistory] };
+    changed = true;
+  }
+
+  const categoryOrder = next.active_rules.map((group) => group.category);
+  const rulesMap = new Map(
+    next.active_rules.map((group) => [group.category, { ...group, rules: [...group.rules] }])
+  );
+
+  for (const defaultGroup of DEFAULT_CONSULTATION_AI_LOGIC_DOCS.active_rules) {
+    const current = rulesMap.get(defaultGroup.category);
+    if (!current) {
+      rulesMap.set(defaultGroup.category, {
+        category: defaultGroup.category,
+        rules: [...defaultGroup.rules],
+      });
+      categoryOrder.push(defaultGroup.category);
+      changed = true;
+      continue;
+    }
+
+    const existingRules = new Set(current.rules);
+    for (const rule of defaultGroup.rules) {
+      if (!existingRules.has(rule)) {
+        current.rules.push(rule);
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    next = {
+      ...next,
+      active_rules: categoryOrder
+        .map((category) => rulesMap.get(category))
+        .filter((group): group is ActiveRuleGroup => Boolean(group)),
+    };
+  }
+
+  const existingNotes = new Set(next.caution_notes);
+  const missingNotes = DEFAULT_CONSULTATION_AI_LOGIC_DOCS.caution_notes.filter(
+    (note) => !existingNotes.has(note)
+  );
+  if (missingNotes.length > 0) {
+    next = { ...next, caution_notes: [...next.caution_notes, ...missingNotes] };
+    changed = true;
+  }
+
+  const logicFlowByTitle = new Map(next.logic_flow.map((item) => [item.title, { ...item, examples: [...item.examples] }]));
+  for (const defaultStep of DEFAULT_CONSULTATION_AI_LOGIC_DOCS.logic_flow) {
+    const current = logicFlowByTitle.get(defaultStep.title);
+    if (!current) continue;
+    const existingExamples = new Set(current.examples);
+    for (const example of defaultStep.examples) {
+      if (!existingExamples.has(example)) {
+        current.examples.push(example);
+        changed = true;
+      }
+    }
+    logicFlowByTitle.set(defaultStep.title, current);
+  }
+
+  if (changed) {
+    next = {
+      ...next,
+      logic_flow: next.logic_flow.map((item) => logicFlowByTitle.get(item.title) ?? item),
+    };
+  }
+
+  return { content: next, changed };
+}
+
 export async function getConsultationAiLogicDocs(): Promise<ConsultationAiLogicDocsRecord> {
   const supabase = createAdminSupabaseClient();
   const { data, error } = await supabase
@@ -85,9 +170,14 @@ export async function getConsultationAiLogicDocs(): Promise<ConsultationAiLogicD
   }
 
   const content = rowToContent(row);
+  const synced = syncMissingDefaults(content);
+  if (synced.changed) {
+    return saveConsultationAiLogicDocs(synced.content, null);
+  }
+
   return {
     id: row.id,
-    ...content,
+    ...synced.content,
     updated_at: row.updated_at,
     updated_by: row.updated_by,
   };
