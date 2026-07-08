@@ -340,6 +340,42 @@ function mergeCampusSchoolMatches(...groups: CampusAreaSchoolMatch[][]): CampusA
   return [...merged.values()];
 }
 
+function buildCommuteTermsWithoutLlm(
+  locationTerms: string[],
+  area: AreaProfile | null,
+  broadRegion: BroadRegionProfile | null
+): CommuteAreaEstimate {
+  const terms = new Set(locationTerms.map((term) => term.trim()).filter(Boolean));
+  if (area) {
+    for (const city of area.cities) terms.add(city);
+    for (const keyword of area.keywords) terms.add(keyword);
+  }
+  if (broadRegion) {
+    for (const prefecture of broadRegion.prefectures) terms.add(prefecture);
+  }
+  const merged = [...terms].slice(0, 24);
+  return {
+    origin_label: locationTerms.join('・') || area?.label || broadRegion?.label,
+    terms: merged,
+    note: area
+      ? '定義済み地域プロファイルと抽出地名を使用'
+      : broadRegion
+        ? '広域プロファイルと抽出地名を使用'
+        : '抽出地名のみを使用',
+  };
+}
+
+function shouldUseCommuteLlm(
+  locationTerms: string[],
+  area: AreaProfile | null,
+  broadRegion: BroadRegionProfile | null
+): boolean {
+  if (locationTerms.length === 0) return false;
+  if (area || broadRegion) return false;
+  if (process.env.CHAT_ENABLE_COMMUTE_LLM === 'false') return false;
+  return true;
+}
+
 async function estimateCommuteAreaTerms(input: {
   locationTerms: string[];
   prefecture?: string | null;
@@ -1684,13 +1720,18 @@ export async function POST(request: NextRequest) {
     const area = detectAreaProfile(searchBasisMessage);
     const broadRegion = detectBroadRegionProfile(searchBasisMessage);
     const locationTerms = extractLocationTerms(searchBasisMessage);
-    const routeRaw = await routeQuery(conversationText, searchBasisMessage);
+    const needsCommuteLlm = shouldUseCommuteLlm(locationTerms, area, broadRegion);
+    const [routeRaw, commuteAreaEstimate] = await Promise.all([
+      routeQuery(conversationText, searchBasisMessage),
+      needsCommuteLlm
+        ? estimateCommuteAreaTerms({
+            locationTerms,
+            prefecture: area?.prefecture ?? detectPrefecture(searchBasisMessage),
+            conversationText,
+          })
+        : Promise.resolve(buildCommuteTermsWithoutLlm(locationTerms, area, broadRegion)),
+    ]);
     const route = area && !routeRaw.prefecture ? { ...routeRaw, prefecture: area.prefecture } : routeRaw;
-    const commuteAreaEstimate = await estimateCommuteAreaTerms({
-      locationTerms,
-      prefecture: route.prefecture ?? area?.prefecture ?? null,
-      conversationText,
-    });
     const commuteLocationTerms = commuteAreaEstimate.terms;
 
     const reasonGroup = route.reason_group ?? inferReasonGroupFromText(searchBasisMessage);
@@ -1750,13 +1791,25 @@ export async function POST(request: NextRequest) {
       ...locationTerms,
       ...(area?.cities ?? []),
     ]);
-    const areaSchoolDocs =
+    const [areaSchoolDocs, monitoringInsightBlock, conditionInsightBlock] = await Promise.all([
       rankedLocationSchools.length > 0
-        ? await fetchRagDocumentsBySchoolIds(
+        ? fetchRagDocumentsBySchoolIds(
             rankedLocationSchools.map((school) => school.id),
-            3
+            2
           )
-        : [];
+        : Promise.resolve([]),
+      buildMonitoringInsightBlock({
+        intent,
+        focus,
+        prefecture: route.prefecture ?? null,
+        reasonGroup,
+        latestUserMessage: searchBasisMessage,
+      }),
+      buildConditionInsightBlock({
+        focus,
+        prefecture: route.prefecture ?? null,
+      }),
+    ]);
     const balancedAreaDocs =
       rankedLocationSchools.length > 0
         ? interleaveRagDocsBySchoolOrder(
@@ -1783,17 +1836,6 @@ export async function POST(request: NextRequest) {
       ),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
     ).slice(0, maxDocs);
-    const monitoringInsightBlock = await buildMonitoringInsightBlock({
-      intent,
-      focus,
-      prefecture: route.prefecture ?? null,
-      reasonGroup,
-      latestUserMessage: searchBasisMessage,
-    });
-    const conditionInsightBlock = await buildConditionInsightBlock({
-      focus,
-      prefecture: route.prefecture ?? null,
-    });
 
     if (docs.length === 0) {
       const noEvidenceReply =
