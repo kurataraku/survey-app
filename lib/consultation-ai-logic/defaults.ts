@@ -228,6 +228,15 @@ export const DEFAULT_CONSULTATION_AI_LOGIC_DOCS: ConsultationAiLogicDocsContent 
         '地域候補校の根拠取得件数を必要最小限に調整（精度は維持）',
       ],
     },
+    {
+      date: '2026-07-08',
+      title: '特定校の所在地質問と追加入力の改善',
+      changes: [
+        '「星槎は立川にある？」のような特定校の所在地質問を school_fact として扱い、学校DBの campus_locations を最優先で回答',
+        '「府中・吉祥寺も含めるとどう？」のような地域拡張の追加入力を学校推薦として扱う',
+        '「下にまとめます」と書いて空欄になる問題を防ぎ、各校見出し内に良かった点・注意点を必須化',
+      ],
+    },
   ],
   review_loop: [
     '管理画面の相談ログで回答を確認する',
