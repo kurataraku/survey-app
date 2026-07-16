@@ -64,6 +64,14 @@ function isEmptyContent(row: DbRow): boolean {
 
 const OBSOLETE_IMPROVEMENT_CHANGES = new Set([
   '地域検索のRAG件数を必要最小限に調整（通常20件・地域指定28件）',
+  '武庫之荘・尼崎周辺、名古屋市名東区・藤が丘周辺を定義済み地域プロファイルに追加',
+]);
+
+const OBSOLETE_ACTIVE_RULES = new Set([
+  '「阪急武庫之荘付近」「名古屋市名東区から通学」など場所だけの追加入力は、前文脈を保持して学校推薦へ寄せる',
+  '定義済み地域プロファイル（立川・浪速区・田端・武庫之荘・名東区など）がある場合は通学圏LLMを省略',
+  '「阪急武庫之荘付近」「名古屋市名東区から通学」のような場所だけの追加入力も学校推薦として扱う',
+  '地域だけの追加入力（例: 名古屋市名東区から通学）は、前の主訴・本人条件を維持して候補校推薦に進む',
 ]);
 
 function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
@@ -131,6 +139,12 @@ function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
       categoryOrder.push(defaultGroup.category);
       changed = true;
       continue;
+    }
+
+    const filteredRules = current.rules.filter((rule) => !OBSOLETE_ACTIVE_RULES.has(rule));
+    if (filteredRules.length !== current.rules.length) {
+      current.rules = filteredRules;
+      changed = true;
     }
 
     const existingRules = new Set(current.rules);

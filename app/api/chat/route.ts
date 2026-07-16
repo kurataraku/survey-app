@@ -25,6 +25,7 @@ import type { RagMatchRow } from '@/lib/rag/types';
 import type { CampusAreaSchoolMatch } from '@/lib/rag/retrieval';
 import { appPath } from '@/lib/base-path';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { extractDictionaryLocationTerms } from '@/lib/locations/location-dictionary';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -215,7 +216,8 @@ function isFollowUpRefinement(text: string): boolean {
   return (
     /^(それ|そこ|その|じゃあ|では|なら|あと|他|ほか|別|追加|具体|詳しく|比較|候補|おすすめ|近い|通える|関東|都内|東京都|週|月|年|理系|文系)/u.test(trimmed) ||
     /^(東京都|神奈川県|埼玉県|千葉県|茨城県|栃木県|群馬県|関東)$/u.test(trimmed) ||
-    /在住|週\s*[0-9０-９一二三四五六七]|年[に\s]*(?:1|2|3|１|２|３|一|二|三).*通学|通学.*(?:希望|できる|少な)|についてどう|は.*(?:どう|強い|合う|向いて)/u.test(trimmed)
+    /在住|付近|近辺|周辺|から通学|駅から|駅付近|週\s*[0-9０-９一二三四五六七]|年[に\s]*(?:1|2|3|１|２|３|一|二|三).*通学|通学.*(?:希望|できる|少な)|についてどう|は.*(?:どう|強い|合う|向いて)/u.test(trimmed) ||
+    Boolean(detectAreaProfile(trimmed) || extractLocationTerms(trimmed).length > 0)
   );
 }
 
@@ -325,13 +327,72 @@ function extractLocationTerms(text: string): string[] {
     }
   }
 
+  const genericPlaceMatches =
+    normalized.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9ー・]+?(?:付近|近辺|周辺|近く|から通学|から通える|在住|起点)/gu) ?? [];
+  for (const raw of genericPlaceMatches) {
+    const term = raw
+      .replace(/(?:付近|近辺|周辺|近く|から通学|から通える|在住|起点)$/u, '')
+      .replace(/^(?:阪急|JR|京王|小田急|東急|西武|東武|京急|京成|名鉄|近鉄|南海|阪神|地下鉄|東京メトロ)/u, '')
+      .trim();
+    if (
+      term.length >= 2 &&
+      !/学校|高校|通信制|相談|回答|ユーザー|本人|子ども|子供|息子|娘|男子|女子|現在|希望|不登校|発達障害|ASD|ADHD|通学|登校|スクーリング/u.test(term)
+    ) {
+      terms.add(term);
+    }
+  }
+
   const stationLikeMatches = normalized.match(/[一-龥ぁ-んァ-ヶA-Za-z0-9]+(?:駅前|駅近)/gu) ?? [];
   for (const raw of stationLikeMatches) {
     const term = raw.replace(/駅前|駅近/u, '駅');
     if (term.length >= 2) terms.add(term);
   }
 
+  for (const match of extractDictionaryLocationTerms(text, { max: 8 })) {
+    terms.add(match.term);
+    if (match.station) terms.add(match.station);
+    if (match.city) terms.add(match.city);
+  }
+
+  if (terms.size === 0) {
+    for (const segment of text.split(/\n|追加条件[:：]/u)) {
+      const candidate = normalizeLocationInput(segment);
+      if (
+        candidate.length >= 2 &&
+        candidate.length <= 16 &&
+        /[一-龥ぁ-んァ-ヶ]/u.test(candidate) &&
+        !/学校|高校|通信制|相談|回答|ユーザー|本人|子ども|子供|息子|娘|男子|女子|現在|希望|不登校|発達障害|ASD|ADHD|通学|登校|スクーリング|おおぞら|クラーク|星槎|トライ|第一学院|N高|S高/u.test(
+          candidate
+        )
+      ) {
+        terms.add(candidate);
+      }
+    }
+  }
+
   return [...terms].slice(0, 8);
+}
+
+function normalizeLocationInput(text: string): string {
+  return text
+    .replace(/[ 　]/g, '')
+    .replace(/[「」『』（）()]/g, '')
+    .replace(/^(?:阪急|JR|京王|小田急|東急|西武|東武|京急|京成|名鉄|近鉄|南海|阪神|地下鉄|東京メトロ|都営|大阪メトロ)/u, '')
+    .trim();
+}
+
+function isLikelyLocationOnlyText(text: string, locationTerms: string[]): boolean {
+  const normalized = normalizeLocationInput(text);
+  if (!normalized || normalized.length > 24) return false;
+  return locationTerms.some((term) => {
+    const normalizedTerm = normalizeLocationInput(term);
+    if (!normalizedTerm) return false;
+    return (
+      normalized === normalizedTerm ||
+      normalized === `${normalizedTerm}駅` ||
+      `${normalized}駅` === normalizedTerm
+    );
+  });
 }
 
 function mergeCampusSchoolMatches(...groups: CampusAreaSchoolMatch[][]): CampusAreaSchoolMatch[] {
@@ -383,10 +444,9 @@ function shouldUseCommuteLlm(
 }
 
 function shouldFetchMonitoringInsight(intent: ChatIntent, conciseRequest: boolean): boolean {
-  if (conciseRequest) return false;
-  return (
-    intent !== 'school_fact' && intent !== 'procedure_explanation' && intent !== 'style_comparison'
-  );
+  void intent;
+  void conciseRequest;
+  return process.env.CHAT_ENABLE_MONITORING_INSIGHT !== 'false';
 }
 
 function resolveRagMatchCount(
@@ -425,7 +485,7 @@ async function estimateCommuteAreaTerms(input: {
           content:
             'あなたは日本の通学圏を推定する検索補助AIです。' +
             '厳密な経路検索ではなく、学校キャンパス候補を探すための駅名・市区町村名キーワードだけをJSONで返します。' +
-            '鉄道・バスで概ね60分以内に通学候補になりやすい主要駅・乗換駅・近隣市区町村を推定してください。' +
+            '鉄道・バスで概ね30分〜60分程度で通学候補になりやすい主要駅・乗換駅・近隣市区町村を推定してください。30分未満の近い候補も除外しないでください。' +
             '学校名、説明文、所要時間、断定表現は返してはいけません。' +
             '出力キーは origin_label, terms, note のみ。terms は最大18件、駅名は「駅」付き、市区町村は正式に近い表記にしてください。',
         },
@@ -446,7 +506,7 @@ async function estimateCommuteAreaTerms(input: {
     return {
       origin_label: parsed.origin_label || fallback.origin_label,
       terms: mergedTerms.slice(0, 24),
-      note: parsed.note || 'LLMで概ね1時間圏の検索語を推定',
+      note: parsed.note || 'LLMで概ね30分〜60分程度の検索語を推定',
     };
   } catch (error) {
     console.error('[api/chat] commute area estimation failed:', error);
@@ -464,6 +524,7 @@ function detectMentionedSchoolNames(text: string): string[] {
     [/第一高等学院|第一学院|第一学院高等学校/u, '第一学院高等学校'],
     [/トライ式|トライ式高等学院/u, 'トライ式高等学院'],
     [/星槎/u, '星槎国際高等学校'],
+    [/おおぞら|屋久島おおぞら|KTC/u, 'おおぞら高等学院'],
   ];
   const names: string[] = [];
   for (const [pattern, schoolName] of aliases) {
@@ -473,6 +534,27 @@ function detectMentionedSchoolNames(text: string): string[] {
 }
 
 function detectFocusProfile(text: string): FocusProfile | null {
+  if (/発達障害|ASD|ADHD|自閉|注意欠如|多動|グレーゾーン|特性|伴走|個別配慮|合理的配慮/i.test(text)) {
+    return {
+      keywords: [
+        '発達障害',
+        'ASD',
+        'ADHD',
+        '特性',
+        '伴走',
+        '個別配慮',
+        '合理的配慮',
+        '面談',
+        '少人数',
+        'カウンセラー',
+        'ソーシャルワーカー',
+      ],
+      label: '発達特性・個別伴走',
+      regex: /発達障害|ASD|ADHD|自閉|注意欠如|多動|グレーゾーン|特性|伴走|個別配慮|合理的配慮|面談|少人数|カウンセラー|ソーシャルワーカー/iu,
+      instruction:
+        '発達特性・個別伴走が主訴です。候補校は、発達障害やASD/ADHDへの明示的な理解、個別面談、少人数、担任・カウンセラー・SSWの伴走、レポート提出の声かけ、静かな環境、オンライン代替や振替対応に関する根拠がある学校を優先してください。本人の性別・居住地・通学可能時間など前の発話で出た制約を落とさないでください。',
+    };
+  }
   if (isLowAttendancePreference(text)) {
     return {
       keywords: [
@@ -637,6 +719,7 @@ function isSchoolFactQuestion(text: string, mentionedSchoolNames: string[]): boo
 function detectChatIntent(text: string): ChatIntent {
   const area = detectAreaProfile(text);
   const broadRegion = detectBroadRegionProfile(text);
+  const locationTerms = extractLocationTerms(text);
   const mentionedSchoolNames = detectMentionedSchoolNames(text);
   const asksHowToChooseOnly =
     /選び方.*知りたい|選ぶ.*ポイント|考え方.*知りたい|流れ.*知りたい|就職率|卒業後.*割合/u.test(
@@ -665,8 +748,11 @@ function detectChatIntent(text: string): ChatIntent {
   if (asksHowToChooseOnly && mentionedSchoolNames.length === 0) return 'general_advice';
   const locationExpansionRequest =
     /含める|広げ|範囲|でなくても|でも良い|でもいい|近辺も|周辺も/u.test(text) &&
-    (extractLocationTerms(text).length > 0 ||
-      /府中|国立|吉祥寺|立川|国分寺|多摩|登戸|田端/u.test(text));
+    locationTerms.length > 0;
+  const locationOnlySchoolRequest =
+    Boolean(area || broadRegion || locationTerms.length > 0) &&
+    (/付近|近辺|周辺|近く|から通学|通える|行ける|在住|駅|市|区|町|村/u.test(text) ||
+      isLikelyLocationOnlyText(text, locationTerms));
   const wantsSchools =
     /おすすめ|お勧め|薦め|すすめ|候補|学校.*(教えて|探し|探して|知りたい)|高校.*(教えて|探し|探して|知りたい)|探しています|探してます|どこ|通える|行きやすい|近い学校|合う.*学校|いい高校|いい学校/u.test(
       text
@@ -677,6 +763,7 @@ function detectChatIntent(text: string): ChatIntent {
     criteriaSchoolRequest ||
     featureSchoolRequest ||
     locationExpansionRequest ||
+    locationOnlySchoolRequest ||
     hasConcreteSelectionCriteria;
   const procedureTerms =
     /退学|転校|転入|編入|新入学|在籍|単位|卒業時期|留年|手続き|書類|成績証明|在学証明|入学時期|受付期間/;
@@ -1462,10 +1549,52 @@ type SurveyAtmosphereRow = {
   schools: SurveyJoinedSchool | SurveyJoinedSchool[] | null;
 };
 
+const REVIEW_NOTES_PRIORITY_SINCE = '2026-07-14T15:00:00.000Z';
+const MONITORING_KEYWORDS = [
+  '不登校',
+  '進学',
+  '受験',
+  '大学',
+  '就職',
+  '転校',
+  '編入',
+  '転入',
+  '通学',
+  '登校',
+  'オンライン',
+  'スクーリング',
+  '学費',
+  '費用',
+  '安い',
+  'キャンパス',
+  '校舎',
+  '住所',
+  '電話',
+  '地域',
+  '候補',
+  '比較',
+  'おすすめ',
+  '資料',
+  '公式',
+  '口コミ',
+  '根拠',
+  'サポート',
+  'メンタル',
+  '人間関係',
+  '朝',
+  '体調',
+  'イラスト',
+  'デザイン',
+];
+
 function normalizePromptText(value: string | null | undefined, maxLength: number): string {
   const normalized = (value ?? '').replace(/\s+/g, ' ').trim();
   if (normalized.length <= maxLength) return normalized;
   return `${normalized.slice(0, maxLength)}...`;
+}
+
+function isPriorityReviewLog(row: ConsultationMonitoringLogRow): boolean {
+  return Boolean(row.created_at && row.created_at >= REVIEW_NOTES_PRIORITY_SINCE);
 }
 
 function scoreMonitoringLog(
@@ -1483,11 +1612,13 @@ function scoreMonitoringLog(
   if (input.focusLabel && row.focus_label === input.focusLabel) score += 3;
   if (input.prefecture && row.prefecture === input.prefecture) score += 2;
   if (input.reasonGroup && row.reason_group === input.reasonGroup) score += 2;
+  if (isPriorityReviewLog(row)) score += 2;
   if (row.status === 'success') score += 1;
 
   const rowQuestion = row.user_question ?? '';
-  for (const keyword of ['不登校', '進学', '受験', '朝', '体調', '通学', 'オンライン', '転校', '編入']) {
-    if (input.latestUserMessage.includes(keyword) && rowQuestion.includes(keyword)) score += 1;
+  const rowText = `${rowQuestion}\n${row.assistant_reply ?? ''}\n${row.review_notes ?? ''}`;
+  for (const keyword of MONITORING_KEYWORDS) {
+    if (input.latestUserMessage.includes(keyword) && rowText.includes(keyword)) score += 1;
   }
 
   return score;
@@ -1511,7 +1642,7 @@ async function buildMonitoringInsightBlock(input: {
       .not('review_notes', 'is', null)
       .neq('review_notes', '')
       .order('created_at', { ascending: false })
-      .limit(24);
+      .limit(80);
 
     if (error || !data) {
       if (error) console.error('[api/chat] monitoring insight fetch failed:', error);
@@ -1529,9 +1660,15 @@ async function buildMonitoringInsightBlock(input: {
           latestUserMessage: input.latestUserMessage,
         }),
       }))
-      .filter(({ row, score }) => score >= 4 && Boolean(row.review_notes?.trim()))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+      .filter(
+        ({ row, score }) =>
+          Boolean(row.review_notes?.trim()) && (score >= 4 || (isPriorityReviewLog(row) && score >= 2))
+      )
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return (b.row.created_at ?? '').localeCompare(a.row.created_at ?? '');
+      })
+      .slice(0, 6);
 
     if (ranked.length === 0) return '';
 
@@ -2078,11 +2215,11 @@ export async function POST(request: NextRequest) {
       ? `今回の主訴は「${focus.label}」です。${focus.instruction} 各候補校の説明では、主訴に直接関係する口コミ根拠を最低1つは明記してください。主訴に直接関係する口コミ根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。`
       : 'ユーザーの主訴を読み取り、候補校の説明では口コミ上の具体的な良かった点・注意点を必ず添えてください。';
     const areaInstruction = area
-      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。全国展開校は本部都道府県とキャンパス所在地が異なる場合があるため、「所在地から拾った地域候補」を優先してください。`
+      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。全国展開校・サポート校は本部都道府県と実際のキャンパス所在地が異なる場合があるため、「所在地から拾った地域候補」に含まれる拠点がある学校だけを候補にしてください。候補に出す各校では、良かった点・注意点とは別に「所在地根拠: ◯◯市/最寄り駅」も1行で明記してください。所在地根拠が書けない学校は候補にしないでください。`
       : '';
     const genericLocationInstruction =
       !area && locationTerms.length > 0
-        ? `ユーザーは「${locationTerms.join('・')}」周辺から通いやすい学校を意図している可能性があります。通学圏推定キーワード（${commuteLocationTerms.join('・') || locationTerms.join('・')}）と所在地から拾った地域候補がある場合は、その候補を優先してください。電車・バスで概ね1時間以内の目安として扱い、実際の所要時間は断定せず、最寄り駅・乗換・徒歩込みで確認するよう促してください。`
+        ? `ユーザーは「${locationTerms.join('・')}」周辺から通いやすい学校を意図している可能性があります。通学圏推定キーワード（${commuteLocationTerms.join('・') || locationTerms.join('・')}）と所在地から拾った地域候補がある場合は、その候補を優先してください。電車・バスで概ね30分〜60分程度の目安として扱い、30分未満の近い候補も除外せず、実際の所要時間は断定せず、最寄り駅・乗換・徒歩込みで確認するよう促してください。`
         : '';
     const broadRegionInstruction = broadRegion
       ? `ユーザーは「${broadRegion.label}」を意図しています。単一都道府県に絞り込まず、${broadRegion.prefectures.join('・')}の学校・キャンパスを関東候補として扱ってください。`
@@ -2103,9 +2240,9 @@ export async function POST(request: NextRequest) {
             : broadRegion
               ? `ユーザーは ${broadRegion.label} を指定しています。候補校は関東圏の検索結果・所在地根拠を優先してください。候補校は原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${broadRegion.label}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : locationTerms.length > 0
-              ? `ユーザーは ${locationTerms.join('・')} 周辺から通いやすい学校を探しています。通学圏推定キーワードと所在地から拾った地域候補、RAG根拠を優先し、電車・バスで概ね1時間以内に通える可能性がある候補校を原則3校、根拠が少ない場合でも最低2校まで比較してください。全国展開校は口コミの都道府県ラベルとキャンパス所在地が異なる場合があるため、所在地候補を優先してください。所要時間は断定せず、「実際の通学時間は乗換・徒歩込みで確認」と添えてください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。各校の###見出し直下に「良かった点:」「注意点:」を1行ずつ必ず書いてください。「下にまとめます」と書いて実際に書かないことは禁止です。必ず次のMarkdown見出し構成で回答してください: ## ${locationTerms.join('・')}周辺で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
+              ? `ユーザーは ${locationTerms.join('・')} 周辺から通いやすい学校を探しています。通学圏推定キーワードと所在地から拾った地域候補、RAG根拠を優先し、電車・バスで概ね30分〜60分程度で通える可能性がある候補校を原則3校、根拠が少ない場合でも最低2校まで比較してください。30分未満の近い候補も除外しないでください。全国展開校・サポート校は口コミの都道府県ラベルとキャンパス所在地が異なる場合があるため、所在地候補を優先してください。所在地根拠が書けない学校は候補にしないでください。所要時間は断定せず、「実際の通学時間は乗換・徒歩込みで確認」と添えてください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。各校の###見出し直下に「所在地根拠:」「良かった点:」「注意点:」を1行ずつ必ず書いてください。「下にまとめます」と書いて実際に書かないことは禁止です。必ず次のMarkdown見出し構成で回答してください: ## ${locationTerms.join('・')}周辺で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
           : route.prefecture
-            ? `ユーザーは ${area?.label ?? route.prefecture} を指定しています。候補校は必ず地域内の検索結果・所在地根拠を最優先してください。地域内の候補を原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。各校の###見出し直下に「良かった点:」「注意点:」を1行ずつ必ず書いてください。「下にまとめます」と書いて実際に書かないことは禁止です。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${area?.label ?? route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
+            ? `ユーザーは ${area?.label ?? route.prefecture} を指定しています。候補校は必ず地域内の検索結果・所在地根拠を最優先してください。地域内の候補を原則3校、根拠が少ない場合でも最低2校まで比較し、1校しか確かな根拠がない場合だけその理由を明記してください。所在地根拠が書けない学校は候補にしないでください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。各校の###見出し直下に「所在地根拠:」「良かった点:」「注意点:」を1行ずつ必ず書いてください。「下にまとめます」と書いて実際に書かないことは禁止です。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## ${area?.label ?? route.prefecture}で候補になりそうな通信制高校 / ## 選んだ理由 / ## 確認ポイント。学校候補の各校名は ### 見出しにしてください。`
             : '地域指定がない推薦質問です。通学圏での断定は避けつつ、今回の主訴に関する口コミ根拠が強い学校を「参考候補」として2〜3校示してください。冒頭で「地域未指定のため、通えるかは別途確認が必要ですが、口コミ上の根拠が強い参考候補として挙げます。都道府県を教えてもらえれば地域内候補に絞れます」と明記してください。候補校は最大3校です。「その他の候補」「補足候補」として4校目以降の学校名を出さないでください。候補校の###見出しには、候補校リスト内の実名校だけを書いてください。必ず次のMarkdown見出し構成で回答してください: ## 口コミ根拠が強い参考候補 / ## 選んだ理由 / ## 地域指定後に確認したいこと。学校候補の各校名は ### 見出しにしてください。';
 
     const completionMessages = [
@@ -2117,6 +2254,7 @@ export async function POST(request: NextRequest) {
           '不登校や学校生活への不安は主要な背景として扱いますが、回答の主軸は学校選び・比較条件・次の確認事項に置いてください。' +
           'ユーザー向け回答では「学校マスター」「DB」「RAG」「プロンプト」「内部ガイド」「登録されています」など運営・開発側の用語を使わないでください。必要なら「当サイトの学校情報」「参照情報」「確認できます」と自然に言い換えてください。' +
           '住所・電話番号・窓口など、参照情報にない詳細を「確認してお出しします」「公式で確認してよいですか」のように約束しないでください。分かる範囲（市区町村・最寄り駅など）を出したうえで、番地や電話番号は公式サイトで確認するよう案内してください。' +
+          '会話履歴に出ている本人の発達特性（ASD/ADHDなど）、体調、性別、居住地、通学可能時間、登校希望、対面/オンライン希望、進学希望は強い制約として保持してください。ユーザーが後続で地域だけを入力した場合も、前の制約を消さず、その地域から通いやすい候補を具体的に提案してください。' +
           'ユーザーが学校候補を明示的に求めていない場合、学校候補・おすすめ校・参考候補を出してはいけません。まず質問に直接答えてください。' +
           '地域指定がある場合、学校候補はその地域の学校を最優先し、根拠にない都外校を候補として出さないでください。' +
           '都外校や全国型オンライン校に触れる場合は、地域内候補が不足する時の補足扱いにしてください。' +
