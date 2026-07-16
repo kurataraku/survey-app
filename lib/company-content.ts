@@ -5,9 +5,9 @@
 
 export const COMPANY = {
   name: '株式会社キャリアエッセンス',
-  catchphrase: '今がもっと注目される社会へ',
+  catchphrase: '過去ではなく、今の挑戦が未来をつくる社会へ',
   /** Hero のサブキャッチ（会社名は非表示） */
-  subCatchphrase: '私達は人の過去でなく今を応援することで社会の発展を支えていきます。',
+  subCatchphrase: '私たちは、過去にとらわれず、今を生きる人と会社に寄り添います。',
   /** ヘッダー用ロゴ。public/company/logo.jpg を配置すること */
   logoPath: '/company/logo.jpg',
   /** 設立日（フッター用） */
@@ -18,48 +18,60 @@ export const COMPANY = {
 
 export const VISION = {
   heading: 'VISION',
-  main: '今がもっと注目される社会へ',
-  sub: `育った環境、出身の学校、出身の会社など、良くも悪くも人は過去に囚われてしまいます。
-そして、我々はつい過去をもとに表面的にその人のことを判断してしまいがちです。
-それは時に人の希望を奪い、成長の機会を奪っていくことにつながります。
-また、何かを得たその時から人は過去に囚われ、過去にしがみつくと、その人の成長は止まってしまいます。
-誰もが過去に囚われず、今生き続ける人の現在が評価されることで社会はもっと面白くなるはず。
-我々は人の過去でなく今を映し出し、今を生きる人を応援することで社会の発展を支えていくことを目指しています。`,
+  main: '過去ではなく、今の挑戦が未来をつくる社会へ',
+  sub: `どんな学校を出たか、どんな会社にいたか、どれだけ大きな組織か。そうした過去のラベルだけで、人や会社の可能性は測れません。
+
+大切なのは、今どんな思いを持ち、どんな一歩を踏み出そうとしているかです。
+
+私たちは、過去にとらわれず、今を生きる人と会社に寄り添います。
+
+一人ひとり、一社一社の現在の挑戦が、より多くの選択肢や機会につながる社会をつくります。`,
 } as const;
 
 export const MISSION = {
   heading: 'MISSION',
-  main: '今を生きるあなたと企業をつなぐ架け橋になる',
-  sub: `私たちは誰よりもあなたの今をきちんと映し出し、あなたのことを本当に必要としている企業と結ばれるように全力を尽くします。
-そのために、人と企業の力を科学し、それぞれの成長に寄り添います。`,
+  main: '今を生きる人と会社に、前へ進む力を届ける',
+  sub: `過去にとらわれず、今を生きる人と会社に寄り添い、前へ進む力を届けます。
+
+一人ひとり、一社一社の現在の挑戦が、より多くの選択肢や機会につながるよう支援します。`,
 } as const;
 
-export const SERVICES = [
-  {
-    id: 'tsushin' as const,
-    name: '通信制高校リアルレビュー',
-    description:
-      '経験者のリアルな声を集め、進路に悩む人が納得して通信制高校を選べるよう支援する口コミメディアです。',
-    href: '/tsushin-kuchikomi',
-    hasButton: true,
-  },
+export const FEATURED_SERVICE = {
+  id: 'tsushin' as const,
+  name: '通信制高校リアルレビュー',
+  description:
+    '通信制高校の卒業生・在校生・保護者のリアルな口コミを集めた口コミメディアです。学校の雰囲気やサポート、学費の実感など、公式情報だけでは見えにくい実態を伝え、進路に悩む方や保護者が納得して学校を選べるよう支援しています。',
+  href: '/tsushin-kuchikomi',
+  hasButton: true,
+  /** サービスロゴ（public/logo-service.png） */
+  logoPath: '/logo-service.png',
+} as const;
+
+export const OTHER_SERVICES = [
   {
     id: 'dx' as const,
-    name: '企業・学校向けDX推進支援',
+    name: 'シクミット',
     description:
-      '業務整理・要件設計からシステム／AIの導入/活用、運用定着までを一気通貫で支援するDX推進サービスを提供しています。',
-    href: null,
-    hasButton: false,
+      '初期費用0円・月額10万円から、手作業や属人化した業務を御社専用のWebシステムへ変える月額制サービスです。業務整理から開発、AI機能の活用、導入後の定着・保守まで伴走し、作って終わりではなく現場で使われる仕組みづくりを支援します。',
+    href: 'https://shikumit.careeressence.jp/',
+    hasButton: true,
+    /** サービスロゴ（public/company/shikumit-logo.png） */
+    logoPath: '/company/shikumit-logo.png',
   },
   {
     id: 'rpo' as const,
     name: '採用支援・RPO',
     description:
-      '企業の採用活動に深く入り込み、設計・運用・改善までを担う採用支援／RPOサービスを提供しています。',
+      '新卒採用・中途採用の両方に対応し、採用戦略の立案から実行まで一気通貫で伴走する採用支援サービスです。母集団形成、候補者対応、選考進捗の管理、改善提案まで現場の状況に合わせて運用を整え、必要な人材と出会う仕組みづくりを支援します。',
     href: null,
     hasButton: false,
+    /** 採用支援・RPOイメージ（public/company/rpo-support.svg） */
+    logoPath: '/company/rpo-support.svg',
   },
 ] as const;
+
+/** 全サービス一覧（順序: 主力 → その他） */
+export const SERVICES = [FEATURED_SERVICE, ...OTHER_SERVICES] as const;
 
 export const EXECUTIVE = {
   name: '倉田 嵩之',

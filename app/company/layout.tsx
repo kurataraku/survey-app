@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { COMPANY, ADDRESS } from '@/lib/company-content';
 
 const navItems = [
+  { href: '#services', label: '事業内容' },
+  { href: '#executive', label: '代表紹介' },
   { href: '#vision', label: 'VISION' },
   { href: '#mission', label: 'MISSION' },
-  { href: '#services', label: 'サービス' },
-  { href: '#executive', label: '代表紹介' },
 ];
 
 export default function CompanyLayout({

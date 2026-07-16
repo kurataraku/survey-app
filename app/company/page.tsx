@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { GraduationCap, Cpu, Users } from 'lucide-react';
 import {
   COMPANY,
   VISION,
   MISSION,
-  SERVICES,
+  FEATURED_SERVICE,
+  OTHER_SERVICES,
   EXECUTIVE,
 } from '@/lib/company-content';
-import { appPath } from '@/lib/base-path';
 import { getSiteUrl } from '@/lib/env-check';
 
 const siteUrl = getSiteUrl().replace(/\/$/, '');
@@ -35,11 +34,63 @@ export const metadata: Metadata = {
   },
 };
 
-const SERVICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  tsushin: GraduationCap,
-  dx: Cpu,
-  rpo: Users,
-};
+function ServiceLogoCard({
+  service,
+}: {
+  service: {
+    name: string;
+    description: string;
+    href: string | null;
+    hasButton: boolean;
+    logoPath: string;
+  };
+}) {
+  const isExternal = service.href?.startsWith('http') ?? false;
+
+  return (
+    <article
+      className="rounded-[var(--company-radius-card)] border border-[var(--company-primary)]/20 bg-white p-6 sm:p-8"
+      style={{
+        boxShadow: 'var(--company-shadow-card)',
+        background: 'linear-gradient(135deg, #ffffff 0%, #f5f9ff 100%)',
+      }}
+    >
+      <div className="flex flex-col items-center gap-7 md:flex-row md:items-center md:gap-10">
+        <div className="flex w-full justify-center md:w-[320px] md:shrink-0">
+          <img
+            src={service.logoPath}
+            alt={service.name}
+            className="h-auto w-full max-w-[300px] rounded-xl"
+            width={640}
+            height={360}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1 text-center md:text-left">
+          <p
+            className="text-[15px]"
+            style={{
+              color: 'var(--company-muted)',
+              lineHeight: 'var(--company-line-height-relaxed)',
+            }}
+          >
+            {service.description}
+          </p>
+          {service.hasButton && service.href ? (
+            <Link
+              href={service.href}
+              target={isExternal ? '_blank' : undefined}
+              rel={isExternal ? 'noreferrer' : undefined}
+              className="mt-5 inline-flex items-center justify-center rounded-[var(--company-radius-btn)] bg-[var(--company-primary)] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--company-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--company-primary)] focus-visible:ring-offset-2"
+            >
+              くわしく見る
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
 
 function SectionHeading({
   id,
@@ -129,78 +180,14 @@ export default function CompanyTopPage() {
         className="mx-auto flex flex-col px-4 pb-24 pt-14 sm:px-6 sm:pt-20 lg:px-8"
         style={{ maxWidth: 'var(--company-container-max)', gap: 'var(--company-section-gap)' }}
       >
-        {/* Vision */}
-        <SectionHeading id="vision" label={VISION.heading} sublabel={VISION.main}>
-          <div
-            className="whitespace-pre-line text-[15px]"
-            style={{
-              color: 'var(--company-muted)',
-              lineHeight: 'var(--company-line-height-relaxed)',
-            }}
-          >
-            {VISION.sub}
-          </div>
-        </SectionHeading>
+        {/* Business */}
+        <SectionHeading id="services" label="事業内容">
+          <div className="flex flex-col" style={{ gap: 'var(--company-gutter-lg)' }}>
+            <ServiceLogoCard service={FEATURED_SERVICE} />
 
-        {/* Mission */}
-        <SectionHeading id="mission" label={MISSION.heading} sublabel={MISSION.main}>
-          <div
-            className="whitespace-pre-line text-[15px]"
-            style={{
-              color: 'var(--company-muted)',
-              lineHeight: 'var(--company-line-height-relaxed)',
-            }}
-          >
-            {MISSION.sub}
-          </div>
-        </SectionHeading>
-
-        {/* Services */}
-        <SectionHeading id="services" label="サービス">
-          <div
-            className="grid gap-6 sm:grid-cols-1 md:grid-cols-3"
-            style={{ gap: 'var(--company-gutter-lg)' }}
-          >
-            {SERVICES.map((s) => {
-              const Icon = SERVICE_ICONS[s.id] ?? Users;
-              return (
-                <div
-                  key={s.id}
-                  className="rounded-[var(--company-radius-card)] border border-gray-200/80 bg-white p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--company-primary)]/30 hover:shadow-[var(--company-shadow-card-hover)]"
-                  style={{ boxShadow: 'var(--company-shadow-card)' }}
-                >
-                  <div
-                    className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: 'rgba(72,148,239,0.1)', color: 'var(--company-primary)' }}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3
-                    className="mb-3 text-base font-semibold"
-                    style={{ color: 'var(--company-text)' }}
-                  >
-                    {s.name}
-                  </h3>
-                  <p
-                    className="text-sm leading-relaxed"
-                    style={{
-                      color: 'var(--company-muted)',
-                      lineHeight: 'var(--company-line-height-relaxed)',
-                    }}
-                  >
-                    {s.description}
-                  </p>
-                  {s.hasButton && s.href && (
-                    <Link
-                      href={s.href}
-                      className="mt-4 inline-flex items-center justify-center rounded-[var(--company-radius-btn)] bg-[var(--company-primary)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--company-primary-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--company-primary)] focus-visible:ring-offset-2"
-                    >
-                      くわしく見る
-                    </Link>
-                  )}
-                </div>
-              );
-            })}
+            {OTHER_SERVICES.map((s) => (
+              <ServiceLogoCard key={s.id} service={s} />
+            ))}
           </div>
         </SectionHeading>
 
@@ -252,6 +239,32 @@ export default function CompanyTopPage() {
                 )}
               </div>
             </div>
+          </div>
+        </SectionHeading>
+
+        {/* Vision */}
+        <SectionHeading id="vision" label={VISION.heading} sublabel={VISION.main}>
+          <div
+            className="whitespace-pre-line text-[15px]"
+            style={{
+              color: 'var(--company-muted)',
+              lineHeight: 'var(--company-line-height-relaxed)',
+            }}
+          >
+            {VISION.sub}
+          </div>
+        </SectionHeading>
+
+        {/* Mission */}
+        <SectionHeading id="mission" label={MISSION.heading} sublabel={MISSION.main}>
+          <div
+            className="whitespace-pre-line text-[15px]"
+            style={{
+              color: 'var(--company-muted)',
+              lineHeight: 'var(--company-line-height-relaxed)',
+            }}
+          >
+            {MISSION.sub}
           </div>
         </SectionHeading>
       </div>
