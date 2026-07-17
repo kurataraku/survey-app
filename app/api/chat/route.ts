@@ -26,6 +26,8 @@ import type { CampusAreaSchoolMatch } from '@/lib/rag/retrieval';
 import { appPath } from '@/lib/base-path';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { extractDictionaryLocationTerms } from '@/lib/locations/location-dictionary';
+import { resolveSchoolNamesInText } from '@/lib/schools/school-name-resolver';
+import { callPerplexityForSummary } from '@/lib/perplexity/client';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -1727,6 +1729,44 @@ function formatCampusLocationLines(value: unknown): string[] {
     .filter((line): line is string => Boolean(line));
 }
 
+async function buildWebSchoolInfoFallbackBlock(schoolNames: string[]): Promise<string> {
+  if (process.env.CHAT_ENABLE_WEB_FALLBACK === 'false') return '';
+  if (!process.env.PERPLEXITY_API_KEY) return '';
+
+  const names = [...new Set(schoolNames.map((name) => name.trim()).filter(Boolean))].slice(0, 2);
+  if (names.length === 0) return '';
+
+  const timeoutMs = 9000;
+  const results = await Promise.all(
+    names.map(async (name) => {
+      try {
+        const result = await Promise.race([
+          callPerplexityForSummary(name),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('web fallback timeout')), timeoutMs)
+          ),
+        ]);
+        const summary = result.summaryText.replace(/\s+/g, ' ').trim();
+        if (!summary) return null;
+        const citations = result.citations.slice(0, 2).join(' , ');
+        return `- ${name}: ${summary}${citations ? `（出典: ${citations}）` : ''}`;
+      } catch (error) {
+        console.error(`[api/chat] web fallback failed for ${name}:`, error);
+        return null;
+      }
+    })
+  );
+
+  const lines = results.filter((line): line is string => Boolean(line));
+  if (lines.length === 0) return '';
+
+  return [
+    '口コミ未収載校の公開情報（公式サイト等のWeb検索由来。当サイトの口コミではない）:',
+    ...lines,
+    '→ この学校について回答する時は、「当サイトの口コミはまだ少ない/ない」ことを一言明記したうえで、上の公開情報を根拠に特徴を説明してください。口コミに基づく評価・比較の断定はしないでください。詳細は公式サイトでの確認を促してください。',
+  ].join('\n');
+}
+
 function campusMatchesLocationTerms(locationText: string, locationTerms: string[]): boolean {
   const normalizedLocation = locationText.replace(/[ 　]/g, '');
   return locationTerms.some((term) => {
@@ -1992,7 +2032,10 @@ export async function POST(request: NextRequest) {
       .join('\n');
 
     const intent = detectChatIntent(searchBasisMessage);
-    const mentionedSchools = detectMentionedSchoolNames(conversationText);
+    const schoolNameResolution = await resolveSchoolNamesInText(latestUserMessage, conversationText);
+    const mentionedSchools = [
+      ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(conversationText)]),
+    ].slice(0, 4);
     const focus = detectFocusProfile(searchBasisMessage);
     const area = detectAreaProfile(searchBasisMessage);
     const broadRegion = detectBroadRegionProfile(searchBasisMessage);
@@ -2116,7 +2159,14 @@ export async function POST(request: NextRequest) {
       mergeRagRows(mentionedSchoolDocs, rerankRowsForFocus(focusDocs, focus)),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
     );
-    const [areaSchoolDocs, schoolInstitutionInfo] = await Promise.all([
+    const mentionedSchoolNamesWithDocs = new Set(
+      mentionedSchoolDocs.map((doc) => doc.school_name).filter(Boolean)
+    );
+    const schoolsNeedingWebFallback = [
+      ...mentionedSchools.filter((name) => !mentionedSchoolNamesWithDocs.has(name)),
+      ...schoolNameResolution.unresolved,
+    ];
+    const [areaSchoolDocs, schoolInstitutionInfo, webSchoolInfoFallbackBlock] = await Promise.all([
       rankedLocationSchools.length > 0
         ? fetchRagDocumentsBySchoolIds(
             rankedLocationSchools.map((school) => school.id),
@@ -2124,6 +2174,9 @@ export async function POST(request: NextRequest) {
           )
         : Promise.resolve([]),
       fetchSchoolInstitutionInfo(preliminaryDocs),
+      schoolsNeedingWebFallback.length > 0
+        ? buildWebSchoolInfoFallbackBlock(schoolsNeedingWebFallback)
+        : Promise.resolve(''),
     ]);
     const balancedAreaDocs =
       rankedLocationSchools.length > 0
@@ -2155,7 +2208,7 @@ export async function POST(request: NextRequest) {
     const finalSchoolInstitutionInfo =
       balancedAreaDocs.length > 0 ? await fetchSchoolInstitutionInfo(docs) : schoolInstitutionInfo;
 
-    if (docs.length === 0) {
+    if (docs.length === 0 && !webSchoolInfoFallbackBlock) {
       const noEvidenceReply =
         '関連する公開口コミがまだ少ないため、現時点では具体校の提案が難しい状況です。' +
         'よければ地域（例: 東京都）や通学頻度（週1-2 / オンライン中心）を教えてください。' +
@@ -2308,6 +2361,7 @@ export async function POST(request: NextRequest) {
           }\n\n` +
           `所在地から拾った地域候補:\n${areaHints}\n\n` +
             (schoolCampusFactBlock ? `${schoolCampusFactBlock}\n\n` : '') +
+            (webSchoolInfoFallbackBlock ? `${webSchoolInfoFallbackBlock}\n\n` : '') +
             (conditionInsightBlock ? `${conditionInsightBlock}\n\n` : '') +
             (monitoringInsightBlock ? `${monitoringInsightBlock}\n\n` : '') +
             (intent === 'school_recommendation'
