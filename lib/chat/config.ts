@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 
 export const CHAT_MODEL_MAIN = process.env.CHAT_OPENAI_MAIN_MODEL?.trim() || 'gpt-5-mini';
 export const CHAT_MODEL_ROUTER = process.env.CHAT_OPENAI_ROUTER_MODEL?.trim() || 'gpt-5-mini';
-export const CHAT_MODEL_HARD = process.env.CHAT_OPENAI_HARD_MODEL?.trim() || CHAT_MODEL_MAIN;
+export const CHAT_MODEL_HARD = process.env.CHAT_OPENAI_HARD_MODEL?.trim() || 'gpt-5';
 export const CHAT_EMBEDDING_MODEL =
   process.env.CHAT_OPENAI_EMBEDDING_MODEL?.trim() || 'text-embedding-3-large';
 // pgvector インデックス上限（2000）に合わせる。text-embedding-3-large は dimensions で縮約可能

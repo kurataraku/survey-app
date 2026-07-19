@@ -2,6 +2,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { logConsultationChat } from '@/lib/consultation-chat/log';
 import {
+  CHAT_MODEL_HARD,
   CHAT_MODEL_MAIN,
   CHAT_MODEL_ROUTER,
   chooseGenerationModel,
@@ -179,6 +180,20 @@ const NOBORITO_NEARBY_CITIES = [
   '横浜市青葉区',
 ];
 
+const KAWAGOE_NEARBY_CITIES = [
+  '川越市',
+  '所沢市',
+  '飯能市',
+  '狭山市',
+  '入間市',
+  'ふじみ野市',
+  '富士見市',
+  '坂戸市',
+  '鶴ヶ島市',
+  'さいたま市大宮区',
+  'さいたま市南区',
+];
+
 const TABATA_NEARBY_CITIES = [
   '北区',
   '荒川区',
@@ -197,6 +212,14 @@ function truncate(text: string, maxLength = 360): string {
 function estimateDifficultyFromText(text: string): 'low' | 'high' {
   const hardKeywords = ['比較', 'どっち', 'どちら', '複数', '候補', '優先順位', '迷って', '不安'];
   const hit = hardKeywords.some((word) => text.includes(word));
+  const constraintSignals = [
+    Boolean(detectPrefecture(text) || detectAreaProfile(text) || extractLocationTerms(text).length > 0),
+    /週\s*[0-9０-９一二三四五六七]|オンライン|対面|通学|登校/u.test(text),
+    /不登校|学習|勉強|レポート|家では.*学習|全く学習/u.test(text),
+    /イラスト|デザイン|マンガ|漫画|アニメ|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信|栄養|調理/u.test(text),
+    /中3|中学|娘|息子|保護者/u.test(text),
+  ].filter(Boolean).length;
+  if (constraintSignals >= 3) return 'high';
   if (hit || text.length > 140) return 'high';
   return 'low';
 }
@@ -257,6 +280,25 @@ function detectAreaProfile(text: string): AreaProfile | null {
       prefecture: '神奈川県',
       cities: NOBORITO_NEARBY_CITIES,
       keywords: ['登戸', '川崎市多摩区', '向ヶ丘遊園', '狛江', '世田谷', '町田', 'キャンパス', '校舎'],
+    };
+  }
+  if (/川越|本川越|霞ヶ関|鶴ヶ島|坂戸|ふじみ野|所沢|飯能|狭山|入間/u.test(text)) {
+    return {
+      label: '川越・所沢・飯能周辺',
+      prefecture: '埼玉県',
+      cities: KAWAGOE_NEARBY_CITIES,
+      keywords: [
+        '川越',
+        '本川越',
+        '所沢',
+        '飯能',
+        '狭山',
+        '入間',
+        'ふじみ野',
+        '坂戸',
+        'キャンパス',
+        '校舎',
+      ],
     };
   }
   if (/田端|西日暮里|日暮里|駒込|巣鴨|王子|赤羽|池袋から|山手線.*北/u.test(text)) {
@@ -594,7 +636,7 @@ function detectFocusProfile(text: string): FocusProfile | null {
         '日帰りスクーリングが主訴です。候補校は、宿泊を伴わない通学型スクーリング、日帰りで通えるキャンパス、振替・オンライン代替に関する根拠がある学校を優先してください。',
     };
   }
-  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の/u.test(text)) {
+  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信/u.test(text)) {
     return {
       keywords: [
         'イラスト',
@@ -606,11 +648,14 @@ function detectFocusProfile(text: string): FocusProfile | null {
         'クリエイティブ',
         'ポートフォリオ',
         '専門コース',
+        '動画',
+        '配信',
+        'VTuber',
       ],
       label: 'イラスト・デザイン',
-      regex: /イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|ポートフォリオ|専門コース/u,
+      regex: /イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|ポートフォリオ|専門コース|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信/u,
       instruction:
-        'イラスト・デザインが主訴です。候補校は、マンガ・イラスト・デザイン・アニメ・美術系コース、作品制作、ポートフォリオ指導、専門講師に関する根拠がある学校を優先してください。',
+        'イラスト・デザインが主訴です。候補校は、マンガ・イラスト・デザイン・アニメ・美術・動画制作系コース、作品制作、ポートフォリオ指導、専門講師に関する根拠がある学校を優先してください。',
     };
   }
   if (/ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/u.test(text)) {
@@ -709,6 +754,38 @@ function detectFocusProfile(text: string): FocusProfile | null {
     };
   }
   return null;
+}
+
+function buildAdditionalConstraintInstruction(text: string): string {
+  const constraints: string[] = [];
+  if (/不登校|学校に行け|登校でき/u.test(text)) {
+    constraints.push(
+      '不登校背景があります。候補校は、登校再開を急がせず、少人数・面談・担任やカウンセラーの伴走・居場所づくりの根拠を確認軸にしてください。'
+    );
+  }
+  if (/週\s*(?:5|５|五)|週５|週5/u.test(text) && /難しい|無理|避けたい|厳しい/u.test(text)) {
+    constraints.push(
+      '週5登校は難しい条件です。週1〜3程度、半日・午後・個別登校、振替、オンライン併用など、登校頻度を調整できる可能性を優先してください。'
+    );
+  }
+  if (/オンラインのみ|オンラインだけ|完全オンライン/u.test(text) && /避けたい|嫌|不安|希望しない/u.test(text)) {
+    constraints.push(
+      'オンラインのみは避けたい条件です。完全オンライン校だけで完結させず、対面授業・キャンパス登校・スクーリング・行事の有無を候補説明に入れてください。'
+    );
+  }
+  if (/家では.*(?:全く|まったく).*学習|全く学習|まったく学習|勉強していない|学習していない/u.test(text)) {
+    constraints.push(
+      '家庭学習が進んでいない条件です。専門コースの魅力だけでなく、基礎学習、レポート提出、学習計画を学校側がどこまで伴走するかを必ず比較してください。'
+    );
+  }
+  if (/イラスト|デザイン|マンガ|漫画|アニメ|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信|栄養|調理/u.test(text)) {
+    constraints.push(
+      '興味分野があります。イラスト・動画・配信・栄養/調理などは「登校のきっかけ」になり得ますが、高卒資格取得に必要な一般科目の支援と両立できるかを重視してください。'
+    );
+  }
+
+  if (constraints.length === 0) return '';
+  return `追加で落としてはいけない制約: ${constraints.join(' ')}`;
 }
 
 function isSchoolFactQuestion(text: string, mentionedSchoolNames: string[]): boolean {
@@ -886,10 +963,13 @@ function buildSearchQuery(latestUserMessage: string): string {
       '日帰りスクーリング 宿泊なし 宿泊不要 通学スクーリング 振替スクーリング オンライン代替 登校日数'
     );
   }
-  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の/.test(latestUserMessage)) {
+  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信/.test(latestUserMessage)) {
     fragments.push(
-      'イラスト デザイン マンガ 漫画 アニメ 美術 クリエイティブ 専門コース ポートフォリオ 作品制作'
+      'イラスト デザイン マンガ 漫画 アニメ 美術 クリエイティブ 動画 配信 VTuber 専門コース ポートフォリオ 作品制作'
     );
+  }
+  if (/栄養|調理|食育|フード|料理|製菓|カフェ/.test(latestUserMessage)) {
+    fragments.push('栄養 調理 食育 フード 料理 製菓 カフェ 専門コース 体験授業');
   }
   if (/ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/.test(latestUserMessage)) {
     fragments.push(
@@ -1035,6 +1115,7 @@ function buildCandidateSchoolBlock(
       refs: number[];
       score: number;
       focusHits: number;
+      isLocationMatch: boolean;
       focusSnippets: string[];
       snippets: string[];
     }
@@ -1050,6 +1131,7 @@ function buildCandidateSchoolBlock(
         refs: [],
         score: 0,
         focusHits: 0,
+        isLocationMatch: false,
         focusSnippets: [],
         snippets: [],
       };
@@ -1069,7 +1151,26 @@ function buildCandidateSchoolBlock(
 
   if (options.locationSchools?.length) {
     for (const school of options.locationSchools) {
-      if (grouped.has(school.name)) continue;
+      const locationSnippet = `キャンパス所在地: ${school.campusLocations
+        .map((location) => {
+          const stationText =
+            location.nearestStations.length > 0
+              ? `（${location.nearestStations.slice(0, 2).join('／')}）`
+              : '';
+          return `${location.prefecture}${location.city}${stationText}`;
+        })
+        .join('、')}`;
+      const existing = grouped.get(school.name);
+      if (existing) {
+        existing.isLocationMatch = true;
+        existing.score += 0.5;
+        for (const location of school.campusLocations) {
+          if (location.prefecture) existing.prefectures.add(location.prefecture);
+        }
+        existing.snippets = [locationSnippet, ...existing.snippets].slice(0, 3);
+        grouped.set(school.name, existing);
+        continue;
+      }
       grouped.set(school.name, {
         schoolName: school.name,
         prefectures: new Set(
@@ -1078,18 +1179,9 @@ function buildCandidateSchoolBlock(
         refs: [],
         score: 0.45,
         focusHits: 0,
+        isLocationMatch: true,
         focusSnippets: [],
-        snippets: [
-          `キャンパス所在地: ${school.campusLocations
-            .map((location) => {
-              const stationText =
-                location.nearestStations.length > 0
-                  ? `（${location.nearestStations.slice(0, 2).join('／')}）`
-                  : '';
-              return `${location.prefecture}${location.city}${stationText}`;
-            })
-            .join('、')}`,
-        ],
+        snippets: [locationSnippet],
       });
     }
   }
@@ -1104,7 +1196,7 @@ function buildCandidateSchoolBlock(
     })
     .filter((candidate) => {
       if (!options.focus) return true;
-      return candidate.focusHits > 0;
+      return candidate.focusHits > 0 || candidate.isLocationMatch;
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
@@ -1124,9 +1216,13 @@ function buildCandidateSchoolBlock(
         candidate.focusSnippets.length > 0
           ? candidate.focusSnippets.join(' / ')
           : candidate.snippets.join(' / ');
-      return `${index + 1}. ${candidate.schoolName}（${profileText}） refs: ${refs}\n   ${
-        options.focus ? `${options.focus.label}に関する口コミ根拠` : '根拠要約'
-      }: ${snippets}`;
+      const refsText = refs ? ` refs: ${refs}` : '';
+      const evidenceLabel = options.focus
+        ? candidate.focusHits > 0
+          ? `${options.focus.label}に関する口コミ根拠`
+          : '所在地根拠（主訴の口コミ根拠は要確認）'
+        : '根拠要約';
+      return `${index + 1}. ${candidate.schoolName}（${profileText}）${refsText}\n   ${evidenceLabel}: ${snippets}`;
     })
     .join('\n');
 }
@@ -1381,6 +1477,109 @@ function sanitizePublicReplyText(text: string): string {
     .replace(/正確な番地・電話を公式で確認してお出ししてよいですか[？?]?/g, '番地や電話番号は公式サイトで確認してください。')
     .replace(/公式で確認してお出ししてよいですか[？?]?/g, '公式サイトで確認してください。')
     .replace(/確認してお出しします/g, '公式サイトで確認してください');
+}
+
+type ChatCompletionMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
+type ChatCompletionOptions = {
+  messages: ChatCompletionMessage[];
+  max_completion_tokens: number;
+};
+
+function isLikelyIncompleteReply(reply: string, intent: ChatIntent): boolean {
+  const trimmed = reply.trim();
+  if (!trimmed) return true;
+  if (intent === 'school_recommendation' && trimmed.length < 220) return true;
+  if (intent !== 'school_recommendation' && trimmed.length < 80) return true;
+  if (intent === 'school_recommendation' && !/##\s/u.test(trimmed)) return true;
+  if (/[、,「『（(]$/u.test(trimmed)) return true;
+  if (!/[。.!?！？）)]$/u.test(trimmed) && !trimmed.includes('\n')) return true;
+  return false;
+}
+
+function buildRepairCompletionOptions(
+  options: ChatCompletionOptions,
+  partialReply: string,
+  intent: ChatIntent
+): ChatCompletionOptions {
+  const repairInstruction =
+    intent === 'school_recommendation'
+      ? '前回の回答が途中で途切れています。会話履歴・地域・候補校リスト・参照根拠を使い、指定されたMarkdown見出し構成で最初から完全な回答を書き直してください。途中で終わらせず、候補校ごとに所在地根拠・良かった点・注意点を必ず含めてください。'
+      : '前回の回答が途中で途切れています。会話履歴と参照根拠を使い、指定された形式で最初から完全な回答を書き直してください。';
+  return {
+    ...options,
+    max_completion_tokens: Math.max(options.max_completion_tokens, 7000),
+    messages: [
+      ...options.messages,
+      {
+        role: 'assistant',
+        content: partialReply || '（回答生成が途中で終了しました）',
+      },
+      {
+        role: 'user',
+        content: repairInstruction,
+      },
+    ],
+  };
+}
+
+async function createCompletionTextWithFallback(
+  openai: ReturnType<typeof getChatOpenAIClient>,
+  preferredModel: string,
+  options: ChatCompletionOptions
+): Promise<{ replyRaw: string; usedModel: string; finishReason: string | null }> {
+  let usedModel = preferredModel;
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model: usedModel,
+      ...options,
+    });
+  } catch (error) {
+    if (usedModel === CHAT_MODEL_MAIN || !isModelUnavailableError(error)) throw error;
+    usedModel = CHAT_MODEL_MAIN;
+    completion = await openai.chat.completions.create({
+      model: usedModel,
+      ...options,
+    });
+  }
+
+  return {
+    replyRaw:
+      completion.choices[0]?.message?.content?.trim() ??
+      'うまく回答を生成できませんでした。もう一度質問を送ってください。',
+    usedModel,
+    finishReason: completion.choices[0]?.finish_reason ?? null,
+  };
+}
+
+async function repairIncompleteReplyIfNeeded(input: {
+  openai: ReturnType<typeof getChatOpenAIClient>;
+  replyRaw: string;
+  usedModel: string;
+  finishReason: string | null;
+  completionOptions: ChatCompletionOptions;
+  intent: ChatIntent;
+}): Promise<{ replyRaw: string; usedModel: string }> {
+  if (input.finishReason !== 'length' && !isLikelyIncompleteReply(input.replyRaw, input.intent)) {
+    return { replyRaw: input.replyRaw, usedModel: input.usedModel };
+  }
+
+  const repairModel = input.usedModel === CHAT_MODEL_MAIN ? CHAT_MODEL_HARD : input.usedModel;
+  const repaired = await createCompletionTextWithFallback(
+    input.openai,
+    repairModel,
+    buildRepairCompletionOptions(input.completionOptions, input.replyRaw, input.intent)
+  );
+
+  if (isLikelyIncompleteReply(repaired.replyRaw, input.intent)) {
+    throw new Error('回答生成が途中で終了しました');
+  }
+
+  return { replyRaw: repaired.replyRaw, usedModel: repaired.usedModel };
 }
 
 function isModelUnavailableError(error: unknown): boolean {
@@ -2037,6 +2236,7 @@ export async function POST(request: NextRequest) {
       ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(conversationText)]),
     ].slice(0, 4);
     const focus = detectFocusProfile(searchBasisMessage);
+    const additionalConstraintInstruction = buildAdditionalConstraintInstruction(searchBasisMessage);
     const area = detectAreaProfile(searchBasisMessage);
     const broadRegion = detectBroadRegionProfile(searchBasisMessage);
     const locationTerms = extractLocationTerms(searchBasisMessage);
@@ -2319,6 +2519,7 @@ export async function POST(request: NextRequest) {
           '勉強の遅れ・学習不安が主訴の場合は、大学受験実績よりも、基礎からの学び直し、レポート提出の伴走、個別フォロー、少人数、登校頻度の柔軟さを優先して比較してください。' +
           '朝起きられない・午前の登校が難しい相談では、登校頻度の少なさだけでなく、午後登校、オンライン代替、振替スクーリング、体調への配慮、生活リズムの伴走を確認軸にしてください。' +
           focusInstruction +
+          additionalConstraintInstruction +
           areaInstruction +
           genericLocationInstruction +
           broadRegionInstruction +
@@ -2381,9 +2582,9 @@ export async function POST(request: NextRequest) {
     ];
 
     const wantsStream = request.headers.get('accept')?.includes('application/x-ndjson') ?? false;
-    const completionOptions = {
+    const completionOptions: ChatCompletionOptions = {
       messages: completionMessages,
-      max_completion_tokens: 5000,
+      max_completion_tokens: 7000,
     };
 
     if (wantsStream) {
@@ -2396,6 +2597,7 @@ export async function POST(request: NextRequest) {
 
             try {
               let stream;
+              let finishReason: string | null = null;
               try {
                 stream = await openai.chat.completions.create({
                   model: usedModel,
@@ -2413,7 +2615,9 @@ export async function POST(request: NextRequest) {
               }
 
               for await (const chunk of stream) {
-                const delta = chunk.choices[0]?.delta?.content ?? '';
+                const choice = chunk.choices[0];
+                finishReason = choice?.finish_reason ?? finishReason;
+                const delta = choice?.delta?.content ?? '';
                 if (!delta) continue;
                 replyRaw += delta;
                 const publicDelta = sanitizePublicReplyText(delta);
@@ -2421,6 +2625,17 @@ export async function POST(request: NextRequest) {
                   encoder.encode(`${JSON.stringify({ type: 'delta', content: publicDelta })}\n`)
                 );
               }
+
+              const repaired = await repairIncompleteReplyIfNeeded({
+                openai,
+                replyRaw,
+                usedModel,
+                finishReason,
+                completionOptions,
+                intent,
+              });
+              replyRaw = repaired.replyRaw;
+              usedModel = repaired.usedModel;
 
               const payload = buildChatPayload(
                 replyRaw,
@@ -2471,25 +2686,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let usedModel = model;
-    let completion;
-    try {
-      completion = await openai.chat.completions.create({
-        model: usedModel,
-        ...completionOptions,
-      });
-    } catch (error) {
-      if (usedModel === CHAT_MODEL_MAIN || !isModelUnavailableError(error)) throw error;
-      usedModel = CHAT_MODEL_MAIN;
-      completion = await openai.chat.completions.create({
-        model: usedModel,
-        ...completionOptions,
-      });
-    }
-
-    const replyRaw =
-      completion.choices[0]?.message?.content?.trim() ??
-      'うまく回答を生成できませんでした。もう一度質問を送ってください。';
+    const generated = await createCompletionTextWithFallback(openai, model, completionOptions);
+    const repaired = await repairIncompleteReplyIfNeeded({
+      openai,
+      replyRaw: generated.replyRaw,
+      usedModel: generated.usedModel,
+      finishReason: generated.finishReason,
+      completionOptions,
+      intent,
+    });
+    const replyRaw = repaired.replyRaw;
+    const usedModel = repaired.usedModel;
 
     const payload = buildChatPayload(
       replyRaw,
