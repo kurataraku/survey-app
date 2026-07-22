@@ -11,6 +11,8 @@ export type LocationDictionaryMatch = {
   confidence: LocationDictionaryConfidence;
   ambiguous: boolean;
   exact: boolean;
+  start?: number;
+  end?: number;
 };
 
 const RAILWAY_PREFIX_PATTERN =
@@ -34,11 +36,69 @@ const GENERAL_WORDS = new Set([
   '中央',
 ]);
 
+const PREFECTURE_NAMES = [
+  '北海道',
+  '青森県',
+  '岩手県',
+  '宮城県',
+  '秋田県',
+  '山形県',
+  '福島県',
+  '茨城県',
+  '栃木県',
+  '群馬県',
+  '埼玉県',
+  '千葉県',
+  '東京都',
+  '神奈川県',
+  '新潟県',
+  '富山県',
+  '石川県',
+  '福井県',
+  '山梨県',
+  '長野県',
+  '岐阜県',
+  '静岡県',
+  '愛知県',
+  '三重県',
+  '滋賀県',
+  '京都府',
+  '大阪府',
+  '兵庫県',
+  '奈良県',
+  '和歌山県',
+  '鳥取県',
+  '島根県',
+  '岡山県',
+  '広島県',
+  '山口県',
+  '徳島県',
+  '香川県',
+  '愛媛県',
+  '高知県',
+  '福岡県',
+  '佐賀県',
+  '長崎県',
+  '熊本県',
+  '大分県',
+  '宮崎県',
+  '鹿児島県',
+  '沖縄県',
+];
+
 function normalizeInput(value: string): string {
   return value
     .replace(/[ 　]/g, '')
     .replace(/[「」『』（）()]/g, '')
     .trim();
+}
+
+function maskPrefectureNames(value: string): string {
+  let masked = value;
+  for (const prefecture of PREFECTURE_NAMES) {
+    masked = masked.replaceAll(prefecture, '□'.repeat(prefecture.length));
+  }
+  return masked;
 }
 
 function stripRailwayPrefix(value: string): string {
@@ -64,6 +124,21 @@ function baseLocationTerm(term: string): string {
   return normalizeInput(term).replace(/駅$/, '');
 }
 
+function findIncludedRange(searchableText: string, term: string, station: string | null): { start: number; end: number } | null {
+  const candidates = [term, station ? station.replace(/駅$/, '') : ''].filter(Boolean);
+  for (const candidate of candidates) {
+    const start = searchableText.indexOf(candidate);
+    if (start >= 0) return { start, end: start + candidate.length };
+  }
+  return null;
+}
+
+function overlaps(a: LocationDictionaryMatch, b: LocationDictionaryMatch): boolean {
+  if (typeof a.start !== 'number' || typeof a.end !== 'number') return false;
+  if (typeof b.start !== 'number' || typeof b.end !== 'number') return false;
+  return a.start < b.end && b.start < a.end;
+}
+
 function removeContainedMatches(matches: LocationDictionaryMatch[]): LocationDictionaryMatch[] {
   const selected: LocationDictionaryMatch[] = [];
   for (const match of matches) {
@@ -71,6 +146,7 @@ function removeContainedMatches(matches: LocationDictionaryMatch[]): LocationDic
     const contained = selected.some((current) => {
       const currentBase = baseLocationTerm(current.term);
       if (currentBase === base) return true;
+      if (overlaps(match, current) && base.length <= currentBase.length) return true;
       return base.length < currentBase.length && currentBase.includes(base);
     });
     if (!contained) selected.push(match);
@@ -85,6 +161,7 @@ export function extractDictionaryLocationTerms(
   const normalizedText = normalizeInput(text);
   if (!normalizedText) return [];
 
+  const searchableText = maskPrefectureNames(normalizedText);
   const context = hasLocationContext(normalizedText);
   const matches = new Map<string, LocationDictionaryMatch>();
 
@@ -96,9 +173,8 @@ export function extractDictionaryLocationTerms(
     }
 
     const exact = isStandaloneText(normalizedText, term);
-    const included =
-      normalizedText.includes(term) ||
-      (entry.station ? normalizedText.includes(entry.station.replace(/駅$/, '')) : false);
+    const includedRange = findIncludedRange(searchableText, term, entry.station);
+    const included = Boolean(includedRange);
 
     if (!exact && !included) continue;
 
@@ -116,6 +192,8 @@ export function extractDictionaryLocationTerms(
       confidence: entryConfidence,
       ambiguous: entry.ambiguous,
       exact,
+      start: includedRange?.start,
+      end: includedRange?.end,
     };
 
     if (

@@ -242,8 +242,29 @@ function isFollowUpRefinement(text: string): boolean {
     /^(それ|そこ|その|じゃあ|では|なら|あと|他|ほか|別|追加|具体|詳しく|比較|候補|おすすめ|近い|通える|関東|都内|東京都|週|月|年|理系|文系)/u.test(trimmed) ||
     /^(東京都|神奈川県|埼玉県|千葉県|茨城県|栃木県|群馬県|関東)$/u.test(trimmed) ||
     /在住|付近|近辺|周辺|から通学|駅から|駅付近|週\s*[0-9０-９一二三四五六七]|年[に\s]*(?:1|2|3|１|２|３|一|二|三).*通学|通学.*(?:希望|できる|少な)|についてどう|は.*(?:どう|強い|合う|向いて)/u.test(trimmed) ||
-    Boolean(detectAreaProfile(trimmed) || extractLocationTerms(trimmed).length > 0)
+    Boolean(detectPrefecture(trimmed) || detectAreaProfile(trimmed) || extractLocationTerms(trimmed).length > 0)
   );
+}
+
+function isRegionalFollowUpText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 40) return false;
+  if (/高校|高等学校|高等学院|学校|学院|学園|N高|S高/u.test(trimmed)) return false;
+  if (detectMentionedSchoolNames(trimmed).length > 0) return false;
+
+  const hasLocation = Boolean(
+    detectPrefecture(trimmed) ||
+      detectAreaProfile(trimmed) ||
+      detectBroadRegionProfile(trimmed) ||
+      extractLocationTerms(trimmed).length > 0
+  );
+  if (!hasLocation) return false;
+
+  const contentWords = trimmed
+    .replace(/[、。,.，・\s　]/g, '')
+    .replace(/(?:です|でお願いします|で|から|在住|周辺|近辺|付近|近く|あたり|辺り|通学|通える|行ける|希望)$/u, '');
+
+  return contentWords.length <= 12;
 }
 
 function getRecentUserMessages(messages: Array<z.infer<typeof MessageSchema>>): string[] {
@@ -851,7 +872,8 @@ function detectChatIntent(text: string): ChatIntent {
     /オンライン中心|オンライン.*通学|通学型|登校型|通学.*オンライン|毎日通う|どちらがいい|どっちがいい/.test(
       text
     );
-  if (comparesLearningStyle && !wantsSchools) return 'style_comparison';
+  const hasLocationSignal = Boolean(detectPrefecture(text) || area || broadRegion || locationTerms.length > 0);
+  if (comparesLearningStyle && !wantsSchools && !hasLocationSignal) return 'style_comparison';
   if (wantsSchools) return 'school_recommendation';
   return 'general_advice';
 }
@@ -859,22 +881,6 @@ function detectChatIntent(text: string): ChatIntent {
 function detectPrefecture(text: string): string | null {
   const area = detectAreaProfile(text);
   if (area) return area.prefecture;
-
-  const aliases: Array<[string, string]> = [
-    ['東京', '東京都'],
-    ['都内', '東京都'],
-    ['神奈川', '神奈川県'],
-    ['大阪', '大阪府'],
-    ['京都', '京都府'],
-    ['兵庫', '兵庫県'],
-    ['埼玉', '埼玉県'],
-    ['千葉', '千葉県'],
-    ['愛知', '愛知県'],
-    ['福岡', '福岡県'],
-  ];
-  for (const [keyword, prefecture] of aliases) {
-    if (text.includes(keyword)) return prefecture;
-  }
 
   const prefectures = [
     '北海道',
@@ -927,6 +933,17 @@ function detectPrefecture(text: string): string | null {
   ];
   for (const pref of prefectures) {
     if (text.includes(pref)) return pref;
+  }
+
+  const aliases: Array<[string, string]> = [
+    ['都内', '東京都'],
+    ...prefectures.map((prefecture) => [
+      prefecture.replace(/(?:都|道|府|県)$/u, ''),
+      prefecture,
+    ] as [string, string]),
+  ];
+  for (const [keyword, prefecture] of aliases) {
+    if (keyword && text.includes(keyword)) return prefecture;
   }
   return null;
 }
@@ -2224,6 +2241,7 @@ export async function POST(request: NextRequest) {
     }
     const searchBasisMessage = getSearchBasisMessage(messages, latestUserMessage);
     const conciseRequest = isConciseRequest(latestUserMessage);
+    const regionalFollowUp = isRegionalFollowUpText(latestUserMessage);
 
     const conversationText = messages
       .slice(-8)
@@ -2232,9 +2250,11 @@ export async function POST(request: NextRequest) {
 
     const intent = detectChatIntent(searchBasisMessage);
     const schoolNameResolution = await resolveSchoolNamesInText(latestUserMessage, conversationText);
-    const mentionedSchools = [
-      ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(conversationText)]),
-    ].slice(0, 4);
+    const mentionedSchools = regionalFollowUp
+      ? []
+      : [
+          ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(conversationText)]),
+        ].slice(0, 4);
     const focus = detectFocusProfile(searchBasisMessage);
     const additionalConstraintInstruction = buildAdditionalConstraintInstruction(searchBasisMessage);
     const area = detectAreaProfile(searchBasisMessage);
@@ -2474,6 +2494,9 @@ export async function POST(request: NextRequest) {
       !area && locationTerms.length > 0
         ? `ユーザーは「${locationTerms.join('・')}」周辺から通いやすい学校を意図している可能性があります。通学圏推定キーワード（${commuteLocationTerms.join('・') || locationTerms.join('・')}）と所在地から拾った地域候補がある場合は、その候補を優先してください。電車・バスで概ね30分〜60分程度の目安として扱い、30分未満の近い候補も除外せず、実際の所要時間は断定せず、最寄り駅・乗換・徒歩込みで確認するよう促してください。`
         : '';
+    const regionalFollowUpInstruction = regionalFollowUp
+      ? '最新発話は地域だけの追加条件です。直前に提示した候補校に限定せず、この地域で通える学校を再選定してください。前の会話にある本人条件・主訴・登校希望は維持してください。'
+      : '';
     const broadRegionInstruction = broadRegion
       ? `ユーザーは「${broadRegion.label}」を意図しています。単一都道府県に絞り込まず、${broadRegion.prefectures.join('・')}の学校・キャンパスを関東候補として扱ってください。`
       : '';
@@ -2522,6 +2545,7 @@ export async function POST(request: NextRequest) {
           additionalConstraintInstruction +
           areaInstruction +
           genericLocationInstruction +
+          regionalFollowUpInstruction +
           broadRegionInstruction +
           responsePolicy +
           '「後でまとめます」「下に記載します」「簡潔にまとめます」と書く場合は、必ず同じ回答内にその内容を書いてください。書けない場合はその表現を使わないでください。' +
@@ -2542,6 +2566,7 @@ export async function POST(request: NextRequest) {
             ? `回答対象にする元の相談:\n${searchBasisMessage}\n\n`
             : '') +
             `質問タイプ:\n${intent}\n` +
+            `地域だけの追加条件:\n${regionalFollowUp ? 'はい。直前候補に限定せず地域条件で再推薦する' : 'いいえ'}\n` +
             `今回の主訴:\n${focus ? focus.label : '明確な主訴なし'}\n` +
             `地域解釈:\n${
               area
