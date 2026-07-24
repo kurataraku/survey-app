@@ -177,6 +177,8 @@ export const DEFAULT_CONSULTATION_AI_LOGIC_DOCS: ConsultationAiLogicDocsContent 
         '管理レビュー取得・キャンパス所在地取得・言及校根拠取得を前段の並列処理に移動',
         '速度改善は並列化と不要処理の省略が中心。学校推薦の通学圏推定精度は維持',
         '回答生成モデルは通常・高難度とも gpt-5.4-mini（reasoning_effort=medium）に統一。環境変数 CHAT_OPENAI_MAIN_MODEL / CHAT_OPENAI_HARD_MODEL で変更可能',
+        'OpenAIの優先処理（service_tier=priority）で生成速度を確保。トークン単価は約2倍。CHAT_OPENAI_SERVICE_TIER=default で通常処理へ戻せる',
+        '同一校×同一種別でほぼ同じ本文のRAGチャンクは除去し、プロンプトの無駄なトークンを削減（情報量は不変）',
         'CHAT_ENABLE_COMMUTE_LLM=false で通学圏LLM全体を無効化可能',
         'CHAT_ENABLE_ROUTER_LLM=true のときのみ検索ルーターLLMを有効化（デフォルトはヒューリスティック）',
       ],
@@ -405,6 +407,14 @@ export const DEFAULT_CONSULTATION_AI_LOGIC_DOCS: ConsultationAiLogicDocsContent 
         '高難度相談で gpt-5 を使用した際に215秒かかるケースがあったため、回答生成を通常・高難度とも新世代の gpt-5.4-mini に統一',
         'gpt-5.4-mini はデフォルトで推論なしのため reasoning_effort=medium を明示し、推論品質を維持したまま応答時間を数十秒レベルに短縮',
         'ルーター・通学圏推定は従来どおり gpt-5-mini を継続使用',
+      ],
+    },
+    {
+      date: '2026-07-24',
+      title: '品質を維持したまま優先処理と重複排除でさらに高速化',
+      changes: [
+        'OpenAIの優先処理（service_tier=priority）を回答生成・通学圏推定・ルーターに適用。モデル・推論設定は同一のため品質は不変で、生成速度が向上（コストは約2倍だが1回あたり十円未満）',
+        '同一校×同一種別でほぼ同じ本文のRAGチャンクを除去し、プロンプトの無駄な読み込みを削減',
       ],
     },
   ],

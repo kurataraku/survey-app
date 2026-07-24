@@ -5,6 +5,7 @@ import {
   CHAT_MODEL_HARD,
   CHAT_MODEL_MAIN,
   CHAT_MODEL_ROUTER,
+  CHAT_SERVICE_TIER,
   chooseGenerationModel,
   getChatOpenAIClient,
 } from '@/lib/chat/config';
@@ -543,6 +544,7 @@ async function estimateCommuteAreaTerms(input: {
     const openai = getChatOpenAIClient();
     const response = await openai.chat.completions.create({
       model: CHAT_MODEL_ROUTER,
+      service_tier: CHAT_SERVICE_TIER,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -1048,6 +1050,7 @@ async function routeQuery(
   try {
     const response = await openai.chat.completions.create({
       model: CHAT_MODEL_ROUTER,
+      service_tier: CHAT_SERVICE_TIER,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -1260,6 +1263,21 @@ function mergeRagRows(primary: RagMatchRow[], secondary: RagMatchRow[]): RagMatc
   for (const row of [...primary, ...secondary]) {
     if (seen.has(row.id)) continue;
     seen.add(row.id);
+    out.push(row);
+  }
+  return out;
+}
+
+// 同一校×同一種別でほぼ同じ本文のチャンクを除去し、プロンプトの無駄なトークンを減らす
+// （情報量は変わらないため回答品質には影響しない）
+function dedupeSimilarRagRows(rows: RagMatchRow[]): RagMatchRow[] {
+  const seen = new Set<string>();
+  const out: RagMatchRow[] = [];
+  for (const row of rows) {
+    const contentKey = row.content.replace(/[\s　]+/gu, '').slice(0, 120);
+    const key = `${row.school_name ?? ''}|${row.source_type}|${contentKey}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     out.push(row);
   }
   return out;
@@ -1505,6 +1523,7 @@ type ChatCompletionOptions = {
   messages: ChatCompletionMessage[];
   max_completion_tokens: number;
   reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high';
+  service_tier?: 'priority' | 'default';
 };
 
 function isLikelyIncompleteReply(reply: string, intent: ChatIntent): boolean {
@@ -2418,12 +2437,14 @@ export async function POST(request: NextRequest) {
             : route.prefecture
               ? 14
               : 10;
-    const docs = mergeRagRows(
+    const docs = dedupeSimilarRagRows(
       mergeRagRows(
-        mergeRagRows(mentionedSchoolDocs, balancedAreaDocs),
-        rerankRowsForFocus(focusDocs, focus)
-      ),
-      rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
+        mergeRagRows(
+          mergeRagRows(mentionedSchoolDocs, balancedAreaDocs),
+          rerankRowsForFocus(focusDocs, focus)
+        ),
+        rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
+      )
     ).slice(0, maxDocs);
 
     const finalSchoolInstitutionInfo =
@@ -2613,6 +2634,7 @@ export async function POST(request: NextRequest) {
       max_completion_tokens: 7000,
       // gpt-5.4-mini はデフォルト推論なしのため、回答品質維持に medium を明示
       reasoning_effort: 'medium',
+      service_tier: CHAT_SERVICE_TIER,
     };
 
     if (wantsStream) {
