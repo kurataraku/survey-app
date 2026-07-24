@@ -73,6 +73,13 @@ const OBSOLETE_ACTIVE_RULES = new Set([
   '定義済み地域プロファイル（立川・浪速区・田端・武庫之荘・名東区など）がある場合は通学圏LLMを省略',
   '「阪急武庫之荘付近」「名古屋市名東区から通学」のような場所だけの追加入力も学校推薦として扱う',
   '地域だけの追加入力（例: 名古屋市名東区から通学）は、前の主訴・本人条件を維持して候補校推薦に進む',
+  '回答生成モデルは通常・高難度とも gpt-5.4-mini（reasoning_effort=medium）に統一。環境変数 CHAT_OPENAI_MAIN_MODEL / CHAT_OPENAI_HARD_MODEL で変更可能',
+  '短答指定がない通常回答は600〜900字程度を目安（以前の800〜1200字から短縮）',
+  'イラスト・デザイン、動画制作、VTuber、落ち着いた雰囲気などの具体的な希望も検出',
+]);
+
+const OBSOLETE_CAUTION_NOTES = new Set([
+  '回答量は短答指定で300字以内、通常は600〜900字が目安です。短答指定の検出語は「簡単に」「短く」「要約」「一言」「3行」「箇条書きだけ」です。',
 ]);
 
 function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
@@ -164,6 +171,12 @@ function syncMissingDefaults(content: ConsultationAiLogicDocsContent): {
         .map((category) => rulesMap.get(category))
         .filter((group): group is ActiveRuleGroup => Boolean(group)),
     };
+  }
+
+  const filteredNotes = next.caution_notes.filter((note) => !OBSOLETE_CAUTION_NOTES.has(note));
+  if (filteredNotes.length !== next.caution_notes.length) {
+    next = { ...next, caution_notes: filteredNotes };
+    changed = true;
   }
 
   const existingNotes = new Set(next.caution_notes);

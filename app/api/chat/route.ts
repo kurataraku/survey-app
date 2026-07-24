@@ -5,6 +5,7 @@ import {
   CHAT_MODEL_HARD,
   CHAT_MODEL_MAIN,
   CHAT_MODEL_ROUTER,
+  CHAT_REASONING_EFFORT,
   CHAT_SERVICE_TIER,
   chooseGenerationModel,
   getChatOpenAIClient,
@@ -545,6 +546,8 @@ async function estimateCommuteAreaTerms(input: {
     const response = await openai.chat.completions.create({
       model: CHAT_MODEL_ROUTER,
       service_tier: CHAT_SERVICE_TIER,
+      // キーワード展開だけの軽いタスクのため推論は最小限にして前処理を速くする
+      reasoning_effort: 'minimal',
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -600,9 +603,18 @@ function detectMentionedSchoolNames(text: string): string[] {
   return names;
 }
 
-function detectFocusProfile(text: string): FocusProfile | null {
-  if (/発達障害|ASD|ADHD|自閉|注意欠如|多動|グレーゾーン|特性|伴走|個別配慮|合理的配慮/i.test(text)) {
-    return {
+type FocusProfileDef = {
+  /** 主訴の検出と、文中の初出位置の特定に使う正規表現 */
+  detect: RegExp;
+  /** detect正規表現より複雑な判定が必要な場合の述語（省略時はdetect.testを使う） */
+  matches?: (text: string) => boolean;
+  profile: FocusProfile;
+};
+
+const FOCUS_PROFILE_DEFS: FocusProfileDef[] = [
+  {
+    detect: /発達障害|ASD|ADHD|自閉|注意欠如|多動|グレーゾーン|特性|伴走|個別配慮|合理的配慮/i,
+    profile: {
       keywords: [
         '発達障害',
         'ASD',
@@ -620,10 +632,12 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /発達障害|ASD|ADHD|自閉|注意欠如|多動|グレーゾーン|特性|伴走|個別配慮|合理的配慮|面談|少人数|カウンセラー|ソーシャルワーカー/iu,
       instruction:
         '発達特性・個別伴走が主訴です。候補校は、発達障害やASD/ADHDへの明示的な理解、個別面談、少人数、担任・カウンセラー・SSWの伴走、レポート提出の声かけ、静かな環境、オンライン代替や振替対応に関する根拠がある学校を優先してください。本人の性別・居住地・通学可能時間など前の発話で出た制約を落とさないでください。',
-    };
-  }
-  if (isLowAttendancePreference(text)) {
-    return {
+    },
+  },
+  {
+    detect: /年数回|年に数回|年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回|集中スクーリング|合宿型スクーリング|オンライン|自宅学習|通学.*少な/u,
+    matches: (text) => isLowAttendancePreference(text),
+    profile: {
       keywords: [
         '年数回',
         '年に数回',
@@ -640,10 +654,11 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /年数回|年に数回|年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回|集中スクーリング|合宿型スクーリング|オンライン|自宅学習|通学.*少な/u,
       instruction:
         '年数回・低頻度通学が主訴です。候補校は、集中スクーリング、オンライン中心、自宅学習、最少登校日数、振替対応に関する根拠がある学校を優先してください。年1〜3回で確実に卒業できると断定せず、公式日程と卒業要件の確認を促してください。',
-    };
-  }
-  if (/日帰り.*スクーリング|スクーリング.*日帰り|宿泊なし|宿泊不要|通い.*スクーリング/u.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /日帰り.*スクーリング|スクーリング.*日帰り|宿泊なし|宿泊不要|通い.*スクーリング/u,
+    profile: {
       keywords: [
         '日帰りスクーリング',
         '宿泊なし',
@@ -657,10 +672,11 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /日帰り|宿泊なし|宿泊不要|通学スクーリング|スクーリング|振替|オンライン代替/u,
       instruction:
         '日帰りスクーリングが主訴です。候補校は、宿泊を伴わない通学型スクーリング、日帰りで通えるキャンパス、振替・オンライン代替に関する根拠がある学校を優先してください。',
-    };
-  }
-  if (/イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信/u.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|絵を|絵が|絵の|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信/u,
+    profile: {
       keywords: [
         'イラスト',
         'デザイン',
@@ -679,10 +695,54 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /イラスト|デザイン|マンガ|漫画|アニメ|美術|クリエイティブ|ポートフォリオ|専門コース|Vtuber|VTuber|ＶＴｕｂｅｒ|動画|配信/u,
       instruction:
         'イラスト・デザインが主訴です。候補校は、マンガ・イラスト・デザイン・アニメ・美術・動画制作系コース、作品制作、ポートフォリオ指導、専門講師に関する根拠がある学校を優先してください。',
-    };
-  }
-  if (/ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/u.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /スポーツ|部活|バスケ|サッカー|野球|テニス|バレー|バドミントン|陸上|水泳|ダンス|武道|柔道|剣道|卓球|体育コース|クラブチーム|遠征|朝練/u,
+    profile: {
+      keywords: [
+        'スポーツ',
+        '部活',
+        '部活動',
+        '大会',
+        'クラブ',
+        '体育',
+        '練習',
+        '遠征',
+        'トレーニング',
+        'アスリート',
+      ],
+      label: 'スポーツ・部活動',
+      regex: /スポーツ|部活|大会|クラブ|体育|練習|遠征|トレーニング|アスリート|両立/u,
+      instruction:
+        'スポーツ・部活動との両立が主訴です。候補校は、部活動の充実、大会出場、スポーツコース・体育コース、練習や遠征と学業の両立、通学日程の柔軟さに関する口コミ根拠がある学校を優先してください。部活の有無や大会出場の可否は学校・キャンパスごとに差が大きいため、根拠がない学校は「根拠は弱め」と明記し、説明会や見学での確認を促してください。',
+    },
+  },
+  {
+    detect: /学校生活.{0,15}楽し|楽し.{0,10}学校生活|(?:友達|友人).{0,12}(?:欲しい|ほしい|作りたい|つくりたい|できる)|文化祭|体育祭|修学旅行|青春|行事.{0,10}(?:楽し|充実|参加)/u,
+    profile: {
+      keywords: [
+        '学校生活',
+        '友達',
+        '友人',
+        '行事',
+        '文化祭',
+        '体育祭',
+        'イベント',
+        '修学旅行',
+        '居場所',
+        '楽しい',
+        '交流',
+      ],
+      label: '学校生活・友人関係を楽しみたい',
+      regex: /学校生活|友達|友人|行事|文化祭|体育祭|イベント|修学旅行|居場所|楽し|交流|青春/u,
+      instruction:
+        '学校生活をもう一度楽しみたい・友人が欲しいという前向きな気持ちが主訴です。候補校は、行事やイベントの充実、友人づくりのきっかけ、生徒同士の交流、居場所づくり、通学時の楽しい雰囲気に関する口コミ根拠がある学校を優先してください。友人関係を築きにくいという口コミがある学校は、その旨を注意点として正直に伝えてください。',
+    },
+  },
+  {
+    detect: /ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/u,
+    profile: {
       keywords: [
         'ネットコース',
         'オンライン',
@@ -698,10 +758,11 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /ネットコース|オンライン|自宅学習|学費|安い|費用|納得感|授業料|通学少な/u,
       instruction:
         'ネットコース・学費重視が主訴です。候補校は、オンライン中心で通学負担が少ないこと、学費の安さ・納得感・追加費用の少なさに関する口コミや学費情報がある学校を優先してください。',
-    };
-  }
-  if (/ギャル|ヤンキー|派手|落ち着い|静か|穏やか|校風|雰囲気/u.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /ギャル|ヤンキー|派手|落ち着い|静か|穏やか|校風|雰囲気/u,
+    profile: {
       keywords: [
         '落ち着いた',
         '静か',
@@ -718,10 +779,11 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /落ち着|静か|穏やか|少人数|雰囲気|校風|服装|派手|にぎやか|マイペース|ギャル|ヤンキー/u,
       instruction:
         '落ち着いた雰囲気が主訴です。候補校は、雰囲気評価が高い、少人数、落ち着いている、派手さ・にぎやかさが強すぎないことに関する口コミ根拠がある学校を優先してください。「ギャル」「ヤンキー」のような表現は決めつけず、服装規定・校風・在校生の雰囲気として丁寧に言い換えてください。',
-    };
-  }
-  if (/就職|就活|キャリア|求人|職業|資格|専門職|インターン/.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /就職|就活|キャリア|求人|職業|資格|専門職|インターン/u,
+    profile: {
       keywords: [
         '就職',
         '就活',
@@ -738,45 +800,150 @@ function detectFocusProfile(text: string): FocusProfile | null {
       regex: /就職|就活|キャリア|求人|職業|資格|面接|履歴書|企業連携|インターン|専門職/u,
       instruction:
         '就職・キャリア支援が主訴です。候補校は、資格取得、職業体験、企業連携、求人紹介、面接・履歴書指導、卒業後の進路相談に関する口コミ根拠がある学校を優先してください。',
-    };
-  }
-  if (/大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路/u,
+    profile: {
       keywords: ['大学', '受験', '進学', '指定校', '推薦', '総合型', '模試', '予備校', '進路'],
       label: '大学受験・進学',
       regex: /大学|受験|進学|指定校|推薦|総合型|AO|模試|予備校|進路|面接練習|志望理由|合格/u,
       instruction:
         '大学受験・進学が主訴です。候補校は、進路相談・大学合格・受験時間の確保・指定校推薦・面接練習・模試・予備校連携など、進学に直接関係する口コミ根拠がある学校を優先してください。',
-    };
-  }
-  if (/朝|起きられ|起きれ|午前|午後|睡眠|起立性|体調|低血圧/.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /朝|起きられ|起きれ|午前|午後|睡眠|起立性|体調|低血圧/u,
+    profile: {
       keywords: ['朝', '起きられ', '午前', '午後', '睡眠', '起立性', '体調', 'オンライン', '振替'],
       label: '朝起きられない・体調面',
       regex: /朝|起きられ|起きれ|午前|午後|睡眠|起立性|体調|低血圧|オンライン|自宅|振替|スクーリング/u,
       instruction:
         '朝起きられない・体調面が主訴です。候補校は、登校時間の柔軟性、オンライン代替、振替スクーリング、体調への配慮、生活リズムの伴走に関する口コミ根拠がある学校を優先してください。',
-    };
-  }
-  if (/勉強|学習|遅れ|遅れて|追いつ|基礎|レポート|単位/.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /勉強|学習|遅れ|遅れて|追いつ|基礎|レポート|単位/u,
+    profile: {
       keywords: ['勉強', '学習', '遅れ', '基礎', 'レポート', '単位', '補習', '個別', '添削'],
       label: '学習遅れ・学び直し',
       regex: /勉強|学習|遅れ|追いつ|基礎|レポート|単位|補習|個別|添削|伴走/u,
       instruction:
         '学習遅れ・学び直しが主訴です。候補校は、基礎からの学び直し、レポート提出支援、個別フォロー、補習、添削に関する口コミ根拠がある学校を優先してください。',
-    };
-  }
-  if (/不登校|学校に行け|登校でき|人間関係|不安/.test(text)) {
-    return {
+    },
+  },
+  {
+    detect: /不登校|学校に行け|登校でき|人間関係|不安/u,
+    profile: {
       keywords: ['不登校', '登校', '人間関係', '不安', '先生', '面談', '少人数', '居場所'],
       label: '不登校・人間関係',
       regex: /不登校|登校|人間関係|不安|先生|面談|少人数|居場所|友人|寄り添/u,
       instruction:
         '不登校・人間関係が主訴です。候補校は、少人数、先生の寄り添い、面談、登校再開、居場所づくりに関する口コミ根拠がある学校を優先してください。',
-    };
+    },
+  },
+];
+
+const MAX_FOCUS_PROFILES = 3;
+
+/**
+ * 主訴プロファイルを全件照合し、相談文で先に述べられた（初出位置が早い）順に最大3件返す。
+ * 位置が同じ場合は定義順（従来の優先順位）を維持する。
+ */
+function detectFocusProfiles(text: string): FocusProfile[] {
+  const found: Array<{ position: number; order: number; profile: FocusProfile }> = [];
+  FOCUS_PROFILE_DEFS.forEach((def, order) => {
+    const matched = def.matches ? def.matches(text) : def.detect.test(text);
+    if (!matched) return;
+    const position = text.search(def.detect);
+    found.push({
+      position: position >= 0 ? position : Number.MAX_SAFE_INTEGER,
+      order,
+      profile: def.profile,
+    });
+  });
+  found.sort((a, b) => a.position - b.position || a.order - b.order);
+  return found.slice(0, MAX_FOCUS_PROFILES).map((item) => item.profile);
+}
+
+/**
+ * 主訴ごとに検索枠（クォータ）を分けてキーワード検索する。
+ * 合成キーワード1回だと口コミ量が多い主訴が枠を占有し、2番目以降の主訴の根拠が
+ * 文脈に入らないことがあるため、優先度順に枠を割り当てて必ず数件ずつ確保する。
+ */
+async function fetchFocusDocsWithQuotas(
+  profiles: FocusProfile[],
+  options: { prefecture: string | null; lowAttendance: boolean }
+): Promise<RagMatchRow[]> {
+  if (profiles.length === 0) return [];
+  const quotas = profiles.length === 1 ? [18] : profiles.length === 2 ? [10, 8] : [8, 6, 4];
+  const lists = await Promise.all(
+    profiles.map((profile, index) => {
+      // 低頻度通学の口コミは表現ゆれが大きいため従来どおり広めに取る
+      const bonus =
+        options.lowAttendance && profile.label === '年数回・低頻度通学' ? 10 : 0;
+      return fetchRagDocumentsByKeywords(profile.keywords, {
+        prefecture: options.prefecture,
+        limit: (quotas[index] ?? 4) + bonus,
+      });
+    })
+  );
+  return lists.reduce<RagMatchRow[]>((merged, list) => mergeRagRows(merged, list), []);
+}
+
+/**
+ * 最終的にLLMへ渡す口コミを選ぶ際、各主訴に対応する口コミを優先度順に
+ * 最低数件ずつ確保してから、残り枠を通常の並び順で埋める。
+ */
+function selectDocsWithFocusCoverage(
+  rows: RagMatchRow[],
+  profiles: FocusProfile[],
+  maxDocs: number
+): RagMatchRow[] {
+  if (profiles.length <= 1 || rows.length <= maxDocs) return rows.slice(0, maxDocs);
+  const reservedPerProfile = [4, 3, 2];
+  const selected: RagMatchRow[] = [];
+  const selectedIds = new Set<string>();
+  profiles.forEach((profile, index) => {
+    let need = reservedPerProfile[index] ?? 2;
+    for (const row of rows) {
+      if (need === 0) break;
+      if (selectedIds.has(row.id)) continue;
+      if (focusHitCount(`${row.title}\n${row.content}`, profile.regex) === 0) continue;
+      selected.push(row);
+      selectedIds.add(row.id);
+      need -= 1;
+    }
+  });
+  for (const row of rows) {
+    if (selected.length >= maxDocs) break;
+    if (selectedIds.has(row.id)) continue;
+    selected.push(row);
+    selectedIds.add(row.id);
   }
-  return null;
+  return selected.slice(0, maxDocs);
+}
+
+/**
+ * 複数主訴をRAG検索・rerank用に1つの合成プロファイルへまとめる。
+ * キーワードは最優先主訴を全件、2番目以降は先頭6件までを採用する。
+ */
+function combineFocusProfiles(profiles: FocusProfile[]): FocusProfile | null {
+  if (profiles.length === 0) return null;
+  if (profiles.length === 1) return profiles[0];
+  const keywords = [
+    ...new Set(
+      profiles.flatMap((profile, index) =>
+        index === 0 ? profile.keywords : profile.keywords.slice(0, 6)
+      )
+    ),
+  ].slice(0, 24);
+  return {
+    keywords,
+    label: profiles.map((profile) => profile.label).join(' / '),
+    regex: new RegExp(profiles.map((profile) => profile.regex.source).join('|'), 'iu'),
+    instruction: profiles.map((profile) => profile.instruction).join(' '),
+  };
 }
 
 function buildAdditionalConstraintInstruction(text: string): string {
@@ -1122,6 +1289,7 @@ function buildCandidateSchoolBlock(
   docs: RagMatchRow[],
   options: {
     focus?: FocusProfile | null;
+    focusProfiles?: FocusProfile[];
     nationwideReferenceOnly?: boolean;
     schoolInstitutionInfo?: Map<string, SchoolInstitutionInfo>;
     locationSchools?: CampusAreaSchoolMatch[];
@@ -1135,11 +1303,14 @@ function buildCandidateSchoolBlock(
       refs: number[];
       score: number;
       focusHits: number;
+      coveredFocusIndexes: Set<number>;
       isLocationMatch: boolean;
       focusSnippets: string[];
       snippets: string[];
     }
   >();
+
+  const focusProfiles = options.focusProfiles ?? [];
 
   docs.forEach((doc, index) => {
     if (!doc.school_name) return;
@@ -1151,6 +1322,7 @@ function buildCandidateSchoolBlock(
         refs: [],
         score: 0,
         focusHits: 0,
+        coveredFocusIndexes: new Set<number>(),
         isLocationMatch: false,
         focusSnippets: [],
         snippets: [],
@@ -1162,12 +1334,26 @@ function buildCandidateSchoolBlock(
     const hits = focusHitCount(targetText, options.focus?.regex);
     current.focusHits += hits;
     current.score += (doc.score ?? doc.similarity ?? 0) + hits * 0.35;
+    focusProfiles.forEach((profile, profileIndex) => {
+      if (focusHitCount(targetText, profile.regex) > 0) {
+        current.coveredFocusIndexes.add(profileIndex);
+      }
+    });
     if (hits > 0 && current.focusSnippets.length < 3) {
       current.focusSnippets.push(extractRelevantSnippet(doc.content, options.focus?.regex));
     }
     if (current.snippets.length < 2) current.snippets.push(extractRelevantSnippet(doc.content));
     grouped.set(doc.school_name, current);
   });
+
+  // 複数主訴の場合、多くの主訴に根拠を持つ学校を優先する（優先度の高い主訴ほど重み大）
+  if (focusProfiles.length > 1) {
+    for (const candidate of grouped.values()) {
+      for (const profileIndex of candidate.coveredFocusIndexes) {
+        candidate.score += (focusProfiles.length - profileIndex) * 0.3;
+      }
+    }
+  }
 
   if (options.locationSchools?.length) {
     for (const school of options.locationSchools) {
@@ -1199,6 +1385,7 @@ function buildCandidateSchoolBlock(
         refs: [],
         score: 0.45,
         focusHits: 0,
+        coveredFocusIndexes: new Set<number>(),
         isLocationMatch: true,
         focusSnippets: [],
         snippets: [locationSnippet],
@@ -2275,7 +2462,9 @@ export async function POST(request: NextRequest) {
       : [
           ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(conversationText)]),
         ].slice(0, 4);
-    const focus = detectFocusProfile(searchBasisMessage);
+    const focusList = detectFocusProfiles(searchBasisMessage);
+    const focus = focusList[0] ?? null;
+    const combinedFocus = combineFocusProfiles(focusList);
     const additionalConstraintInstruction = buildAdditionalConstraintInstruction(searchBasisMessage);
     const area = detectAreaProfile(searchBasisMessage);
     const broadRegion = detectBroadRegionProfile(searchBasisMessage);
@@ -2314,7 +2503,7 @@ export async function POST(request: NextRequest) {
           })
         : Promise.resolve(''),
       buildConditionInsightBlock({
-        focus,
+        focus: focusList.find((profile) => profile.label === '落ち着いた雰囲気') ?? null,
         prefecture: insightPrefecture,
       }),
       buildSchoolCampusFactBlock(mentionedSchools, [
@@ -2333,7 +2522,7 @@ export async function POST(request: NextRequest) {
       userQuestion: latestUserMessage,
       conversationPreview: conversationText,
       intent,
-      focus,
+      focus: combinedFocus,
       mentionedSchools,
       route,
       reasonGroup,
@@ -2359,10 +2548,10 @@ export async function POST(request: NextRequest) {
           reasonGroup,
           matchCount: ragMatchCount,
         }),
-        focus && intent !== 'school_fact'
-          ? fetchRagDocumentsByKeywords(focus.keywords, {
+        focusList.length > 0 && intent !== 'school_fact'
+          ? fetchFocusDocsWithQuotas(focusList, {
               prefecture: route.prefecture ?? null,
-              limit: isLowAttendancePreference(searchBasisMessage) ? 28 : 18,
+              lowAttendance: isLowAttendancePreference(searchBasisMessage),
             })
           : Promise.resolve([]),
         area
@@ -2396,8 +2585,8 @@ export async function POST(request: NextRequest) {
       ...(area?.cities ?? []),
     ]);
     const preliminaryDocs = mergeRagRows(
-      mergeRagRows(mentionedSchoolDocs, rerankRowsForFocus(focusDocs, focus)),
-      rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
+      mergeRagRows(mentionedSchoolDocs, rerankRowsForFocus(focusDocs, combinedFocus)),
+      rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), combinedFocus)
     );
     const mentionedSchoolNamesWithDocs = new Set(
       mentionedSchoolDocs.map((doc) => doc.school_name).filter(Boolean)
@@ -2437,15 +2626,19 @@ export async function POST(request: NextRequest) {
             : route.prefecture
               ? 14
               : 10;
-    const docs = dedupeSimilarRagRows(
-      mergeRagRows(
+    const docs = selectDocsWithFocusCoverage(
+      dedupeSimilarRagRows(
         mergeRagRows(
-          mergeRagRows(mentionedSchoolDocs, balancedAreaDocs),
-          rerankRowsForFocus(focusDocs, focus)
-        ),
-        rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), focus)
-      )
-    ).slice(0, maxDocs);
+          mergeRagRows(
+            mergeRagRows(mentionedSchoolDocs, balancedAreaDocs),
+            rerankRowsForFocus(focusDocs, combinedFocus)
+          ),
+          rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), combinedFocus)
+        )
+      ),
+      focusList,
+      maxDocs
+    );
 
     const finalSchoolInstitutionInfo =
       balancedAreaDocs.length > 0 ? await fetchSchoolInstitutionInfo(docs) : schoolInstitutionInfo;
@@ -2506,9 +2699,19 @@ export async function POST(request: NextRequest) {
 
     const model = chooseGenerationModel(route.difficulty);
     const openai = getChatOpenAIClient();
-    const focusInstruction = focus
-      ? `今回の主訴は「${focus.label}」です。${focus.instruction} 各候補校の説明では、主訴に直接関係する口コミ根拠を最低1つは明記してください。主訴に直接関係する口コミ根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。`
-      : 'ユーザーの主訴を読み取り、候補校の説明では口コミ上の具体的な良かった点・注意点を必ず添えてください。';
+    const focusInstruction =
+      focusList.length > 1
+        ? `今回の主訴は複数あります。相談文で先に述べられたものほど優先度が高いものとして扱い、すべての主訴に回答内で必ず触れてください。` +
+          focusList
+            .map(
+              (profile, index) =>
+                `【主訴${index + 1}${index === 0 ? '（最優先）' : ''}: ${profile.label}】${profile.instruction}`
+            )
+            .join('') +
+          ' 各候補校の説明では、最優先の主訴に直接関係する口コミ根拠を最低1つは明記し、2番目以降の主訴についても口コミ根拠か確認ポイントのどちらかで必ず触れてください。最優先の主訴に関する根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。2番目以降の主訴について参照情報に口コミ根拠が見つからない場合は、曖昧にぼかさず「◯◯に関する口コミ根拠は今回見つからなかったため、見学・説明会での確認ポイントとして挙げます」と正直に明示してください。'
+        : focus
+          ? `今回の主訴は「${focus.label}」です。${focus.instruction} 各候補校の説明では、主訴に直接関係する口コミ根拠を最低1つは明記してください。主訴に直接関係する口コミ根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。`
+          : 'ユーザーの主訴を読み取り、候補校の説明では口コミ上の具体的な良かった点・注意点を必ず添えてください。';
     const areaInstruction = area
       ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。全国展開校・サポート校は本部都道府県と実際のキャンパス所在地が異なる場合があるため、「所在地から拾った地域候補」に含まれる拠点がある学校だけを候補にしてください。候補に出す各校では、良かった点・注意点とは別に「所在地根拠: ◯◯市/最寄り駅」も1行で明記してください。所在地根拠が書けない学校は候補にしないでください。`
       : '';
@@ -2577,7 +2780,7 @@ export async function POST(request: NextRequest) {
           '断定・過剰保証は避け、医療診断や法律助言はしません。' +
           (conciseRequest
             ? '回答は300字以内にしてください。'
-            : '回答は簡潔に、600〜900字程度を目安にしてください。') +
+            : '回答は600字程度を目安に、長くても700字までにしてください。') +
           '根拠に使ったdoc参照を文中に [doc_n] 形式で付けてください。',
       },
       {
@@ -2589,7 +2792,13 @@ export async function POST(request: NextRequest) {
             : '') +
             `質問タイプ:\n${intent}\n` +
             `地域だけの追加条件:\n${regionalFollowUp ? 'はい。直前候補に限定せず地域条件で再推薦する' : 'いいえ'}\n` +
-            `今回の主訴:\n${focus ? focus.label : '明確な主訴なし'}\n` +
+            `今回の主訴（相談文で先に述べられた順・優先度順）:\n${
+              focusList.length > 0
+                ? focusList
+                    .map((profile, index) => `優先度${index + 1}: ${profile.label}`)
+                    .join(' / ')
+                : '明確な主訴なし'
+            }\n` +
             `地域解釈:\n${
               area
                 ? `${area.label}（${area.prefecture}）`
@@ -2616,7 +2825,8 @@ export async function POST(request: NextRequest) {
               ? `候補校リスト（###見出しに使える実名校は、この候補校リストまたは上の補助情報に出ている学校だけ）:\n${buildCandidateSchoolBlock(
                   docs,
                   {
-                    focus,
+                    focus: combinedFocus,
+                    focusProfiles: focusList,
                     nationwideReferenceOnly: !route.prefecture && !broadRegion,
                     schoolInstitutionInfo: schoolInstitutionInfoForPrompt,
                     locationSchools: rankedLocationSchools,
@@ -2632,8 +2842,8 @@ export async function POST(request: NextRequest) {
     const completionOptions: ChatCompletionOptions = {
       messages: completionMessages,
       max_completion_tokens: 7000,
-      // gpt-5.4-mini はデフォルト推論なしのため、回答品質維持に medium を明示
-      reasoning_effort: 'medium',
+      // gpt-5.4-mini はデフォルト推論なしのため明示する。環境変数 CHAT_OPENAI_REASONING_EFFORT で調整可能
+      reasoning_effort: CHAT_REASONING_EFFORT,
       service_tier: CHAT_SERVICE_TIER,
     };
 

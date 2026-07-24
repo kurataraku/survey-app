@@ -24,6 +24,7 @@ const SCHOOL_CONTEXT_PATTERN =
 const GENERAL_WORDS = new Set([
   '学校',
   '高校',
+  '大学',
   '通信',
   '通学',
   '登校',

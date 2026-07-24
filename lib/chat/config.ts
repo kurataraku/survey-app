@@ -9,6 +9,16 @@ export const CHAT_MODEL_HARD = process.env.CHAT_OPENAI_HARD_MODEL?.trim() || 'gp
 // 環境変数 CHAT_OPENAI_SERVICE_TIER=default で通常処理へ戻せる
 export const CHAT_SERVICE_TIER: 'priority' | 'default' =
   process.env.CHAT_OPENAI_SERVICE_TIER?.trim() === 'default' ? 'default' : 'priority';
+
+// 回答生成の推論レベル。low は速度優先、medium へ環境変数だけで戻せる
+const REASONING_EFFORT_VALUES = ['minimal', 'low', 'medium', 'high'] as const;
+export type ChatReasoningEffort = (typeof REASONING_EFFORT_VALUES)[number];
+const envReasoningEffort = process.env.CHAT_OPENAI_REASONING_EFFORT?.trim();
+export const CHAT_REASONING_EFFORT: ChatReasoningEffort = REASONING_EFFORT_VALUES.includes(
+  envReasoningEffort as ChatReasoningEffort
+)
+  ? (envReasoningEffort as ChatReasoningEffort)
+  : 'low';
 export const CHAT_EMBEDDING_MODEL =
   process.env.CHAT_OPENAI_EMBEDDING_MODEL?.trim() || 'text-embedding-3-large';
 // pgvector インデックス上限（2000）に合わせる。text-embedding-3-large は dimensions で縮約可能
