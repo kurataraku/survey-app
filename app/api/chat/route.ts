@@ -1504,6 +1504,7 @@ type ChatCompletionMessage = {
 type ChatCompletionOptions = {
   messages: ChatCompletionMessage[];
   max_completion_tokens: number;
+  reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high';
 };
 
 function isLikelyIncompleteReply(reply: string, intent: ChatIntent): boolean {
@@ -2610,6 +2611,8 @@ export async function POST(request: NextRequest) {
     const completionOptions: ChatCompletionOptions = {
       messages: completionMessages,
       max_completion_tokens: 7000,
+      // gpt-5.4-mini はデフォルト推論なしのため、回答品質維持に medium を明示
+      reasoning_effort: 'medium',
     };
 
     if (wantsStream) {
