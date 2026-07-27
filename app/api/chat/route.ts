@@ -72,6 +72,8 @@ type FocusProfile = {
   label: string;
   regex: RegExp;
   instruction: string;
+  /** true の場合、このテーマの根拠がある学校が十分あれば候補をその学校だけに絞る（絶対条件扱い） */
+  constraint?: boolean;
 };
 type AreaProfile = {
   label: string;
@@ -757,6 +759,7 @@ const FOCUS_PROFILE_DEFS: FocusProfileDef[] = [
       // 「スクーリング」「自宅」等はほぼ全校の口コミに登場するため、
       // オンライン中心の根拠判定には本当にオンライン学習を示す語だけを使う
       regex: /オンライン|ネットコース|ネット授業|映像授業|自宅学習|在宅|通学なし/u,
+      constraint: true,
       instruction:
         'オンライン中心で学びたいという希望が相談の中心です。候補校の選定はこの希望を絶対条件として扱ってください。候補校リストの中にオンライン・ネットコース・自宅学習中心の口コミ根拠がある学校が3校以上ある場合は、提示する候補3校すべてをその学校にしてください。オンライン根拠のある学校を差し置いて、通学前提・登校日程の自由度だけの学校を候補に入れてはいけません。オンライン根拠のある学校が3校未満の場合のみ、「通学型だがオンライン代替・振替がある」ことを明示した上で補足候補を足してください。なお通信制高校でもスクーリング（年数回程度の登校）は制度上必要になることが多いため、完全にゼロにはできない点を一言添えてください。',
     },
@@ -936,11 +939,13 @@ async function fetchFocusDocsWithQuotas(
       // 低頻度通学の口コミは表現ゆれが大きいため従来どおり広めに取る
       const bonus =
         options.lowAttendance && profile.label === '年数回・低頻度通学' ? 10 : 0;
-      const quota = (quotas[index] ?? 4) + bonus;
+      // 絶対条件テーマは候補を絞り込む材料になるため、より多くの学校の根拠を確保する
+      const constraintBonus = profile.constraint ? 4 : 0;
+      const quota = (quotas[index] ?? 4) + bonus + constraintBonus;
       // 学校の多様性を確保するため、多めに取得してから学校ごとの件数を制限する
       const rows = await fetchRagDocumentsByKeywords(profile.keywords, {
         prefecture: options.prefecture,
-        limit: Math.min(quota * 3, 40),
+        limit: Math.min(quota * 4, 60),
       });
       return diversifyRowsBySchool(rows, quota);
     })
@@ -1405,8 +1410,11 @@ function buildCandidateSchoolBlock(
     current.focusHits += hits;
     current.score += (doc.score ?? doc.similarity ?? 0) + hits * 0.35;
     focusProfiles.forEach((profile, profileIndex) => {
-      if (focusHitCount(targetText, profile.regex) > 0) {
+      const profileHits = focusHitCount(targetText, profile.regex);
+      if (profileHits > 0) {
         current.coveredFocusIndexes.add(profileIndex);
+        // 絶対条件テーマは、根拠が濃い学校ほど候補上位に来るよう加点する
+        if (profile.constraint) current.score += Math.min(profileHits, 4) * 0.3;
       }
     });
     if (hits > 0 && current.focusSnippets.length < 3) {
@@ -1463,7 +1471,7 @@ function buildCandidateSchoolBlock(
     }
   }
 
-  const sortedCandidates = [...grouped.values()]
+  let sortedCandidates = [...grouped.values()]
     .filter((candidate) => {
       if (!options.nationwideReferenceOnly) return true;
       if (isLocalPublicSchoolName(candidate.schoolName)) return false;
@@ -1476,6 +1484,20 @@ function buildCandidateSchoolBlock(
       return candidate.focusHits > 0 || candidate.isLocationMatch;
     })
     .sort((a, b) => b.score - a.score);
+
+  // 絶対条件（constraint）テーマがある場合、そのテーマの口コミ根拠がある学校が
+  // 3校以上あれば、候補リスト自体をその学校だけに絞る（LLMの裁量に任せない）
+  const constraintIndexes = focusProfiles
+    .map((profile, index) => (profile.constraint ? index : -1))
+    .filter((index) => index >= 0);
+  let filteredByConstraint = sortedCandidates;
+  for (const constraintIndex of constraintIndexes) {
+    const covered = filteredByConstraint.filter((candidate) =>
+      candidate.coveredFocusIndexes.has(constraintIndex)
+    );
+    if (covered.length >= 3) filteredByConstraint = covered;
+  }
+  sortedCandidates = filteredByConstraint;
 
   // 複数主訴の場合、スコア上位だけで切ると口コミ件数が多い主訴の学校が枠を占有し、
   // 2番目以降の主訴（例: オンライン希望）をカバーする学校が候補から漏れる。
