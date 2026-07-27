@@ -230,7 +230,8 @@ function isLowAttendancePreference(text: string): boolean {
   return (
     /年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回.*(?:通学|登校|スクーリング)/u.test(text) ||
     /(?:通学|登校|スクーリング).{0,12}年[に\s]*(?:1|2|3|１|２|３|一|二|三)[,，、〜~・\-－]*(?:2|3|２|３|二|三)?回/u.test(text) ||
-    /集中スクーリング|年数回|年に数回|年数日の登校|合宿型スクーリング/u.test(text)
+    /集中スクーリング|年数回|年に数回|年数日の登校|合宿型スクーリング/u.test(text) ||
+    /通いたくない|通学したくない|登校したくない|通わずに|通わない/u.test(text)
   );
 }
 
@@ -741,7 +742,7 @@ const FOCUS_PROFILE_DEFS: FocusProfileDef[] = [
     },
   },
   {
-    detect: /ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得/u,
+    detect: /ネットコース|オンライン.*安|安い|学費.*安|費用.*安|低価格|学費.*納得|お金.{0,8}(?:ない|なく|厳し|余裕|かけられ)|金銭的|経済的に|(?:費用|学費).{0,6}抑え/u,
     profile: {
       keywords: [
         'ネットコース',
@@ -750,12 +751,13 @@ const FOCUS_PROFILE_DEFS: FocusProfileDef[] = [
         '学費',
         '安い',
         '費用',
+        'お金',
         '納得感',
         '授業料',
         '通学少ない',
       ],
       label: 'ネットコース・学費重視',
-      regex: /ネットコース|オンライン|自宅学習|学費|安い|費用|納得感|授業料|通学少な/u,
+      regex: /ネットコース|オンライン|自宅学習|学費|安い|費用|お金|納得感|授業料|通学少な/u,
       instruction:
         'ネットコース・学費重視が主訴です。候補校は、オンライン中心で通学負担が少ないこと、学費の安さ・納得感・追加費用の少なさに関する口コミや学費情報がある学校を優先してください。',
     },
@@ -2456,11 +2458,25 @@ export async function POST(request: NextRequest) {
       .join('\n');
 
     const intent = detectChatIntent(searchBasisMessage);
-    const schoolNameResolution = await resolveSchoolNamesInText(latestUserMessage, conversationText);
+    // AI自身が前ターンで推薦した校名を「ユーザーが言及した学校」と誤認すると、
+    // 追加条件だけの発話でも前回候補の比較モードに固定されてしまう。
+    // 校名の抽出は原則ユーザー発話のみを対象にし、「この中で」「どっちが」など
+    // 直前候補への参照表現があるときだけ会話全体（アシスタント発話含む）から拾う。
+    const userConversationText = messages
+      .slice(-8)
+      .filter((message) => message.role === 'user')
+      .map((message) => message.content)
+      .join('\n');
+    const refersToPreviousCandidates =
+      /この中|その中|この[23２３]校|その[23２３]校|の中で|どれが|どれに|どっち|どちら|比べ|比較|上記|さっき|先ほど|前の候補/u.test(
+        latestUserMessage
+      );
+    const schoolNameSourceText = refersToPreviousCandidates ? conversationText : userConversationText;
+    const schoolNameResolution = await resolveSchoolNamesInText(latestUserMessage, schoolNameSourceText);
     const mentionedSchools = regionalFollowUp
       ? []
       : [
-          ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(conversationText)]),
+          ...new Set([...schoolNameResolution.resolved, ...detectMentionedSchoolNames(schoolNameSourceText)]),
         ].slice(0, 4);
     const focusList = detectFocusProfiles(searchBasisMessage);
     const focus = focusList[0] ?? null;

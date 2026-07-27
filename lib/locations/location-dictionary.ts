@@ -125,11 +125,30 @@ function baseLocationTerm(term: string): string {
   return normalizeInput(term).replace(/駅$/, '');
 }
 
+const KATAKANA_CHAR = /[ァ-ヶー]/u;
+
+// カタカナ語（例: 駅名エイリアス「スクリーン」）が、より長いカタカナ語の内部
+// （例: 「スクリーング」= スクーリングの誤字）にマッチした場合は地名として扱わない
+function isEmbeddedInKatakanaRun(text: string, start: number, end: number): boolean {
+  const before = start > 0 ? text[start - 1] : '';
+  const after = end < text.length ? text[end] : '';
+  return KATAKANA_CHAR.test(before) || KATAKANA_CHAR.test(after);
+}
+
 function findIncludedRange(searchableText: string, term: string, station: string | null): { start: number; end: number } | null {
   const candidates = [term, station ? station.replace(/駅$/, '') : ''].filter(Boolean);
   for (const candidate of candidates) {
-    const start = searchableText.indexOf(candidate);
-    if (start >= 0) return { start, end: start + candidate.length };
+    let from = 0;
+    while (from <= searchableText.length - candidate.length) {
+      const start = searchableText.indexOf(candidate, from);
+      if (start < 0) break;
+      const end = start + candidate.length;
+      const isKatakanaTerm = KATAKANA_CHAR.test(candidate[candidate.length - 1]);
+      if (!isKatakanaTerm || !isEmbeddedInKatakanaRun(searchableText, start, end)) {
+        return { start, end };
+      }
+      from = start + 1;
+    }
   }
   return null;
 }
