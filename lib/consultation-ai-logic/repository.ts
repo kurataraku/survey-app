@@ -76,6 +76,7 @@ const OBSOLETE_ACTIVE_RULES = new Set([
   '回答生成モデルは通常・高難度とも gpt-5.4-mini（reasoning_effort=medium）に統一。環境変数 CHAT_OPENAI_MAIN_MODEL / CHAT_OPENAI_HARD_MODEL で変更可能',
   '短答指定がない通常回答は600〜900字程度を目安（以前の800〜1200字から短縮）',
   'イラスト・デザイン、動画制作、VTuber、落ち着いた雰囲気などの具体的な希望も検出',
+  '「お金があまりない」「金銭的に厳しい」も学費重視として、「あまり通いたくない」「通わずに」も低頻度通学の希望として検出',
 ]);
 
 const OBSOLETE_CAUTION_NOTES = new Set([
