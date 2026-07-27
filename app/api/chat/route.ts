@@ -752,14 +752,13 @@ const FOCUS_PROFILE_DEFS: FocusProfileDef[] = [
         '映像授業',
         'ネット授業',
         '通学なし',
-        'スクーリング',
-        '登校日数',
-        '通学少ない',
       ],
       label: 'オンライン中心',
-      regex: /オンライン|ネットコース|ネット授業|映像授業|自宅学習|自宅|在宅|通学(?:なし|少な)|スクーリング|登校日数/u,
+      // 「スクーリング」「自宅」等はほぼ全校の口コミに登場するため、
+      // オンライン中心の根拠判定には本当にオンライン学習を示す語だけを使う
+      regex: /オンライン|ネットコース|ネット授業|映像授業|自宅学習|在宅|通学なし/u,
       instruction:
-        'オンライン中心で学びたいという希望が相談の中心です。候補校は、オンラインコース・ネットコース・自宅学習中心で通学頻度を最小限にできる口コミ根拠がある学校だけにしてください。通学前提の学校を通常の候補として出さないでください。どうしても候補が足りない場合のみ、「通学型だがオンライン代替・振替がある」ことを明示した上で補足候補としてください。なお通信制高校でもスクーリング（年数回程度の登校）は制度上必要になることが多いため、完全にゼロにはできない点を一言添えてください。',
+        'オンライン中心で学びたいという希望が相談の中心です。候補校の選定はこの希望を絶対条件として扱ってください。候補校リストの中にオンライン・ネットコース・自宅学習中心の口コミ根拠がある学校が3校以上ある場合は、提示する候補3校すべてをその学校にしてください。オンライン根拠のある学校を差し置いて、通学前提・登校日程の自由度だけの学校を候補に入れてはいけません。オンライン根拠のある学校が3校未満の場合のみ、「通学型だがオンライン代替・振替がある」ことを明示した上で補足候補を足してください。なお通信制高校でもスクーリング（年数回程度の登校）は制度上必要になることが多いため、完全にゼロにはできない点を一言添えてください。',
     },
   },
   {
@@ -894,6 +893,38 @@ function detectFocusProfiles(text: string): FocusProfile[] {
  * 合成キーワード1回だと口コミ量が多い主訴が枠を占有し、2番目以降の主訴の根拠が
  * 文脈に入らないことがあるため、優先度順に枠を割り当てて必ず数件ずつ確保する。
  */
+/**
+ * 口コミ数が多い1校（例: N高）だけで枠が埋まらないよう、
+ * まず学校ごと1件ずつ拾って学校の多様性を確保し、残り枠を学校ごと最大 maxPerSchool 件まで許容して埋める。
+ */
+function diversifyRowsBySchool(
+  rows: RagMatchRow[],
+  limit: number,
+  maxPerSchool = 2
+): RagMatchRow[] {
+  const selected: RagMatchRow[] = [];
+  const selectedIds = new Set<string>();
+  const perSchool = new Map<string, number>();
+  for (const row of rows) {
+    if (selected.length >= limit) break;
+    const key = row.school_name ?? row.id;
+    if ((perSchool.get(key) ?? 0) >= 1) continue;
+    selected.push(row);
+    selectedIds.add(row.id);
+    perSchool.set(key, 1);
+  }
+  for (const row of rows) {
+    if (selected.length >= limit) break;
+    if (selectedIds.has(row.id)) continue;
+    const key = row.school_name ?? row.id;
+    if ((perSchool.get(key) ?? 0) >= maxPerSchool) continue;
+    selected.push(row);
+    selectedIds.add(row.id);
+    perSchool.set(key, (perSchool.get(key) ?? 0) + 1);
+  }
+  return selected;
+}
+
 async function fetchFocusDocsWithQuotas(
   profiles: FocusProfile[],
   options: { prefecture: string | null; lowAttendance: boolean }
@@ -901,14 +932,17 @@ async function fetchFocusDocsWithQuotas(
   if (profiles.length === 0) return [];
   const quotas = profiles.length === 1 ? [18] : profiles.length === 2 ? [10, 8] : [8, 6, 4];
   const lists = await Promise.all(
-    profiles.map((profile, index) => {
+    profiles.map(async (profile, index) => {
       // 低頻度通学の口コミは表現ゆれが大きいため従来どおり広めに取る
       const bonus =
         options.lowAttendance && profile.label === '年数回・低頻度通学' ? 10 : 0;
-      return fetchRagDocumentsByKeywords(profile.keywords, {
+      const quota = (quotas[index] ?? 4) + bonus;
+      // 学校の多様性を確保するため、多めに取得してから学校ごとの件数を制限する
+      const rows = await fetchRagDocumentsByKeywords(profile.keywords, {
         prefecture: options.prefecture,
-        limit: (quotas[index] ?? 4) + bonus,
+        limit: Math.min(quota * 3, 40),
       });
+      return diversifyRowsBySchool(rows, quota);
     })
   );
   return lists.reduce<RagMatchRow[]>((merged, list) => mergeRagRows(merged, list), []);
@@ -924,18 +958,26 @@ function selectDocsWithFocusCoverage(
   maxDocs: number
 ): RagMatchRow[] {
   if (profiles.length <= 1 || rows.length <= maxDocs) return rows.slice(0, maxDocs);
-  const reservedPerProfile = [4, 3, 2];
+  const reservedPerProfile = [5, 4, 3];
   const selected: RagMatchRow[] = [];
   const selectedIds = new Set<string>();
   profiles.forEach((profile, index) => {
     let need = reservedPerProfile[index] ?? 2;
-    for (const row of rows) {
+    // 1周目は学校ごと1件に制限し、その主訴の根拠が複数校ぶん文脈に入るようにする
+    const schoolsInReserve = new Set<string>();
+    for (const distinctOnly of [true, false]) {
+      for (const row of rows) {
+        if (need === 0) break;
+        if (selectedIds.has(row.id)) continue;
+        if (focusHitCount(`${row.title}\n${row.content}`, profile.regex) === 0) continue;
+        const schoolKey = row.school_name ?? row.id;
+        if (distinctOnly && schoolsInReserve.has(schoolKey)) continue;
+        selected.push(row);
+        selectedIds.add(row.id);
+        schoolsInReserve.add(schoolKey);
+        need -= 1;
+      }
       if (need === 0) break;
-      if (selectedIds.has(row.id)) continue;
-      if (focusHitCount(`${row.title}\n${row.content}`, profile.regex) === 0) continue;
-      selected.push(row);
-      selectedIds.add(row.id);
-      need -= 1;
     }
   });
   for (const row of rows) {
@@ -1421,7 +1463,7 @@ function buildCandidateSchoolBlock(
     }
   }
 
-  const candidates = [...grouped.values()]
+  const sortedCandidates = [...grouped.values()]
     .filter((candidate) => {
       if (!options.nationwideReferenceOnly) return true;
       if (isLocalPublicSchoolName(candidate.schoolName)) return false;
@@ -1433,8 +1475,40 @@ function buildCandidateSchoolBlock(
       if (!options.focus) return true;
       return candidate.focusHits > 0 || candidate.isLocationMatch;
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+    .sort((a, b) => b.score - a.score);
+
+  // 複数主訴の場合、スコア上位だけで切ると口コミ件数が多い主訴の学校が枠を占有し、
+  // 2番目以降の主訴（例: オンライン希望）をカバーする学校が候補から漏れる。
+  // 各主訴につき最低3校（存在すれば）を候補リストに保証する。
+  const maxCandidates = 8;
+  let candidates: typeof sortedCandidates;
+  if (focusProfiles.length > 1) {
+    const picked: typeof sortedCandidates = [];
+    const pickedNames = new Set<string>();
+    focusProfiles.forEach((_, profileIndex) => {
+      let need = 3;
+      for (const candidate of sortedCandidates) {
+        if (need === 0) break;
+        if (!candidate.coveredFocusIndexes.has(profileIndex)) continue;
+        if (pickedNames.has(candidate.schoolName)) {
+          need -= 1;
+          continue;
+        }
+        picked.push(candidate);
+        pickedNames.add(candidate.schoolName);
+        need -= 1;
+      }
+    });
+    for (const candidate of sortedCandidates) {
+      if (picked.length >= maxCandidates) break;
+      if (pickedNames.has(candidate.schoolName)) continue;
+      picked.push(candidate);
+      pickedNames.add(candidate.schoolName);
+    }
+    candidates = picked.slice(0, maxCandidates).sort((a, b) => b.score - a.score);
+  } else {
+    candidates = sortedCandidates.slice(0, maxCandidates);
+  }
 
   if (candidates.length === 0) return '実名校候補なし';
 
