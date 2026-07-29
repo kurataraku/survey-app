@@ -39,6 +39,28 @@ export interface GetReviewsListResult {
   limit: number;
 }
 
+/** PostgREST が1リクエストで返す行数の上限。到達すると件数・ページ数が不足するため検知する */
+const SCAN_ROW_LIMIT = 1000;
+
+type ScanRow = {
+  id: string;
+  schools: { status?: string | null } | { status?: string | null }[] | null;
+  answers?: unknown;
+};
+
+type DetailRow = {
+  id: string;
+  school_id: string | null;
+  school_name: string | null;
+  overall_satisfaction: number | null;
+  good_comment: string | null;
+  bad_comment: string | null;
+  enrollment_year: number | null;
+  attendance_frequency: string | null;
+  created_at: string | null;
+  schools: { slug?: string | null; prefecture?: string | null } | { slug?: string | null; prefecture?: string | null }[] | null;
+};
+
 export const getReviewsList = cache(async (
   params: GetReviewsListParams = {}
 ): Promise<GetReviewsListResult> => {
@@ -60,13 +82,13 @@ export const getReviewsList = cache(async (
   else if (sort === 'rating_desc') { orderColumn = 'overall_satisfaction'; orderAscending = false; }
   else if (sort === 'rating_asc') { orderColumn = 'overall_satisfaction'; orderAscending = true; }
 
+  const reasonFilters = getReviewReasonsForGroup(reasonGroup);
+  // answers は絞り込みにしか使わないため、絞り込み指定がなければ取得しない
+  const needsAnswers = Boolean(prefecture) || reasonFilters.length > 0;
+
   let queryBuilder = supabase
     .from('survey_responses')
-    .select(`
-      id, school_id, school_name, overall_satisfaction, good_comment, bad_comment,
-      created_at, enrollment_year, attendance_frequency, answers,
-      schools(id, name, slug, status, prefecture)
-    `)
+    .select(`id, schools(status)${needsAnswers ? ', answers' : ''}`)
     .eq('is_public', true)
     .not('school_id', 'is', null)
     .order(orderColumn, { ascending: orderAscending });
@@ -78,16 +100,20 @@ export const getReviewsList = cache(async (
   if (creditRating)     queryBuilder = queryBuilder.eq('credit_rating', creditRating);
   if (tuitionRating)    queryBuilder = queryBuilder.eq('tuition_rating', tuitionRating);
 
-  const { data: allReviewsData, error } = await queryBuilder;
+  const { data: allReviewsData, error } = await queryBuilder.returns<ScanRow[]>();
 
   if (error) {
     console.error('[getReviewsList]', error);
     return { reviews: [], total: 0, page, totalPages: 0, limit };
   }
 
-  const reasonFilters = getReviewReasonsForGroup(reasonGroup);
+  if ((allReviewsData?.length ?? 0) >= SCAN_ROW_LIMIT) {
+    console.error(
+      `[getReviewsList] 走査行数が上限(${SCAN_ROW_LIMIT})に達しました。total とページ数が実際より少なくなります`
+    );
+  }
 
-  const filtered = (allReviewsData || []).filter((r: { schools: { status?: string; prefecture?: string } | { status?: string; prefecture?: string }[] | null; answers?: unknown }) => {
+  const filtered = (allReviewsData || []).filter((r) => {
     const school = Array.isArray(r.schools) ? r.schools[0] : r.schools;
     if (!school || school.status !== 'active') return false;
 
@@ -120,37 +146,61 @@ export const getReviewsList = cache(async (
 
   const total = filtered.length;
   const paginated = filtered.slice(offset, offset + limit);
+  const reviewIds = paginated.map((r) => r.id);
 
-  const reviewIds = paginated.map((r: { id: string }) => r.id);
+  if (reviewIds.length === 0) {
+    return { reviews: [], total, page, totalPages: Math.ceil(total / limit), limit };
+  }
+
+  // 本文などの重いカラムは、実際に表示する分だけ取得する
+  const { data: detailRows, error: detailError } = await supabase
+    .from('survey_responses')
+    .select(`
+      id, school_id, school_name, overall_satisfaction, good_comment, bad_comment,
+      created_at, enrollment_year, attendance_frequency,
+      schools(slug, prefecture)
+    `)
+    .in('id', reviewIds)
+    .returns<DetailRow[]>();
+
+  if (detailError) {
+    console.error('[getReviewsList] detail', detailError);
+    return { reviews: [], total: 0, page, totalPages: 0, limit };
+  }
+
+  const detailById = new Map<string, DetailRow>();
+  detailRows?.forEach((row) => detailById.set(row.id, row));
+
   const likeCounts = new Map<string, number>();
   reviewIds.forEach((id) => likeCounts.set(id, 0));
 
-  if (reviewIds.length) {
-    const { data: likes } = await supabase
-      .from('review_likes')
-      .select('review_id')
-      .in('review_id', reviewIds);
-    likes?.forEach((l: { review_id: string }) => {
-      likeCounts.set(l.review_id, (likeCounts.get(l.review_id) || 0) + 1);
-    });
-  }
+  const { data: likes } = await supabase
+    .from('review_likes')
+    .select('review_id')
+    .in('review_id', reviewIds);
+  likes?.forEach((l: { review_id: string }) => {
+    likeCounts.set(l.review_id, (likeCounts.get(l.review_id) || 0) + 1);
+  });
 
-  const reviews: ReviewListItem[] = paginated.map((r: Record<string, unknown>) => {
+  // in() は順序を保証しないため、ページ内の並び順は reviewIds 側で維持する
+  const reviews: ReviewListItem[] = reviewIds.flatMap((id) => {
+    const r = detailById.get(id);
+    if (!r) return [];
     const school = Array.isArray(r.schools) ? r.schools[0] : r.schools;
-    return {
-      id: r.id as string,
-      school_id: r.school_id as string | null,
-      school_name: (r.school_name as string) || '',
-      school_slug: (school as { slug?: string; prefecture?: string } | null)?.slug ?? null,
-      school_prefecture: (school as { slug?: string; prefecture?: string } | null)?.prefecture ?? null,
-      overall_satisfaction: (r.overall_satisfaction as number) ?? 0,
-      good_comment: (r.good_comment as string) || '',
-      bad_comment: (r.bad_comment as string) || '',
-      enrollment_year: r.enrollment_year as number | null,
-      attendance_frequency: r.attendance_frequency as string | null,
-      like_count: likeCounts.get(r.id as string) || 0,
-      created_at: (r.created_at as string) || '',
-    };
+    return [{
+      id: r.id,
+      school_id: r.school_id,
+      school_name: r.school_name || '',
+      school_slug: school?.slug ?? null,
+      school_prefecture: school?.prefecture ?? null,
+      overall_satisfaction: r.overall_satisfaction ?? 0,
+      good_comment: r.good_comment || '',
+      bad_comment: r.bad_comment || '',
+      enrollment_year: r.enrollment_year,
+      attendance_frequency: r.attendance_frequency,
+      like_count: likeCounts.get(r.id) || 0,
+      created_at: r.created_at || '',
+    }];
   });
 
   return {
