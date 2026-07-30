@@ -4,6 +4,7 @@ import { requireAdminOrAgent } from '@/lib/auth/admin';
 import { sanitizeCampusLocationsInput } from '@/lib/schools/campusLocations';
 import { normalizeText } from '@/lib/utils';
 import { syncRagForSchoolIds } from '@/lib/rag/sync';
+import { normalizeSlugValue, recordSchoolSlugHistory } from '@/lib/schools/slug-history';
 
 export async function GET(
   request: NextRequest,
@@ -144,6 +145,12 @@ export async function PUT(
       );
     }
 
+    const { data: currentSchool } = await supabase
+      .from('schools')
+      .select('name, status, slug')
+      .eq('id', id)
+      .single();
+
     // スラッグの重複チェック（自分自身を除く）
     const { data: slugConflict } = await supabase
       .from('schools')
@@ -206,13 +213,6 @@ export async function PUT(
 
     // statusが'pending'から'active'に変更される場合、school_nameで紐づいている口コミのschool_idを更新
     if (status === 'active') {
-      // 現在の学校情報を取得（更新前）
-      const { data: currentSchool } = await supabase
-        .from('schools')
-        .select('name, status')
-        .eq('id', id)
-        .single();
-      
       // 現在のstatusが'pending'の場合、school_nameで紐づいている口コミのschool_idを更新
       if (currentSchool && currentSchool.status === 'pending') {
         // school_nameで紐づいているが、school_idがnullの口コミを更新
@@ -243,6 +243,16 @@ export async function PUT(
         { error: '学校情報の更新に失敗しました', details: updateError.message },
         { status: 500 }
       );
+    }
+
+    const previousSlug = normalizeSlugValue(currentSchool?.slug);
+    const nextSlug = normalizeSlugValue(slug);
+    if (previousSlug && nextSlug && previousSlug !== nextSlug) {
+      await recordSchoolSlugHistory(supabase, {
+        schoolId: id,
+        oldSlug: previousSlug,
+        reason: 'manual_update',
+      });
     }
 
     return NextResponse.json(school);

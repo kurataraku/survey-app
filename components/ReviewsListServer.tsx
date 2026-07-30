@@ -72,6 +72,7 @@ export default function ReviewsListServer({
           {page > 1 ? (
             <Link
               href={buildPageUrl({ page: page - 1, attendanceFrequency, prefecture, reasonGroup, sort })}
+              rel="nofollow"
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               前へ
@@ -87,6 +88,7 @@ export default function ReviewsListServer({
           {page < totalPages ? (
             <Link
               href={buildPageUrl({ page: page + 1, attendanceFrequency, prefecture, reasonGroup, sort })}
+              rel="nofollow"
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               次へ

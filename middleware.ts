@@ -5,6 +5,36 @@ import { BASE_PATH } from '@/lib/base-path';
 
 const APEX_ORIGIN = 'https://careeressence.jp';
 
+/**
+ * ベースパスなしでもページが表示されてしまう URL 群（rewrites の副作用）。
+ * 正規URLは常に BASE_PATH 付きなので、素のパスは 308 で寄せて重複インデックスを防ぐ。
+ */
+const APP_PAGE_PREFIXES = [
+  '/schools',
+  '/reviews',
+  '/rankings',
+  '/features',
+  '/about',
+  '/terms',
+  '/privacy',
+  '/contact',
+  '/campaign',
+  '/simulator',
+  '/consultation-ai',
+  '/survey',
+  '/export',
+  '/admin',
+];
+
+function needsBasePathRedirect(pathname: string): boolean {
+  if (pathname === BASE_PATH || pathname.startsWith(`${BASE_PATH}/`)) return false;
+  // サーバー間の内部 fetch がベースパスなしの /api を叩くため除外する
+  if (pathname === '/api' || pathname.startsWith('/api/')) return false;
+  return APP_PAGE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
   const pathname = request.nextUrl.pathname;
@@ -26,6 +56,14 @@ export async function middleware(request: NextRequest) {
       res.headers.set('X-Robots-Tag', 'noindex');
     }
     return res;
+  }
+
+  // 1b. パス正規化: /schools/... のようなベースパスなしURL → /tsushin-kuchikomi/schools/...
+  // 重複インデックス防止に加え、素の /admin/* が middleware の認証を素通りするのも塞ぐ
+  if (needsBasePathRedirect(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = `${BASE_PATH}${pathname}`;
+    return NextResponse.redirect(url, { status: 308 });
   }
 
   // 2b. /tsushin-kuchikomi/api/admin/* でも Supabase セッションを更新する

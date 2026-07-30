@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import Link from 'next/link';
 import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import { getSchoolSlugs } from '@/lib/schools/getSchoolSlugs';
@@ -21,6 +21,8 @@ import { getDecliningSchoolMetaOverride } from '@/lib/schools/declining-school-m
 import { getGscPrioritySchoolMetaOverride } from '@/lib/seo/gsc-priority-school-meta';
 import { normalizeSchoolMetaDescription } from '@/lib/schools/normalizeSchoolMetaDescription';
 import { normalizeSchoolMetaTitle } from '@/lib/schools/normalizeSchoolMetaTitle';
+import { isThinSchoolPage } from '@/lib/seo/thin-school-page';
+import { resolveLegacySchoolSlug } from '@/lib/schools/resolveLegacySchoolSlug';
 
 // ISR: 60秒ごとに再検証（LCP改善のためキャッシュを活用）
 export const revalidate = 60;
@@ -50,6 +52,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const school = await getSchoolWithStats(decodedSlug);
 
   if (!school) {
+    const resolvedLegacy = await resolveLegacySchoolSlug(decodedSlug);
+    if (resolvedLegacy) {
+      permanentRedirect(appPath(`/schools/${encodeURIComponent(resolvedLegacy.slug)}`));
+    }
+
     return {
       title: '学校が見つかりません',
     };
@@ -82,11 +89,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const pathname = `/schools/${resolvedParams.slug}`;
   const canonical = `${appBaseUrl}${pathname}`;
 
+  const isThin = isThinSchoolPage({
+    reviewCount: school.review_count,
+    intro: school.intro,
+    hasPublishedAiContent: Boolean(
+      school.ai_summary || school.seo_sections || school.faq_items || school.review_tendency
+    ),
+    hasTuitionEstimate: Boolean(school.tuition_estimate),
+    hasCourseListing: Boolean(school.course_listing),
+  });
+
   return {
     title,
     description,
     keywords,
     alternates: { canonical },
+    ...(isThin ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
       title,
       description,
@@ -116,6 +134,11 @@ export default async function SchoolDetailPage({ params }: PageProps) {
   const school = await getSchoolWithStats(decodedSlug);
 
   if (!school) {
+    const resolvedLegacy = await resolveLegacySchoolSlug(decodedSlug);
+    if (resolvedLegacy) {
+      permanentRedirect(appPath(`/schools/${encodeURIComponent(resolvedLegacy.slug)}`));
+    }
+
     notFound();
   }
 

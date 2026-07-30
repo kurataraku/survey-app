@@ -88,6 +88,7 @@ function InternalLinks({ prefecture }: { prefecture: string }) {
           <li key={`${href}-${label}`}>
             <Link
               href={href}
+              rel={href.includes('?') ? 'nofollow' : undefined}
               className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 p-4 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"
             >
               <span className="block text-sm font-bold text-blue-700 mb-1">{label}</span>
@@ -141,6 +142,7 @@ function LocationInsightsSection({
                   <li key={city.city}>
                     <Link
                       href={appPath(`/schools?campus_prefecture=${prefParam}&campus_city=${cityParam}`)}
+                      rel="nofollow"
                       className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 p-4 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"
                     >
                       <span className="block text-sm font-bold text-blue-700 mb-1">

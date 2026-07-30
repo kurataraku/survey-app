@@ -53,6 +53,7 @@ export default function RequestNotificationCta({
         <Link
           href={href}
           onClick={handleClick}
+          rel="nofollow"
           className="ml-1 text-blue-600 hover:text-blue-800 font-medium hover:underline"
         >
           こちらからご連絡ください
@@ -79,6 +80,7 @@ export default function RequestNotificationCta({
       <Link
         href={href}
         onClick={handleClick}
+        rel="nofollow"
         className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
       >
         資料請求を希望する

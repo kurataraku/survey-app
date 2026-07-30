@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeText } from '@/lib/utils';
 import { requireAdmin } from '@/lib/auth/admin';
+import { recordSchoolSlugHistory } from '@/lib/schools/slug-history';
 
 export async function POST(
   request: NextRequest,
@@ -46,7 +47,7 @@ export async function POST(
     // 統合元の学校情報を取得
     const { data: sourceSchool, error: sourceError } = await supabase
       .from('schools')
-      .select('id, name, name_normalized')
+      .select('id, name, name_normalized, slug')
       .eq('id', sourceSchoolId)
       .single();
 
@@ -140,6 +141,12 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    await recordSchoolSlugHistory(supabase, {
+      schoolId: target_school_id,
+      oldSlug: sourceSchool.slug,
+      reason: 'merge',
+    });
 
     return NextResponse.json({
       success: true,

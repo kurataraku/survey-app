@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import Link from 'next/link';
 import SchoolReviewsListServer from '@/components/SchoolReviewsListServer';
 import SchoolReviewsFilters from './SchoolReviewsFilters';
@@ -11,6 +11,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 import SchoolPageBreadcrumbs from '@/components/SchoolPageBreadcrumbs';
 import { isDefaultSchoolReviewsIndex } from '@/lib/schools/school-reviews-seo';
 import { schoolReviewsListPageHeading } from '@/lib/schools/school-reviews-list-copy';
+import { resolveLegacySchoolSlug } from '@/lib/schools/resolveLegacySchoolSlug';
 
 /** 常にサーバーでレンダリングし、口コミ本文を初期HTMLに含める（クローラー対応） */
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,11 @@ export async function generateMetadata({
 
   const school = await getSchoolWithStats(decodedSlug);
   if (!school) {
+    const resolvedLegacy = await resolveLegacySchoolSlug(decodedSlug);
+    if (resolvedLegacy) {
+      permanentRedirect(appPath(`/schools/${encodeURIComponent(resolvedLegacy.slug)}/reviews`));
+    }
+
     return { title: '学校が見つかりません' };
   }
 
@@ -61,8 +67,11 @@ export async function generateMetadata({
   const canonical = useHubCanonical ? hubCanonical : listCanonical;
 
   const pageNum = parseInt(getStr(resolvedSearch.page) || '1', 10);
+  // 口コミ0件の一覧は実質空ページ（ソフト404）になるため検索結果に出さない
   const robots =
-    pageNum > 1 ? ({ index: false as const, follow: true as const } satisfies Metadata['robots']) : undefined;
+    pageNum > 1 || school.review_count === 0
+      ? ({ index: false as const, follow: true as const } satisfies Metadata['robots'])
+      : undefined;
 
   return {
     title,
@@ -85,6 +94,11 @@ export default async function SchoolReviewsPage({ params, searchParams }: PagePr
   const decodedSlug = decodeURIComponent(resolvedParams.slug);
   const school = await getSchoolWithStats(decodedSlug);
   if (!school) {
+    const resolvedLegacy = await resolveLegacySchoolSlug(decodedSlug);
+    if (resolvedLegacy) {
+      permanentRedirect(appPath(`/schools/${encodeURIComponent(resolvedLegacy.slug)}/reviews`));
+    }
+
     notFound();
   }
   const page = parseInt(getStr(resolvedSearch.page) || '1', 10);

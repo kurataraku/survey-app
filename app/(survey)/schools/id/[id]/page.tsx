@@ -1,4 +1,4 @@
-import { redirect, notFound } from 'next/navigation';
+import { permanentRedirect, notFound } from 'next/navigation';
 import { getSchoolById } from '@/lib/schools/getSchoolById';
 import SchoolDetailByIdClient from '@/components/SchoolDetailByIdClient';
 import type { Metadata } from 'next';
@@ -21,7 +21,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const title = `${school.name}の口コミ・評判`;
   const description = `${school.name}の口コミ・評判をまとめました。在校生・卒業生・保護者の生の声を掲載しています。`;
-  const canonical = `${getAppBaseUrl()}/schools/id/${resolved.id}`;
+  // slug があるページは /schools/{slug} と内容が重複するため、正規URLをそちらに寄せる
+  const hasSlug = Boolean(school.slug && school.slug.trim() !== '');
+  const canonical = hasSlug
+    ? `${getAppBaseUrl()}/schools/${encodeURIComponent(school.slug!.trim())}`
+    : `${getAppBaseUrl()}/schools/id/${resolved.id}`;
 
   return {
     title,
@@ -41,7 +45,7 @@ export default async function SchoolDetailByIdPage({ params }: PageProps) {
   }
 
   if (school.slug && school.slug.trim() !== '') {
-    redirect(appPath(`/schools/${encodeURIComponent(school.slug)}`));
+    permanentRedirect(appPath(`/schools/${encodeURIComponent(school.slug.trim())}`));
   }
 
   return (

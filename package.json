@@ -18,6 +18,8 @@
     "set-password-directly": "tsx scripts/set-password-directly.ts",
     "debug:merge": "tsx scripts/debug-merge.ts",
     "seo:coverage": "tsx scripts/seo-coverage.ts",
+    "seo:thin-pages": "tsx scripts/thin-school-pages.ts",
+    "seo:legacy-slugs": "tsx scripts/check-legacy-slug-resolution.ts",
     "sync:rag": "tsx scripts/sync-rag-documents.ts --all",
     "generate:highlights": "tsx scripts/generate-school-highlights.ts",
     "publish:draft-summaries": "tsx scripts/publish-draft-summaries.ts",

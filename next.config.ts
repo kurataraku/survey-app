@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
 import { LEGACY_SCHOOL_SLUG_REDIRECTS } from "./lib/seo/gsc-priority-schools";
 
+// ベースパスなしの旧URLは、middleware での再リダイレクトを挟まないよう直接ベースパス付きへ送る
 const legacySchoolRedirects = Object.entries(LEGACY_SCHOOL_SLUG_REDIRECTS).flatMap(
   ([fromSlug, toSlug]) => [
     {
       source: `/schools/${fromSlug}`,
-      destination: `/schools/${toSlug}`,
+      destination: `/tsushin-kuchikomi/schools/${toSlug}`,
       permanent: true,
     },
     {
@@ -26,7 +27,7 @@ const nextConfig: NextConfig = {
       ...legacySchoolRedirects,
       {
         source: "/features/kanto-tsushin-setsumeikai-2024-schedule",
-        destination: "/features/kanto-tsushin-setsumeikai-2026-schedule",
+        destination: "/tsushin-kuchikomi/features/kanto-tsushin-setsumeikai-2026-schedule",
         permanent: true,
       },
       {

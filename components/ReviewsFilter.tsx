@@ -87,6 +87,7 @@ export default function ReviewsFilter() {
               <Link
                 key={opt.value}
                 href={buildUrl(searchParams, { sort: opt.value })}
+                rel="nofollow"
                 className={`text-sm font-bold px-4 py-1.5 rounded-full border-2 transition-all ${
                   isActive
                     ? 'bg-gray-800 text-white border-gray-800'
@@ -110,6 +111,7 @@ export default function ReviewsFilter() {
               <Link
                 key={opt.value}
                 href={buildUrl(searchParams, { attendance_frequency: opt.value })}
+                rel="nofollow"
                 className={`text-sm font-bold px-4 py-1.5 rounded-full border-2 transition-all ${
                   isActive
                     ? 'bg-sky-500 text-white border-sky-500'
@@ -153,6 +155,7 @@ export default function ReviewsFilter() {
         <div className="flex flex-wrap gap-2">
           <Link
             href={buildUrl(searchParams, { reason_group: '' })}
+            rel="nofollow"
             className={`text-sm font-bold px-4 py-1.5 rounded-full border-2 transition-all ${
               reasonGroup === ''
                 ? 'bg-gray-200 text-gray-700 border-gray-200'
@@ -167,6 +170,7 @@ export default function ReviewsFilter() {
               <Link
                 key={group.key}
                 href={buildUrl(searchParams, { reason_group: group.key })}
+                  rel="nofollow"
                 className={`text-sm font-bold px-4 py-1.5 rounded-full border-2 transition-all ${
                   isActive
                     ? 'bg-sky-500 text-white border-sky-500'
@@ -191,6 +195,7 @@ export default function ReviewsFilter() {
               <Link
                 key={opt.value}
                 href={buildUrl(searchParams, { overall: opt.value })}
+                  rel="nofollow"
                 className={`text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-all whitespace-nowrap ${
                   isActive
                     ? isAll
@@ -235,6 +240,7 @@ export default function ReviewsFilter() {
                         <Link
                           key={opt.value}
                           href={buildUrl(searchParams, { [dim.key]: opt.value })}
+                          rel="nofollow"
                           className={`text-xs font-bold px-2 py-1 rounded-full border-2 transition-all whitespace-nowrap ${
                             isActive
                               ? isAll

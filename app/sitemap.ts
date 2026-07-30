@@ -1,65 +1,60 @@
 import { MetadataRoute } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
 import { getPrefecturePath, prefectures } from '@/lib/prefectures';
+import { isThinSchoolPage } from '@/lib/seo/thin-school-page';
+import {
+  countReviewsBySchool,
+  type ReviewSchoolLink,
+} from '@/lib/seo/school-review-counts';
 
 const PAGE_SIZE = 1000;
-const MIN_SCHOOL_REVIEWS_FOR_REVIEWS_SITEMAP = 3;
+/** .in() のURL長を抑えるためのIDチャンクサイズ */
+const ID_CHUNK_SIZE = 150;
 
 type SitemapSchool = {
   id: string;
   name: string;
   slug: string | null;
+  intro: string | null;
   updated_at: string | null;
-};
-
-type SitemapReviewLink = {
-  school_id: string | null;
-  school_name: string | null;
-  schools: { id: string; status: string | null } | { id: string; status: string | null }[] | null;
 };
 
 function encodePathSegment(segment: string): string {
   return encodeURIComponent(segment);
 }
 
-function addCount(map: Map<string, number>, key: string) {
-  map.set(key, (map.get(key) ?? 0) + 1);
-}
+/**
+ * 指定テーブルで published 行を持つ school_id の集合を返す。
+ * 1件でも取得に失敗したら null を返す。不完全な集合で薄いページ判定をすると
+ * 中身のある学校URLをサイトマップから落としてしまうため。
+ */
+async function fetchPublishedSchoolIds(
+  supabase: SupabaseClient,
+  table: string,
+  schoolIds: string[]
+): Promise<Set<string> | null> {
+  const out = new Set<string>();
 
-function countReviewsBySchool(schools: SitemapSchool[], reviews: SitemapReviewLink[]) {
-  const counts = new Map<string, number>();
-  const activeSchoolIds = new Set(schools.map((school) => school.id));
-  const schoolsByName = new Map<string, SitemapSchool[]>();
+  for (let i = 0; i < schoolIds.length; i += ID_CHUNK_SIZE) {
+    const slice = schoolIds.slice(i, i + ID_CHUNK_SIZE);
+    const { data, error } = await supabase
+      .from(table)
+      .select('school_id')
+      .in('school_id', slice)
+      .eq('status', 'published');
 
-  for (const school of schools) {
-    const list = schoolsByName.get(school.name) ?? [];
-    list.push(school);
-    schoolsByName.set(school.name, list);
-  }
-
-  for (const review of reviews) {
-    const linkedSchool = Array.isArray(review.schools) ? review.schools[0] : review.schools;
-
-    if (review.school_id && activeSchoolIds.has(review.school_id)) {
-      addCount(counts, review.school_id);
-      continue;
+    if (error) {
+      console.error(`[sitemap] ${table}:`, error);
+      return null;
     }
 
-    if (!review.school_name) continue;
-
-    const matchedSchools = schoolsByName.get(review.school_name) ?? [];
-    const pointsToInactiveOrMissingSchool =
-      review.school_id && (!linkedSchool || linkedSchool.status !== 'active');
-
-    if (!review.school_id || pointsToInactiveOrMissingSchool) {
-      for (const school of matchedSchools) {
-        addCount(counts, school.id);
-      }
+    for (const row of (data as { school_id: string | null }[] | null) ?? []) {
+      if (row.school_id) out.add(row.school_id);
     }
   }
 
-  return counts;
+  return out;
 }
 
 function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitemap {
@@ -143,7 +138,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (;;) {
     const { data: schools, error } = await supabase
       .from('schools')
-      .select('id, name, slug, updated_at')
+      .select('id, name, slug, intro, updated_at')
       .eq('status', 'active')
       .eq('is_public', true)
       .not('slug', 'is', null)
@@ -156,7 +151,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     schoolFrom += PAGE_SIZE;
   }
 
-  const allReviewLinks: SitemapReviewLink[] = [];
+  const allReviewLinks: ReviewSchoolLink[] = [];
   let reviewLinkFrom = 0;
   for (;;) {
     const { data: reviews, error } = await supabase
@@ -174,8 +169,34 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const reviewCountsBySchool = countReviewsBySchool(allSchools, allReviewLinks);
 
+  // 実質空の学校ページをサイトマップから除くための公開コンテンツ状況
+  const allSchoolIds = allSchools.map((school) => school.id);
+  const [aiContentSchoolIds, tuitionSchoolIds, courseSchoolIds] = await Promise.all([
+    fetchPublishedSchoolIds(supabase, 'school_ai_summaries', allSchoolIds),
+    fetchPublishedSchoolIds(supabase, 'school_tuition_estimates', allSchoolIds),
+    fetchPublishedSchoolIds(supabase, 'school_course_listings', allSchoolIds),
+  ]);
+  // 取得に失敗した場合は誤除外を避けるため、薄いページの絞り込み自体を行わない
+  const canFilterThinSchools =
+    aiContentSchoolIds !== null && tuitionSchoolIds !== null && courseSchoolIds !== null;
+
   for (const school of allSchools) {
     if (!school.slug) continue;
+
+    const reviewCount = reviewCountsBySchool.get(school.id) ?? 0;
+    if (
+      canFilterThinSchools &&
+      isThinSchoolPage({
+        reviewCount,
+        intro: school.intro,
+        hasPublishedAiContent: aiContentSchoolIds!.has(school.id),
+        hasTuitionEstimate: tuitionSchoolIds!.has(school.id),
+        hasCourseListing: courseSchoolIds!.has(school.id),
+      })
+    ) {
+      continue;
+    }
+
     const slug = encodePathSegment(school.slug);
     const lastModified = school.updated_at ? new Date(school.updated_at) : new Date();
 
@@ -185,15 +206,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.9,
     });
-
-    if ((reviewCountsBySchool.get(school.id) ?? 0) >= MIN_SCHOOL_REVIEWS_FOR_REVIEWS_SITEMAP) {
-      out.push({
-        url: `${baseUrl}/schools/${slug}/reviews`,
-        lastModified,
-        changeFrequency: 'weekly',
-        priority: 0.85,
-      });
-    }
   }
 
   // 記事: 全件取得（ページネーション）
