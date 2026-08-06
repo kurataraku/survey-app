@@ -83,6 +83,9 @@ export const THEME_HUBS: ThemeHub[] = [
       'kanto-tsushin-setsumeikai-2026-schedule',
       'kansai-tsushin-setsumeikai-2026-schedule',
       'fukuoka-tsushin-setsumeikai-2026-schedule',
+      'aichi-tsushin-setsumeikai-2026-schedule',
+      'kumamoto-tsushin-setsumeikai-2026-schedule',
+      'miyagi-tsushin-setsumeikai-2026-schedule',
     ],
   },
 ];
