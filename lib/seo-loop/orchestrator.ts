@@ -9,6 +9,8 @@ import { observeGscIssues } from './observer';
 import { notifySlackApproval } from './slack';
 import type { SeoLoopRun, SeoLoopStepResult } from './types';
 
+const MAX_STEPS_PER_TICK = 8;
+
 type ProposalRow = {
   id: string;
   version: number;
@@ -36,6 +38,60 @@ async function updateRun(
   if (error) throw error;
 }
 
+async function loadRun(supabase: SupabaseClient, runId: string): Promise<SeoLoopRun> {
+  const { data, error } = await supabase
+    .from('seo_loop_runs')
+    .select('id,idempotency_key,status,retry_count,max_retries')
+    .eq('id', runId)
+    .single();
+
+  if (error) throw error;
+  return data as SeoLoopRun;
+}
+
+async function countApprovedProposals(supabase: SupabaseClient, runId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('seo_proposals')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', runId)
+    .eq('status', 'approved');
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * 日次Cronは1回なので、未完了runを優先して再開する。
+ * 人間承認待ちのみのrunはスキップし、当日runの新規観測を妨げない。
+ */
+async function selectRunnableRun(supabase: SupabaseClient): Promise<SeoLoopRun> {
+  const { data: openRuns, error } = await supabase
+    .from('seo_loop_runs')
+    .select('id,idempotency_key,status,retry_count,max_retries')
+    .in('status', ['observing', 'analyzing', 'pending_approval', 'executing'])
+    .order('created_at', { ascending: true })
+    .limit(20);
+
+  if (error) throw error;
+
+  for (const candidate of (openRuns ?? []) as SeoLoopRun[]) {
+    if (
+      candidate.status === 'observing' ||
+      candidate.status === 'analyzing' ||
+      candidate.status === 'executing'
+    ) {
+      return candidate;
+    }
+
+    if (candidate.status === 'pending_approval') {
+      const approvedCount = await countApprovedProposals(supabase, candidate.id);
+      if (approvedCount > 0) return candidate;
+    }
+  }
+
+  return createOrLoadRun(supabase, dailyRunKey());
+}
+
 async function handlePendingApproval(
   supabase: SupabaseClient,
   run: SeoLoopRun
@@ -53,16 +109,8 @@ async function handlePendingApproval(
     await notifySlackApproval({ supabase, proposal });
   }
 
-  const { data: approved, error: approvalError } = await supabase
-    .from('seo_proposals')
-    .select('id,version,payload_hash,action,rationale,payload,seo_approvals(id,proposal_payload_hash,proposal_version,status)')
-    .eq('run_id', run.id)
-    .eq('status', 'approved')
-    .limit(1);
-
-  if (approvalError) throw approvalError;
-
-  if (approved?.length) {
+  const approvedCount = await countApprovedProposals(supabase, run.id);
+  if (approvedCount > 0) {
     await updateRun(supabase, run.id, {
       status: 'executing',
       current_step: 'execute',
@@ -71,7 +119,7 @@ async function handlePendingApproval(
     return {
       status: 'pending_approval',
       runId: run.id,
-      message: '承認済みproposalを検出し、次tickでexecuteへ進みます',
+      message: '承認済みproposalを検出したのでexecuteへ進みます',
     };
   }
 
@@ -164,7 +212,7 @@ async function handleExecute(
   return { status: 'executed', runId: run.id, message: '承認済みproposalの実行ゲート処理が完了しました' };
 }
 
-async function processLockedRun(
+async function processOneStep(
   supabase: SupabaseClient,
   run: SeoLoopRun
 ): Promise<SeoLoopStepResult> {
@@ -195,6 +243,65 @@ async function processLockedRun(
   return { status: 'skipped', runId: run.id, message: `未対応statusです: ${run.status}` };
 }
 
+function isTerminalStatus(status: string): boolean {
+  return status === 'completed' || status === 'failed' || status === 'skipped';
+}
+
+/**
+ * 1回のCron呼び出しで、待機状態か完了までステップを連続実行する。
+ * 人間承認待ち（pending_approval かつ approvedなし）で停止する。
+ */
+async function advanceRunUntilIdle(
+  supabase: SupabaseClient,
+  initialRun: SeoLoopRun
+): Promise<SeoLoopStepResult> {
+  const messages: string[] = [];
+  let last: SeoLoopStepResult = {
+    status: 'skipped',
+    runId: initialRun.id,
+    message: 'ステップ未実行',
+  };
+
+  for (let step = 0; step < MAX_STEPS_PER_TICK; step += 1) {
+    const run = await loadRun(supabase, initialRun.id);
+
+    if (isTerminalStatus(run.status)) {
+      if (messages.length === 0) {
+        return { status: 'skipped', runId: run.id, message: `runは既に${run.status}です` };
+      }
+      break;
+    }
+
+    last = await processOneStep(supabase, run);
+    messages.push(last.message);
+
+    const after = await loadRun(supabase, run.id);
+
+    if (isTerminalStatus(after.status)) {
+      break;
+    }
+
+    if (after.status === 'pending_approval') {
+      const approvedCount = await countApprovedProposals(supabase, after.id);
+      if (approvedCount === 0) {
+        last = {
+          status: 'pending_approval',
+          runId: after.id,
+          message: messages.join(' → '),
+        };
+        return last;
+      }
+      // 承認済みがある場合は同tickでexecuteへ続く
+      continue;
+    }
+  }
+
+  return {
+    ...last,
+    message: messages.length > 0 ? messages.join(' → ') : last.message,
+  };
+}
+
 export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   const config = getSeoLoopConfig();
   if (!config.enabled) {
@@ -202,7 +309,7 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   }
 
   const supabase = createAdminSupabaseClient();
-  const run = await createOrLoadRun(supabase, dailyRunKey());
+  const run = await selectRunnableRun(supabase);
   const lockedBy = `vercel:${process.pid}:${Date.now()}`;
   const locked = await acquireRunLock({
     supabase,
@@ -216,11 +323,12 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   }
 
   try {
-    return await processLockedRun(supabase, locked);
+    return await advanceRunUntilIdle(supabase, locked);
   } catch (error) {
+    const current = await loadRun(supabase, run.id).catch(() => run);
     await updateRun(supabase, run.id, {
-      status: run.retry_count + 1 >= run.max_retries ? 'failed' : run.status,
-      retry_count: run.retry_count + 1,
+      status: current.retry_count + 1 >= current.max_retries ? 'failed' : current.status,
+      retry_count: current.retry_count + 1,
       error_message: error instanceof Error ? error.message : String(error),
       next_action_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     });

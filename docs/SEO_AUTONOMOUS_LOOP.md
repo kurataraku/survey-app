@@ -14,7 +14,7 @@ sequenceDiagram
   participant Slack as Slack
   participant Exec as TypedExecutor
 
-  Cron->>API: tick
+  Cron->>API: tick (日次1回)
   API->>DB: acquire_lock
   API->>GSC: fetch_readonly_metrics
   API->>LLM: analyze_untrusted_data
@@ -22,9 +22,10 @@ sequenceDiagram
   API->>API: zod_validate_and_risk_rules
   API->>DB: save_proposal_hash
   API->>Slack: request_approval
+  Note over API: 1回のtickで観測→分析→Slackまで連続実行し、人間承認待ちで停止
   Slack->>API: approve_or_reject
   API->>DB: bind_approval_to_hash
-  Cron->>API: execute_approved
+  Cron->>API: 次回tickで承認済みをexecute
   API->>Exec: allowlisted_action
   Exec->>DB: save_experiment
 ```
