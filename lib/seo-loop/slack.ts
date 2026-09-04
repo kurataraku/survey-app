@@ -19,7 +19,35 @@ type SlackInteractionPayload = {
   type?: string;
   user?: { id?: string; name?: string; username?: string };
   actions?: SlackInteractionAction[];
+  response_url?: string;
+  channel?: { id?: string };
+  message?: { ts?: string };
 };
+
+async function replaceSlackOriginalMessage(params: {
+  responseUrl?: string;
+  text: string;
+}): Promise<void> {
+  if (!params.responseUrl) return;
+
+  await fetch(params.responseUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({
+      replace_original: true,
+      text: params.text,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: params.text,
+          },
+        },
+      ],
+    }),
+  });
+}
 
 export function verifySlackSignature(params: {
   signingSecret: string;
@@ -203,6 +231,16 @@ export async function handleSlackInteraction(params: {
     .eq('version', proposal.version)
     .eq('payload_hash', proposal.payload_hash);
   if (proposalUpdateError) throw proposalUpdateError;
+
+  const statusLabel =
+    status === 'approved' ? '承認済み' : status === 'rejected' ? '却下' : '修正依頼';
+  const actor = payload.user?.name ?? payload.user?.username ?? payload.user?.id ?? 'unknown';
+  const confirmation = `*SEO提案を${statusLabel}にしました*\nAction proposal: \`${proposalId}\`\nby ${actor}\n（実行は \`SEO_LOOP_EXECUTION_ENABLED\` が true のときのみ）`;
+
+  await replaceSlackOriginalMessage({
+    responseUrl: payload.response_url,
+    text: confirmation,
+  });
 
   return { ok: true, message: `proposalを${status}に更新しました` };
 }
