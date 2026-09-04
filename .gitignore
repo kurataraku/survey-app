@@ -37,6 +37,12 @@ debug-ga.txt
 # agent logs
 /logs/
 
+# SEO loop / GSC secrets and generated reports
+/secrets/
+**/gsc-sa*.json
+**/google-service-account*.json
+/logs/gsc/
+
 # CSV files for seeding
 *.csv
 !supabase-schema*.sql

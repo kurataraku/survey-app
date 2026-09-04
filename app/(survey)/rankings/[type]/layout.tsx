@@ -49,7 +49,7 @@ export async function generateMetadata({
   const canonical = `${appBaseUrl}${pathname}`;
 
   return {
-    title: `通信制高校 ${rankingInfo.title} | 通信制高校リアルレビュー`,
+    title: `通信制高校 ${rankingInfo.title}`,
     description: rankingInfo.description,
     keywords: [
       '通信制高校 ランキング',

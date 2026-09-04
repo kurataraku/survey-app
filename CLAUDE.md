@@ -19,6 +19,12 @@ npm run check-env
 
 # SEOカバレッジ（公開校・AI要約・記事件数のJSON出力）
 npm run seo:coverage
+# アプリ内SEO自走システム（GSC/Slack/Cron）: docs/SEO_AUTONOMOUS_LOOP.md / docs/SEO_LOOP_SYSTEM_SETUP.md / .cursor/rules/seo-autonomous-loop.mdc
+
+# GSC Search Analytics（readonly）
+npm run seo:gsc:summary
+npm run seo:gsc:pages
+npm run seo:gsc:queries
 
 # 学校タグ highlights を OpenAI で一括生成（初回は --dry-run --limit=5 推奨）
 npm run generate:highlights -- --all --sleep-ms=150

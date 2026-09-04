@@ -19,7 +19,7 @@ function getStr(v: string | string[] | undefined): string {
 }
 
 export const metadata: Metadata = {
-  title: '最新口コミ | 通信制高校リアルレビュー',
+  title: '最新口コミ',
   description: '通信制高校の口コミ・評判を最新順で閲覧。実際に通った人のリアルな声で、あなたに合う学校を見つけよう。',
   alternates: { canonical: `${getAppBaseUrl()}/reviews` },
 };

@@ -6,7 +6,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 const appBaseUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
-  title: 'このサイトについて｜通信制高校リアルレビュー',
+  title: 'このサイトについて',
   description: '通信制高校の選び直しを支える、リアルな口コミメディア。入学前に知りたい「本当のこと」を、実際に通った人の声で届けます。後悔のない選択が、未来の一歩になります。',
   alternates: { canonical: `${appBaseUrl}/about` },
   openGraph: {
@@ -102,7 +102,7 @@ export default function AboutPage() {
           </h2>
           <div className="text-gray-700 text-base sm:text-lg leading-relaxed space-y-6">
             <p>
-              学校は、良くも悪くも"閉ざされやすい"場所です。<br />
+              学校は、良くも悪くも「閉ざされやすい」場所です。<br />
               入学前に、その学校のリアルを知ることは簡単ではありません。
             </p>
             <p>

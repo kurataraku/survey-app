@@ -4,7 +4,7 @@ import { getAppBaseUrl } from '@/lib/env-check';
 const appBaseUrl = getAppBaseUrl();
 
 export const metadata: Metadata = {
-  title: '通信制高校リアルレビュー｜プライバシーポリシー',
+  title: 'プライバシーポリシー',
   description: '通信制高校リアルレビューのプライバシーポリシーページです。',
   alternates: { canonical: `${appBaseUrl}/privacy` },
   openGraph: {

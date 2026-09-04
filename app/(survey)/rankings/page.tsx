@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
 
 export const metadata: Metadata = {
-  title: 'ランキング | 通信制高校リアルレビュー',
+  title: 'ランキング',
   description:
     '総合評判・口コミ数・先生対応など、様々な指標で通信制高校をランキング形式で確認できます。評価系ランキングは口コミ3件以上の学校のみ対象（口コミ数ランキングは1件以上）。',
   alternates: { canonical: `${getAppBaseUrl()}/rankings` },

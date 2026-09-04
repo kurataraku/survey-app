@@ -29,8 +29,8 @@ export async function generateMetadata({
 
   const article = await getArticleBySlug(slug);
 
-  const title = article?.meta_title ?? article?.title ?? '特集記事';
-  const fullTitle = `${title} | 通信制高校リアルレビュー`;
+  const pageTitle = article?.meta_title ?? article?.title ?? '特集記事';
+  const fullTitle = `${pageTitle} | 通信制高校リアルレビュー`;
   const rawDesc = (article?.meta_description ?? article?.excerpt ?? '').trim();
   const description = article
     ? (rawDesc ? truncate(rawDesc, DESCRIPTION_MAX) : '通信制高校に関する特集記事・インタビュー・お役立ち情報を掲載。')
@@ -38,7 +38,7 @@ export async function generateMetadata({
   const ogImage = article ? toAbsoluteImageUrl(article.featured_image_url ?? null) : undefined;
 
   return {
-    title: fullTitle,
+    title: pageTitle,
     description,
     keywords: ['通信制高校', '通信制高校 特集', '通信制高校 情報'],
     alternates: { canonical },

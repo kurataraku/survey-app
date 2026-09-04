@@ -21,7 +21,7 @@ function getStr(v: string | string[] | undefined): string {
 }
 
 export const metadata: Metadata = {
-  title: '通信制高校を探す | 通信制高校リアルレビュー',
+  title: '通信制高校を探す',
   description: '口コミ・評判で通信制高校を検索。都道府県、評価、口コミ数で絞り込んで、あなたに合う学校を見つけよう。',
   alternates: { canonical: `${getAppBaseUrl()}/schools` },
 };

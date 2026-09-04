@@ -19,7 +19,7 @@ function getStr(v: string | string[] | undefined): string {
 }
 
 export const metadata: Metadata = {
-  title: '特集ページ | 通信制高校リアルレビュー',
+  title: '特集ページ',
   description: '通信制高校のリアル体験談やお役立ち情報。在校生・卒業生のインタビューや選び方のヒントを掲載。',
   alternates: { canonical: `${getAppBaseUrl()}/features` },
 };

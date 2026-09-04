@@ -55,7 +55,8 @@ export async function generateMetadata({
   }
 
   const heading = schoolReviewsListPageHeading(school.name);
-  const title = `${heading} | 通信制高校リアルレビュー`;
+  const title = heading;
+  const fullTitle = `${title} | 通信制高校リアルレビュー`;
   const description = `${school.name}の口コミを、通学頻度・進路・キャンパスなどの条件から探せます。学校ページの口コミ・評判まとめとあわせてご利用ください。`;
 
   const appBaseUrl = getAppBaseUrl();
@@ -79,7 +80,7 @@ export async function generateMetadata({
     alternates: { canonical },
     ...(robots ? { robots } : {}),
     openGraph: {
-      title,
+      title: fullTitle,
       description,
       type: 'website',
       url: canonical,
