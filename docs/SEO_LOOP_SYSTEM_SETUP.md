@@ -78,6 +78,7 @@ curl -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/se
 ```
 
 本番ではVercel Cronが `CRON_SECRET` をBearerとして付与します。
+スケジュールは `vercel.json` の `17 23 * * *`（UTC）= 毎日 **日本時間 8:17** です。
 1回のtickで観測→分析→Slack通知まで連続実行し、人間承認待ちで停止します。
 承認後の実行ゲートは、次回以降のCron（または手動tick）で進みます。
 
