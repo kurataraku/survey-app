@@ -6,10 +6,11 @@ import { payloadHash } from './hash';
 import { acquireRunLock, createOrLoadRun, dailyRunKey, releaseRunLock } from './lock';
 import { analyzeIssuesToProposals } from './analyzer';
 import { observeGscIssues } from './observer';
-import { notifySlackApproval } from './slack';
+import { notifySlackApproval, notifySlackLoopStatus } from './slack';
 import type { SeoLoopRun, SeoLoopStepResult } from './types';
 
 const MAX_STEPS_PER_TICK = 8;
+const MAX_RUNS_PER_TICK = 3;
 
 type ProposalRow = {
   id: string;
@@ -309,35 +310,79 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   }
 
   const supabase = createAdminSupabaseClient();
-  const run = await selectRunnableRun(supabase);
-  const lockedBy = `vercel:${process.pid}:${Date.now()}`;
-  const locked = await acquireRunLock({
-    supabase,
-    runId: run.id,
-    config,
-    lockedBy,
-  });
+  const todayKey = dailyRunKey();
+  const results: SeoLoopStepResult[] = [];
+  const processedIds = new Set<string>();
 
-  if (!locked) {
-    return { status: 'locked', runId: run.id, message: '別Functionが同じrunを処理中です' };
-  }
+  for (let i = 0; i < MAX_RUNS_PER_TICK; i += 1) {
+    const run = await selectRunnableRun(supabase);
+    if (processedIds.has(run.id)) {
+      break;
+    }
 
-  try {
-    return await advanceRunUntilIdle(supabase, locked);
-  } catch (error) {
-    const current = await loadRun(supabase, run.id).catch(() => run);
-    await updateRun(supabase, run.id, {
-      status: current.retry_count + 1 >= current.max_retries ? 'failed' : current.status,
-      retry_count: current.retry_count + 1,
-      error_message: error instanceof Error ? error.message : String(error),
-      next_action_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-    });
-    return {
-      status: 'failed',
+    const lockedBy = `vercel:${process.pid}:${Date.now()}:${i}`;
+    const locked = await acquireRunLock({
+      supabase,
       runId: run.id,
-      message: error instanceof Error ? error.message : String(error),
-    };
-  } finally {
-    await releaseRunLock(supabase, run.id);
+      config,
+      lockedBy,
+    });
+
+    if (!locked) {
+      results.push({ status: 'locked', runId: run.id, message: '別Functionが同じrunを処理中です' });
+      break;
+    }
+
+    processedIds.add(run.id);
+
+    try {
+      const result = await advanceRunUntilIdle(supabase, locked);
+      results.push(result);
+    } catch (error) {
+      const current = await loadRun(supabase, run.id).catch(() => run);
+      await updateRun(supabase, run.id, {
+        status: current.retry_count + 1 >= current.max_retries ? 'failed' : current.status,
+        retry_count: current.retry_count + 1,
+        error_message: error instanceof Error ? error.message : String(error),
+        next_action_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+      const failed: SeoLoopStepResult = {
+        status: 'failed',
+        runId: run.id,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      results.push(failed);
+      await notifySlackLoopStatus({
+        text: `*SEO Loop 失敗*\nrun: \`${run.idempotency_key}\`\n${failed.message}`,
+      }).catch(() => undefined);
+      break;
+    } finally {
+      await releaseRunLock(supabase, run.id);
+    }
+
+    // 当日runまで処理したら終了。古い承認済みの消化後に当日観測へ進める。
+    if (run.idempotency_key === todayKey) {
+      break;
+    }
   }
+
+  if (results.length === 0) {
+    return { status: 'skipped', message: '処理対象のrunがありません' };
+  }
+
+  const mergedMessage = results.map((r) => r.message).join(' | ');
+  const last = results[results.length - 1]!;
+  const noProposal = results.some((r) => r.message.includes('承認対象proposalは生成されませんでした'));
+  const hadApprovalWait = results.some((r) => r.status === 'pending_approval');
+
+  if (noProposal && !hadApprovalWait) {
+    await notifySlackLoopStatus({
+      text: `*SEO Loop 実行結果*\n提案カードはありませんでした。\n\`${mergedMessage}\``,
+    }).catch(() => undefined);
+  }
+
+  return {
+    ...last,
+    message: mergedMessage,
+  };
 }

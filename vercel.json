@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/seo-loop",
+      "path": "/tsushin-kuchikomi/api/cron/seo-loop",
       "schedule": "17 23 * * *"
     }
   ]

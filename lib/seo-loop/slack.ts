@@ -72,6 +72,40 @@ export function verifySlackSignature(params: {
   return crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
+export async function notifySlackLoopStatus(params: {
+  text: string;
+}): Promise<void> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_SEO_CHANNEL_ID;
+  if (!token || !channel) return;
+
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json; charset=utf-8',
+    },
+    body: JSON.stringify({
+      channel,
+      text: params.text,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: params.text,
+          },
+        },
+      ],
+    }),
+  });
+
+  const json = (await response.json()) as { ok?: boolean; error?: string };
+  if (!json.ok) {
+    throw new Error(`Slackステータス通知に失敗しました: ${json.error ?? response.statusText}`);
+  }
+}
+
 export async function notifySlackApproval(params: {
   supabase: SupabaseClient;
   proposal: SeoProposalForSlack;

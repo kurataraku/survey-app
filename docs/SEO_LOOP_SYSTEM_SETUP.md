@@ -79,8 +79,11 @@ curl -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/se
 
 本番ではVercel Cronが `CRON_SECRET` をBearerとして付与します。
 スケジュールは `vercel.json` の `17 23 * * *`（UTC）= 毎日 **日本時間 8:17** です。
+Cron path は `/tsushin-kuchikomi/api/cron/seo-loop` です（ベースパス付き）。
 1回のtickで観測→分析→Slack通知まで連続実行し、人間承認待ちで停止します。
 承認後の実行ゲートは、次回以降のCron（または手動tick）で進みます。
+提案0件の日も、Slackに「提案なし」ステータスを送ります（沈黙で止まっていないことを確認しやすくするため）。
+Vercel ダッシュボードの Cron / Function ログで、毎朝の実行有無も確認してください。
 
 ## 7. 運用上の注意
 
