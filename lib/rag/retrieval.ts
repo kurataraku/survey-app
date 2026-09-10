@@ -431,13 +431,17 @@ export async function fetchRagDocumentsBySchoolIds(
 
 export async function fetchRagDocumentsByKeywords(
   keywords: string[],
-  options: { prefecture?: string | null; limit?: number } = {}
+  options: {
+    prefecture?: string | null;
+    limit?: number;
+    sourceTypes?: RagSourceType[] | null;
+  } = {}
 ): Promise<RagMatchRow[]> {
   const terms = [...new Set(keywords.map((keyword) => keyword.trim()).filter(Boolean))].slice(0, 10);
   if (terms.length === 0) return [];
 
   const supabase = getSupabaseServiceClient();
-  const query = supabase
+  let query = supabase
     .from('rag_documents')
     .select(
       'id, source_type, source_id, chunk_key, school_id, school_name, prefecture, reason_groups, title, content, metadata, source_url'
@@ -450,6 +454,10 @@ export async function fetchRagDocumentsByKeywords(
         .join(',')
     )
     .limit(options.limit ?? 16);
+
+  if (options.sourceTypes && options.sourceTypes.length > 0) {
+    query = query.in('source_type', options.sourceTypes);
+  }
 
   const { data, error } = await query;
   if (error) throw error;
@@ -465,6 +473,46 @@ export async function fetchRagDocumentsByKeywords(
       similarity: 1,
       score: 1.15,
     }));
+}
+
+/**
+ * 公開口コミ（rag_documents.source_type = review）を持つ学校IDを返す。
+ * 相談AIの候補校提示で、口コミなし校の混入を防ぐために使う。
+ */
+export async function fetchSchoolIdsHavingPublicReviews(
+  schoolIds: string[]
+): Promise<Set<string>> {
+  const ids = [...new Set(schoolIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return new Set();
+
+  const supabase = getSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from('rag_documents')
+    .select('school_id')
+    .eq('is_public', true)
+    .eq('source_type', 'review')
+    .in('school_id', ids);
+
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .map((row) => (row as { school_id: string | null }).school_id)
+      .filter((id): id is string => Boolean(id))
+  );
+}
+
+/**
+ * 口コミ投稿がある学校を優先する。口コミあり校が1校でもあれば、口コミなし校は落とす。
+ * 口コミあり校がゼロのときだけ、口コミなし校をフォールバックとして残す。
+ */
+export function preferSchoolsWithPublicReviews<T extends { id: string }>(
+  schools: T[],
+  reviewSchoolIds: Set<string>
+): T[] {
+  if (schools.length === 0) return schools;
+  const withReviews = schools.filter((school) => reviewSchoolIds.has(school.id));
+  return withReviews.length > 0 ? withReviews : schools;
 }
 
 export function inferReasonGroupFromText(text: string): RagReasonGroup | null {

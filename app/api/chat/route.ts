@@ -18,7 +18,9 @@ import {
   fetchRagDocumentsBySchoolNames,
   fetchRagDocumentsBySchoolIds,
   fetchRagDocumentsByKeywords,
+  fetchSchoolIdsHavingPublicReviews,
   interleaveRagDocsBySchoolOrder,
+  preferSchoolsWithPublicReviews,
   rankLocationSchoolMatches,
   inferReasonGroupFromText,
   rerankForGuardianConsultation,
@@ -943,9 +945,11 @@ async function fetchFocusDocsWithQuotas(
       const constraintBonus = profile.constraint ? 4 : 0;
       const quota = (quotas[index] ?? 4) + bonus + constraintBonus;
       // 学校の多様性を確保するため、多めに取得してから学校ごとの件数を制限する
+      // 候補校の主訴根拠は公開口コミのみを使う（学校紹介・FAQなどを口コミ根拠扱いしない）
       const rows = await fetchRagDocumentsByKeywords(profile.keywords, {
         prefecture: options.prefecture,
         limit: Math.min(quota * 4, 60),
+        sourceTypes: ['review'],
       });
       return diversifyRowsBySchool(rows, quota);
     })
@@ -1368,6 +1372,8 @@ function buildCandidateSchoolBlock(
     nationwideReferenceOnly?: boolean;
     schoolInstitutionInfo?: Map<string, SchoolInstitutionInfo>;
     locationSchools?: CampusAreaSchoolMatch[];
+    locationSchoolsWithReviews?: Set<string>;
+    mentionedSchoolNames?: string[];
   } = {}
 ): string {
   const grouped = new Map<
@@ -1380,12 +1386,17 @@ function buildCandidateSchoolBlock(
       focusHits: number;
       coveredFocusIndexes: Set<number>;
       isLocationMatch: boolean;
+      hasReviewEvidence: boolean;
       focusSnippets: string[];
       snippets: string[];
     }
   >();
 
   const focusProfiles = options.focusProfiles ?? [];
+  const mentionedSchoolNameSet = new Set(
+    (options.mentionedSchoolNames ?? []).map((name) => name.trim()).filter(Boolean)
+  );
+  const locationSchoolsWithReviews = options.locationSchoolsWithReviews ?? new Set<string>();
 
   docs.forEach((doc, index) => {
     if (!doc.school_name) return;
@@ -1399,24 +1410,31 @@ function buildCandidateSchoolBlock(
         focusHits: 0,
         coveredFocusIndexes: new Set<number>(),
         isLocationMatch: false,
+        hasReviewEvidence: false,
         focusSnippets: [],
         snippets: [],
       };
 
     if (doc.prefecture) current.prefectures.add(doc.prefecture);
     current.refs.push(index + 1);
+    const isReviewDoc = doc.source_type === 'review';
+    if (isReviewDoc) current.hasReviewEvidence = true;
     const targetText = `${doc.title}\n${doc.content}`;
-    const hits = focusHitCount(targetText, options.focus?.regex);
+    // 「口コミ根拠」は公開口コミのみ。学校紹介・FAQ・要約のヒットは口コミ扱いしない
+    const hits = isReviewDoc ? focusHitCount(targetText, options.focus?.regex) : 0;
     current.focusHits += hits;
-    current.score += (doc.score ?? doc.similarity ?? 0) + hits * 0.35;
-    focusProfiles.forEach((profile, profileIndex) => {
-      const profileHits = focusHitCount(targetText, profile.regex);
-      if (profileHits > 0) {
-        current.coveredFocusIndexes.add(profileIndex);
-        // 絶対条件テーマは、根拠が濃い学校ほど候補上位に来るよう加点する
-        if (profile.constraint) current.score += Math.min(profileHits, 4) * 0.3;
-      }
-    });
+    current.score +=
+      (doc.score ?? doc.similarity ?? 0) * (isReviewDoc ? 1 : 0.35) + hits * 0.35;
+    if (isReviewDoc) {
+      focusProfiles.forEach((profile, profileIndex) => {
+        const profileHits = focusHitCount(targetText, profile.regex);
+        if (profileHits > 0) {
+          current.coveredFocusIndexes.add(profileIndex);
+          // 絶対条件テーマは、根拠が濃い学校ほど候補上位に来るよう加点する
+          if (profile.constraint) current.score += Math.min(profileHits, 4) * 0.3;
+        }
+      });
+    }
     if (hits > 0 && current.focusSnippets.length < 3) {
       current.focusSnippets.push(extractRelevantSnippet(doc.content, options.focus?.regex));
     }
@@ -1433,8 +1451,16 @@ function buildCandidateSchoolBlock(
     }
   }
 
+  const hasReviewBackedFromDocs = [...grouped.values()].some(
+    (candidate) => candidate.hasReviewEvidence
+  );
+  const hasReviewBackedLocationSchools = (options.locationSchools ?? []).some((school) =>
+    locationSchoolsWithReviews.has(school.id)
+  );
+
   if (options.locationSchools?.length) {
     for (const school of options.locationSchools) {
+      const schoolHasReviews = locationSchoolsWithReviews.has(school.id);
       const locationSnippet = `キャンパス所在地: ${school.campusLocations
         .map((location) => {
           const stationText =
@@ -1447,12 +1473,17 @@ function buildCandidateSchoolBlock(
       const existing = grouped.get(school.name);
       if (existing) {
         existing.isLocationMatch = true;
+        if (schoolHasReviews) existing.hasReviewEvidence = true;
         existing.score += 0.5;
         for (const location of school.campusLocations) {
           if (location.prefecture) existing.prefectures.add(location.prefecture);
         }
         existing.snippets = [locationSnippet, ...existing.snippets].slice(0, 3);
         grouped.set(school.name, existing);
+        continue;
+      }
+      // 口コミあり校が既にある場合、所在地だけの口コミなし校は候補に入れない
+      if ((hasReviewBackedFromDocs || hasReviewBackedLocationSchools) && !schoolHasReviews) {
         continue;
       }
       grouped.set(school.name, {
@@ -1465,6 +1496,7 @@ function buildCandidateSchoolBlock(
         focusHits: 0,
         coveredFocusIndexes: new Set<number>(),
         isLocationMatch: true,
+        hasReviewEvidence: schoolHasReviews,
         focusSnippets: [],
         snippets: [locationSnippet],
       });
@@ -1484,6 +1516,21 @@ function buildCandidateSchoolBlock(
       return candidate.focusHits > 0 || candidate.isLocationMatch;
     })
     .sort((a, b) => b.score - a.score);
+
+  // 口コミ投稿がある学校を優先。口コミありが1校でもあれば、口コミなしは原則除外。
+  // ユーザーが明示言及した学校だけは比較・確認のため例外的に残す。
+  const reviewBackedCandidates = sortedCandidates.filter(
+    (candidate) => candidate.hasReviewEvidence
+  );
+  if (reviewBackedCandidates.length > 0) {
+    const mentionedWithoutReview = sortedCandidates.filter(
+      (candidate) =>
+        !candidate.hasReviewEvidence && mentionedSchoolNameSet.has(candidate.schoolName)
+    );
+    sortedCandidates = [...reviewBackedCandidates, ...mentionedWithoutReview].sort(
+      (a, b) => b.score - a.score
+    );
+  }
 
   // 絶対条件（constraint）テーマがある場合、そのテーマの口コミ根拠がある学校が
   // 3校以上あれば、候補リスト自体をその学校だけに絞る（LLMの裁量に任せない）
@@ -1549,10 +1596,16 @@ function buildCandidateSchoolBlock(
           : candidate.snippets.join(' / ');
       const refsText = refs ? ` refs: ${refs}` : '';
       const evidenceLabel = options.focus
-        ? candidate.focusHits > 0
+        ? candidate.hasReviewEvidence && candidate.focusHits > 0
           ? `${options.focus.label}に関する口コミ根拠`
-          : '所在地根拠（相談内容の口コミ根拠は要確認）'
-        : '根拠要約';
+          : candidate.hasReviewEvidence
+            ? '公開口コミあり（今回の相談テーマとの直接一致は要確認）'
+            : mentionedSchoolNameSet.has(candidate.schoolName)
+              ? 'ユーザー言及校（公開口コミは今回見つからず）'
+              : '所在地根拠のみ（公開口コミなし・最終手段）'
+        : candidate.hasReviewEvidence
+          ? '公開口コミ根拠'
+          : '根拠要約（公開口コミなし）';
       // どの相談テーマの根拠を持つ学校かをLLMに明示し、テーマ条件に沿った候補選択を確実にする
       const coveredThemesText =
         focusProfiles.length > 1
@@ -1561,7 +1614,10 @@ function buildCandidateSchoolBlock(
                 .sort((a, b) => a - b)
                 .map((profileIndex) => focusProfiles[profileIndex]?.label)
                 .filter(Boolean)
-                .join('・') || 'なし（所在地根拠のみ）'
+                .join('・') ||
+              (candidate.hasReviewEvidence
+                ? '公開口コミはあるが今回のテーマ一致は弱め'
+                : 'なし（口コミなし）')
             }`
           : '';
       return `${index + 1}. ${candidate.schoolName}（${profileText}）${refsText}\n   ${evidenceLabel}: ${snippets}${coveredThemesText}`;
@@ -2729,10 +2785,18 @@ export async function POST(request: NextRequest) {
       areaSchools,
       broadRegionSchools
     );
-    const rankedLocationSchools = rankLocationSchoolMatches(locationSchools, [
+    const rankedLocationSchoolsRaw = rankLocationSchoolMatches(locationSchools, [
       ...locationTerms,
       ...(area?.cities ?? []),
     ]);
+    const locationReviewSchoolIds = await fetchSchoolIdsHavingPublicReviews(
+      rankedLocationSchoolsRaw.map((school) => school.id)
+    );
+    // 口コミ投稿がある地域校を優先。口コミあり校がゼロのときだけ口コミなし校を残す
+    const rankedLocationSchools = preferSchoolsWithPublicReviews(
+      rankedLocationSchoolsRaw,
+      locationReviewSchoolIds
+    );
     const preliminaryDocs = mergeRagRows(
       mergeRagRows(mentionedSchoolDocs, rerankRowsForFocus(focusDocs, combinedFocus)),
       rerankRowsForFocus(rerankForGuardianConsultation(docsRaw, reasonGroup), combinedFocus)
@@ -2775,7 +2839,7 @@ export async function POST(request: NextRequest) {
             : route.prefecture
               ? 14
               : 10;
-    const docs = selectDocsWithFocusCoverage(
+    const docsRawSelected = selectDocsWithFocusCoverage(
       dedupeSimilarRagRows(
         mergeRagRows(
           mergeRagRows(
@@ -2788,6 +2852,26 @@ export async function POST(request: NextRequest) {
       focusList,
       maxDocs
     );
+    // 推薦時は、公開口コミがある学校の文書を優先。口コミあり校が存在するなら口コミなし校の文書は落とす
+    // （ユーザー明示言及校は比較のため例外で残す）
+    const mentionedSchoolNameSet = new Set(mentionedSchools);
+    const reviewSchoolNamesFromDocs = new Set(
+      docsRawSelected
+        .filter((doc) => doc.source_type === 'review' && doc.school_name)
+        .map((doc) => doc.school_name as string)
+    );
+    for (const school of rankedLocationSchools) {
+      if (locationReviewSchoolIds.has(school.id)) reviewSchoolNamesFromDocs.add(school.name);
+    }
+    const docs =
+      intent === 'school_recommendation' && reviewSchoolNamesFromDocs.size > 0
+        ? docsRawSelected.filter((doc) => {
+            if (!doc.school_name) return true;
+            if (reviewSchoolNamesFromDocs.has(doc.school_name)) return true;
+            if (mentionedSchoolNameSet.has(doc.school_name)) return true;
+            return false;
+          })
+        : docsRawSelected;
 
     const finalSchoolInstitutionInfo =
       balancedAreaDocs.length > 0 ? await fetchSchoolInstitutionInfo(docs) : schoolInstitutionInfo;
@@ -2815,15 +2899,22 @@ export async function POST(request: NextRequest) {
 
     const schoolInstitutionInfoForPrompt = finalSchoolInstitutionInfo;
 
-    const evidenceBySchool = new Map<string, number>();
+    const evidenceBySchool = new Map<string, { total: number; reviews: number }>();
     for (const doc of docs) {
       if (!doc.school_name) continue;
-      evidenceBySchool.set(doc.school_name, (evidenceBySchool.get(doc.school_name) ?? 0) + 1);
+      const current = evidenceBySchool.get(doc.school_name) ?? { total: 0, reviews: 0 };
+      current.total += 1;
+      if (doc.source_type === 'review') current.reviews += 1;
+      evidenceBySchool.set(doc.school_name, current);
     }
     const schoolHints = [...evidenceBySchool.entries()]
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => b[1].reviews - a[1].reviews || b[1].total - a[1].total)
       .slice(0, 8)
-      .map(([school, count]) => `${school} (${count}件の関連根拠)`)
+      .map(([school, count]) =>
+        count.reviews > 0
+          ? `${school}（公開口コミ${count.reviews}件）`
+          : `${school}（口コミなし・関連情報${count.total}件）`
+      )
       .join(' / ');
     const areaHints =
       (area || broadRegion || commuteLocationTerms.length > 0) && rankedLocationSchools.length > 0
@@ -2862,7 +2953,7 @@ export async function POST(request: NextRequest) {
           ? `今回の相談の中心は「${focus.label}」です。${focus.instruction} 各候補校の説明では、相談の中心に直接関係する口コミ根拠を最低1つは明記してください。相談の中心に直接関係する口コミ根拠が薄い学校は、候補にしないか「根拠は弱め」と明記してください。`
           : 'ユーザーが一番気にしていることを読み取り、候補校の説明では口コミ上の具体的な良かった点・注意点を必ず添えてください。';
     const areaInstruction = area
-      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。口コミ根拠が薄い場合でも、所在地根拠と確認事項を分けて説明してください。全国展開校・サポート校は本部都道府県と実際のキャンパス所在地が異なる場合があるため、「所在地から拾った地域候補」に含まれる拠点がある学校だけを候補にしてください。候補に出す各校では、良かった点・注意点とは別に「所在地根拠: ◯◯市/最寄り駅」も1行で明記してください。所在地根拠が書けない学校は候補にしないでください。`
+      ? `ユーザーは「${area.label}」周辺を意図しています。学校候補は、所在地・キャンパスがこの周辺市区にある学校を最優先してください。候補校は公開口コミがある学校だけを選んでください。口コミがない学校は、候補校リストに公開口コミあり校が一切ない場合に限り、所在地根拠と確認事項を分けて補足できます。全国展開校・サポート校は本部都道府県と実際のキャンパス所在地が異なる場合があるため、「所在地から拾った地域候補」に含まれる拠点がある学校だけを候補にしてください。候補に出す各校では、良かった点・注意点とは別に「所在地根拠: ◯◯市/最寄り駅」も1行で明記してください。所在地根拠が書けない学校は候補にしないでください。`
       : '';
     const genericLocationInstruction =
       !area && locationTerms.length > 0
@@ -2907,6 +2998,7 @@ export async function POST(request: NextRequest) {
           '会話履歴に出ている本人の発達特性（ASD/ADHDなど）、体調、性別、居住地、通学可能時間、登校希望、対面/オンライン希望、進学希望は強い制約として保持してください。ユーザーが後続で地域だけを入力した場合も、前の制約を消さず、その地域から通いやすい候補を具体的に提案してください。' +
           'ユーザーが学校候補を明示的に求めていない場合、学校候補・おすすめ校・参考候補を出してはいけません。まず質問に直接答えてください。' +
           '地域指定がある場合、学校候補はその地域の学校を最優先し、根拠にない都外校を候補として出さないでください。' +
+          '候補校を出す場合は、公開口コミがある学校を必ず優先してください。口コミ投稿がない学校は、候補校リスト上で公開口コミあり校が存在しない場合に限り提示できます。口コミなし校を口コミ引用のように書かないでください。' +
           '都外校や全国型オンライン校に触れる場合は、地域内候補が不足する時の補足扱いにしてください。' +
           '候補校を出す場合、公立通信制・私立通信制・サポート校の区分が分かる学校は、学校名の近くと本文で必ず明記してください。' +
           'サポート校を候補に出す場合は、通信制高校本体への別途在籍が必要になる場合があることを一言添えてください。' +
@@ -2971,7 +3063,7 @@ export async function POST(request: NextRequest) {
             (conditionInsightBlock ? `${conditionInsightBlock}\n\n` : '') +
             (monitoringInsightBlock ? `${monitoringInsightBlock}\n\n` : '') +
             (intent === 'school_recommendation'
-              ? `候補校リスト（###見出しに使える実名校は、この候補校リストまたは上の補助情報に出ている学校だけ）:\n${buildCandidateSchoolBlock(
+              ? `候補校リスト（###見出しに使える実名校は、この候補校リストまたは上の補助情報に出ている学校だけ。公開口コミがある学校がリストにある場合は、口コミなし校を候補にしない）:\n${buildCandidateSchoolBlock(
                   docs,
                   {
                     focus: combinedFocus,
@@ -2979,6 +3071,8 @@ export async function POST(request: NextRequest) {
                     nationwideReferenceOnly: !route.prefecture && !broadRegion,
                     schoolInstitutionInfo: schoolInstitutionInfoForPrompt,
                     locationSchools: rankedLocationSchools,
+                    locationSchoolsWithReviews: locationReviewSchoolIds,
+                    mentionedSchoolNames: mentionedSchools,
                   }
                 )}\n\n`
               : '') +
