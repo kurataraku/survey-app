@@ -7,7 +7,14 @@ import { compareSearchAnalytics, getGscSiteUrl } from '@/lib/gsc/client';
 import { getGscComparisonPeriods } from '@/lib/gsc/periods';
 import type { SeoLoopConfig } from './config';
 
-const MAX_PRIORITY_PAGE_QUERY_URLS = 5;
+const MAX_PRIORITY_PAGE_QUERY_URLS = 8;
+
+/** 検出する課題数はproposal上限より多く取り、見送り分を吸収する */
+const ISSUE_CAP_MULTIPLIER = 2;
+
+export function issueCapForRun(maxDailyProposals: number): number {
+  return Math.max(1, maxDailyProposals) * ISSUE_CAP_MULTIPLIER;
+}
 
 export function selectPriorityUrls(
   pageRows: Parameters<typeof extractGscOpportunities>[0],
@@ -63,9 +70,10 @@ export async function observeGscIssues(params: {
     }),
   ]);
 
+  const issueCap = issueCapForRun(params.config.maxDailyProposals);
   const priorityUrls = selectPriorityUrls(
     pages.rows,
-    Math.min(MAX_PRIORITY_PAGE_QUERY_URLS, params.config.maxDailyProposals)
+    Math.min(MAX_PRIORITY_PAGE_QUERY_URLS, issueCap)
   );
   const pageQueryResults = await Promise.allSettled(
     priorityUrls.map((page) =>
@@ -93,10 +101,7 @@ export async function observeGscIssues(params: {
     ...extractGscOpportunities(pages.rows),
     ...extractGscOpportunities(queries.rows),
   ];
-  const opportunities = rankAndDedupeOpportunities(
-    allOpportunities,
-    params.config.maxDailyProposals
-  );
+  const opportunities = rankAndDedupeOpportunities(allOpportunities, issueCap);
 
   for (const opportunity of opportunities) {
     const { error } = await params.supabase.from('seo_issues').upsert(

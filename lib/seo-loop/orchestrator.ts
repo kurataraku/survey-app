@@ -4,7 +4,8 @@ import { getSeoLoopConfig } from './config';
 import { executeApprovedProposal } from './executor';
 import { payloadHash } from './hash';
 import { acquireRunLock, createOrLoadRun, dailyRunKey, releaseRunLock } from './lock';
-import { analyzeIssuesToProposals } from './analyzer';
+import { analyzeIssuesToProposals, countOpenIssues } from './analyzer';
+import { remainingDailyProposalBudget } from './limits';
 import { observeGscIssues } from './observer';
 import {
   notifySlackApproval,
@@ -34,6 +35,11 @@ import type { SeoLoopRun, SeoLoopStepResult } from './types';
 
 const MAX_STEPS_PER_TICK = 8;
 const MAX_RUNS_PER_TICK = 3;
+/**
+ * Function maxDuration(300s)とrun lock TTL(既定240s)より手前で
+ * 新しいLLMステップを始めないための時間予算。超えた分の課題はopenのまま次tickで続ける。
+ */
+const TICK_TIME_BUDGET_MS = 180_000;
 
 class RetryableSeoLoopError extends Error {}
 
@@ -180,9 +186,35 @@ async function selectRunnableRun(
   return createOrLoadRun(supabase, dailyRunKey());
 }
 
+/**
+ * Slack通知まで終えたあと、未分析課題と当日予算が残っていれば同じrunで分析へ戻す。
+ * 承認待ちで止めず、1日のうちに提案を積み増すための折り返し。
+ */
+async function resumeAnalysisIfPossible(
+  supabase: SupabaseClient,
+  run: SeoLoopRun,
+  config: ReturnType<typeof getSeoLoopConfig>,
+  deadlineAt: number
+): Promise<boolean> {
+  if (Date.now() >= deadlineAt) return false;
+  const openIssues = await countOpenIssues(supabase, run.id);
+  if (openIssues === 0) return false;
+  const budget = await remainingDailyProposalBudget(supabase, config);
+  if (budget <= 0) return false;
+
+  await updateRun(supabase, run.id, {
+    status: 'analyzing',
+    current_step: 'analyze',
+    completed_at: null,
+    next_action_at: new Date().toISOString(),
+  });
+  return true;
+}
+
 async function handlePendingApproval(
   supabase: SupabaseClient,
-  run: SeoLoopRun
+  run: SeoLoopRun,
+  deadlineAt: number
 ): Promise<SeoLoopStepResult> {
   const { data: proposals, error } = await supabase
     .from('seo_proposals')
@@ -282,6 +314,13 @@ async function handlePendingApproval(
     .eq('status', 'pending_approval');
   if (pendingError) throw pendingError;
   if ((pendingCount ?? 0) === 0) {
+    if (await resumeAnalysisIfPossible(supabase, run, config, deadlineAt)) {
+      return {
+        status: 'analyzed',
+        runId: run.id,
+        message: `${blockedCount}件が品質ゲート不合格のため、残りの課題分析を続けます`,
+      };
+    }
     await updateRun(supabase, run.id, {
       status: 'completed',
       current_step: 'evaluate',
@@ -302,6 +341,14 @@ async function handlePendingApproval(
       status: 'pending_approval',
       runId: run.id,
       message: `${retryableCount}件は一時的な観測失敗のため再評価待ちです`,
+    };
+  }
+
+  if (await resumeAnalysisIfPossible(supabase, run, config, deadlineAt)) {
+    return {
+      status: 'analyzed',
+      runId: run.id,
+      message: 'Slack通知後、残りの課題分析を続けます',
     };
   }
 
@@ -441,7 +488,8 @@ async function handleExecute(
 
 async function processOneStep(
   supabase: SupabaseClient,
-  run: SeoLoopRun
+  run: SeoLoopRun,
+  deadlineAt: number
 ): Promise<SeoLoopStepResult> {
   const config = getSeoLoopConfig();
 
@@ -455,7 +503,12 @@ async function processOneStep(
   }
 
   if (run.status === 'analyzing') {
-    const result = await analyzeIssuesToProposals({ supabase, runId: run.id, config });
+    const result = await analyzeIssuesToProposals({
+      supabase,
+      runId: run.id,
+      config,
+      deadlineAt,
+    });
     return { status: 'analyzed', runId: run.id, message: result.message };
   }
 
@@ -474,7 +527,7 @@ async function processOneStep(
   }
 
   if (run.status === 'pending_approval') {
-    return handlePendingApproval(supabase, run);
+    return handlePendingApproval(supabase, run, deadlineAt);
   }
 
   if (run.status === 'executing') {
@@ -494,7 +547,8 @@ function isTerminalStatus(status: string): boolean {
  */
 async function advanceRunUntilIdle(
   supabase: SupabaseClient,
-  initialRun: SeoLoopRun
+  initialRun: SeoLoopRun,
+  deadlineAt: number
 ): Promise<SeoLoopStepResult> {
   const messages: string[] = [];
   let last: SeoLoopStepResult = {
@@ -513,7 +567,12 @@ async function advanceRunUntilIdle(
       break;
     }
 
-    last = await processOneStep(supabase, run);
+    if (step > 0 && Date.now() >= deadlineAt) {
+      messages.push('実行時間上限に達したため、残りは次回tickで続けます');
+      break;
+    }
+
+    last = await processOneStep(supabase, run, deadlineAt);
     messages.push(last.message);
 
     const after = await loadRun(supabase, run.id);
@@ -583,11 +642,13 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
     }).catch(() => undefined);
   }
   const todayKey = dailyRunKey();
+  const deadlineAt = Date.now() + TICK_TIME_BUDGET_MS;
   const results: SeoLoopStepResult[] = [];
   const processedIds = new Set<string>();
   let revisionRunsProcessed = 0;
 
   for (let i = 0; i < MAX_RUNS_PER_TICK; i += 1) {
+    if (i > 0 && Date.now() >= deadlineAt) break;
     const allowRevision = revisionRunsProcessed < 2;
     const run = await selectRunnableRun(supabase, processedIds, allowRevision);
     if (processedIds.has(run.id)) {
@@ -634,7 +695,7 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
           next_action_at: new Date().toISOString(),
         });
       }
-      const result = await advanceRunUntilIdle(supabase, locked);
+      const result = await advanceRunUntilIdle(supabase, locked, deadlineAt);
       results.push(result);
     } catch (error) {
       const current = await loadRun(supabase, run.id).catch(() => run);

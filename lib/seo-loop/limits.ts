@@ -21,6 +21,15 @@ async function countSince(
   return count ?? 0;
 }
 
+/** 当日あと何件proposalを作れるか。0以下なら生成を止める */
+export async function remainingDailyProposalBudget(
+  supabase: SupabaseClient,
+  config: SeoLoopConfig
+): Promise<number> {
+  const proposalCount = await countSince(supabase, 'seo_proposals', startOfUtcDay());
+  return Math.max(0, config.maxDailyProposals - proposalCount);
+}
+
 export async function assertProposalLimits(
   supabase: SupabaseClient,
   config: SeoLoopConfig,

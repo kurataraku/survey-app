@@ -102,13 +102,13 @@ curl -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/se
 ```
 
 本番ではVercel Cronが `CRON_SECRET` をBearerとして付与します。
-スケジュールは `vercel.json` の `17 23 * * *`（UTC）= 毎日 **日本時間 8:17** です。
+スケジュールは `vercel.json` の `17 * * * *`（UTC）= **毎時17分**です。毎時起動はVercel Proプランが前提です。
 Cron path は `/tsushin-kuchikomi/api/cron/seo-loop` です（ベースパス付き）。
-1回のtickで観測→分析→Slack通知まで連続実行し、人間承認待ちで停止します。
-承認後の実行ゲートは、次回以降のCron（または手動tick）で進みます。
-修正依頼の改訂も次回Cronで処理するため、日次Cron運用ではSlack再提案まで最大約24時間かかります。急ぐ場合はCron APIを手動実行してください。
-提案0件の日も、Slackに「提案なし」ステータスを送ります（沈黙で止まっていないことを確認しやすくするため）。
-Vercel ダッシュボードの Cron / Function ログで、毎朝の実行有無も確認してください。
+GSC観測は日次run key（`seo-loop:YYYY-MM-DD`）で1日1回だけ実行し、以降のtickは未分析課題の分析、Slack通知、修正依頼の改訂、承認済みの実行ゲートを進めます。
+1 tickでは観測→分析→Slack通知を繰り返し、未分析課題か当日proposal予算が尽きるか、実行時間予算（180秒）に達したところで止めます。残りは次のtickで続きます。
+修正依頼の改訂は次のtickで処理するため、Slack再提案まで最大約1時間です。急ぐ場合はCron APIを手動実行してください。
+提案0件のtickでは、Slackの実行結果通知に見送り理由と未分析課題数が入ります。
+Vercel ダッシュボードの Cron / Function ログで実行有無も確認してください。
 
 ## 7. 運用上の注意
 

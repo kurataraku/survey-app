@@ -14,7 +14,7 @@ sequenceDiagram
   participant Slack as Slack
   participant Exec as TypedExecutor
 
-  Cron->>API: tick (日次1回)
+  Cron->>API: tick (毎時)
   API->>DB: acquire_lock
   API->>GSC: fetch_readonly_metrics
   API->>LLM: analyze_untrusted_data
@@ -24,7 +24,7 @@ sequenceDiagram
   API->>DB: active版とshadow版を同一proposalで評価
   Note over API,DB: shadow結果は専用ログだけへ保存し、proposal/approval/実行へ流さない
   API->>Slack: active版合格proposalだけrequest_approval
-  Note over API: 1回のtickで観測→分析→Slackまで連続実行し、人間承認待ちで停止
+  Note over API: 1回のtickで観測→分析→Slack通知を繰り返し、未分析課題と当日予算が尽きたら停止
   Slack->>API: approve_or_reject
   API->>DB: bind_approval_to_hash
   Cron->>API: 次回tickで承認済みをexecute
@@ -85,6 +85,20 @@ Untrusted Data
 ```
 
 LLMは任意SQL、任意テーブル、任意カラム、汎用DBパッチを指定できません。
+
+## 提案スループット
+
+Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun keyで1日1回だけ行い、以降のtickは未分析課題、Slack通知、修正依頼の改訂、承認済みの実行ゲートを進めます。修正依頼を押してから再提案が届くまでは最大1時間です。
+
+1 tickの流れは次のとおりです。
+
+- 観測でproposal上限の2倍（既定20件）まで課題を保存する
+- 分析は5件ずつ処理し、Slack通知後に未分析課題と当日予算が残っていれば同じrunで分析へ戻る
+- Function実行時間の予算（180秒）を超えたら新しい課題に着手せず、残りをopenのまま次tickへ回す
+
+1日のproposal数はRulebookの`ops.maxDailyProposals`が上限です（既定10件）。`SEO_LOOP_MAX_DAILY_PROPOSALS`を大きくしてもRulebook値が優先されるため、10件を超えるにはRulebook新版とshadow昇格が必要です。
+
+提案が0件で終わったtickでは、Slackの実行結果通知に見送り理由（`context` / `facts` / `policy` / `analyst` / `strategist` / `assemble`）と未分析課題数が入ります。どの段で落ちたかを見て、プロンプトかRulebookのどちらを直すか判断してください。
 
 ## 情報削減と重複変更の禁止
 

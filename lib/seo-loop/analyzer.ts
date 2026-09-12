@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { callLLM, resolveModel } from '@/lib/seo-generation/llm-client';
 import { payloadHash, stableJson } from './hash';
-import { assertProposalLimits } from './limits';
+import { assertProposalLimits, remainingDailyProposalBudget } from './limits';
 import { collectFactContext } from './context/collector';
 import { validateProposalAgainstContext } from './context/validate';
 import { analystOutputSchema } from './analysis/types';
@@ -48,7 +48,11 @@ type SeoIssueRow = {
   scores: unknown;
 };
 
-const STRUCTURED_MAX_ATTEMPTS = 2;
+/** 構造化出力の再試行回数。Rulebook・content policy違反を直す猶予を持たせる */
+const STRUCTURED_MAX_ATTEMPTS = 3;
+
+/** 1回のanalyzeステップで扱う課題数。残課題は同tickの次ステップか次tickで続ける */
+const ISSUE_BATCH_SIZE = 5;
 
 function mergeIssueEvidence(
   issue: SeoIssueRow,
@@ -61,22 +65,40 @@ function mergeIssueEvidence(
   return { ...existing, ...additional };
 }
 
-async function fetchOpenIssues(supabase: SupabaseClient, runId: string): Promise<SeoIssueRow[]> {
+async function fetchOpenIssues(
+  supabase: SupabaseClient,
+  runId: string,
+  limit = ISSUE_BATCH_SIZE
+): Promise<SeoIssueRow[]> {
   const { data, error } = await supabase
     .from('seo_issues')
     .select('id,issue_type,title,description,target_url,query,gsc_snapshot,evidence,scores')
     .eq('run_id', runId)
     .eq('status', 'open')
-    .limit(5);
+    .limit(limit);
 
   if (error) throw error;
   return (data ?? []) as SeoIssueRow[];
+}
+
+export async function countOpenIssues(
+  supabase: SupabaseClient,
+  runId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from('seo_issues')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', runId)
+    .eq('status', 'open');
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function analyzeIssuesToProposals(params: {
   supabase: SupabaseClient;
   runId: string;
   config: SeoLoopConfig;
+  deadlineAt?: number;
 }): Promise<{ proposalCount: number; message: string }> {
   const issues = await fetchOpenIssues(params.supabase, params.runId);
   if (issues.length === 0) {
@@ -96,8 +118,22 @@ export async function analyzeIssuesToProposals(params: {
   const ruleIds = allRuleIds(rulebook.content);
   const effectiveLimits = effectiveRulebookLimits(params.config, rulebook);
   let proposalCount = 0;
+  let remainingBudget = await remainingDailyProposalBudget(params.supabase, {
+    ...params.config,
+    ...effectiveLimits,
+  });
+  let stoppedReason: 'budget' | 'deadline' | null = null;
+  const dismissedStages: string[] = [];
 
   for (const issue of issues) {
+    if (remainingBudget <= 0) {
+      stoppedReason = 'budget';
+      break;
+    }
+    if (params.deadlineAt !== undefined && Date.now() >= params.deadlineAt) {
+      stoppedReason = 'deadline';
+      break;
+    }
     if (!issue.target_url) {
       const { error } = await params.supabase
         .from('seo_issues')
@@ -109,6 +145,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (error) throw error;
+      dismissedStages.push('context');
       continue;
     }
 
@@ -129,6 +166,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (updateError) throw updateError;
+      dismissedStages.push('context');
       continue;
     }
 
@@ -151,6 +189,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (error) throw error;
+      dismissedStages.push('facts');
       continue;
     }
 
@@ -173,6 +212,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (error) throw error;
+      dismissedStages.push('policy');
       continue;
     }
 
@@ -244,6 +284,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (error) throw error;
+      dismissedStages.push('analyst');
       continue;
     }
 
@@ -262,6 +303,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (error) throw error;
+      dismissedStages.push('analyst_insufficient');
       continue;
     }
 
@@ -339,6 +381,7 @@ export async function analyzeIssuesToProposals(params: {
         })
         .eq('id', issue.id);
       if (error) throw error;
+      dismissedStages.push('strategist');
       continue;
     }
 
@@ -416,7 +459,9 @@ export async function analyzeIssuesToProposals(params: {
       if (error) throw error;
       proposalCount += 1;
       issueProposalCount += 1;
+      remainingBudget -= 1;
     }
+    if (issueProposalCount === 0) dismissedStages.push('assemble');
 
     const { error: issueUpdateError } = await params.supabase
       .from('seo_issues')
@@ -432,21 +477,46 @@ export async function analyzeIssuesToProposals(params: {
     if (issueUpdateError) throw issueUpdateError;
   }
 
+  const openRemaining = await countOpenIssues(params.supabase, params.runId);
+  // 未分析課題と当日予算が残っていれば同じrunで分析を続ける。
+  // 予算切れ・時間切れのときも課題はopenのまま残し、次tickで再開する。
+  const continueAnalyzing =
+    openRemaining > 0 && remainingBudget > 0 && stoppedReason !== 'budget';
+  const nextStatus =
+    proposalCount > 0
+      ? 'pending_approval'
+      : continueAnalyzing
+        ? 'analyzing'
+        : 'completed';
+
   const { error: runUpdateError } = await params.supabase
     .from('seo_loop_runs')
     .update({
-      status: proposalCount > 0 ? 'pending_approval' : 'completed',
+      status: nextStatus,
       current_step: proposalCount > 0 ? 'approve' : 'analyze',
-      completed_at: proposalCount > 0 ? null : new Date().toISOString(),
+      completed_at: nextStatus === 'completed' ? new Date().toISOString() : null,
     })
     .eq('id', params.runId);
   if (runUpdateError) throw runUpdateError;
+
+  const remainingNote =
+    openRemaining > 0
+      ? `／未分析課題${openRemaining}件${
+          stoppedReason === 'budget'
+            ? '（当日proposal上限に到達）'
+            : stoppedReason === 'deadline'
+              ? '（実行時間上限で中断）'
+              : ''
+        }`
+      : '';
+  const dismissedNote =
+    dismissedStages.length > 0 ? `／見送り: ${dismissedStages.join(',')}` : '';
 
   return {
     proposalCount,
     message:
       proposalCount > 0
-        ? `${proposalCount}件の構造化proposalを保存しました`
-        : '承認対象proposalは生成されませんでした',
+        ? `${proposalCount}件の構造化proposalを保存しました${dismissedNote}${remainingNote}`
+        : `承認対象proposalは生成されませんでした${dismissedNote}${remainingNote}`,
   };
 }
