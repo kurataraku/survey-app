@@ -1,3 +1,4 @@
+import { contentChangeRegressions } from '../content-change';
 import type { ProposalPayloadV2, TypedAction } from '../types';
 import type { FactContextSnapshot } from './types';
 
@@ -47,6 +48,8 @@ export function validateProposalAgainstContext(
       }
     }
   }
+
+  errors.push(...contentChangeRegressions(proposal, context));
 
   return [...new Set(errors)];
 }

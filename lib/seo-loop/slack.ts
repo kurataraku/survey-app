@@ -1,6 +1,11 @@
 import * as crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { proposalPayloadV2Schema } from './types';
+import {
+  existingInternalLinkCount,
+  isStructuredTextAction,
+  summarizeTextChange,
+} from './content-change';
+import { proposalPayloadV2Schema, type ProposalPayloadV2 } from './types';
 import type { ProposalEvaluationResult } from './evaluation/types';
 
 type SeoProposalForSlack = {
@@ -40,6 +45,56 @@ function safeSlackValue(value: string, max: number): string {
     .replace(/`/g, 'ˋ');
 }
 
+function linkChangeLine(target: ProposalPayloadV2['targets'][number]): string {
+  const existing = existingInternalLinkCount(target.currentValue);
+  const countLabel =
+    existing === null
+      ? '既存リンク件数は不明です'
+      : `内部リンク ${existing}件 → ${existing + 1}件`;
+  return `• 追加リンク: ${safeSlackValue(target.proposedValue, 300)}\n  ${countLabel}`;
+}
+
+function textChangeLine(target: ProposalPayloadV2['targets'][number]): string {
+  const change = summarizeTextChange(target.currentValue, target.proposedValue);
+  const delta = change.proposedLength - change.currentLength;
+  const percent =
+    change.currentLength === 0 ? 0 : Math.round((delta / change.currentLength) * 100);
+  const signed = (value: number): string => (value >= 0 ? `+${value}` : `${value}`);
+  const lines = [
+    `• 文字数: ${change.currentLength} → ${change.proposedLength} (${signed(delta)} / ${signed(percent)}%)`,
+  ];
+  if (change.removedHeadings.length > 0) {
+    lines.push(
+      `  削除される見出し: ${safeSlackValue(change.removedHeadings.join(' / '), 300)}`
+    );
+  }
+  if (change.addedHeadings.length > 0) {
+    lines.push(
+      `  追加される見出し: ${safeSlackValue(change.addedHeadings.join(' / '), 300)}`
+    );
+  }
+  if (change.removedBulletCount > 0 || change.addedBulletCount > 0) {
+    lines.push(
+      `  箇条書き: 削除${change.removedBulletCount}件 / 追加${change.addedBulletCount}件`
+    );
+  }
+  lines.push(
+    `  行単位: 削除${change.removedLineCount}行 / 追加${change.addedLineCount}行`
+  );
+  return lines.join('\n');
+}
+
+/** 承認者が変更前後の差分を一目で判断できるよう、変更内容を要約する */
+export function changeOverview(proposal: ProposalPayloadV2): string {
+  return proposal.targets
+    .map((target) => {
+      if (proposal.action === 'addApprovedInternalLink') return linkChangeLine(target);
+      if (isStructuredTextAction(proposal.action)) return textChangeLine(target);
+      return `• 文字数: ${target.currentValue.trim().length} → ${target.proposedValue.trim().length}`;
+    })
+    .join('\n');
+}
+
 export function approvalDetails(
   payload: unknown,
   evaluation: ProposalEvaluationResult
@@ -50,19 +105,19 @@ export function approvalDetails(
   const targets = proposal.targets
     .map(
       (target) =>
-        `• \`${safeSlackValue(`${target.type}:${target.id}`, 150)}\`\n  現在: ${safeSlackValue(target.currentValue, 350)}\n  提案: ${safeSlackValue(target.proposedValue, 350)}`
+        `• \`${safeSlackValue(`${target.type}:${target.id}`, 150)}\`\n  対象URL: ${safeSlackValue(target.url, 200)}\n  変更前: ${safeSlackValue(target.currentValue, 300)}\n  変更後: ${safeSlackValue(target.proposedValue, 300)}`
     )
     .join('\n');
   const evidence = proposal.facts
     .slice(0, 3)
-    .map((fact) => `• [${fact.source}] ${safeSlackValue(fact.statement, 300)}`)
+    .map((fact) => `• [${fact.source}] ${safeSlackValue(fact.statement, 250)}`)
     .join('\n');
   const warnings =
     evaluation.warnings.length > 0
       ? `\n*警告*\n${evaluation.warnings.map((warning) => `• ${safeSlackValue(warning, 250)}`).join('\n')}`
       : '';
   return truncateSlack(
-    `*評価* ${evaluation.softEval.totalScore}/100 / Risk: \`${evaluation.riskLevel}\`${warnings}\n\n*対象と実測値*\n${targets}\n\n*根拠*\n${evidence}`,
+    `*評価* ${evaluation.softEval.totalScore}/100 / Risk: \`${evaluation.riskLevel}\`${warnings}\n\n*変更内容*\n${changeOverview(proposal)}\n\n*変更前後の値*\n${targets}\n\n*根拠*\n${evidence}`,
     2900
   );
 }

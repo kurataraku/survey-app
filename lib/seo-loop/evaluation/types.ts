@@ -12,6 +12,8 @@ export type HardGateRuleId =
   | 'no_forbidden_expression'
   | 'no_duplicate_proposal'
   | 'internal_link_same_origin'
+  | 'internal_link_not_duplicated'
+  | 'content_structure_preserved'
   | 'target_limit'
   | 'daily_proposal_limit';
 

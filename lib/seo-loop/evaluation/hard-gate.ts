@@ -1,5 +1,10 @@
 import type { FactContextSnapshot } from '../context/types';
 import {
+  internalLinkRegressions,
+  isStructuredTextAction,
+  structuredTextRegressions,
+} from '../content-change';
+import {
   ACTION_VALUE_LIMITS,
   containsSiteBrand,
   forbiddenExpressions,
@@ -122,6 +127,18 @@ export function runHardGate(params: {
             new URL(target.proposedValue).origin === new URL(context.target.url).origin
         ))
   );
+  const duplicatedLinks =
+    proposal && context && proposal.action === 'addApprovedInternalLink'
+      ? proposal.targets.flatMap((target) =>
+          internalLinkRegressions(target.proposedValue, context)
+        )
+      : [];
+  const structureRegressions =
+    proposal && isStructuredTextAction(proposal.action)
+      ? proposal.targets.flatMap((target) =>
+          structuredTextRegressions(target.currentValue, target.proposedValue)
+        )
+      : [];
   const targetCount = proposal?.targets.length ?? 0;
   const approvalPhase = (params.phase ?? 'approval') === 'approval';
 
@@ -207,6 +224,26 @@ export function runHardGate(params: {
       '内部リンク先が対象サイトと同一originではありません',
       undefined,
       'risk.same_origin_link.v1'
+    ),
+    rule(
+      'internal_link_not_duplicated',
+      Boolean(
+        proposal &&
+          (proposal.action !== 'addApprovedInternalLink' ||
+            (context !== null && duplicatedLinks.length === 0))
+      ),
+      '追加リンクは対象ページの既存リンクと重複しません',
+      '追加リンクが既存リンクまたは対象ページ自身と重複します',
+      duplicatedLinks.length > 0 ? { regressions: duplicatedLinks } : undefined
+    ),
+    rule(
+      'content_structure_preserved',
+      Boolean(proposal && structureRegressions.length === 0),
+      '既存の見出し・箇条書き・情報量を維持しています',
+      '既存の見出し・箇条書き・情報量を削減しています',
+      structureRegressions.length > 0
+        ? { regressions: structureRegressions }
+        : undefined
     ),
     rule(
       'target_limit',

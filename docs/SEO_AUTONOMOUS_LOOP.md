@@ -86,6 +86,17 @@ Untrusted Data
 
 LLMは任意SQL、任意テーブル、任意カラム、汎用DBパッチを指定できません。
 
+## 情報削減と重複変更の禁止
+
+「短くする」「一般的な一覧へリンクを増やす」といった変更は、それ自体ではSEO改善の根拠になりません。次の変更はStrategistプロンプトで禁止し、生成時の再試行検証とHard Gateの両方で拒否します。
+
+- `content_structure_preserved`: `updateSeoSummary`で、currentValueにある見出しの削除、箇条書きの純減、残存文字数比率80%未満の短縮
+- `internal_link_not_duplicated`: `addApprovedInternalLink`で、公開HTMLの既存内部リンクと同一URL、または対象ページ自身へのリンク追加
+
+判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。
+
+Slackの承認カードは`*変更内容*`として、対象URL、文字数のbefore/after、削除・追加される見出し、箇条書きと行の増減、内部リンク件数の増減を表示します。承認者は本文全体を読み比べずに変化を判断できます。
+
 ## 承認固定
 
 proposalには `version` と `payload_hash` を保存します。Slack承認時の hash/version と実行時の hash/version が一致しない場合は実行を拒否し、再承認を要求します。
