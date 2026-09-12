@@ -1,8 +1,42 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { extractGscOpportunities } from '@/lib/gsc/analyze';
+import {
+  extractGscOpportunities,
+  type GscOpportunity,
+} from '@/lib/gsc/analyze';
 import { compareSearchAnalytics, getGscSiteUrl } from '@/lib/gsc/client';
 import { getGscComparisonPeriods } from '@/lib/gsc/periods';
 import type { SeoLoopConfig } from './config';
+
+const MAX_PRIORITY_PAGE_QUERY_URLS = 5;
+
+export function selectPriorityUrls(
+  pageRows: Parameters<typeof extractGscOpportunities>[0],
+  limit = MAX_PRIORITY_PAGE_QUERY_URLS
+): string[] {
+  const urls = extractGscOpportunities(pageRows)
+    .map((opportunity) => opportunity.targetUrl)
+    .filter((url): url is string => Boolean(url));
+  return [...new Set(urls)].slice(0, Math.max(0, limit));
+}
+
+export function rankAndDedupeOpportunities(
+  opportunities: GscOpportunity[],
+  limit: number
+): GscOpportunity[] {
+  const ranked = [...opportunities].sort(
+    (a, b) =>
+      Number(Boolean(b.targetUrl)) - Number(Boolean(a.targetUrl)) ||
+      b.scores.opportunity - a.scores.opportunity
+  );
+  const deduped = new Map<string, GscOpportunity>();
+  for (const opportunity of ranked) {
+    const key = opportunity.targetUrl
+      ? `${opportunity.issueType}:${opportunity.targetUrl}`
+      : opportunity.issueKey;
+    if (!deduped.has(key)) deduped.set(key, opportunity);
+  }
+  return [...deduped.values()].slice(0, limit);
+}
 
 export async function observeGscIssues(params: {
   supabase: SupabaseClient;
@@ -29,10 +63,40 @@ export async function observeGscIssues(params: {
     }),
   ]);
 
-  const opportunities = [
+  const priorityUrls = selectPriorityUrls(
+    pages.rows,
+    Math.min(MAX_PRIORITY_PAGE_QUERY_URLS, params.config.maxDailyProposals)
+  );
+  const pageQueryResults = await Promise.allSettled(
+    priorityUrls.map((page) =>
+      compareSearchAnalytics({
+        siteUrl,
+        current: periods.current,
+        previous: periods.previous,
+        dimensions: ['page', 'query'],
+        rowLimit: params.config.gscRowLimit,
+        page,
+      })
+    )
+  );
+  const pageQueryComparisons = pageQueryResults
+    .filter(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<typeof compareSearchAnalytics>>> =>
+        result.status === 'fulfilled'
+    )
+    .map((result) => result.value);
+
+  const allOpportunities = [
+    ...pageQueryComparisons.flatMap((comparison) =>
+      extractGscOpportunities(comparison.rows)
+    ),
     ...extractGscOpportunities(pages.rows),
     ...extractGscOpportunities(queries.rows),
-  ].slice(0, params.config.maxDailyProposals);
+  ];
+  const opportunities = rankAndDedupeOpportunities(
+    allOpportunities,
+    params.config.maxDailyProposals
+  );
 
   for (const opportunity of opportunities) {
     const { error } = await params.supabase.from('seo_issues').upsert(
@@ -70,6 +134,12 @@ export async function observeGscIssues(params: {
         previous_period: periods.previous,
         page_rows: pages.rows.length,
         query_rows: queries.rows.length,
+        priority_page_query_urls: priorityUrls,
+        page_query_failures: pageQueryResults.filter((result) => result.status === 'rejected').length,
+        page_query_rows: pageQueryComparisons.reduce(
+          (total, comparison) => total + comparison.rows.length,
+          0
+        ),
         issue_count: opportunities.length,
       },
     })

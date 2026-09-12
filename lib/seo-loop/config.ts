@@ -7,6 +7,7 @@ export type SeoLoopConfig = {
   lockTtlSeconds: number;
   gscDays: number;
   gscRowLimit: number;
+  softEvalMinScore: number;
 };
 
 function boolEnv(name: string, defaultValue: boolean): boolean {
@@ -32,6 +33,7 @@ export function getSeoLoopConfig(): SeoLoopConfig {
     lockTtlSeconds: intEnv('SEO_LOOP_LOCK_TTL_SECONDS', 240),
     gscDays: intEnv('SEO_LOOP_GSC_DAYS', 28),
     gscRowLimit: intEnv('SEO_LOOP_GSC_ROW_LIMIT', 50),
+    softEvalMinScore: Math.min(100, Math.max(0, intEnv('SEO_LOOP_SOFT_EVAL_MIN_SCORE', 75))),
   };
 }
 

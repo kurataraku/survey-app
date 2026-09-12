@@ -1,0 +1,29 @@
+[
+  {
+    "id": "bad-no-evidence-01",
+    "proposal": {
+      "action": "updateSeoSummary",
+      "targets": [
+        {
+          "type": "school",
+          "id": "school-anon-002",
+          "currentValue": "現在の要約",
+          "proposedValue": "現在の要約"
+        }
+      ],
+      "rationale": "改善するため。",
+      "expectedImpact": "良くなる。",
+      "evidence": []
+    }
+  },
+  {
+    "id": "bad-schema-01",
+    "proposal": {
+      "action": "executeArbitrarySql",
+      "targets": [],
+      "rationale": "",
+      "expectedImpact": "",
+      "evidence": []
+    }
+  }
+]

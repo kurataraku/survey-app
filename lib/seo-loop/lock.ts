@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SeoLoopConfig } from './config';
 import type { SeoLoopRun } from './types';
+import { loadRulebookForRun } from './rulebook/runtime';
 
 function isoNow(): string {
   return new Date().toISOString();
@@ -14,6 +15,14 @@ export function dailyRunKey(date = new Date()): string {
   return `seo-loop:${date.toISOString().slice(0, 10)}`;
 }
 
+async function bindRulebook(
+  supabase: SupabaseClient,
+  run: SeoLoopRun
+): Promise<SeoLoopRun> {
+  await loadRulebookForRun({ supabase, runId: run.id });
+  return run;
+}
+
 export async function createOrLoadRun(
   supabase: SupabaseClient,
   idempotencyKey: string
@@ -25,7 +34,7 @@ export async function createOrLoadRun(
     .maybeSingle();
 
   if (selectError) throw selectError;
-  if (existing) return existing as SeoLoopRun;
+  if (existing) return bindRulebook(supabase, existing as SeoLoopRun);
 
   const { data, error } = await supabase
     .from('seo_loop_runs')
@@ -46,10 +55,10 @@ export async function createOrLoadRun(
       .single();
 
     if (loadError) throw error;
-    return loaded as SeoLoopRun;
+    return bindRulebook(supabase, loaded as SeoLoopRun);
   }
 
-  return data as SeoLoopRun;
+  return bindRulebook(supabase, data as SeoLoopRun);
 }
 
 export async function acquireRunLock(params: {

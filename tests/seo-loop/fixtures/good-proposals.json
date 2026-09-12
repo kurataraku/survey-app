@@ -1,0 +1,42 @@
+[
+  {
+    "id": "good-meta-title-01",
+    "proposal": {
+      "action": "updateSchoolMetaTitle",
+      "targets": [
+        {
+          "type": "school",
+          "id": "school-anon-001",
+          "url": "https://example.invalid/schools/alpha",
+          "currentValue": "匿名校Aの学校情報",
+          "proposedValue": "匿名校Aの口コミ・評判｜学習環境と支援内容"
+        }
+      ],
+      "rationale": "表示回数が多い一方でCTRが低く、検索意図を示す語が現行タイトルに不足しているため。",
+      "expectedImpact": "検索結果上でページ内容が伝わりやすくなり、CTRの改善が期待できる。",
+      "evidence": [
+        "匿名化GSC: 表示回数1200、CTR1.1%、平均掲載順位8.4位"
+      ]
+    }
+  },
+  {
+    "id": "good-description-01",
+    "proposal": {
+      "action": "updateFeatureMetaDescription",
+      "targets": [
+        {
+          "type": "feature",
+          "id": "feature-anon-001",
+          "url": "https://example.invalid/features/support",
+          "currentValue": "支援内容を紹介します。",
+          "proposedValue": "匿名化した利用者の声をもとに、学習支援の特徴と比較時の確認点を紹介します。"
+        }
+      ],
+      "rationale": "掲載順位は改善余地のある範囲だが、現行説明文がページ固有の判断材料を示していないため。",
+      "expectedImpact": "検索意図との一致が明確になり、対象クエリからのクリック増加が期待できる。",
+      "evidence": [
+        "匿名化GSC: 表示回数640、平均掲載順位11.2位"
+      ]
+    }
+  }
+]

@@ -1,0 +1,84 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { extractGscOpportunities } from '../../lib/gsc/analyze';
+import type { GscComparedRow } from '../../lib/gsc/types';
+
+const fixturePath = fileURLToPath(new URL('./fixtures/gsc-opportunities.json', import.meta.url));
+const fixtureRows = JSON.parse(readFileSync(fixturePath, 'utf8')) as GscComparedRow[];
+
+function row(overrides: Partial<GscComparedRow> = {}): GscComparedRow {
+  return {
+    keys: ['https://example.invalid/page', '匿名クエリ'],
+    clicks: 10,
+    impressions: 100,
+    ctr: 0.02,
+    position: 16,
+    previous: null,
+    delta: null,
+    ...overrides,
+  };
+}
+
+describe('extractGscOpportunities', () => {
+  it('匿名fixtureから該当する課題だけを抽出し、スコア降順に並べる', () => {
+    const opportunities = extractGscOpportunities(fixtureRows);
+
+    expect(opportunities.map((item) => item.issueType)).toEqual([
+      'striking_distance',
+      'striking_distance',
+      'declining_clicks',
+      'low_ctr_high_impressions',
+    ]);
+    expect(opportunities[0]?.targetUrl).toBe('https://example.invalid/schools/alpha');
+    expect(opportunities[0]?.query).toBe('匿名校A 口コミ');
+  });
+
+  it('CTR条件の境界を判定する', () => {
+    expect(
+      extractGscOpportunities([row({ impressions: 200, ctr: 0.0199 })]).map((item) => item.issueType)
+    ).toContain('low_ctr_high_impressions');
+    expect(
+      extractGscOpportunities([row({ impressions: 200, ctr: 0.02 })]).map((item) => item.issueType)
+    ).not.toContain('low_ctr_high_impressions');
+    expect(
+      extractGscOpportunities([row({ impressions: 199, ctr: 0.0199 })]).map((item) => item.issueType)
+    ).not.toContain('low_ctr_high_impressions');
+  });
+
+  it('掲載順位5〜15位と表示100回の境界を含む', () => {
+    const issues = extractGscOpportunities([
+      row({ keys: ['https://example.invalid/five'], position: 5 }),
+      row({ keys: ['https://example.invalid/fifteen'], position: 15 }),
+      row({ keys: ['https://example.invalid/below'], position: 4.99 }),
+      row({ keys: ['https://example.invalid/above'], position: 15.01 }),
+      row({ keys: ['https://example.invalid/few'], position: 10, impressions: 99 }),
+    ]);
+
+    expect(issues.map((item) => item.targetUrl)).toEqual([
+      'https://example.invalid/five',
+      'https://example.invalid/fifteen',
+    ]);
+  });
+
+  it('クリック下落-10を境界として抽出する', () => {
+    expect(extractGscOpportunities([row({ delta: { clicks: -10, impressions: 0, ctr: 0, position: 0 } })])).toHaveLength(1);
+    expect(extractGscOpportunities([row({ delta: { clicks: -9, impressions: 0, ctr: 0, position: 0 } })])).toHaveLength(0);
+  });
+
+  it('入力を破壊せず、結果を20件に制限する', () => {
+    const rows = Array.from({ length: 25 }, (_, index) =>
+      row({
+        keys: [`https://example.invalid/${index}`],
+        impressions: 100 + index,
+        position: 10,
+      })
+    );
+    const before = JSON.stringify(rows);
+    const result = extractGscOpportunities(rows);
+
+    expect(result).toHaveLength(20);
+    expect(result[0]?.targetUrl).toBe('https://example.invalid/24');
+    expect(JSON.stringify(rows)).toBe(before);
+  });
+});

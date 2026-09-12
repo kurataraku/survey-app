@@ -1,0 +1,32 @@
+[
+  {
+    "id": "same-value",
+    "mutation": "sameValue",
+    "expectedRule": "value_changed"
+  },
+  {
+    "id": "too-short-title",
+    "mutation": "shortValue",
+    "expectedRule": "value_length"
+  },
+  {
+    "id": "duplicated-school-brand",
+    "mutation": "duplicateBrand",
+    "expectedRule": "brand_not_duplicated"
+  },
+  {
+    "id": "guaranteed-success-expression",
+    "mutation": "forbiddenExpression",
+    "expectedRule": "no_forbidden_expression"
+  },
+  {
+    "id": "stale-current-value",
+    "mutation": "staleCurrentValue",
+    "expectedRule": "current_value_match"
+  },
+  {
+    "id": "unknown-target",
+    "mutation": "unknownTarget",
+    "expectedRule": "target_exists"
+  }
+]

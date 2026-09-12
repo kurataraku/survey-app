@@ -1,0 +1,39 @@
+[
+  {
+    "keys": ["https://example.invalid/schools/alpha", "匿名校A 口コミ"],
+    "clicks": 13,
+    "impressions": 1200,
+    "ctr": 0.011,
+    "position": 8.4,
+    "previous": {
+      "clicks": 28,
+      "impressions": 1100,
+      "ctr": 0.0255,
+      "position": 7.9
+    },
+    "delta": {
+      "clicks": -15,
+      "impressions": 100,
+      "ctr": -0.0145,
+      "position": 0.5
+    }
+  },
+  {
+    "keys": ["https://example.invalid/features/support", "学習支援 比較"],
+    "clicks": 18,
+    "impressions": 640,
+    "ctr": 0.0281,
+    "position": 11.2,
+    "previous": null,
+    "delta": null
+  },
+  {
+    "keys": ["https://example.invalid/schools/beta", "匿名校B"],
+    "clicks": 9,
+    "impressions": 199,
+    "ctr": 0.019,
+    "position": 15.1,
+    "previous": null,
+    "delta": null
+  }
+]

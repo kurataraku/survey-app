@@ -7,18 +7,39 @@ import { acquireRunLock, createOrLoadRun, dailyRunKey, releaseRunLock } from './
 import { analyzeIssuesToProposals } from './analyzer';
 import { observeGscIssues } from './observer';
 import { notifySlackApproval, notifySlackLoopStatus } from './slack';
+import {
+  findNextRevisionRunId,
+  hasPendingRevisionForRun,
+  reviseRequestedProposal,
+} from './revision/service';
+import {
+  isRulebookBindingConflict,
+  loadRulebookForRun,
+} from './rulebook/runtime';
+import { processRulePatchLearning } from './rulebook/learning';
+import {
+  evaluateProposalForApproval,
+  shouldSendProposalToSlack,
+  type ProposalForEvaluation,
+} from './evaluation/evaluate';
 import type { SeoLoopRun, SeoLoopStepResult } from './types';
 
 const MAX_STEPS_PER_TICK = 8;
 const MAX_RUNS_PER_TICK = 3;
 
+class RetryableSeoLoopError extends Error {}
+
 type ProposalRow = {
   id: string;
+  run_id: string;
   version: number;
   payload_hash: string;
   action: string;
   rationale: string | null;
   payload: unknown;
+  context_snapshot: unknown;
+  parent_proposal_id: string | null;
+  revision_number: number;
 };
 
 type ApprovedProposalRow = ProposalRow & {
@@ -61,24 +82,75 @@ async function countApprovedProposals(supabase: SupabaseClient, runId: string): 
   return count ?? 0;
 }
 
+async function hasUnnotifiedPendingProposal(
+  supabase: SupabaseClient,
+  runId: string
+): Promise<boolean> {
+  const { data: proposals, error: proposalError } = await supabase
+    .from('seo_proposals')
+    .select('id,version,payload_hash')
+    .eq('run_id', runId)
+    .eq('status', 'pending_approval')
+    .limit(20);
+  if (proposalError) throw proposalError;
+  const ids = (proposals ?? []).map((proposal) => proposal.id as string);
+  if (ids.length === 0) return false;
+
+  const { data: approvals, error: approvalError } = await supabase
+    .from('seo_approvals')
+    .select('proposal_id,proposal_version,proposal_payload_hash,status,slack_message_ts')
+    .in('proposal_id', ids);
+  if (approvalError) throw approvalError;
+  const notified = new Set(
+    (approvals ?? [])
+      .filter(
+        (approval) =>
+          Boolean(approval.slack_message_ts) ||
+          (approval.status !== 'pending' && approval.status !== undefined)
+      )
+      .map(
+        (approval) =>
+          `${approval.proposal_id}:${approval.proposal_version}:${approval.proposal_payload_hash}`
+      )
+  );
+  return (proposals ?? []).some(
+    (proposal) =>
+      !notified.has(`${proposal.id}:${proposal.version}:${proposal.payload_hash}`)
+  );
+}
+
 /**
  * 日次Cronは1回なので、未完了runを優先して再開する。
  * 人間承認待ちのみのrunはスキップし、当日runの新規観測を妨げない。
  */
-async function selectRunnableRun(supabase: SupabaseClient): Promise<SeoLoopRun> {
+async function selectRunnableRun(
+  supabase: SupabaseClient,
+  excludedRunIds: ReadonlySet<string> = new Set(),
+  allowRevision = true
+): Promise<SeoLoopRun> {
+  if (allowRevision) {
+    const revisionRunId = await findNextRevisionRunId({
+      supabase,
+      excludedRunIds,
+    });
+    if (revisionRunId) return loadRun(supabase, revisionRunId);
+  }
+
   const { data: openRuns, error } = await supabase
     .from('seo_loop_runs')
     .select('id,idempotency_key,status,retry_count,max_retries')
-    .in('status', ['observing', 'analyzing', 'pending_approval', 'executing'])
+    .in('status', ['observing', 'analyzing', 'revising', 'pending_approval', 'executing'])
     .order('created_at', { ascending: true })
     .limit(20);
 
   if (error) throw error;
 
   for (const candidate of (openRuns ?? []) as SeoLoopRun[]) {
+    if (excludedRunIds.has(candidate.id)) continue;
     if (
       candidate.status === 'observing' ||
       candidate.status === 'analyzing' ||
+      candidate.status === 'revising' ||
       candidate.status === 'executing'
     ) {
       return candidate;
@@ -86,7 +158,12 @@ async function selectRunnableRun(supabase: SupabaseClient): Promise<SeoLoopRun> 
 
     if (candidate.status === 'pending_approval') {
       const approvedCount = await countApprovedProposals(supabase, candidate.id);
-      if (approvedCount > 0) return candidate;
+      if (
+        approvedCount > 0 ||
+        (await hasUnnotifiedPendingProposal(supabase, candidate.id))
+      ) {
+        return candidate;
+      }
     }
   }
 
@@ -99,15 +176,63 @@ async function handlePendingApproval(
 ): Promise<SeoLoopStepResult> {
   const { data: proposals, error } = await supabase
     .from('seo_proposals')
-    .select('id,version,payload_hash,action,rationale,payload')
+    .select('id,run_id,version,payload_hash,action,rationale,payload,context_snapshot,parent_proposal_id,revision_number')
     .eq('run_id', run.id)
     .eq('status', 'pending_approval')
     .limit(10);
 
   if (error) throw error;
 
+  const config = getSeoLoopConfig();
+  let blockedCount = 0;
+  let blockedRevisionCount = 0;
+  let retryableCount = 0;
   for (const proposal of (proposals ?? []) as ProposalRow[]) {
-    await notifySlackApproval({ supabase, proposal });
+    const evaluation = await evaluateProposalForApproval({
+      supabase,
+      config,
+      proposal: proposal as ProposalForEvaluation,
+    });
+    if (evaluation.retryable) {
+      retryableCount += 1;
+      continue;
+    }
+    if (!shouldSendProposalToSlack(evaluation)) {
+      const { error: blockError } = await supabase
+        .from('seo_proposals')
+        .update({ status: 'quality_blocked', risk_level: evaluation.riskLevel })
+        .eq('id', proposal.id)
+        .eq('version', proposal.version)
+        .eq('payload_hash', proposal.payload_hash)
+        .eq('status', 'pending_approval');
+      if (blockError) throw blockError;
+
+      const { error: approvalError } = await supabase
+        .from('seo_approvals')
+        .update({ status: 'invalidated' })
+        .eq('proposal_id', proposal.id)
+        .eq('status', 'pending');
+      if (approvalError) throw approvalError;
+      blockedCount += 1;
+      if (proposal.parent_proposal_id) blockedRevisionCount += 1;
+      continue;
+    }
+
+    const { error: riskUpdateError } = await supabase
+      .from('seo_proposals')
+      .update({ risk_level: evaluation.riskLevel })
+      .eq('id', proposal.id)
+      .eq('version', proposal.version)
+      .eq('payload_hash', proposal.payload_hash)
+      .eq('status', 'pending_approval');
+    if (riskUpdateError) throw riskUpdateError;
+    await notifySlackApproval({ supabase, proposal, evaluation });
+  }
+
+  if (blockedRevisionCount > 0) {
+    await notifySlackLoopStatus({
+      text: `SEO改訂proposal ${blockedRevisionCount}件が品質ゲート不合格となり、再承認通知を停止しました。評価理由はseo_proposal_evaluationsを確認してください。`,
+    }).catch(() => undefined);
   }
 
   const approvedCount = await countApprovedProposals(supabase, run.id);
@@ -124,6 +249,36 @@ async function handlePendingApproval(
     };
   }
 
+  const { count: pendingCount, error: pendingError } = await supabase
+    .from('seo_proposals')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', run.id)
+    .eq('status', 'pending_approval');
+  if (pendingError) throw pendingError;
+  if ((pendingCount ?? 0) === 0) {
+    await updateRun(supabase, run.id, {
+      status: 'completed',
+      current_step: 'evaluate',
+      completed_at: new Date().toISOString(),
+    });
+    return {
+      status: 'skipped',
+      runId: run.id,
+      message: `${blockedCount}件が品質ゲート不合格となり、Slack送信を停止しました`,
+    };
+  }
+
+  if (retryableCount > 0) {
+    await notifySlackLoopStatus({
+      text: `SEO品質評価を再試行します: ${retryableCount}件でFact Contextの再取得に失敗しました。変更・承認通知は行っていません。`,
+    }).catch(() => undefined);
+    return {
+      status: 'pending_approval',
+      runId: run.id,
+      message: `${retryableCount}件は一時的な観測失敗のため再評価待ちです`,
+    };
+  }
+
   return {
     status: 'pending_approval',
     runId: run.id,
@@ -137,7 +292,7 @@ async function handleExecute(
 ): Promise<SeoLoopStepResult> {
   const { data, error } = await supabase
     .from('seo_proposals')
-    .select('id,version,payload_hash,action,rationale,payload,seo_approvals(id,proposal_payload_hash,proposal_version,status)')
+    .select('id,run_id,version,payload_hash,action,rationale,payload,context_snapshot,parent_proposal_id,revision_number,seo_approvals(id,proposal_payload_hash,proposal_version,status)')
     .eq('run_id', run.id)
     .eq('status', 'approved')
     .limit(5);
@@ -168,6 +323,35 @@ async function handleExecute(
         .update({ status: 'execution_blocked' })
         .eq('id', proposal.id);
       if (blockError) throw blockError;
+      continue;
+    }
+
+    const executionEvaluation = await evaluateProposalForApproval({
+      supabase,
+      config: getSeoLoopConfig(),
+      proposal: proposal as ProposalForEvaluation,
+      forceFresh: true,
+      phase: 'execution',
+    });
+    if (executionEvaluation.retryable) {
+      throw new RetryableSeoLoopError(
+        '実行直前のFact Context再取得に失敗したため、実行を延期します'
+      );
+    }
+    if (!shouldSendProposalToSlack(executionEvaluation)) {
+      const { error: evaluationBlockError } = await supabase
+        .from('seo_proposals')
+        .update({ status: 'execution_blocked', risk_level: 'blocked' })
+        .eq('id', proposal.id)
+        .eq('version', proposal.version)
+        .eq('payload_hash', proposal.payload_hash);
+      if (evaluationBlockError) throw evaluationBlockError;
+      const { error: invalidateError } = await supabase
+        .from('seo_approvals')
+        .update({ status: 'invalidated' })
+        .eq('id', approval.id)
+        .eq('status', 'approved');
+      if (invalidateError) throw invalidateError;
       continue;
     }
 
@@ -204,11 +388,27 @@ async function handleExecute(
     if (proposalUpdateError) throw proposalUpdateError;
   }
 
-  await updateRun(supabase, run.id, {
-    status: 'completed',
-    current_step: 'execute',
-    completed_at: new Date().toISOString(),
-  });
+  const { count: remainingPending, error: remainingError } = await supabase
+    .from('seo_proposals')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', run.id)
+    .eq('status', 'pending_approval');
+  if (remainingError) throw remainingError;
+  await updateRun(
+    supabase,
+    run.id,
+    (remainingPending ?? 0) > 0
+      ? {
+          status: 'pending_approval',
+          current_step: 'approval',
+          next_action_at: new Date().toISOString(),
+        }
+      : {
+          status: 'completed',
+          current_step: 'execute',
+          completed_at: new Date().toISOString(),
+        }
+  );
 
   return { status: 'executed', runId: run.id, message: '承認済みproposalの実行ゲート処理が完了しました' };
 }
@@ -230,6 +430,20 @@ async function processOneStep(
 
   if (run.status === 'analyzing') {
     const result = await analyzeIssuesToProposals({ supabase, runId: run.id, config });
+    return { status: 'analyzed', runId: run.id, message: result.message };
+  }
+
+  if (run.status === 'revising') {
+    const result = await reviseRequestedProposal({
+      supabase,
+      runId: run.id,
+      config,
+    });
+    if (result.outcome === 'failed') {
+      await notifySlackLoopStatus({
+        text: `SEO改訂proposalを生成できませんでした。\nrun: \`${run.idempotency_key}\`\n${result.message}`,
+      }).catch(() => undefined);
+    }
     return { status: 'analyzed', runId: run.id, message: result.message };
   }
 
@@ -285,6 +499,8 @@ async function advanceRunUntilIdle(
     if (after.status === 'pending_approval') {
       const approvedCount = await countApprovedProposals(supabase, after.id);
       if (approvedCount === 0) {
+        // 新規・改訂proposalの生成直後は、同tick内で品質評価とSlack通知まで進める。
+        if (last.status === 'analyzed') continue;
         last = {
           status: 'pending_approval',
           runId: after.id,
@@ -310,12 +526,28 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   }
 
   const supabase = createAdminSupabaseClient();
+  try {
+    const learning = await processRulePatchLearning(supabase);
+    if (learning.generated > 0 || learning.notified > 0) {
+      await notifySlackLoopStatus({ text: learning.message }).catch(
+        () => undefined
+      );
+    }
+  } catch (error) {
+    await notifySlackLoopStatus({
+      text: `SEO Rule Patch処理を安全停止しました。通常のSEO Loopは継続します。\n${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    }).catch(() => undefined);
+  }
   const todayKey = dailyRunKey();
   const results: SeoLoopStepResult[] = [];
   const processedIds = new Set<string>();
+  let revisionRunsProcessed = 0;
 
   for (let i = 0; i < MAX_RUNS_PER_TICK; i += 1) {
-    const run = await selectRunnableRun(supabase);
+    const allowRevision = revisionRunsProcessed < 2;
+    const run = await selectRunnableRun(supabase, processedIds, allowRevision);
     if (processedIds.has(run.id)) {
       break;
     }
@@ -336,10 +568,51 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
     processedIds.add(run.id);
 
     try {
+      const boundRulebook = await loadRulebookForRun({
+        supabase,
+        runId: run.id,
+      });
+      if (boundRulebook.source === 'fallback') {
+        await notifySlackLoopStatus({
+          text: `SEO RulebookをDBから固定できなかったため、安全なコード内fallbackを使用します。\nrun: \`${run.idempotency_key}\`\nhash: \`${boundRulebook.contentHash}\``,
+        }).catch(() => undefined);
+      }
+      if (
+        allowRevision &&
+        run.status !== 'failed' &&
+        run.status !== 'skipped' &&
+        run.retry_count < run.max_retries &&
+        (await hasPendingRevisionForRun(supabase, run.id))
+      ) {
+        revisionRunsProcessed += 1;
+        await updateRun(supabase, run.id, {
+          status: 'revising',
+          current_step: 'revise',
+          completed_at: null,
+          next_action_at: new Date().toISOString(),
+        });
+      }
       const result = await advanceRunUntilIdle(supabase, locked);
       results.push(result);
     } catch (error) {
       const current = await loadRun(supabase, run.id).catch(() => run);
+      if (
+        error instanceof RetryableSeoLoopError ||
+        isRulebookBindingConflict(error)
+      ) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'run固定Rulebookとの不一致を検出したため再試行します';
+        await updateRun(supabase, run.id, {
+          status: current.status,
+          retry_count: current.retry_count,
+          error_message: message,
+          next_action_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
+        results.push({ status: 'skipped', runId: run.id, message });
+        continue;
+      }
       await updateRun(supabase, run.id, {
         status: current.retry_count + 1 >= current.max_retries ? 'failed' : current.status,
         retry_count: current.retry_count + 1,

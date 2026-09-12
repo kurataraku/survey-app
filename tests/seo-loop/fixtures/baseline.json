@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "rubricVersion": "deterministic-v1",
+  "fixtureCount": 4,
+  "averageScore": 65,
+  "evaluations": [
+    {
+      "id": "good-meta-title-01",
+      "score": 100,
+      "valid": true,
+      "payloadHash": "7c657d663be00218b79b10b46470613d7e11d3615b7645bc534f767aab59f2f9",
+      "checks": {
+        "schema": true,
+        "identifiedTarget": true,
+        "currentValue": true,
+        "evidence": true,
+        "rationale": true,
+        "expectedImpact": true,
+        "changedValue": true
+      }
+    },
+    {
+      "id": "good-description-01",
+      "score": 100,
+      "valid": true,
+      "payloadHash": "6f7eb4f2d5f16395ceb7b6d7cc0f26d5f56a18c1481f765fe5973f57b9e22faf",
+      "checks": {
+        "schema": true,
+        "identifiedTarget": true,
+        "currentValue": true,
+        "evidence": true,
+        "rationale": true,
+        "expectedImpact": true,
+        "changedValue": true
+      }
+    },
+    {
+      "id": "bad-no-evidence-01",
+      "score": 60,
+      "valid": true,
+      "payloadHash": "6bae5332874488b0f27f4ed02a1c0385fb80511250c4f0e93bf95d03af406f34",
+      "checks": {
+        "schema": true,
+        "identifiedTarget": true,
+        "currentValue": true,
+        "evidence": false,
+        "rationale": false,
+        "expectedImpact": false,
+        "changedValue": false
+      }
+    },
+    {
+      "id": "bad-schema-01",
+      "score": 0,
+      "valid": false,
+      "payloadHash": "36b1d17d40a1ab30e8c4675756bfe59c9cbd5911baa74de438bf4d4b843aad2c",
+      "checks": {
+        "schema": false,
+        "identifiedTarget": false,
+        "currentValue": false,
+        "evidence": false,
+        "rationale": false,
+        "expectedImpact": false,
+        "changedValue": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "low-ctr-school",
+    "issueType": "low_ctr_high_impressions",
+    "pageType": "school",
+    "currentValues": {
+      "updateSchoolMetaTitle": "匿名校Aの口コミ"
+    },
+    "expectedActions": ["updateSchoolMetaTitle"]
+  },
+  {
+    "id": "low-ctr-feature",
+    "issueType": "low_ctr_high_impressions",
+    "pageType": "feature",
+    "currentValues": {
+      "updateFeatureMetaDescription": "匿名特集の説明"
+    },
+    "expectedActions": ["updateFeatureMetaDescription"]
+  },
+  {
+    "id": "striking-school-no-summary",
+    "issueType": "striking_distance",
+    "pageType": "school",
+    "currentValues": {
+      "addApprovedInternalLink": "links:2:sha256:anonymous"
+    },
+    "expectedActions": ["addApprovedInternalLink"]
+  },
+  {
+    "id": "unsupported-issue",
+    "issueType": "unknown_issue",
+    "pageType": "school",
+    "currentValues": {
+      "updateSchoolMetaTitle": "匿名校Bの口コミ"
+    },
+    "expectedActions": []
+  }
+]
