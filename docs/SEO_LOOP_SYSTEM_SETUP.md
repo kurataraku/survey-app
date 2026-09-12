@@ -60,6 +60,8 @@ SEO_LOOP_MAX_DAILY_PROPOSALS=10
 SEO_LOOP_MAX_DAILY_EXECUTIONS=3
 SEO_LOOP_MAX_TARGETS_PER_PROPOSAL=3
 SEO_LOOP_SOFT_EVAL_MIN_SCORE=75
+SEO_RULEBOOK_PATCH_ENABLED=false
+SEO_RULEBOOK_SHADOW_ENABLED=false
 ```
 
 ## 5. Supabase
@@ -75,12 +77,13 @@ SEO_LOOP_SOFT_EVAL_MIN_SCORE=75
 7. `supabase-migrations/add-seo-loop-versioned-rulebook.sql`
 8. `supabase-migrations/add-seo-loop-typed-rule-patches.sql`
 9. `supabase-migrations/allow-seo-loop-single-operator-rule-patch-approval.sql`
+10. `supabase-migrations/add-seo-loop-shadow-rollouts.sql`
 
 Proposal v2は`schema_version`と生成時の`context_snapshot`へ、二段階分析は`seo_analysis_traces`へ、品質ゲートは`seo_proposal_evaluations`へ、Slackの却下・修正理由は`seo_feedback`へ書き込みます。修正依頼から生成した子proposalは`parent_proposal_id`と`revision_feedback_id`で旧行・feedbackへ接続し、`seo_revision_traces`へ生成履歴を残します。2つ目以降のmigrationは対応コードをデプロイする前に適用してください。
 特に`add-seo-loop-feedback.sql`未適用の状態で単位5のコードをデプロイすると、Slackの承認・却下処理は安全側に停止します。
 単位6ではrunを一時的に`revising`へ戻し、`create_seo_proposal_revision` RPC内で子proposal作成・旧approval無効化・親の`revision_resolved_at`更新を原子的に行います。子の`version`は親+1、`revision_number`はチェーン深度です。単位6 migration未適用時は改訂処理だけを縮退し、通常の観測・分析は継続します。
 単位7ではactiveな`seo_rulebook_versions`をrun開始時に`seo_rulebook_bindings`へsnapshot固定します。同じrunではactive版が変わっても固定済み内容を使い続け、proposalとevaluationへversion・hash・rule IDsを保存します。DB取得失敗・schema不適合・hash不一致時は、より緩い設定へ倒さずコード内の安全なv1 fallbackを使います。人間向け内容と変更履歴は`docs/seo-rulebook/`を参照してください。
-単位8では独立した複数feedbackから固定AllowlistのTyped Rule Patchだけを候補化し、専用Slack承認者による第二承認後に次runから有効化します。9番は、8番を適用済みの環境を含め、一人運用でも同じSlackユーザーが別工程の第二承認を行えるようにする補正migrationです。既定は`SEO_RULEBOOK_PATCH_ENABLED=false`です。設定、運用床、一人運用時の安全境界、状態確認、rollbackは`docs/seo-rulebook/RULE_PATCH_OPERATIONS.md`を参照してください。
+単位8では独立した複数feedbackから固定AllowlistのTyped Rule Patchだけを候補化します。9番は、8番を適用済みの環境を含め、一人運用でも同じSlackユーザーが別工程の第二承認を行えるようにする補正migrationです。10番の適用後は第二承認で即active化せず、旧active版を主系に維持したshadow比較へ移行します。比較基準を満たし、Slackで最終昇格承認した次runからだけ新版が有効になります。既定は`SEO_RULEBOOK_PATCH_ENABLED=false`かつ`SEO_RULEBOOK_SHADOW_ENABLED=false`です。設定、運用床、一人運用時の安全境界、状態確認、rollbackは`docs/seo-rulebook/RULE_PATCH_OPERATIONS.md`を参照してください。
 
 ## 6. 動作確認
 
@@ -111,7 +114,31 @@ Vercel ダッシュボードの Cron / Function ログで、毎朝の実行有�
 
 - GSC・Slack・Service Accountの秘密情報をdocsやレポートへ書かない
 - `SEO_LOOP_EXECUTION_ENABLED=false` の間は観測・提案までで止まる
+- `SEO_RULEBOOK_SHADOW_ENABLED=false` の間はshadow評価・指標更新・昇格操作を行わない
 - Type Aの実行はAllowlist Executorのみ
 - Type Bは本番ソースを書き換えず、提案として保存する
 - `revision_requested`のfeedbackはuntrusted dataとして扱い、固定actionの改訂proposalを別行で生成して再度品質ゲート・人間承認へ送る
 - 改訂の非一時的な生成失敗は最大3回で停止し、`revision_error`へ理由を残す。復旧時は原因修正後に対象proposalの`revision_retry_count=0`、`revision_next_action_at=now()`へ戻す
+
+## 8. Unit 9の適用・段階リリース
+
+既存環境へ導入する際は、Slackカード操作とmigration/deployの競合を避けるため次の順に行います。
+
+1. Vercelで`SEO_RULEBOOK_PATCH_ENABLED=false`、`SEO_RULEBOOK_SHADOW_ENABLED=false`にして再デプロイする
+2. `add-seo-loop-shadow-rollouts.sql`をSupabase SQL Editorで適用する
+3. Unit 9コードをデプロイする
+4. `npm run seo:rulebook:status`でactive版のhash整合性と`rollout: null`を確認する
+5. Vercelで`SEO_RULEBOOK_PATCH_ENABLED=true`、`SEO_RULEBOOK_SHADOW_ENABLED=true`にして再デプロイする
+6. `SEO_LOOP_EXECUTION_ENABLED=false`は変更しない
+
+第二承認後は`npm run seo:rulebook:status`の`rollout`で`shadowing`、run数、評価proposal数、判断数、5指標を確認できます。最低7 run・10 proposal・主系とshadow対象それぞれ5実判断に達するまでは昇格しません。基準達成時は`ready`になり、Slackへ最終昇格カードを1回だけ送ります。
+
+shadow評価は同一proposalの比較専用で、Slack proposalカードやExecutorへは流れません。shadow処理で一時障害が起きても主系処理は継続します。障害が続く場合は`SEO_RULEBOOK_SHADOW_ENABLED=false`にして再デプロイし、active版を維持したまま調査します。
+
+昇格直後はactive版のschema/hashを再検査し、失敗時は自動rollbackを要求します。運用中の異常は次で直前版へ戻します。
+
+```bash
+npm run seo:rulebook:status -- --rollback-current --yes --actor=Uxxxxxxxx
+```
+
+rollback後も既存run bindingは固定されたままです。次のrunから戻したactive版を使用します。

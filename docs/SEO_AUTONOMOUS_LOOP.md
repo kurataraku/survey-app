@@ -21,7 +21,9 @@ sequenceDiagram
   LLM-->>API: structured_json
   API->>API: zod_validate_and_risk_rules
   API->>DB: save_proposal_hash
-  API->>Slack: request_approval
+  API->>DB: active版とshadow版を同一proposalで評価
+  Note over API,DB: shadow結果は専用ログだけへ保存し、proposal/approval/実行へ流さない
+  API->>Slack: active版合格proposalだけrequest_approval
   Note over API: 1回のtickで観測→分析→Slackまで連続実行し、人間承認待ちで停止
   Slack->>API: approve_or_reject
   API->>DB: bind_approval_to_hash
@@ -52,6 +54,9 @@ Supabaseを状態の正本にします。
 - `seo_approvals`
 - `seo_experiments`
 - `seo_results`
+- `seo_rulebook_rollouts`
+- `seo_rulebook_shadow_evaluations`
+- `seo_rulebook_rollout_metric_snapshots`
 
 Cron/Functionの二重起動を前提に、`idempotency_key`、`locked_at`、`lock_expires_at`、`next_action_at`、`retry_count` で排他・冪等性を担保します。
 
@@ -89,9 +94,20 @@ proposalには `version` と `payload_hash` を保存します。Slack承認時�
 
 - `SEO_LOOP_ENABLED=false`: Orchestrator tick全体をno-op
 - `SEO_LOOP_EXECUTION_ENABLED=false`: 観測・分析・提案・承認は継続、変更実行のみ停止
+- `SEO_RULEBOOK_SHADOW_ENABLED=false`: Rulebook新版のshadow評価・指標更新・昇格操作を停止
 - `SEO_LOOP_MAX_DAILY_PROPOSALS`
 - `SEO_LOOP_MAX_DAILY_EXECUTIONS`
 - `SEO_LOOP_MAX_TARGETS_PER_PROPOSAL`
+
+## Rulebookのshadow運用
+
+Typed Rule Patchの第二承認は新版の即時active化ではなく、`shadowing`開始を許可します。旧active版は主系のままです。以後、旧版で生成された同一proposalを新版Rulebookでも評価し、shadow結果は`seo_rulebook_shadow_evaluations`だけへ保存します。shadow側から`seo_proposals`、`seo_approvals`、Slack proposalカード、Typed Executorへは書き込みません。
+
+比較指標は提案生成率、Hard Gate通過率、承認率、修正率、同じ修正の再発率です。Unit 8のTyped Patchはrisk scopeだけを変更するため、提案生成率は旧新版で同一です。評価による表出差はSlack到達可能率として別に比較します。shadowでは人間へカードを送らないため、承認率・修正率・再発率は「主系で実際に得た人間判断のうち、新版も表出させた同一proposal」に限定した投影値です。実判断のない値をshadow承認として捏造しません。
+
+最低7 run、評価済み10 proposal、主系・shadow対象とも実判断5件を満たし、固定された回帰基準をすべて通過した場合だけ`ready`になります。`ready`になっても自動昇格せず、Slackの最終昇格承認で初めて旧版をretired、新版をactiveへ同一transactionで切り替えます。既存runのRulebook bindingは変わらず、次runから新版を使います。
+
+障害時は`SEO_RULEBOOK_SHADOW_ENABLED=false`でshadow経路だけを停止できます。主系proposal処理はshadowの失敗を理由に停止しません。昇格後に異常があれば`npm run seo:rulebook:status -- --rollback-current --yes --actor=<Slack User ID>`で直前active版へ戻します。`SEO_LOOP_EXECUTION_ENABLED=false`はExecutor本番設計と効果再計測が完成するまで維持します。
 
 ## 効果検証
 

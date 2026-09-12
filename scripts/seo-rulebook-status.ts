@@ -31,6 +31,21 @@ if (!active) throw new Error('active Rulebookがありません');
 
 const parsed = rulebookContentSchema.safeParse(active.content);
 const hashValid = parsed.success && payloadHash(parsed.data) === active.content_hash;
+const { data: rollout, error: rolloutError } = await supabase
+  .from('seo_rulebook_rollouts')
+  .select(
+    'id,candidate_id,candidate_version,patch_hash,status,base_rulebook_version,base_rulebook_hash,shadow_content_hash,run_count,evaluated_proposal_count,observed_decision_count,metrics_version,metrics,started_at,ready_at,promoted_at'
+  )
+  .in('status', ['shadowing', 'ready'])
+  .order('started_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+if (
+  rolloutError &&
+  !['42P01', 'PGRST204', 'PGRST205'].includes(rolloutError.code ?? '')
+) {
+  throw rolloutError;
+}
 console.log(
   JSON.stringify(
     {
@@ -42,12 +57,56 @@ console.log(
         activatedAt: active.activated_at,
         createdByKind: active.created_by_kind,
       },
+      rollout: rollout
+        ? {
+            id: rollout.id,
+            candidateId: rollout.candidate_id,
+            status: rollout.status,
+            baseVersion: rollout.base_rulebook_version,
+            baseHash: rollout.base_rulebook_hash,
+            shadowHash: rollout.shadow_content_hash,
+            runCount: rollout.run_count,
+            evaluatedProposalCount: rollout.evaluated_proposal_count,
+            observedDecisionCount: rollout.observed_decision_count,
+            metricsVersion: rollout.metrics_version,
+            metrics: rollout.metrics,
+            startedAt: rollout.started_at,
+            readyAt: rollout.ready_at,
+          }
+        : null,
     },
     null,
     2
   )
 );
 if (!hashValid) throw new Error('active Rulebookのschema/hashが不正です');
+
+if (args.has('--reject-rollout')) {
+  const patchEnabled = ['true', '1'].includes(
+    process.env.SEO_RULEBOOK_PATCH_ENABLED?.toLowerCase() ?? ''
+  );
+  const shadowEnabled = ['true', '1'].includes(
+    process.env.SEO_RULEBOOK_SHADOW_ENABLED?.toLowerCase() ?? ''
+  );
+  if (!patchEnabled || !shadowEnabled || !args.has('--yes') || !actor) {
+    throw new Error(
+      'rollout却下には両switch=true、--reject-rollout --yes --actor=<ID>が必要です'
+    );
+  }
+  if (!rollout) throw new Error('進行中のRulebook rolloutがありません');
+  const { data, error } = await supabase.rpc('reject_seo_rulebook_rollout', {
+    p_rollout_id: rollout.id,
+    p_candidate_id: rollout.candidate_id,
+    p_candidate_version: rollout.candidate_version,
+    p_patch_hash: rollout.patch_hash,
+    p_shadow_content_hash: rollout.shadow_content_hash,
+    p_approver_id: actor,
+    p_approver_name: 'seo-rulebook-status CLI',
+  });
+  if (error) throw error;
+  console.log(JSON.stringify({ rolloutRejected: data }, null, 2));
+  return;
+}
 
 if (args.has('--rollback-current')) {
   const patchEnabled = ['true', '1'].includes(

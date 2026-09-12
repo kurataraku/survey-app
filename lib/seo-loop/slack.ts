@@ -304,7 +304,7 @@ export async function notifySlackRulePatchApproval(params: {
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: `*SEO Rulebook変更の第二承認*\nBase: \`v${params.candidate.base_rulebook_version} ${params.candidate.base_rulebook_hash.slice(0, 12)}...\`\nPath: \`${safeSlackValue(params.candidate.patch_path, 180)}\`\nNew value: \`${safeSlackValue(String(patch.value), 100)}\`\nEvidence: \`${params.candidate.evidence_count} independent feedbacks\`\nPatch hash: \`${params.candidate.patch_hash.slice(0, 12)}...\`\nProposed content: \`${params.candidate.proposed_content_hash.slice(0, 12)}...\``,
+              text: `*SEO Rulebook変更の第二承認（shadow開始）*\nBase: \`v${params.candidate.base_rulebook_version} ${params.candidate.base_rulebook_hash.slice(0, 12)}...\`\nPath: \`${safeSlackValue(params.candidate.patch_path, 180)}\`\nNew value: \`${safeSlackValue(String(patch.value), 100)}\`\nEvidence: \`${params.candidate.evidence_count} independent feedbacks\`\nPatch hash: \`${params.candidate.patch_hash.slice(0, 12)}...\`\nProposed content: \`${params.candidate.proposed_content_hash.slice(0, 12)}...\`\n承認後もactive版は変わらず、7 run以上の比較と最終昇格承認が必要です。`,
             },
           },
           {
@@ -312,7 +312,7 @@ export async function notifySlackRulePatchApproval(params: {
             elements: [
               {
                 type: 'button',
-                text: { type: 'plain_text', text: 'Rulebookへ適用' },
+                text: { type: 'plain_text', text: 'Shadow開始を承認' },
                 style: 'primary',
                 action_id: 'seo_rule_patch_approve',
                 value: ref,
@@ -354,5 +354,156 @@ export async function notifySlackRulePatchApproval(params: {
       .eq('status', 'pending_approval');
     throw error;
   }
+  return true;
+}
+
+function percent(value: number | null): string {
+  return value === null ? 'N/A' : `${(value * 100).toFixed(1)}%`;
+}
+
+export async function notifySlackRolloutPromotion(params: {
+  supabase: SupabaseClient;
+  rollout: {
+    id: string;
+    candidate_id: string;
+    candidate_version: number;
+    patch_hash: string;
+    base_rulebook_version: number;
+    base_rulebook_hash: string;
+    shadow_content_hash: string;
+    status: string;
+    slack_message_ts: string | null;
+    metrics: {
+      metricsHash: string;
+      samples: {
+        runs: number;
+        evaluatedProposals: number;
+        mainObservedDecisions: number;
+      };
+      metrics: {
+        proposalGenerationRate: {
+          main: { rate: number | null };
+          shadow: { rate: number | null };
+        };
+        slackReachabilityRate: {
+          main: { rate: number | null };
+          shadow: { rate: number | null };
+        };
+        hardGatePassRate: {
+          main: { rate: number | null };
+          shadow: { rate: number | null };
+        };
+        approvalRate: {
+          main: { rate: number | null };
+          shadowProjected: { rate: number | null };
+        };
+        revisionRate: {
+          main: { rate: number | null };
+          shadowProjected: { rate: number | null };
+        };
+        sameCorrectionRecurrenceRate: {
+          main: { rate: number | null };
+          shadowProjected: { rate: number | null };
+        };
+      };
+    };
+  };
+}): Promise<boolean> {
+  if (
+    params.rollout.status !== 'ready' ||
+    params.rollout.slack_message_ts
+  ) {
+    return false;
+  }
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_SEO_CHANNEL_ID;
+  if (!token || !channel) return false;
+
+  const { data: claimed, error: claimError } = await params.supabase
+    .from('seo_rulebook_rollouts')
+    .update({ notify_attempted_at: new Date().toISOString() })
+    .eq('id', params.rollout.id)
+    .eq('status', 'ready')
+    .is('notify_attempted_at', null)
+    .select('id')
+    .maybeSingle();
+  if (claimError) throw claimError;
+  if (!claimed) return false;
+
+  const ref = JSON.stringify({
+    kind: 'rulebook_rollout',
+    id: params.rollout.id,
+    candidateId: params.rollout.candidate_id,
+    candidateVersion: params.rollout.candidate_version,
+    patchHash: params.rollout.patch_hash,
+    shadowHash: params.rollout.shadow_content_hash,
+    metricsHash: params.rollout.metrics.metricsHash,
+  });
+  const metrics = params.rollout.metrics.metrics;
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json; charset=utf-8',
+    },
+    body: JSON.stringify({
+      channel,
+      text: 'SEO Rulebook shadow比較が昇格基準を満たしました',
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*SEO Rulebook 最終昇格承認*\nBase: \`v${params.rollout.base_rulebook_version} ${params.rollout.base_rulebook_hash.slice(0, 12)}...\`\nShadow: \`${params.rollout.shadow_content_hash.slice(0, 12)}...\`\nSamples: ${params.rollout.metrics.samples.runs} runs / ${params.rollout.metrics.samples.evaluatedProposals} proposals / ${params.rollout.metrics.samples.mainObservedDecisions} decisions\n提案生成率: ${percent(metrics.proposalGenerationRate.main.rate)} → ${percent(metrics.proposalGenerationRate.shadow.rate)} (risk-only patchのため同一)\nSlack到達可能率: ${percent(metrics.slackReachabilityRate.main.rate)} → ${percent(metrics.slackReachabilityRate.shadow.rate)}\nHard Gate通過率: ${percent(metrics.hardGatePassRate.main.rate)} → ${percent(metrics.hardGatePassRate.shadow.rate)}\n承認率: ${percent(metrics.approvalRate.main.rate)} → ${percent(metrics.approvalRate.shadowProjected.rate)} (projected)\n修正率: ${percent(metrics.revisionRate.main.rate)} → ${percent(metrics.revisionRate.shadowProjected.rate)} (projected)\n同じ修正の再発率: ${percent(metrics.sameCorrectionRecurrenceRate.main.rate)} → ${percent(metrics.sameCorrectionRecurrenceRate.shadowProjected.rate)} (projected)\nこの操作で初めて新版がactiveになります。`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '新版を主系へ昇格' },
+              style: 'primary',
+              action_id: 'seo_rulebook_rollout_promote',
+              value: ref,
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'Rolloutを却下' },
+              style: 'danger',
+              action_id: 'seo_rulebook_rollout_reject',
+              value: ref,
+            },
+          ],
+        },
+      ],
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const json = (await response.json().catch(() => ({}))) as {
+    ok?: boolean;
+    ts?: string;
+    error?: string;
+  };
+  if (!json.ok) {
+    await params.supabase
+      .from('seo_rulebook_rollouts')
+      .update({
+        status: 'shadowing',
+        notify_attempted_at: null,
+        ready_at: null,
+      })
+      .eq('id', params.rollout.id)
+      .eq('status', 'ready');
+    throw new Error(
+      `Rollout昇格Slack通知に失敗しました: ${json.error ?? response.statusText}`
+    );
+  }
+  const { error: updateError } = await params.supabase
+    .from('seo_rulebook_rollouts')
+    .update({ slack_channel: channel, slack_message_ts: json.ts ?? null })
+    .eq('id', params.rollout.id)
+    .eq('status', 'ready');
+  if (updateError) throw updateError;
   return true;
 }

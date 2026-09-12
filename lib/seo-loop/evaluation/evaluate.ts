@@ -253,18 +253,26 @@ export async function evaluateProposalForApproval(params: {
   proposal: ProposalForEvaluation;
   forceFresh?: boolean;
   phase?: 'approval' | 'execution';
+  rulebookOverride?: BoundRulebook;
+  persist?: boolean;
+  ignoreProposalRulebookStamp?: boolean;
+  freshContextOverride?: {
+    context: FactContextSnapshot | null;
+    warning: string | null;
+  };
 }): Promise<ProposalEvaluationResult> {
   const phase = params.phase ?? 'approval';
-  const rulebook = await loadRulebookForRun({
-    supabase: params.supabase,
-    runId: params.proposal.run_id,
-  });
+  const rulebook =
+    params.rulebookOverride ??
+    (await loadRulebookForRun({
+      supabase: params.supabase,
+      runId: params.proposal.run_id,
+    }));
   const limits = effectiveRulebookLimits(params.config, rulebook);
   const actionValueLimits = effectiveActionValueLimits(rulebook);
-  const proposalRulebook = await loadProposalRulebookStamp(
-    params.supabase,
-    params.proposal
-  );
+  const proposalRulebook = params.ignoreProposalRulebookStamp
+    ? null
+    : await loadProposalRulebookStamp(params.supabase, params.proposal);
   if (proposalRulebook && proposalRulebook.hash !== rulebook.contentHash) {
     const hardGate = runHardGate({
       payload: params.proposal.payload,
@@ -296,16 +304,18 @@ export async function evaluateProposalForApproval(params: {
       ],
       warnings: [message],
     };
-    await saveEvaluation({
-      supabase: params.supabase,
-      proposal: params.proposal,
-      result,
-      phase,
-      rulebook,
-    });
+    if (params.persist !== false) {
+      await saveEvaluation({
+        supabase: params.supabase,
+        proposal: params.proposal,
+        result,
+        phase,
+        rulebook,
+      });
+    }
     return result;
   }
-  if (!params.forceFresh) {
+  if (!params.forceFresh && params.persist !== false) {
     const existing = await loadExistingEvaluation(
       params.supabase,
       params.proposal,
@@ -319,10 +329,12 @@ export async function evaluateProposalForApproval(params: {
   const storedContextResult = factContextSnapshotSchema.safeParse(
     params.proposal.context_snapshot
   );
-  const fresh = await collectFreshContext(
-    params.supabase,
-    storedContextResult.success ? storedContextResult.data : null
-  );
+  const fresh =
+    params.freshContextOverride ??
+    (await collectFreshContext(
+      params.supabase,
+      storedContextResult.success ? storedContextResult.data : null
+    ));
   if (fresh.warning) {
     const hardGate = runHardGate({
       payload: params.proposal.payload,
@@ -347,13 +359,15 @@ export async function evaluateProposalForApproval(params: {
       blockReasons: [`infrastructure: ${fresh.warning}`],
       warnings: [fresh.warning],
     };
-    await saveEvaluation({
-      supabase: params.supabase,
-      proposal: params.proposal,
-      result,
-      phase,
-      rulebook,
-    });
+    if (params.persist !== false) {
+      await saveEvaluation({
+        supabase: params.supabase,
+        proposal: params.proposal,
+        result,
+        phase,
+        rulebook,
+      });
+    }
     return result;
   }
   const [duplicateProposal, proposalCount] =
@@ -412,13 +426,15 @@ export async function evaluateProposalForApproval(params: {
     blockReasons,
     warnings,
   };
-  await saveEvaluation({
-    supabase: params.supabase,
-    proposal: params.proposal,
-    result,
-    phase,
-    rulebook,
-  });
+  if (params.persist !== false) {
+    await saveEvaluation({
+      supabase: params.supabase,
+      proposal: params.proposal,
+      result,
+      phase,
+      rulebook,
+    });
+  }
   return result;
 }
 

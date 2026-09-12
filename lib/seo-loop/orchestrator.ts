@@ -6,7 +6,11 @@ import { payloadHash } from './hash';
 import { acquireRunLock, createOrLoadRun, dailyRunKey, releaseRunLock } from './lock';
 import { analyzeIssuesToProposals } from './analyzer';
 import { observeGscIssues } from './observer';
-import { notifySlackApproval, notifySlackLoopStatus } from './slack';
+import {
+  notifySlackApproval,
+  notifySlackLoopStatus,
+  notifySlackRolloutPromotion,
+} from './slack';
 import {
   findNextRevisionRunId,
   hasPendingRevisionForRun,
@@ -17,6 +21,10 @@ import {
   loadRulebookForRun,
 } from './rulebook/runtime';
 import { processRulePatchLearning } from './rulebook/learning';
+import {
+  evaluateProposalWithShadow,
+  refreshShadowRolloutMetrics,
+} from './rollout/service';
 import {
   evaluateProposalForApproval,
   shouldSendProposalToSlack,
@@ -40,6 +48,8 @@ type ProposalRow = {
   context_snapshot: unknown;
   parent_proposal_id: string | null;
   revision_number: number;
+  rulebook_version?: number;
+  rulebook_hash?: string;
 };
 
 type ApprovedProposalRow = ProposalRow & {
@@ -176,7 +186,7 @@ async function handlePendingApproval(
 ): Promise<SeoLoopStepResult> {
   const { data: proposals, error } = await supabase
     .from('seo_proposals')
-    .select('id,run_id,version,payload_hash,action,rationale,payload,context_snapshot,parent_proposal_id,revision_number')
+    .select('id,run_id,version,payload_hash,action,rationale,payload,context_snapshot,parent_proposal_id,revision_number,rulebook_version,rulebook_hash')
     .eq('run_id', run.id)
     .eq('status', 'pending_approval')
     .limit(10);
@@ -188,11 +198,27 @@ async function handlePendingApproval(
   let blockedRevisionCount = 0;
   let retryableCount = 0;
   for (const proposal of (proposals ?? []) as ProposalRow[]) {
-    const evaluation = await evaluateProposalForApproval({
-      supabase,
-      config,
-      proposal: proposal as ProposalForEvaluation,
-    });
+    let evaluation;
+    try {
+      evaluation = await evaluateProposalWithShadow({
+        supabase,
+        config,
+        proposal: proposal as ProposalForEvaluation,
+      });
+    } catch (shadowError) {
+      console.error('SEO Rulebook shadow evaluation failed; main continues', {
+        proposalId: proposal.id,
+        message:
+          shadowError instanceof Error
+            ? shadowError.message
+            : String(shadowError),
+      });
+      evaluation = await evaluateProposalForApproval({
+        supabase,
+        config,
+        proposal: proposal as ProposalForEvaluation,
+      });
+    }
     if (evaluation.retryable) {
       retryableCount += 1;
       continue;
@@ -526,6 +552,22 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   }
 
   const supabase = createAdminSupabaseClient();
+  const refreshRollout = async (): Promise<void> => {
+    try {
+      const ready = await refreshShadowRolloutMetrics(supabase, config);
+      if (ready) {
+        await notifySlackRolloutPromotion({
+          supabase,
+          rollout: ready,
+        });
+      }
+    } catch (error) {
+      console.error('SEO Rulebook shadow metrics failed; main continues', {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  await refreshRollout();
   try {
     const learning = await processRulePatchLearning(supabase);
     if (learning.generated > 0 || learning.notified > 0) {
@@ -640,6 +682,7 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
   }
 
   if (results.length === 0) {
+    await refreshRollout();
     return { status: 'skipped', message: '処理対象のrunがありません' };
   }
 
@@ -653,6 +696,7 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
       text: `*SEO Loop 実行結果*\n提案カードはありませんでした。\n\`${mergedMessage}\``,
     }).catch(() => undefined);
   }
+  await refreshRollout();
 
   return {
     ...last,

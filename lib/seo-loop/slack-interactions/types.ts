@@ -10,6 +10,18 @@ export const slackRulePatchRefSchema = slackProposalRefSchema.extend({
   kind: z.literal('rulebook_patch'),
 });
 export type SlackRulePatchRef = z.infer<typeof slackRulePatchRefSchema>;
+export const slackRulebookRolloutRefSchema = z.object({
+  kind: z.literal('rulebook_rollout'),
+  id: z.string().uuid(),
+  candidateId: z.string().uuid(),
+  candidateVersion: z.number().int().positive(),
+  patchHash: z.string().length(64),
+  shadowHash: z.string().length(64),
+  metricsHash: z.string().length(64),
+});
+export type SlackRulebookRolloutRef = z.infer<
+  typeof slackRulebookRolloutRefSchema
+>;
 
 export const feedbackDecisionSchema = z.enum(['rejected', 'revision_requested']);
 export type FeedbackDecision = z.infer<typeof feedbackDecisionSchema>;
@@ -48,6 +60,8 @@ export const slackBlockActionPayloadSchema = z.object({
           'seo_revision_requested',
           'seo_rule_patch_approve',
           'seo_rule_patch_reject',
+          'seo_rulebook_rollout_promote',
+          'seo_rulebook_rollout_reject',
         ]),
         value: z.string().min(1),
       })
@@ -128,6 +142,17 @@ export function parseProposalRef(value: string): SlackProposalRef | null {
 export function parseRulePatchRef(value: string): SlackRulePatchRef | null {
   try {
     const parsed = slackRulePatchRefSchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseRulebookRolloutRef(
+  value: string
+): SlackRulebookRolloutRef | null {
+  try {
+    const parsed = slackRulebookRolloutRefSchema.safeParse(JSON.parse(value));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

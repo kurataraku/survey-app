@@ -8,12 +8,14 @@ import {
 } from './modal';
 import {
   parseProposalRef,
+  parseRulebookRolloutRef,
   parseRulePatchRef,
   slackBlockActionPayloadSchema,
   slackViewSubmissionPayloadSchema,
   type FeedbackDecision,
   type SlackBlockActionPayload,
   type SlackProposalRef,
+  type SlackRulebookRolloutRef,
   type SlackRulePatchRef,
   type SlackViewSubmissionPayload,
 } from './types';
@@ -70,6 +72,11 @@ function isAuthorizedRulebookUser(userId: string): boolean {
 
 function isRulePatchSwitchEnabled(): boolean {
   const value = process.env.SEO_RULEBOOK_PATCH_ENABLED?.toLowerCase();
+  return value === 'true' || value === '1';
+}
+
+function isShadowRolloutSwitchEnabled(): boolean {
+  const value = process.env.SEO_RULEBOOK_SHADOW_ENABLED?.toLowerCase();
   return value === 'true' || value === '1';
 }
 
@@ -209,6 +216,7 @@ async function decideRulePatch(params: {
 }): Promise<SlackInteractionResult> {
   if (
     !isRulePatchSwitchEnabled() ||
+    (params.decision === 'approve' && !isShadowRolloutSwitchEnabled()) ||
     !isAuthorizedRulebookUser(params.payload.user.id)
   ) {
     return blockActionError(
@@ -250,6 +258,12 @@ async function decideRulePatch(params: {
     return blockActionError(
       params.payload,
       'Base Rulebookが更新済みのため、この候補をsupersededにしました。'
+    );
+  }
+  if (status === 'rollout_busy') {
+    return blockActionError(
+      params.payload,
+      '別のRulebook shadow比較が進行中です。完了または却下後に再試行してください。'
     );
   }
   let afterAction: (() => Promise<void>) | undefined;
@@ -330,8 +344,175 @@ async function decideRulePatch(params: {
             responseUrl: params.payload.response_url!,
             text:
               params.decision === 'approve'
-                ? `Rule Patchを第二承認し、次のrunから有効化しました\nCandidate: ${params.patchRef.id}\nby ${actorName(params.payload.user)}`
+                ? status === 'shadowing'
+                  ? `Rule Patchを第二承認し、shadow比較を開始しました。active版は変更していません\nCandidate: ${params.patchRef.id}\nby ${actorName(params.payload.user)}`
+                  : `Rule Patchを第二承認し、次のrunから有効化しました\nCandidate: ${params.patchRef.id}\nby ${actorName(params.payload.user)}`
                 : `Rule Patchを却下しました\nCandidate: ${params.patchRef.id}\nby ${actorName(params.payload.user)}`,
+            replaceOriginal: true,
+          },
+        }
+      : {}),
+  };
+}
+
+async function decideRulebookRollout(params: {
+  supabase: SupabaseClient;
+  payload: SlackBlockActionPayload;
+  rolloutRef: SlackRulebookRolloutRef;
+  decision: 'promote' | 'reject';
+}): Promise<SlackInteractionResult> {
+  if (
+    !isRulePatchSwitchEnabled() ||
+    !isShadowRolloutSwitchEnabled() ||
+    !isAuthorizedRulebookUser(params.payload.user.id)
+  ) {
+    return blockActionError(
+      params.payload,
+      'Rulebook rolloutは無効、または専用承認者として登録されていません。'
+    );
+  }
+  const functionName =
+    params.decision === 'promote'
+      ? 'promote_seo_rulebook_rollout'
+      : 'reject_seo_rulebook_rollout';
+  const rpcArgs = {
+    p_rollout_id: params.rolloutRef.id,
+    p_candidate_id: params.rolloutRef.candidateId,
+    p_candidate_version: params.rolloutRef.candidateVersion,
+    p_patch_hash: params.rolloutRef.patchHash,
+    p_shadow_content_hash: params.rolloutRef.shadowHash,
+    p_approver_id: params.payload.user.id,
+    p_approver_name: actorName(params.payload.user),
+    ...(params.decision === 'promote'
+      ? { p_metrics_hash: params.rolloutRef.metricsHash }
+      : {}),
+  };
+  const { data, error } = await params.supabase.rpc(functionName, rpcArgs);
+  if (error || !data) {
+    console.error(`${functionName} failed`, {
+      code: error?.code,
+      message: error?.message,
+    });
+    return blockActionError(
+      params.payload,
+      'Rolloutは基準未達・無効・処理済み、またはBase Rulebookが更新済みです。'
+    );
+  }
+  const status =
+    params.decision === 'promote' &&
+    typeof data === 'object' &&
+    data !== null &&
+    'status' in data
+      ? String((data as { status: unknown }).status)
+      : 'rejected';
+  if (status === 'superseded') {
+    return blockActionError(
+      params.payload,
+      'Base Rulebookが更新済みのため、このrolloutをsupersededにしました。'
+    );
+  }
+  if (status === 'rolled_back') {
+    return {
+      status: 200,
+      body: { ok: false },
+      ...(isSlackResponseUrl(params.payload.response_url)
+        ? {
+            afterResponse: {
+              responseUrl: params.payload.response_url,
+              text: `このrolloutは昇格後にrollback済みです\nRollout: ${params.rolloutRef.id}`,
+              replaceOriginal: true,
+            },
+          }
+        : {}),
+    };
+  }
+  if (params.decision === 'promote' && status === 'promoted') {
+    const promoted = data as {
+      versionId?: unknown;
+      contentHash?: unknown;
+      isCurrentlyActive?: unknown;
+    };
+    if (promoted.isCurrentlyActive !== true) {
+      return blockActionError(
+        params.payload,
+        'このrolloutは昇格後にrollback済みです。'
+      );
+    }
+    const versionId =
+      typeof promoted.versionId === 'string' ? promoted.versionId : null;
+    const contentHash =
+      typeof promoted.contentHash === 'string'
+        ? promoted.contentHash
+        : null;
+    const { data: active, error: activeError } = versionId
+      ? await params.supabase
+          .from('seo_rulebook_versions')
+          .select('id,content,content_hash,status')
+          .eq('id', versionId)
+          .maybeSingle()
+      : { data: null, error: { message: 'missing promoted version id' } };
+    const parsed = rulebookContentSchema.safeParse(active?.content);
+    if (
+      activeError ||
+      !active ||
+      active.status !== 'active' ||
+      !contentHash ||
+      active.content_hash !== contentHash ||
+      !parsed.success ||
+      payloadHash(parsed.data) !== contentHash
+    ) {
+      if (versionId && contentHash) {
+        const rollback = await params.supabase.rpc('rollback_seo_rulebook', {
+          p_current_version_id: versionId,
+          p_current_hash: contentHash,
+          p_actor_id: params.payload.user.id,
+          p_actor_name: actorName(params.payload.user),
+          p_idempotency_key: `post-check-rollout:${params.rolloutRef.id}`,
+        });
+        if (
+          !rollback.error &&
+          rollback.data &&
+          typeof rollback.data === 'object' &&
+          (rollback.data as { status?: unknown }).status === 'rolled_back'
+        ) {
+          return {
+            status: 200,
+            body: { ok: false },
+            ...(isSlackResponseUrl(params.payload.response_url)
+              ? {
+                  afterResponse: {
+                    responseUrl: params.payload.response_url,
+                    text: `新版の昇格後検査に失敗したため直前版へrollbackしました\nRollout: ${params.rolloutRef.id}`,
+                    replaceOriginal: true,
+                  },
+                }
+              : {}),
+          };
+        }
+        return blockActionError(
+          params.payload,
+          `新版の昇格後検査に失敗し、rollback完了も確認できません。直ちに管理者確認が必要です: ${
+            rollback.error?.message ?? 'unknown error'
+          }`
+        );
+      }
+      return blockActionError(
+        params.payload,
+        '新版の昇格後検査に失敗し、version/hash不足のためrollbackを要求できませんでした。直ちに管理者確認が必要です。'
+      );
+    }
+  }
+  return {
+    status: 200,
+    body: { ok: true },
+    ...(isSlackResponseUrl(params.payload.response_url)
+      ? {
+          afterResponse: {
+            responseUrl: params.payload.response_url!,
+            text:
+              params.decision === 'promote'
+                ? `shadow基準を満たしたRulebook新版を主系へ昇格しました\nRollout: ${params.rolloutRef.id}\nby ${actorName(params.payload.user)}`
+                : `Rulebook rolloutを却下しました\nRollout: ${params.rolloutRef.id}\nby ${actorName(params.payload.user)}`,
             replaceOriginal: true,
           },
         }
@@ -472,6 +653,24 @@ export async function handleSlackInteraction(params: {
     return blockActionError(parsed.data, 'この操作を行う権限がありません');
   }
   const action = parsed.data.actions[0]!;
+  if (
+    action.action_id === 'seo_rulebook_rollout_promote' ||
+    action.action_id === 'seo_rulebook_rollout_reject'
+  ) {
+    const rolloutRef = parseRulebookRolloutRef(action.value);
+    if (!rolloutRef) {
+      return blockActionError(parsed.data, 'Rollout参照が不正です。');
+    }
+    return decideRulebookRollout({
+      supabase: params.supabase,
+      payload: parsed.data,
+      rolloutRef,
+      decision:
+        action.action_id === 'seo_rulebook_rollout_promote'
+          ? 'promote'
+          : 'reject',
+    });
+  }
   if (
     action.action_id === 'seo_rule_patch_approve' ||
     action.action_id === 'seo_rule_patch_reject'

@@ -1,6 +1,7 @@
 export type SeoLoopConfig = {
   enabled: boolean;
   executionEnabled: boolean;
+  shadowRolloutEnabled?: boolean;
   maxDailyProposals: number;
   maxDailyExecutions: number;
   maxTargetsPerProposal: number;
@@ -27,6 +28,7 @@ export function getSeoLoopConfig(): SeoLoopConfig {
   return {
     enabled: boolEnv('SEO_LOOP_ENABLED', false),
     executionEnabled: boolEnv('SEO_LOOP_EXECUTION_ENABLED', false),
+    shadowRolloutEnabled: boolEnv('SEO_RULEBOOK_SHADOW_ENABLED', false),
     maxDailyProposals: intEnv('SEO_LOOP_MAX_DAILY_PROPOSALS', 10),
     maxDailyExecutions: intEnv('SEO_LOOP_MAX_DAILY_EXECUTIONS', 3),
     maxTargetsPerProposal: intEnv('SEO_LOOP_MAX_TARGETS_PER_PROPOSAL', 3),

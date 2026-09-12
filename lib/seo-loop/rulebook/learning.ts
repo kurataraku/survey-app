@@ -185,7 +185,7 @@ async function generateCandidate(
         .from('seo_rule_patch_candidates')
         .select('id')
         .eq('patch_path', path)
-        .in('status', ['draft', 'pending_approval', 'rejected'])
+        .in('status', ['draft', 'pending_approval', 'shadowing', 'rejected'])
         .gte('created_at', cooldownSince)
         .limit(1)
         .maybeSingle(),
