@@ -48,7 +48,12 @@ export async function middleware(request: NextRequest) {
 
   // 1. ホスト正規化（最優先）: www / vercel.app → apex に恒久リダイレクト
   // / は会社トップ、/tsushin-kuchikomi はアプリトップ。パスはそのまま転送。
-  if (isWww || (isVercelApp && !skipVercelRedirect)) {
+  // Vercel Cron は常に *.vercel.app を叩くため、cron API はリダイレクトしない。
+  // 308 だと Authorization 付き実行が本体 route に到達せず、SEO Loop が無音停止する。
+  const isCronApiPath =
+    pathname.startsWith(`${BASE_PATH}/api/cron/`) ||
+    pathname.startsWith('/api/cron/');
+  if ((isWww || (isVercelApp && !skipVercelRedirect)) && !isCronApiPath) {
     const path = pathname + request.nextUrl.search;
     const redirectUrl = new URL(path, APEX_ORIGIN);
     const res = NextResponse.redirect(redirectUrl, { status: 308 });
