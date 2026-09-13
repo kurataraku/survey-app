@@ -18,6 +18,8 @@ import {
 import type { HardGateRuleResult } from './types';
 import type { RulebookContent } from '../rulebook/schema';
 
+const CONTENT_STRUCTURE_SEVERITY: HardGateRuleResult['severity'] = 'warn';
+
 function normalizedUrl(value: string): string | null {
   try {
     const url = new URL(value);
@@ -34,11 +36,13 @@ function rule(
   success: string,
   failure: string,
   details?: Record<string, unknown>,
-  rulebookRuleId?: string
+  rulebookRuleId?: string,
+  severity: HardGateRuleResult['severity'] = 'block'
 ): HardGateRuleResult {
   return {
     ruleId,
     passed,
+    severity,
     message: passed ? success : failure,
     ...(details ? { details } : {}),
     ...(rulebookRuleId ? { rulebookRuleId } : {}),
@@ -243,7 +247,9 @@ export function runHardGate(params: {
       '既存の見出し・箇条書き・情報量を削減しています',
       structureRegressions.length > 0
         ? { regressions: structureRegressions }
-        : undefined
+        : undefined,
+      undefined,
+      CONTENT_STRUCTURE_SEVERITY
     ),
     rule(
       'target_limit',
@@ -264,7 +270,7 @@ export function runHardGate(params: {
   ];
 
   return {
-    passed: results.every((result) => result.passed),
+    passed: results.every((result) => result.severity === 'warn' || result.passed),
     proposal,
     results,
   };

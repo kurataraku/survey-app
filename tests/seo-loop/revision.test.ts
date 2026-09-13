@@ -116,6 +116,7 @@ type RecordedCall = {
 
 function fakeSupabase(params?: {
   consumedFeedback?: boolean;
+  feedbackCategory?: string;
   runStatus?: string;
   calls?: RecordedCall[];
 }): SupabaseClient {
@@ -138,7 +139,7 @@ function fakeSupabase(params?: {
     proposal_version: 1,
     proposal_payload_hash: parent.payload_hash,
     reason: '検索意図に対して表現が抽象的なので修正してください',
-    category: 'search_intent_mismatch',
+    category: params?.feedbackCategory ?? 'search_intent_mismatch',
     desired_change: '検索クエリとの対応が分かる表現へ変更してください',
     general_rule_candidate: true,
   };
@@ -337,7 +338,8 @@ describe('revision proposal service', () => {
     });
 
     expect(result.proposalCount).toBe(0);
-    expect(callLLMMock).toHaveBeenCalledTimes(2);
+    expect(result.notify).toBe(false);
+    expect(callLLMMock).toHaveBeenCalledTimes(3);
     expect(
       calls.some(
         (call) => call.table === 'rpc:create_seo_proposal_revision'
@@ -348,6 +350,29 @@ describe('revision proposal service', () => {
         table: 'seo_proposals',
         operation: 'update',
         value: expect.objectContaining({ revision_retry_count: 1 }),
+      })
+    );
+  });
+
+  it('wrong_targetの改訂要求はaction固定レーンで打ち切る', async () => {
+    const calls: RecordedCall[] = [];
+    const result = await reviseRequestedProposal({
+      supabase: fakeSupabase({ calls, feedbackCategory: 'wrong_target' }),
+      runId,
+      config,
+    });
+
+    expect(result.outcome).toBe('abandoned');
+    expect(result.notify).toBe(true);
+    expect(callLLMMock).not.toHaveBeenCalled();
+    expect(calls).toContainEqual(
+      expect.objectContaining({
+        table: 'seo_proposals',
+        operation: 'update',
+        value: expect.objectContaining({
+          status: 'rejected',
+          revision_resolved_at: expect.any(String),
+        }),
       })
     );
   });

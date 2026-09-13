@@ -403,7 +403,7 @@ export async function evaluateProposalForApproval(params: {
       ),
   });
   const blockReasons = hardGate.results
-    .filter((result) => !result.passed)
+    .filter((result) => result.severity === 'block' && !result.passed)
     .map((result) => `${result.ruleId}: ${result.message}`);
   if (!softPassed) {
     blockReasons.push(
@@ -412,6 +412,9 @@ export async function evaluateProposalForApproval(params: {
   }
   const warnings = [
     ...softEval.warnings,
+    ...hardGate.results
+      .filter((result) => result.severity === 'warn' && !result.passed)
+      .map((result) => `${result.ruleId}: ${result.message}`),
     ...(fresh.warning ? [fresh.warning] : []),
   ];
   const result: ProposalEvaluationResult = {

@@ -518,9 +518,9 @@ async function processOneStep(
       runId: run.id,
       config,
     });
-    if (result.outcome === 'failed') {
+    if ((result.outcome === 'failed' || result.outcome === 'abandoned') && result.notify) {
       await notifySlackLoopStatus({
-        text: `SEO改訂proposalを生成できませんでした。\nrun: \`${run.idempotency_key}\`\n${result.message}`,
+        text: `SEO改訂proposalを${result.outcome === 'abandoned' ? '打ち切りました' : '生成できませんでした'}。\nrun: \`${run.idempotency_key}\`\n${result.message}`,
       }).catch(() => undefined);
     }
     return { status: 'analyzed', runId: run.id, message: result.message };

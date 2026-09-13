@@ -158,6 +158,21 @@ export function contentChangeRegressions(
   return [...new Set(regressions)];
 }
 
+/**
+ * 生成時のretry対象にする変更退行。
+ * dry-run期間は構造退行を学習材料としてSlackへ流すため、機械的に直せる重複リンクだけを止める。
+ */
+export function retryableContentChangeRegressions(
+  proposal: ProposalPayloadV2,
+  context: FactContextSnapshot
+): string[] {
+  if (proposal.action !== 'addApprovedInternalLink') return [];
+  const regressions = proposal.targets.flatMap((target) =>
+    internalLinkRegressions(target.proposedValue, context)
+  );
+  return [...new Set(regressions)];
+}
+
 export function isStructuredTextAction(action: TypedAction): boolean {
   return STRUCTURED_TEXT_ACTIONS.has(action);
 }

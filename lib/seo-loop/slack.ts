@@ -116,8 +116,15 @@ export function approvalDetails(
     evaluation.warnings.length > 0
       ? `\n*警告*\n${evaluation.warnings.map((warning) => `• ${safeSlackValue(warning, 250)}`).join('\n')}`
       : '';
+  const hardGateWarnings = evaluation.hardGateResults
+    .filter((result) => result.severity === 'warn' && !result.passed)
+    .map((result) => `• ${safeSlackValue(result.message, 250)}`);
+  const hardGateWarningText =
+    hardGateWarnings.length > 0
+      ? `\n*Hard Gate警告（承認は可能）*\n${hardGateWarnings.join('\n')}`
+      : '';
   return truncateSlack(
-    `*評価* ${evaluation.softEval.totalScore}/100 / Risk: \`${evaluation.riskLevel}\`${warnings}\n\n*変更内容*\n${changeOverview(proposal)}\n\n*変更前後の値*\n${targets}\n\n*根拠*\n${evidence}`,
+    `*評価* ${evaluation.softEval.totalScore}/100 / Risk: \`${evaluation.riskLevel}\`${warnings}${hardGateWarningText}\n\n*変更内容*\n${changeOverview(proposal)}\n\n*変更前後の値*\n${targets}\n\n*根拠*\n${evidence}`,
     2900
   );
 }

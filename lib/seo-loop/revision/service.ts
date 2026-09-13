@@ -27,7 +27,7 @@ import {
 } from './prompts';
 
 const MAX_REVISION_RETRIES = 3;
-const STRUCTURED_MAX_ATTEMPTS = 2;
+const STRUCTURED_MAX_ATTEMPTS = 3;
 
 type ParentProposalRow = {
   id: string;
@@ -312,7 +312,7 @@ async function markRevisionFailure(params: {
   request: RevisionRequest;
   message: string;
   retryable?: boolean;
-}): Promise<void> {
+}): Promise<{ retryCount: number; notify: boolean }> {
   const retryCount =
     params.request.parent.revision_retry_count + (params.retryable ? 0 : 1);
   const { error: proposalError } = await params.supabase
@@ -333,6 +333,47 @@ async function markRevisionFailure(params: {
       retryCount >= MAX_REVISION_RETRIES
         ? `改訂生成が${MAX_REVISION_RETRIES}回失敗しました: ${params.message}`
         : params.message,
+  });
+  return {
+    retryCount,
+    notify: retryCount >= MAX_REVISION_RETRIES,
+  };
+}
+
+async function abandonRevisionRequest(params: {
+  supabase: SupabaseClient;
+  request: RevisionRequest;
+  message: string;
+}): Promise<void> {
+  const { error: proposalError } = await params.supabase
+    .from('seo_proposals')
+    .update({
+      status: 'rejected',
+      revision_resolved_at: new Date().toISOString(),
+      revision_error: params.message,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.request.parent.id)
+    .eq('status', 'revision_requested')
+    .is('revision_resolved_at', null);
+  if (proposalError) throw proposalError;
+
+  await params.supabase
+    .from('seo_approvals')
+    .update({
+      status: 'rejected',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('proposal_id', params.request.parent.id)
+    .eq('proposal_version', params.request.parent.version)
+    .eq('proposal_payload_hash', params.request.parent.payload_hash)
+    .eq('status', 'revision_requested');
+
+  await settleRunAfterRevision({
+    supabase: params.supabase,
+    runId: params.request.parent.run_id,
+    currentStep: 'revision_abandoned',
+    errorMessage: params.message,
   });
 }
 
@@ -384,8 +425,10 @@ export async function reviseRequestedProposal(params: {
   config: SeoLoopConfig;
 }): Promise<{
   proposalCount: number;
-  outcome: 'created' | 'no_request' | 'failed';
+  outcome: 'created' | 'no_request' | 'failed' | 'abandoned';
   message: string;
+  notify: boolean;
+  reason: string | null;
 }> {
   const request = (await loadPendingRevisionRequests(params.supabase, params.runId))[0];
   if (!request) {
@@ -398,12 +441,14 @@ export async function reviseRequestedProposal(params: {
       proposalCount: 0,
       outcome: 'no_request',
       message: '処理可能な改訂要求がありません',
+      notify: false,
+      reason: null,
     };
   }
 
   const parentParsed = proposalPayloadV2Schema.safeParse(request.parent.payload);
   if (!parentParsed.success) {
-    await markRevisionFailure({
+    const failure = await markRevisionFailure({
       supabase: params.supabase,
       request,
       message: '改訂元がProposal v2 schemaに適合しません',
@@ -412,6 +457,24 @@ export async function reviseRequestedProposal(params: {
       proposalCount: 0,
       outcome: 'failed',
       message: '改訂元proposalが不正なため改訂を停止しました',
+      notify: failure.notify,
+      reason: '改訂元がProposal v2 schemaに適合しません',
+    };
+  }
+  if (request.feedback.category === 'wrong_target') {
+    const reason =
+      'wrong_targetの修正依頼は、現在の改訂レーンではaction/対象を変更できないため打ち切りました。新しいissueから別proposalを生成してください。';
+    await abandonRevisionRequest({
+      supabase: params.supabase,
+      request,
+      message: reason,
+    });
+    return {
+      proposalCount: 0,
+      outcome: 'abandoned',
+      message: reason,
+      notify: true,
+      reason,
     };
   }
   const rulebook = await loadRulebookForRun({
@@ -428,11 +491,13 @@ export async function reviseRequestedProposal(params: {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await markRevisionFailure({ supabase: params.supabase, request, message });
+    const failure = await markRevisionFailure({ supabase: params.supabase, request, message });
     return {
       proposalCount: 0,
       outcome: 'failed',
       message: `改訂上限チェック失敗: ${message}`,
+      notify: failure.notify,
+      reason: message,
     };
   }
 
@@ -444,7 +509,7 @@ export async function reviseRequestedProposal(params: {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await markRevisionFailure({
+    const failure = await markRevisionFailure({
       supabase: params.supabase,
       request,
       message,
@@ -454,6 +519,8 @@ export async function reviseRequestedProposal(params: {
       proposalCount: 0,
       outcome: 'failed',
       message: `Fact Context再取得失敗: ${message}`,
+      notify: failure.notify,
+      reason: message,
     };
   }
 
@@ -530,7 +597,7 @@ export async function reviseRequestedProposal(params: {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await markRevisionFailure({
+    const failure = await markRevisionFailure({
       supabase: params.supabase,
       request,
       message,
@@ -540,12 +607,14 @@ export async function reviseRequestedProposal(params: {
       proposalCount: 0,
       outcome: 'failed',
       message: `改訂trace保存失敗: ${message}`,
+      notify: failure.notify,
+      reason: message,
     };
   }
   if (!revisionRun.data) {
     const message =
       revisionRun.attempts.at(-1)?.error ?? '改訂Strategistが有効なJSONを返しませんでした';
-    await markRevisionFailure({
+    const failure = await markRevisionFailure({
       supabase: params.supabase,
       request,
       message,
@@ -556,7 +625,9 @@ export async function reviseRequestedProposal(params: {
     return {
       proposalCount: 0,
       outcome: 'failed',
-      message: '改訂proposalを生成できませんでした',
+      message: `改訂proposalを生成できませんでした: ${message}`,
+      notify: failure.notify,
+      reason: message,
     };
   }
 
@@ -569,7 +640,7 @@ export async function reviseRequestedProposal(params: {
   });
   const hash = payloadHash(proposal);
   if (hash === request.parent.payload_hash) {
-    await markRevisionFailure({
+    const failure = await markRevisionFailure({
       supabase: params.supabase,
       request,
       message: '改訂proposalのpayload hashが元proposalと同一です',
@@ -578,6 +649,8 @@ export async function reviseRequestedProposal(params: {
       proposalCount: 0,
       outcome: 'failed',
       message: '同一hashの改訂proposalを拒否しました',
+      notify: failure.notify,
+      reason: '改訂proposalのpayload hashが元proposalと同一です',
     };
   }
   const baseline =
@@ -619,7 +692,7 @@ export async function reviseRequestedProposal(params: {
   if (createError || !childId) {
     const message =
       createError?.message ?? '改訂proposalの原子的保存に失敗しました';
-    await markRevisionFailure({
+    const failure = await markRevisionFailure({
       supabase: params.supabase,
       request,
       message,
@@ -629,6 +702,8 @@ export async function reviseRequestedProposal(params: {
       proposalCount: 0,
       outcome: 'failed',
       message: `改訂proposal保存失敗: ${message}`,
+      notify: failure.notify,
+      reason: message,
     };
   }
 
@@ -636,5 +711,7 @@ export async function reviseRequestedProposal(params: {
     proposalCount: 1,
     outcome: 'created',
     message: `改訂proposalを生成しました: revision ${request.parent.revision_number + 1}`,
+    notify: false,
+    reason: null,
   };
 }

@@ -26,6 +26,8 @@
     "seo:gsc:page-query": "tsx scripts/gsc-search-analytics.ts --mode=page-query",
     "seo:eval": "tsx scripts/seo-loop-eval.ts",
     "seo:rulebook:status": "tsx scripts/seo-rulebook-status.ts",
+    "seo:revision:status": "tsx scripts/seo-revision-status.ts",
+    "seo:proposals:review": "tsx scripts/seo-proposals-review.ts",
     "sync:rag": "tsx scripts/sync-rag-documents.ts --all",
     "generate:highlights": "tsx scripts/generate-school-highlights.ts",
     "publish:draft-summaries": "tsx scripts/publish-draft-summaries.ts",

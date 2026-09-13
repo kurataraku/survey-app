@@ -12,7 +12,11 @@ export const ISSUE_ACTION_CANDIDATES: Record<SeoIssueType, readonly TypedAction[
     'updateSchoolMetaTitle',
     'updateFeatureMetaDescription',
   ],
-  striking_distance: ['updateSeoSummary', 'addApprovedInternalLink'],
+  striking_distance: [
+    'updateSchoolMetaTitle',
+    'updateSeoSummary',
+    'addApprovedInternalLink',
+  ],
   declining_clicks: [
     'updateSchoolMetaTitle',
     'updateFeatureMetaDescription',

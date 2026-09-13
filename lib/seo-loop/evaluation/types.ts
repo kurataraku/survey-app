@@ -20,6 +20,7 @@ export type HardGateRuleId =
 export type HardGateRuleResult = {
   ruleId: HardGateRuleId;
   passed: boolean;
+  severity: 'block' | 'warn';
   message: string;
   details?: Record<string, unknown>;
   rulebookRuleId?: string;

@@ -100,16 +100,23 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 
 提案が0件で終わったtickでは、Slackの実行結果通知に見送り理由（`context` / `facts` / `policy` / `analyst` / `strategist` / `assemble`）と未分析課題数が入ります。どの段で落ちたかを見て、プロンプトかRulebookのどちらを直すか判断してください。
 
-## 情報削減と重複変更の禁止
+## 情報削減と重複変更の扱い
 
-「短くする」「一般的な一覧へリンクを増やす」といった変更は、それ自体ではSEO改善の根拠になりません。次の変更はStrategistプロンプトで禁止し、生成時の再試行検証とHard Gateの両方で拒否します。
+「短くする」「一般的な一覧へリンクを増やす」といった変更は、それ自体ではSEO改善の根拠になりません。ただしExecutorがdry-runの間は、低価値提案も学習材料としてSlackへ流します。判定は次の3層に分けます。
 
-- `content_structure_preserved`: `updateSeoSummary`で、currentValueにある見出しの削除、箇条書きの純減、残存文字数比率80%未満の短縮
-- `internal_link_not_duplicated`: `addApprovedInternalLink`で、公開HTMLの既存内部リンクと同一URL、または対象ページ自身へのリンク追加
+- 生成時validate: Fact不一致、currentValue不一致、重複内部リンクなど、リトライで機械的に直せるものだけを差し戻す
+- Hard Gate block: schema違反、Allowlist外、対象不一致、禁止表現、重複内部リンクなど、実行しても害がある／意味がないものだけを止める
+- Soft Eval / Slack warning: `updateSeoSummary`での見出し削除、箇条書きの純減、残存文字数比率80%未満の短縮、文字数変化5%未満の言い換え疑いを警告として表示する
 
-判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。
+判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。Phase 2でTyped Executorの本番書き込みを有効化する前に、構造退行warningをblockへ戻すか再判定します。
 
 Slackの承認カードは`*変更内容*`として、対象URL、文字数のbefore/after、削除・追加される見出し、箇条書きと行の増減、内部リンク件数の増減を表示します。承認者は本文全体を読み比べずに変化を判断できます。
+
+Slack通知を共有してルールを育てる場合は、まず `npm run seo:proposals:review -- --days=1` の出力を確認します。追記先は以下の3層です。
+
+- 生成の質を上げたい場合: `lib/seo-loop/analysis/prompts.ts` の `STRATEGIST_CONTENT_POLICY`
+- 機械判定できる注意喚起にしたい場合: `lib/seo-loop/content-change.ts` と `lib/seo-loop/evaluation/soft-eval.ts`
+- 実行されたら害があるため止めたい場合: `lib/seo-loop/evaluation/hard-gate.ts` のblockルール
 
 ## 承認固定
 
@@ -182,6 +189,8 @@ Typed Rule Patchの第二承認は新版の即時active化ではなく、`shadow
 - `npm run seo:gsc:pages`
 - `npm run seo:gsc:queries`
 - `npm run seo:gsc:page-query -- --page=https://...`
+- `npm run seo:revision:status`
+- `npm run seo:proposals:review -- --days=1`
 - `npm run seo:coverage`
 - `npm run seo:thin-pages`
 - `npm run build`

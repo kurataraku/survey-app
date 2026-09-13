@@ -134,26 +134,32 @@ describe('本文の情報削減を止める', () => {
     expect(structuredTextRegressions(currentSummary, shortened)).toHaveLength(3);
   });
 
-  it('Hard Gateがcontent_structure_preservedで停止する', () => {
+  it('Hard Gateはcontent_structure_preservedを警告として通す', () => {
     const result = hardGate(summaryProposal(shortened));
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
     expect(result.results).toContainEqual(
-      expect.objectContaining({ ruleId: 'content_structure_preserved', passed: false })
+      expect.objectContaining({
+        ruleId: 'content_structure_preserved',
+        passed: false,
+        severity: 'warn',
+      })
     );
   });
 
-  it('生成時の検証で構造退行を差し戻す', () => {
+  it('生成時の検証では構造退行を差し戻さない', () => {
     const proposal = proposalPayloadV2Schema.parse(summaryProposal(shortened));
-    expect(validateProposalAgainstContext(proposal, context)).toContainEqual(
-      expect.stringContaining('既存の見出しを削除しています')
-    );
+    expect(validateProposalAgainstContext(proposal, context)).toEqual([]);
   });
 
   it('見出しと箇条書きを保ったまま情報を足す案は通す', () => {
     const improved = `${currentSummary}\n- スクーリングは年数回のため、通学負担を抑えたい人にも向いています。`;
     expect(structuredTextRegressions(currentSummary, improved)).toEqual([]);
     expect(hardGate(summaryProposal(improved)).results).toContainEqual(
-      expect.objectContaining({ ruleId: 'content_structure_preserved', passed: true })
+      expect.objectContaining({
+        ruleId: 'content_structure_preserved',
+        passed: true,
+        severity: 'warn',
+      })
     );
   });
 });
@@ -193,7 +199,14 @@ describe('Slackの変更前後表示', () => {
     passed: true,
     retryable: false,
     hardGatePassed: true,
-    hardGateResults: [],
+    hardGateResults: [
+      {
+        ruleId: 'content_structure_preserved',
+        passed: false,
+        severity: 'warn',
+        message: '既存の見出し・箇条書き・情報量を削減しています',
+      },
+    ],
     softEval: runSoftEval(
       proposalPayloadV2Schema.parse(summaryProposal(`${currentSummary}\n- 追加情報`))
     ),
@@ -212,6 +225,7 @@ describe('Slackの変更前後表示', () => {
     expect(overview).toContain('削除される見出し: この学校が合う人 / 学費・通学スタイルの注意点');
     const details = approvalDetails(proposal, evaluation);
     expect(details).toContain('*変更内容*');
+    expect(details).toContain('*Hard Gate警告（承認は可能）*');
     expect(details).toContain(`対象URL: ${targetUrl}`);
   });
 

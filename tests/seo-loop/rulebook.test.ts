@@ -315,4 +315,49 @@ describe('Versioned Rulebook', () => {
       candidateActionsForIssue('declining_clicks', schoolContext, analyzer)
     ).toEqual(['updateSeoSummary']);
   });
+
+  it('striking_distanceのコード側allowlistはタイトル改善を許可する', () => {
+    const analyzer = {
+      ...FALLBACK_RULEBOOK.analyzer,
+      issueActionCandidates: {
+        ...FALLBACK_RULEBOOK.analyzer.issueActionCandidates,
+        striking_distance: [
+          'updateSchoolMetaTitle' as const,
+          'updateSeoSummary' as const,
+          'addApprovedInternalLink' as const,
+        ],
+      },
+    };
+    expect(
+      candidateActionsForIssue('striking_distance', schoolContext, analyzer)
+    ).toEqual(['updateSchoolMetaTitle', 'updateSeoSummary']);
+  });
+
+  it('Rulebook v2 migrationのcontent hashがpayloadHashと一致する', () => {
+    const migration = readFileSync(
+      resolve(
+        process.cwd(),
+        'supabase-migrations/activate-seo-rulebook-v2-striking-distance-title.sql'
+      ),
+      'utf8'
+    );
+    const seed = migration.match(
+      /\(\s*2,\s*1,\s*'active',\s*'([\s\S]*?)'::jsonb,\s*'([a-f0-9]{64})'/
+    );
+    expect(seed).not.toBeNull();
+    const content = JSON.parse(seed![1]!) as unknown;
+    expect(rulebookContentSchema.safeParse(content).success).toBe(true);
+    expect(payloadHash(content)).toBe(seed![2]);
+    expect(content).toMatchObject({
+      analyzer: {
+        issueActionCandidates: {
+          striking_distance: [
+            'updateSchoolMetaTitle',
+            'updateSeoSummary',
+            'addApprovedInternalLink',
+          ],
+        },
+      },
+    });
+  });
 });
