@@ -97,6 +97,7 @@ Typed Executor はまだ Phase1 dry-run（`blockedUntilPhase2`）。`SEO_LOOP_EX
 
 Cronを1周させて確認する。
 
+- execute後に当日runが`completed`で止まらず、残りopen issueがあれば`analyzing`へ戻るか（2026-09-14 修正）
 - 提案が生成されるか（`npm run seo:proposals:review -- --days=1`）。`quality_blocked` だけでゼロになっていないか
 - title提案の比率が上がっているか（プロンプトのtitle優先が効いているか）
 - Slackに届いた案がクエリ語・具体事実を足しているか

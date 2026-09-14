@@ -189,14 +189,15 @@ async function selectRunnableRun(
 /**
  * Slack通知まで終えたあと、未分析課題と当日予算が残っていれば同じrunで分析へ戻す。
  * 承認待ちで止めず、1日のうちに提案を積み増すための折り返し。
+ * 時間切れでも analyzing に戻す。completed にすると次の毎時tickが再開できない。
  */
 async function resumeAnalysisIfPossible(
   supabase: SupabaseClient,
   run: SeoLoopRun,
   config: ReturnType<typeof getSeoLoopConfig>,
-  deadlineAt: number
+  _deadlineAt: number
 ): Promise<boolean> {
-  if (Date.now() >= deadlineAt) return false;
+  void _deadlineAt;
   const openIssues = await countOpenIssues(supabase, run.id);
   if (openIssues === 0) return false;
   const budget = await remainingDailyProposalBudget(supabase, config);
@@ -359,10 +360,100 @@ async function handlePendingApproval(
   };
 }
 
+/**
+ * execute後にrunを閉じるか、残り課題の分析へ戻すかを決める。
+ * 承認1件で当日runがcompletedになり、毎時tickが止まるのを防ぐ。
+ */
+export function nextRunStateAfterExecute(params: {
+  remainingPending: number;
+  openIssues: number;
+  remainingBudget: number;
+}): 'pending_approval' | 'analyzing' | 'completed' {
+  if (params.remainingPending > 0) return 'pending_approval';
+  // 時間切れでも completed にしない。analyzing のまま残せば次の毎時tickが再開できる。
+  if (params.openIssues > 0 && params.remainingBudget > 0) return 'analyzing';
+  return 'completed';
+}
+
+async function finishAfterExecute(params: {
+  supabase: SupabaseClient;
+  run: SeoLoopRun;
+  config: ReturnType<typeof getSeoLoopConfig>;
+  deadlineAt: number;
+  processedApproved: boolean;
+}): Promise<SeoLoopStepResult> {
+  const { count: remainingPending, error: remainingError } = await params.supabase
+    .from('seo_proposals')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', params.run.id)
+    .eq('status', 'pending_approval');
+  if (remainingError) throw remainingError;
+
+  const openIssues = await countOpenIssues(params.supabase, params.run.id);
+  const remainingBudget = await remainingDailyProposalBudget(
+    params.supabase,
+    params.config
+  );
+  const nextState = nextRunStateAfterExecute({
+    remainingPending: remainingPending ?? 0,
+    openIssues,
+    remainingBudget,
+  });
+
+  if (nextState === 'pending_approval') {
+    await updateRun(params.supabase, params.run.id, {
+      status: 'pending_approval',
+      current_step: 'approval',
+      completed_at: null,
+      next_action_at: new Date().toISOString(),
+    });
+    return {
+      status: 'executed',
+      runId: params.run.id,
+      message: params.processedApproved
+        ? '承認済みproposalの実行ゲート処理が完了し、残りの承認待ちへ戻ります'
+        : '実行対象の承認済みproposalはありません。残りの承認待ちへ戻ります',
+    };
+  }
+
+  if (nextState === 'analyzing') {
+    const resumed = await resumeAnalysisIfPossible(
+      params.supabase,
+      params.run,
+      params.config,
+      params.deadlineAt
+    );
+    if (resumed) {
+      return {
+        status: 'analyzed',
+        runId: params.run.id,
+        message: params.processedApproved
+          ? '承認済みproposalの実行ゲート処理が完了し、残りの課題分析を続けます'
+          : '実行対象の承認済みproposalがないため、残りの課題分析を続けます',
+      };
+    }
+  }
+
+  await updateRun(params.supabase, params.run.id, {
+    status: 'completed',
+    current_step: 'execute',
+    completed_at: new Date().toISOString(),
+  });
+  return {
+    status: params.processedApproved ? 'executed' : 'skipped',
+    runId: params.run.id,
+    message: params.processedApproved
+      ? '承認済みproposalの実行ゲート処理が完了しました'
+      : '実行対象の承認済みproposalがありません',
+  };
+}
+
 async function handleExecute(
   supabase: SupabaseClient,
-  run: SeoLoopRun
+  run: SeoLoopRun,
+  deadlineAt: number
 ): Promise<SeoLoopStepResult> {
+  const config = getSeoLoopConfig();
   const { data, error } = await supabase
     .from('seo_proposals')
     .select('id,run_id,version,payload_hash,action,rationale,payload,context_snapshot,parent_proposal_id,revision_number,seo_approvals(id,proposal_payload_hash,proposal_version,status)')
@@ -374,12 +465,13 @@ async function handleExecute(
 
   const proposals = (data ?? []) as ApprovedProposalRow[];
   if (proposals.length === 0) {
-    await updateRun(supabase, run.id, {
-      status: 'completed',
-      current_step: 'execute',
-      completed_at: new Date().toISOString(),
+    return finishAfterExecute({
+      supabase,
+      run,
+      config,
+      deadlineAt,
+      processedApproved: false,
     });
-    return { status: 'skipped', runId: run.id, message: '実行対象の承認済みproposalがありません' };
   }
 
   for (const proposal of proposals) {
@@ -401,7 +493,7 @@ async function handleExecute(
 
     const executionEvaluation = await evaluateProposalForApproval({
       supabase,
-      config: getSeoLoopConfig(),
+      config,
       proposal: proposal as ProposalForEvaluation,
       forceFresh: true,
       phase: 'execution',
@@ -431,7 +523,7 @@ async function handleExecute(
     const actualHash = payloadHash(proposal.payload);
     const result = await executeApprovedProposal({
       supabase,
-      config: getSeoLoopConfig(),
+      config,
       proposalId: proposal.id,
       approvalId: approval.id,
       payload: proposal.payload,
@@ -461,29 +553,13 @@ async function handleExecute(
     if (proposalUpdateError) throw proposalUpdateError;
   }
 
-  const { count: remainingPending, error: remainingError } = await supabase
-    .from('seo_proposals')
-    .select('id', { count: 'exact', head: true })
-    .eq('run_id', run.id)
-    .eq('status', 'pending_approval');
-  if (remainingError) throw remainingError;
-  await updateRun(
+  return finishAfterExecute({
     supabase,
-    run.id,
-    (remainingPending ?? 0) > 0
-      ? {
-          status: 'pending_approval',
-          current_step: 'approval',
-          next_action_at: new Date().toISOString(),
-        }
-      : {
-          status: 'completed',
-          current_step: 'execute',
-          completed_at: new Date().toISOString(),
-        }
-  );
-
-  return { status: 'executed', runId: run.id, message: '承認済みproposalの実行ゲート処理が完了しました' };
+    run,
+    config,
+    deadlineAt,
+    processedApproved: true,
+  });
 }
 
 async function processOneStep(
@@ -531,7 +607,7 @@ async function processOneStep(
   }
 
   if (run.status === 'executing') {
-    return handleExecute(supabase, run);
+    return handleExecute(supabase, run, deadlineAt);
   }
 
   return { status: 'skipped', runId: run.id, message: `未対応statusです: ${run.status}` };

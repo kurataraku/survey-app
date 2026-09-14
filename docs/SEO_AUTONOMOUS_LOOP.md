@@ -94,6 +94,7 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 
 - 観測でproposal上限の2倍（既定20件）まで課題を保存する
 - 分析は5件ずつ処理し、Slack通知後に未分析課題と当日予算が残っていれば同じrunで分析へ戻る
+- 承認済みproposalの実行ゲート後も同様に、未分析課題と当日予算が残っていれば`completed`にせず分析へ戻る
 - Function実行時間の予算（180秒）を超えたら新しい課題に着手せず、残りをopenのまま次tickへ回す
 
 1日のproposal数はRulebookの`ops.maxDailyProposals`が上限です（既定10件）。`SEO_LOOP_MAX_DAILY_PROPOSALS`を大きくしてもRulebook値が優先されるため、10件を超えるにはRulebook新版とshadow昇格が必要です。
