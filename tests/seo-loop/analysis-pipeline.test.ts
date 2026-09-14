@@ -9,6 +9,11 @@ import {
 } from '../../lib/seo-loop/analysis/facts';
 import { candidateActionsForIssue } from '../../lib/seo-loop/analysis/policy';
 import {
+  STRATEGIST_CONTENT_POLICY,
+  STRATEGIST_NULL_CONDITIONS,
+  strategistInput,
+} from '../../lib/seo-loop/analysis/prompts';
+import {
   assembleProposalV2,
   validateStrategistAction,
 } from '../../lib/seo-loop/analysis/strategy';
@@ -211,6 +216,46 @@ describe('Strategistのgrounding', () => {
       targetMetric: analyst.targetMetric,
       confidence: analyst.confidence,
     });
+  });
+});
+
+describe('Strategistへ渡す生成ポリシー', () => {
+  it('言い換え・短縮・構造破壊を禁止し、null条件を明示する', () => {
+    expect(STRATEGIST_CONTENT_POLICY.forbidden).toContain(
+      '見出しや箇条書きを<br>や<br />に置き換えて構造を潰すこと'
+    );
+    expect(STRATEGIST_CONTENT_POLICY.forbidden).toContain(
+      'currentValueよりproposedValueの文字数が減るだけのupdateSeoSummary'
+    );
+    expect(STRATEGIST_CONTENT_POLICY.required).toContain(
+      'proposedValueには、selectedFactsのQueryに含まれ、かつcurrentValueには無い語を少なくとも1つ含める'
+    );
+    expect(STRATEGIST_NULL_CONDITIONS).toContain(
+      'currentValueの言い換え・語順入れ替え・語尾調整しか思いつかないとき'
+    );
+  });
+
+  it('issue typeとaction優先順をStrategist入力に含める', () => {
+    const input = strategistInput({
+      analyst: analystOutputSchema.parse({
+        sufficient: true,
+        selectedFactIds: ['gsc.snapshot'],
+        hypotheses: ['タイトルが検索意図を示していない'],
+        missingInformation: [],
+        diagnosis: 'CTR低下の原因候補がタイトルにある',
+        targetMetric: 'ctr',
+        confidence: 0.7,
+      }),
+      selectedFacts: [],
+      candidateActions: ['updateSchoolMetaTitle', 'updateSeoSummary'],
+      context: contextFor(fixtures[0]!),
+      issueType: 'striking_distance',
+      retryError: null,
+    }) as Record<string, unknown>;
+
+    expect(input.issueType).toBe('striking_distance');
+    expect(input.candidateActionsAreOrderedByPriority).toBe(true);
+    expect(input.nullConditions).toBe(STRATEGIST_NULL_CONDITIONS);
   });
 });
 

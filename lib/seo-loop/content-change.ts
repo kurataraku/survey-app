@@ -6,6 +6,12 @@ const STRUCTURED_TEXT_ACTIONS: ReadonlySet<TypedAction> = new Set([
   'updateSeoSummary',
 ]);
 
+/** SERPに出る短文を扱うaction。短縮自体は表示幅調整として正当になりうる */
+const SHORT_TEXT_ACTIONS: ReadonlySet<TypedAction> = new Set([
+  'updateSchoolMetaTitle',
+  'updateFeatureMetaDescription',
+]);
+
 /** 本文変更で残すべき最小文字数比率。これを下回る短縮は情報削減として扱う */
 export const STRUCTURED_TEXT_MIN_RETAINED_RATIO = 0.8;
 
@@ -175,6 +181,209 @@ export function retryableContentChangeRegressions(
 
 export function isStructuredTextAction(action: TypedAction): boolean {
   return STRUCTURED_TEXT_ACTIONS.has(action);
+}
+
+export type LowValueChangeFlag =
+  | 'paraphrase_only'
+  | 'shortened_without_addition'
+  | 'structure_flattened'
+  | 'no_new_query_term';
+
+export type LowValueChangeFinding = {
+  flag: LowValueChangeFlag;
+  message: string;
+};
+
+/** 変更そのものに情報価値がないと機械判定できるフラグ */
+const SEVERE_LOW_VALUE_FLAGS: ReadonlySet<LowValueChangeFlag> = new Set([
+  'paraphrase_only',
+  'shortened_without_addition',
+  'structure_flattened',
+]);
+
+/** 言い換え判定の上限。これ未満の文字数変化は情報量が変わっていないとみなす */
+const PARAPHRASE_CHANGE_RATE = 0.05;
+/** 短文actionで意図的な短縮とみなす下限比率 */
+const SHORT_TEXT_SHORTENING_RATIO = 0.9;
+/** 短文actionで情報追加とみなすのに必要な実質文字数 */
+const SHORT_TEXT_MIN_ADDED_LENGTH = 2;
+
+const LINE_BREAK_TAG = /<br\s*\/?>/iu;
+
+/** title/descriptionで情報量を増やさない一般語 */
+const GENERIC_FILLER_WORDS = [
+  'について',
+  'おすすめ',
+  'チェック',
+  'ガイド',
+  'サイト',
+  'ページ',
+  '一覧',
+  'まとめ',
+  '紹介',
+  '解説',
+  '提供',
+  '詳細',
+  '詳しく',
+  '特集',
+  '情報',
+  '学校',
+  '人気',
+  '最新',
+  '徹底',
+];
+
+const FUNCTION_CHARS = /[はがをにでとのもやへかられますしるでだあっ]/gu;
+const NON_WORD_CHARS = /[\p{P}\p{S}\s\u3000]/gu;
+
+/** currentValueとproposedValueの共通前後を除いた、実際に差し替わった部分 */
+function addedFragment(currentValue: string, proposedValue: string): string {
+  const current = currentValue.trim();
+  const proposed = proposedValue.trim();
+  let prefix = 0;
+  while (
+    prefix < current.length &&
+    prefix < proposed.length &&
+    current[prefix] === proposed[prefix]
+  ) {
+    prefix += 1;
+  }
+  let suffix = 0;
+  while (
+    suffix < current.length - prefix &&
+    suffix < proposed.length - prefix &&
+    current[current.length - 1 - suffix] === proposed[proposed.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  return proposed.slice(prefix, proposed.length - suffix);
+}
+
+/** 一般語・助詞・記号を除いて残る文字数。語尾追加だけの変更は0に近づく */
+function substantiveLength(fragment: string): number {
+  const withoutFillers = GENERIC_FILLER_WORDS.reduce(
+    (text, word) => text.split(word).join(''),
+    fragment
+  );
+  return withoutFillers
+    .replace(NON_WORD_CHARS, '')
+    .replace(FUNCTION_CHARS, '').length;
+}
+
+/** GSC Factに含まれる検索クエリ語 */
+function queryTerms(proposal: ProposalPayloadV2): string[] {
+  return proposal.facts
+    .filter((fact) => fact.source === 'gsc')
+    .flatMap((fact) => {
+      const matched = fact.statement.match(/^Query:\s*(.+)$/u);
+      return matched ? matched[1]!.split(/[\s\u3000]+/u) : [];
+    })
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 2);
+}
+
+function structuredTextFindings(
+  currentValue: string,
+  proposedValue: string
+): LowValueChangeFinding[] {
+  const change = summarizeTextChange(currentValue, proposedValue);
+  const changeRate =
+    change.currentLength === 0
+      ? 1
+      : Math.abs(change.proposedLength - change.currentLength) / change.currentLength;
+  // 既存行や既存箇条書きを言い換えるだけでも追加件数は増えるため、純増だけを情報追加とみなす
+  const addedNothing =
+    change.addedHeadings.length === 0 &&
+    change.addedBulletCount <= change.removedBulletCount &&
+    change.addedLineCount <= change.removedLineCount;
+  const findings: LowValueChangeFinding[] = [];
+
+  if (addedNothing && changeRate < PARAPHRASE_CHANGE_RATE) {
+    findings.push({
+      flag: 'paraphrase_only',
+      message: `言い換えのみの変更です（文字数変化 ${(changeRate * 100).toFixed(1)}%、見出し・箇条書きの追加なし）`,
+    });
+  }
+  if (addedNothing && change.proposedLength < change.currentLength) {
+    findings.push({
+      flag: 'shortened_without_addition',
+      message: '情報追加のない短縮です。短文化自体はSEO改善の根拠になりません',
+    });
+  }
+  if (!LINE_BREAK_TAG.test(currentValue) && LINE_BREAK_TAG.test(proposedValue)) {
+    findings.push({
+      flag: 'structure_flattened',
+      message: '<br>を持ち込んで見出し・箇条書き構造を潰しています',
+    });
+  } else if (
+    change.removedHeadings.length > 0 ||
+    change.removedBulletCount > change.addedBulletCount
+  ) {
+    findings.push({
+      flag: 'structure_flattened',
+      message: '既存の見出しまたは箇条書きを減らしています',
+    });
+  }
+  return findings;
+}
+
+function shortTextFindings(
+  currentValue: string,
+  proposedValue: string
+): LowValueChangeFinding[] {
+  const currentLength = currentValue.trim().length;
+  const proposedLength = proposedValue.trim().length;
+  if (proposedLength < currentLength * SHORT_TEXT_SHORTENING_RATIO) return [];
+
+  const added = addedFragment(currentValue, proposedValue);
+  if (substantiveLength(added) >= SHORT_TEXT_MIN_ADDED_LENGTH) return [];
+  return [
+    {
+      flag: 'paraphrase_only',
+      message: `一般語の追加・語尾調整だけで情報が増えていません（追加部分: ${added || 'なし'}）`,
+    },
+  ];
+}
+
+/**
+ * 「情報が増えていない変更」を機械判定する。
+ * Soft Evalで表現品質・期待効果に上限を課すための入力にする。
+ */
+export function lowValueChangeFindings(
+  proposal: ProposalPayloadV2
+): LowValueChangeFinding[] {
+  const isStructured = STRUCTURED_TEXT_ACTIONS.has(proposal.action);
+  const isShortText = SHORT_TEXT_ACTIONS.has(proposal.action);
+  if (!isStructured && !isShortText) return [];
+
+  const terms = queryTerms(proposal);
+  const findings = proposal.targets.flatMap((target) => {
+    const perTarget = isStructured
+      ? structuredTextFindings(target.currentValue, target.proposedValue)
+      : shortTextFindings(target.currentValue, target.proposedValue);
+    const addedQueryTerm = terms.some(
+      (term) =>
+        !target.currentValue.includes(term) && target.proposedValue.includes(term)
+    );
+    if (terms.length > 0 && !addedQueryTerm) {
+      perTarget.push({
+        flag: 'no_new_query_term',
+        message: `対象クエリ語を新たに含めていません（${terms.join(' / ')}）`,
+      });
+    }
+    return perTarget;
+  });
+
+  const seen = new Set<string>();
+  return findings.filter((finding) => {
+    if (seen.has(finding.message)) return false;
+    seen.add(finding.message);
+    return true;
+  });
+}
+
+export function isSevereLowValueFlag(flag: LowValueChangeFlag): boolean {
+  return SEVERE_LOW_VALUE_FLAGS.has(flag);
 }
 
 /** currentValue（`links:25:sha256:...`）から実測リンク件数を読む */

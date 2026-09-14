@@ -3,6 +3,7 @@ import type { FactContextSnapshot } from '../../lib/seo-loop/context/types';
 import { validateProposalAgainstContext } from '../../lib/seo-loop/context/validate';
 import {
   contentChangeRegressions,
+  lowValueChangeFindings,
   structuredTextRegressions,
   summarizeTextChange,
 } from '../../lib/seo-loop/content-change';
@@ -161,6 +162,112 @@ describe('本文の情報削減を止める', () => {
         severity: 'warn',
       })
     );
+  });
+});
+
+describe('情報が増えない変更をSoft Evalで落とす', () => {
+  const currentTitle = '匿名通信制高校の口コミ';
+
+  function titleProposal(proposedValue: string): unknown {
+    return {
+      ...(summaryProposal('dummy') as Record<string, unknown>),
+      action: 'updateSchoolMetaTitle',
+      targetMetric: 'ctr',
+      facts: [
+        { source: 'gsc', statement: 'Query: 匿名通信制高校 学費' },
+        { source: 'gsc', statement: '表示回数1348、CTR1.1%' },
+      ],
+      evidence: ['Query: 匿名通信制高校 学費', '表示回数1348、CTR1.1%'],
+      expectedImpact: '学費の検索意図に応える語を入れてCTRの改善を期待する',
+      targets: [
+        {
+          type: 'school',
+          id: 'school-anon-001',
+          url: targetUrl,
+          currentValue: currentTitle,
+          proposedValue,
+        },
+      ],
+    };
+  }
+
+  function flagsOf(payload: unknown): string[] {
+    return lowValueChangeFindings(proposalPayloadV2Schema.parse(payload)).map(
+      (finding) => finding.flag
+    );
+  }
+
+  function score(payload: unknown): number {
+    return runSoftEval(proposalPayloadV2Schema.parse(payload)).totalScore;
+  }
+
+  it('要約の言い換えのみを閾値未満にする', () => {
+    const paraphrased = currentSummary.replace(
+      '自分のペースで学習したい生徒に向いています。',
+      '自分のペースで学習したい生徒に適しています。'
+    );
+    expect(flagsOf(summaryProposal(paraphrased))).toContain('paraphrase_only');
+    expect(score(summaryProposal(paraphrased))).toBeLessThan(75);
+  });
+
+  it('「充実」と言いながら短縮する案を閾値未満にする', () => {
+    const shortened = currentSummary.replace(
+      '- 学費は公立高校より高く、年間負担は約2倍との声があります。',
+      '- 学費は公立高校より高いとの声があります。'
+    );
+    expect(flagsOf(summaryProposal(shortened))).toContain(
+      'shortened_without_addition'
+    );
+    expect(score(summaryProposal(shortened))).toBeLessThan(75);
+  });
+
+  it('見出しを<br>へ置き換える案を閾値未満にする', () => {
+    const flattened = currentSummary
+      .replace('## この学校が合う人', '<br>この学校が合う人')
+      .replace('## 学費・通学スタイルの注意点', '<br>学費・通学スタイルの注意点');
+    expect(flagsOf(summaryProposal(flattened))).toContain('structure_flattened');
+    expect(score(summaryProposal(flattened))).toBeLessThan(75);
+  });
+
+  it('titleの語尾追加のみを閾値未満にする', () => {
+    const payload = titleProposal(`${currentTitle}を提供する学校`);
+    expect(flagsOf(payload)).toEqual(['paraphrase_only', 'no_new_query_term']);
+    expect(score(payload)).toBeLessThan(75);
+  });
+
+  it('クエリ語と具体情報を足すtitleは通す', () => {
+    const payload = titleProposal(`${currentTitle}・学費と評判`);
+    expect(flagsOf(payload)).toEqual([]);
+    expect(score(payload)).toBeGreaterThanOrEqual(75);
+  });
+
+  it('SERP幅に合わせたtitle短縮は上限キャップの対象にしない', () => {
+    const payload = {
+      ...(titleProposal('匿名通信制高校の口コミ・学費') as Record<string, unknown>),
+      targets: [
+        {
+          type: 'school',
+          id: 'school-anon-001',
+          url: targetUrl,
+          currentValue:
+            '匿名通信制高校の口コミ・評判・学費・入試情報まとめ｜通信制高校リアルレビュー',
+          proposedValue: '匿名通信制高校の口コミ・学費',
+        },
+      ],
+    };
+    expect(flagsOf(payload)).not.toContain('paraphrase_only');
+    expect(flagsOf(payload)).not.toContain('shortened_without_addition');
+  });
+
+  it('見出しと箇条書きを足す要約は上限キャップの対象にしない', () => {
+    const improved = [
+      currentSummary,
+      '',
+      '## 学費の目安',
+      '- 年間の授業料は約25万円との口コミがあります。',
+    ].join('\n');
+    expect(flagsOf(summaryProposal(improved))).toEqual([]);
+    expect(score(summaryProposal(improved))).toBeGreaterThanOrEqual(75);
   });
 });
 

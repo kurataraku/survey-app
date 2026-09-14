@@ -335,6 +335,7 @@ export async function analyzeIssuesToProposals(params: {
           selectedFacts: facts,
           candidateActions,
           context,
+          issueType: issue.issue_type,
           ruleIds,
           rulebookVersion: rulebook.version,
           rulebookHash: rulebook.contentHash,

@@ -110,6 +110,22 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 
 判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。Phase 2でTyped Executorの本番書き込みを有効化する前に、構造退行warningをblockへ戻すか再判定します。
 
+### 情報が増えない変更の上限キャップ
+
+`lib/seo-loop/content-change.ts` の `lowValueChangeFindings` が、変更内容だけから4つのフラグを機械判定します。
+
+| フラグ | 判定 | 対象action |
+|---|---|---|
+| `paraphrase_only` | 文字数変化5%未満で、見出し・箇条書き・行の純増がない | `updateSeoSummary` |
+| `paraphrase_only` | 共通前後を除いた追加部分が、一般語・助詞・記号を落とすと実質2文字未満 | `updateSchoolMetaTitle` / `updateFeatureMetaDescription` |
+| `shortened_without_addition` | 短縮かつ純増がない | `updateSeoSummary` |
+| `structure_flattened` | `<br>`の新規混入、見出し削除、箇条書きの純減 | `updateSeoSummary` |
+| `no_new_query_term` | GSCのQuery Factがあるのに、currentValueに無くproposedValueに現れるクエリ語がない | テキスト系すべて |
+
+前3つのいずれかが立つと、Soft Evalは `expressionQuality` と `expectedImpact` を各6点に制限します。この上限下では理論最大72点となり、既定soft閾値75を構造的に超えられないため、根拠Factと診断文だけが上手い言い換え案は必ず `quality_blocked` になります。`no_new_query_term` 単独は `searchIntent` -6にとどめ、Slackへの流量を確保します。
+
+SERP表示幅に合わせたtitle短縮（現行値の90%未満へ縮める変更）は情報削減として扱いません。`quality_blocked` になった提案もDBに残るため、`npm run seo:proposals:review` でスコアとフラグを確認できます。
+
 Slackの承認カードは`*変更内容*`として、対象URL、文字数のbefore/after、削除・追加される見出し、箇条書きと行の増減、内部リンク件数の増減を表示します。承認者は本文全体を読み比べずに変化を判断できます。
 
 Slack通知を共有してルールを育てる場合は、まず `npm run seo:proposals:review -- --days=1` の出力を確認します。追記先は以下の3層です。
