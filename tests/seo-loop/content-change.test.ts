@@ -147,9 +147,11 @@ describe('本文の情報削減を止める', () => {
     );
   });
 
-  it('生成時の検証では構造退行を差し戻さない', () => {
+  it('生成時の検証で構造退行を再生成へ差し戻す', () => {
     const proposal = proposalPayloadV2Schema.parse(summaryProposal(shortened));
-    expect(validateProposalAgainstContext(proposal, context)).toEqual([]);
+    expect(validateProposalAgainstContext(proposal, context)).toContain(
+      '既存の見出しまたは箇条書きを減らしています'
+    );
   });
 
   it('見出しと箇条書きを保ったまま情報を足す案は通す', () => {
@@ -237,6 +239,43 @@ describe('情報が増えない変更をSoft Evalで落とす', () => {
 
   it('クエリ語と具体情報を足すtitleは通す', () => {
     const payload = titleProposal(`${currentTitle}・学費と評判`);
+    expect(flagsOf(payload)).toEqual([]);
+    expect(score(payload)).toBeGreaterThanOrEqual(75);
+  });
+
+  it('具体的比較軸を抽象表現へ置き換えるtitleは閾値未満にする', () => {
+    const payload = {
+      ...(titleProposal('dummy') as Record<string, unknown>),
+      targets: [
+        {
+          type: 'school',
+          id: 'school-anon-001',
+          url: targetUrl,
+          currentValue:
+            'クラーク記念国際高等学校の口コミ・評判｜コース・サポート・学費',
+          proposedValue:
+            'クラーク記念国際高等学校の口コミ・評判｜多様な学びと充実したサポート体制',
+        },
+      ],
+    };
+    expect(flagsOf(payload)).toContain('concrete_axis_removed');
+    expect(score(payload)).toBeLessThan(75);
+  });
+
+  it('既存情報を残して新しい具体的比較軸を足すtitleは通す', () => {
+    const payload = {
+      ...(titleProposal('dummy') as Record<string, unknown>),
+      targets: [
+        {
+          type: 'school',
+          id: 'school-anon-001',
+          url: targetUrl,
+          currentValue: 'あずさ第一高等学校の口コミ・評判',
+          proposedValue:
+            'あずさ第一高等学校の口コミ・評判｜柔軟な通学スタイルと専門コース',
+        },
+      ],
+    };
     expect(flagsOf(payload)).toEqual([]);
     expect(score(payload)).toBeGreaterThanOrEqual(75);
   });

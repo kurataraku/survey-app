@@ -8,6 +8,7 @@ import {
 import { determineRiskLevel } from '../risk-rules';
 import { proposalPayloadV2Schema } from '../types';
 import { runHardGate } from './hard-gate';
+import { checkInternalLinkReachability } from './internal-link-reachability';
 import { runSoftEval } from './soft-eval';
 import type { ProposalEvaluationResult, SoftEvalResult } from './types';
 import {
@@ -377,6 +378,13 @@ export async function evaluateProposalForApproval(params: {
           dailyProposalCount(params.supabase),
         ])
       : [false, 0];
+  const parsedProposal = proposalPayloadV2Schema.safeParse(
+    params.proposal.payload
+  );
+  const internalLinkReachability =
+    parsedProposal.success && fresh.context
+    ? await checkInternalLinkReachability(parsedProposal.data, fresh.context)
+    : undefined;
   const hardGate = runHardGate({
     payload: params.proposal.payload,
     context: fresh.context,
@@ -385,6 +393,7 @@ export async function evaluateProposalForApproval(params: {
     dailyProposalCount: proposalCount,
     maxDailyProposals: limits.maxDailyProposals,
     maxTargetsPerProposal: limits.maxTargetsPerProposal,
+    internalLinkReachability,
     actionValueLimits,
     forbiddenExpressionIds: rulebook.content.risk.forbiddenExpressionIds,
   });

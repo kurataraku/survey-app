@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { callLLM, resolveModel } from '@/lib/seo-generation/llm-client';
+import { callLLM } from '@/lib/seo-generation/llm-client';
 import { payloadHash, stableJson } from './hash';
 import { assertProposalLimits, remainingDailyProposalBudget } from './limits';
 import { collectFactContext } from './context/collector';
@@ -35,6 +35,10 @@ import {
   loadRulebookForRun,
 } from './rulebook/runtime';
 import { allRuleIds } from './rulebook/schema';
+import {
+  resolveSeoLoopAnalystModel,
+  resolveSeoLoopStrategistModel,
+} from './models';
 
 type SeoIssueRow = {
   id: string;
@@ -110,7 +114,8 @@ export async function analyzeIssuesToProposals(params: {
     return { proposalCount: 0, message: '分析対象の課題がありません' };
   }
 
-  const model = resolveModel('SEO_LOOP_LLM_MODEL', 'gpt-4o-mini', 'openai');
+  const analystModel = resolveSeoLoopAnalystModel();
+  const strategistModel = resolveSeoLoopStrategistModel();
   const rulebook = await loadRulebookForRun({
     supabase: params.supabase,
     runId: params.runId,
@@ -246,13 +251,14 @@ export async function analyzeIssuesToProposals(params: {
         }),
       call: (inputSnapshot) =>
         callLLM({
-          provider: model.provider,
-          model: model.model,
+          provider: analystModel.provider,
+          model: analystModel.model,
           systemPrompt: ANALYST_SYSTEM_PROMPT,
           userPrompt: stableJson(inputSnapshot),
           jsonMode: true,
           maxTokens: 1200,
           temperature: 0.1,
+          reasoningEffort: 'low',
         }),
     });
     await recordAnalysisAttempts({
@@ -261,8 +267,8 @@ export async function analyzeIssuesToProposals(params: {
       issueId: issue.id,
       stage: 'analyst',
       promptVersion: ANALYST_PROMPT_VERSION,
-      provider: model.provider,
-      model: model.model,
+      provider: analystModel.provider,
+      model: analystModel.model,
       attempts: analystRun.attempts,
     });
 
@@ -343,13 +349,14 @@ export async function analyzeIssuesToProposals(params: {
         }),
       call: (inputSnapshot) =>
         callLLM({
-          provider: model.provider,
-          model: model.model,
+          provider: strategistModel.provider,
+          model: strategistModel.model,
           systemPrompt: STRATEGIST_SYSTEM_PROMPT,
           userPrompt: stableJson(inputSnapshot),
           jsonMode: true,
           maxTokens: 2200,
           temperature: 0.2,
+          reasoningEffort: 'medium',
         }),
     });
     await recordAnalysisAttempts({
@@ -358,8 +365,8 @@ export async function analyzeIssuesToProposals(params: {
       issueId: issue.id,
       stage: 'strategist',
       promptVersion: STRATEGIST_PROMPT_VERSION,
-      provider: model.provider,
-      model: model.model,
+      provider: strategistModel.provider,
+      model: strategistModel.model,
       attempts: strategistRun.attempts,
     });
 
@@ -425,8 +432,10 @@ export async function analyzeIssuesToProposals(params: {
             analysis: {
               analyst_prompt_version: ANALYST_PROMPT_VERSION,
               strategist_prompt_version: STRATEGIST_PROMPT_VERSION,
-              model_provider: model.provider,
-              model: model.model,
+              analyst_model_provider: analystModel.provider,
+              analyst_model: analystModel.model,
+              strategist_model_provider: strategistModel.provider,
+              strategist_model: strategistModel.model,
               analyst_input_hash: analystRun.attempts.at(-1)?.inputHash ?? null,
               strategist_input_hash: strategistRun.attempts.at(-1)?.inputHash ?? null,
             },

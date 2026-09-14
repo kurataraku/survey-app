@@ -360,4 +360,36 @@ describe('Versioned Rulebook', () => {
       },
     });
   });
+
+  it('Rulebook v3はfeature striking_distanceとリンク到達性ruleを有効化する', () => {
+    const migration = readFileSync(
+      resolve(
+        process.cwd(),
+        'supabase-migrations/activate-seo-rulebook-v3-feature-striking-distance.sql'
+      ),
+      'utf8'
+    );
+    const seed = migration.match(
+      /\(\s*3,\s*1,\s*'active',\s*'([\s\S]*?)'::jsonb,\s*'([a-f0-9]{64})'/
+    );
+    expect(seed).not.toBeNull();
+    const content = JSON.parse(seed![1]!) as unknown;
+    expect(rulebookContentSchema.safeParse(content).success).toBe(true);
+    expect(payloadHash(content)).toBe(seed![2]);
+    expect(content).toMatchObject({
+      analyzer: {
+        issueActionCandidates: {
+          striking_distance: [
+            'updateSchoolMetaTitle',
+            'updateFeatureMetaDescription',
+            'updateSeoSummary',
+            'addApprovedInternalLink',
+          ],
+        },
+      },
+      risk: {
+        ruleIds: expect.arrayContaining(['risk.internal_link_reachable.v1']),
+      },
+    });
+  });
 });

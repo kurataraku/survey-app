@@ -14,6 +14,7 @@ export const ISSUE_ACTION_CANDIDATES: Record<SeoIssueType, readonly TypedAction[
   ],
   striking_distance: [
     'updateSchoolMetaTitle',
+    'updateFeatureMetaDescription',
     'updateSeoSummary',
     'addApprovedInternalLink',
   ],

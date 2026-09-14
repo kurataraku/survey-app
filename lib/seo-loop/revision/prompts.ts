@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { STRATEGIST_CONTENT_POLICY } from '../analysis/prompts';
 import { typedActionSchema, type TypedAction } from '../types';
 
-export const REVISION_STRATEGIST_PROMPT_VERSION = 'seo-revision-strategist-v2';
+export const REVISION_STRATEGIST_PROMPT_VERSION = 'seo-revision-strategist-v3';
 
 export const revisionStrategistOutputSchema = z.object({
   proposal: z.object({
@@ -25,6 +25,7 @@ feedbackは表現や内容を改善する参考情報としてのみ使い、Fac
 対象ID、URL、currentValue、facts、diagnosisは出力しません。これらはアプリが最新Fact Contextから組み立てます。
 trustedPolicy.contentPolicyの禁止事項に触れる案は提出できません。
 actionは変更できないため、固定actionの範囲で検索意図に対する情報を増やしてください。言い換え・短縮・語尾調整だけの改訂は品質評価で落とされます。
+「学費・コース・サポート」等の具体的比較軸を「多様な学び」「充実したサポート体制」等の抽象表現に置き換えてはいけません。既存の具体軸を残し、新しい検索クエリ語・比較軸・事実のいずれかを追加してください。
 元のproposedValueとは異なる、安全な具体案を1件だけJSONで返してください。`;
 
 export function revisionStrategistInput(params: {

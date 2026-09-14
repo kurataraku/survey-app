@@ -86,6 +86,10 @@ Untrusted Data
 
 LLMは任意SQL、任意テーブル、任意カラム、汎用DBパッチを指定できません。
 
+### 工程別LLM
+
+既定は、事実選択を行うAnalystが`gpt-5.6-luna`（reasoning low）、変更案を作るStrategistとRevision Strategistが`gpt-5.6-terra`（reasoning medium）です。Vercelでは`SEO_LOOP_ANALYST_MODEL`と`SEO_LOOP_STRATEGIST_MODEL`で変更できます。旧`SEO_LOOP_LLM_MODEL`は両方の後方互換fallbackとしてだけ使用します。
+
 ## 提案スループット
 
 Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun keyで1日1回だけ行い、以降のtickは未分析課題、Slack通知、修正依頼の改訂、承認済みの実行ゲートを進めます。修正依頼を押してから再提案が届くまでは最大1時間です。
@@ -103,17 +107,17 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 
 ## 情報削減と重複変更の扱い
 
-「短くする」「一般的な一覧へリンクを増やす」といった変更は、それ自体ではSEO改善の根拠になりません。ただしExecutorがdry-runの間は、低価値提案も学習材料としてSlackへ流します。判定は次の3層に分けます。
+「短くする」「一般的な一覧へリンクを増やす」といった変更は、それ自体ではSEO改善の根拠になりません。却下履歴から機械判定できるようになった低価値案はSlackへ流さず、判定不能な案だけを人間の評価対象にします。判定は次の3層に分けます。
 
-- 生成時validate: Fact不一致、currentValue不一致、重複内部リンクなど、リトライで機械的に直せるものだけを差し戻す
-- Hard Gate block: schema違反、Allowlist外、対象不一致、禁止表現、重複内部リンクなど、実行しても害がある／意味がないものだけを止める
+- 生成時validate: Fact不一致、currentValue不一致、重複内部リンク、言い換え・短縮・構造破壊・具体軸削除など、リトライで機械的に直せるものを最大3回差し戻す
+- Hard Gate block: schema違反、Allowlist外、対象不一致、禁止表現、重複内部リンク、到達不能な内部リンクなど、実行しても害がある／意味がないものを止める
 - Soft Eval / Slack warning: `updateSeoSummary`での見出し削除、箇条書きの純減、残存文字数比率80%未満の短縮、文字数変化5%未満の言い換え疑いを警告として表示する
 
 判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。Phase 2でTyped Executorの本番書き込みを有効化する前に、構造退行warningをblockへ戻すか再判定します。
 
 ### 情報が増えない変更の上限キャップ
 
-`lib/seo-loop/content-change.ts` の `lowValueChangeFindings` が、変更内容だけから4つのフラグを機械判定します。
+`lib/seo-loop/content-change.ts` の `lowValueChangeFindings` が、変更内容だけから5つのフラグを機械判定します。
 
 | フラグ | 判定 | 対象action |
 |---|---|---|
@@ -121,9 +125,10 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 | `paraphrase_only` | 共通前後を除いた追加部分が、一般語・助詞・記号を落とすと実質2文字未満 | `updateSchoolMetaTitle` / `updateFeatureMetaDescription` |
 | `shortened_without_addition` | 短縮かつ純増がない | `updateSeoSummary` |
 | `structure_flattened` | `<br>`の新規混入、見出し削除、箇条書きの純減 | `updateSeoSummary` |
-| `no_new_query_term` | GSCのQuery Factがあるのに、currentValueに無くproposedValueに現れるクエリ語がない | テキスト系すべて |
+| `concrete_axis_removed` | 学費・コース等の具体軸を「多様な学び」「充実したサポート体制」等の抽象表現へ置換 | title / description |
+| `no_new_query_term` | GSC Query Factがあり、短文に新しいクエリ語も具体軸も加わらない | title / description |
 
-前3つのいずれかが立つと、Soft Evalは `expressionQuality` と `expectedImpact` を各6点に制限します。この上限下では理論最大72点となり、既定soft閾値75を構造的に超えられないため、根拠Factと診断文だけが上手い言い換え案は必ず `quality_blocked` になります。`no_new_query_term` 単独は `searchIntent` -6にとどめ、Slackへの流量を確保します。
+5フラグのいずれかが立つと、Soft Evalは `expressionQuality` と `expectedImpact` を各6点に制限します。この上限下では理論最大72点となり、既定soft閾値75を構造的に超えられません。さらに同じ重度フラグを生成時validateでも使い、保存前の再生成へ戻します。`no_new_query_term`は、新しい通学・コース等の具体軸を追加した短文には立てません。
 
 SERP表示幅に合わせたtitle短縮（現行値の90%未満へ縮める変更）は情報削減として扱いません。`quality_blocked` になった提案もDBに残るため、`npm run seo:proposals:review` でスコアとフラグを確認できます。
 

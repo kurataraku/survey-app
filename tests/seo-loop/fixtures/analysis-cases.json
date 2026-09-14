@@ -27,6 +27,16 @@
     "expectedActions": ["addApprovedInternalLink"]
   },
   {
+    "id": "striking-feature",
+    "issueType": "striking_distance",
+    "pageType": "feature",
+    "currentValues": {
+      "updateFeatureMetaDescription": "匿名特集の説明",
+      "addApprovedInternalLink": "links:2:sha256:anonymous"
+    },
+    "expectedActions": ["updateFeatureMetaDescription", "addApprovedInternalLink"]
+  },
+  {
     "id": "unsupported-issue",
     "issueType": "unknown_issue",
     "pageType": "school",

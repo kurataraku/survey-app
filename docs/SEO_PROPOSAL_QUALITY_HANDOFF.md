@@ -35,7 +35,7 @@ Typed Executor はまだ Phase1 dry-run（`blockedUntilPhase2`）。`SEO_LOOP_EX
 
 **2. Soft Eval 上限キャップ**（`lib/seo-loop/content-change.ts` / `evaluation/soft-eval.ts`）
 
-`lowValueChangeFindings` で4フラグを判定。詳細は `docs/SEO_AUTONOMOUS_LOOP.md`「情報が増えない変更の上限キャップ」。重度フラグ（`paraphrase_only` / `shortened_without_addition` / `structure_flattened`）が立つと `expressionQuality` と `expectedImpact` を各6点に制限し、理論最大72点で閾値75を構造的に超えられなくする。`no_new_query_term` 単独は `searchIntent` -6のみ。
+`lowValueChangeFindings` で5フラグを判定。詳細は `docs/SEO_AUTONOMOUS_LOOP.md`「情報が増えない変更の上限キャップ」。重度フラグ（`paraphrase_only` / `shortened_without_addition` / `structure_flattened` / `concrete_axis_removed` / `no_new_query_term`）が立つと `expressionQuality` と `expectedImpact` を各6点に制限し、理論最大72点で閾値75を構造的に超えられなくする。`no_new_query_term` は短文変更でクエリ語も具体軸も追加されない場合だけ立つ。
 
 **実データ検証**（`npm run seo:proposals:review -- --days=3 --limit=8`）
 
@@ -53,6 +53,19 @@ Typed Executor はまだ Phase1 dry-run（`blockedUntilPhase2`）。`SEO_LOOP_EX
 | 8 | 84–92 | 64 | shortened_without_addition |
 
 **撤退ライン**: 次ループで提案がゼロになったら `soft-eval.ts` の `LOW_VALUE_DIMENSION_CAP` を6→10に上げる（理論最大80点で通過余地が生まれる）。
+
+### 2026-09-14 追加（バランス型の品質改善）
+
+- 工程別モデル: Analyst=`gpt-5.6-luna`（reasoning low）、Strategist/Revision=`gpt-5.6-terra`（reasoning medium）。旧`SEO_LOOP_LLM_MODEL`は後方互換fallback
+- prompt version: `seo-strategist-v3` / `seo-revision-strategist-v3`
+- クラーク型（学費・コース等の具体軸を「多様な学び」「充実したサポート体制」へ置換）を`concrete_axis_removed`として重度判定
+- 短文でクエリ語も新しい具体軸も増えない`no_new_query_term`を重度判定。ただし通学・コース等を新しく足すあずさ型は対象外
+- 重度`lowValueChangeFindings`を生成時validateへ接続し、Slack保存前に最大3回再生成
+- 内部リンクは同一origin確認後にHEAD→GETで到達性確認し、404/410等をHard Gate block
+- featureの`striking_distance`は`updateFeatureMetaDescription`を内部リンクより優先
+- Rulebook v3 migration: `activate-seo-rulebook-v3-feature-striking-distance.sql`
+
+集中回帰テストは66件合格。次は本番デプロイ、Rulebook v3適用、Vercel工程別モデル設定後の実測確認。
 
 ## 直近8件の評価結果（2026-09-14時点）
 
@@ -103,13 +116,13 @@ Cronを1周させて確認する。
 - Slackに届いた案がクエリ語・具体事実を足しているか
 - 提案が完全にゼロなら `LOW_VALUE_DIMENSION_CAP` を6→10に緩める
 
-### 3. 生成時validateの再調整（慎重）
+### 3. 生成時validateの再調整 — 2026-09-14 実装済み
 
 対象: `lib/seo-loop/context/validate.ts`
 
-- 以前、構造退行を生成時blockにしたら提案ゼロになった
-- 今度入れるなら `lowValueChangeFindings` の重度フラグを `retryableContentChangeRegressions` に足す形にする（判定は実装済みなので再利用できる）
-- ただし 2.5 の実測でSlack流量を確認してから。生成時blockはリトライ3回を消費する点に注意
+- `lowValueChangeFindings` の重度フラグを `retryableContentChangeRegressions` に追加済み
+- 生成時blockはリトライ3回を消費するため、次ループで`strategist`失敗率と提案数を確認する
+- 提案がゼロの場合、まず`no_new_query_term`だけを重度対象から戻す。構造破壊・短縮・具体軸削除は緩めない
 
 ### 4. 却下フィードバックの一般ルール化
 

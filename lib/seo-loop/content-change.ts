@@ -166,17 +166,22 @@ export function contentChangeRegressions(
 
 /**
  * 生成時のretry対象にする変更退行。
- * dry-run期間は構造退行を学習材料としてSlackへ流すため、機械的に直せる重複リンクだけを止める。
+ * 機械判定できる構造退行・情報価値のない案はSlackへ流す前に再生成する。
  */
 export function retryableContentChangeRegressions(
   proposal: ProposalPayloadV2,
   context: FactContextSnapshot
 ): string[] {
-  if (proposal.action !== 'addApprovedInternalLink') return [];
-  const regressions = proposal.targets.flatMap((target) =>
-    internalLinkRegressions(target.proposedValue, context)
-  );
-  return [...new Set(regressions)];
+  const regressions =
+    proposal.action === 'addApprovedInternalLink'
+      ? proposal.targets.flatMap((target) =>
+          internalLinkRegressions(target.proposedValue, context)
+        )
+      : [];
+  const lowValue = lowValueChangeFindings(proposal)
+    .filter((finding) => isSevereLowValueFlag(finding.flag))
+    .map((finding) => finding.message);
+  return [...new Set([...regressions, ...lowValue])];
 }
 
 export function isStructuredTextAction(action: TypedAction): boolean {
@@ -187,6 +192,7 @@ export type LowValueChangeFlag =
   | 'paraphrase_only'
   | 'shortened_without_addition'
   | 'structure_flattened'
+  | 'concrete_axis_removed'
   | 'no_new_query_term';
 
 export type LowValueChangeFinding = {
@@ -199,6 +205,8 @@ const SEVERE_LOW_VALUE_FLAGS: ReadonlySet<LowValueChangeFlag> = new Set([
   'paraphrase_only',
   'shortened_without_addition',
   'structure_flattened',
+  'concrete_axis_removed',
+  'no_new_query_term',
 ]);
 
 /** 言い換え判定の上限。これ未満の文字数変化は情報量が変わっていないとみなす */
@@ -209,6 +217,41 @@ const SHORT_TEXT_SHORTENING_RATIO = 0.9;
 const SHORT_TEXT_MIN_ADDED_LENGTH = 2;
 
 const LINE_BREAK_TAG = /<br\s*\/?>/iu;
+
+/** 「充実」「多様」等で具体性があるように見せるだけの販促的な一般表現 */
+const GENERIC_PROMOTIONAL_PHRASES =
+  /多様な学び|柔軟な学び|充実したサポート(?:体制)?|手厚いサポート(?:体制)?|サポート体制|学校の魅力|魅力を(?:紹介|解説)/gu;
+
+/** 通信制高校の検索者が比較判断に使う具体軸 */
+const CONCRETE_AXIS_TERMS = [
+  '学費',
+  '費用',
+  'コース',
+  '通学',
+  '登校',
+  'スクーリング',
+  'サポート',
+  '進路',
+  '就職',
+  '大学進学',
+  '単位',
+  'レポート',
+  '制服',
+  '校則',
+  '不登校',
+  'メンタル',
+  '行事',
+  '雰囲気',
+  '学校生活',
+  '学習環境',
+] as const;
+
+function concreteAxes(value: string): Set<string> {
+  const concreteText = value.replace(GENERIC_PROMOTIONAL_PHRASES, '');
+  return new Set(
+    CONCRETE_AXIS_TERMS.filter((term) => concreteText.includes(term))
+  );
+}
 
 /** title/descriptionで情報量を増やさない一般語 */
 const GENERIC_FILLER_WORDS = [
@@ -231,6 +274,12 @@ const GENERIC_FILLER_WORDS = [
   '人気',
   '最新',
   '徹底',
+  '充実',
+  '多様',
+  '柔軟',
+  '魅力',
+  '体制',
+  '学び',
 ];
 
 const FUNCTION_CHARS = /[はがをにでとのもやへかられますしるでだあっ]/gu;
@@ -331,18 +380,32 @@ function shortTextFindings(
   currentValue: string,
   proposedValue: string
 ): LowValueChangeFinding[] {
+  const currentAxes = concreteAxes(currentValue);
+  const proposedAxes = concreteAxes(proposedValue);
+  const removedAxes = [...currentAxes].filter((axis) => !proposedAxes.has(axis));
+  const addedAxes = [...proposedAxes].filter((axis) => !currentAxes.has(axis));
+  const findings: LowValueChangeFinding[] = [];
+  if (removedAxes.length > 0 && addedAxes.length === 0) {
+    findings.push({
+      flag: 'concrete_axis_removed',
+      message: `具体的な比較軸を一般表現へ置き換えています（削除: ${removedAxes.join(' / ')}）`,
+    });
+  }
+
   const currentLength = currentValue.trim().length;
   const proposedLength = proposedValue.trim().length;
-  if (proposedLength < currentLength * SHORT_TEXT_SHORTENING_RATIO) return [];
+  if (proposedLength < currentLength * SHORT_TEXT_SHORTENING_RATIO) {
+    return findings;
+  }
 
   const added = addedFragment(currentValue, proposedValue);
-  if (substantiveLength(added) >= SHORT_TEXT_MIN_ADDED_LENGTH) return [];
-  return [
-    {
+  if (substantiveLength(added) < SHORT_TEXT_MIN_ADDED_LENGTH) {
+    findings.push({
       flag: 'paraphrase_only',
       message: `一般語の追加・語尾調整だけで情報が増えていません（追加部分: ${added || 'なし'}）`,
-    },
-  ];
+    });
+  }
+  return findings;
 }
 
 /**
@@ -365,10 +428,19 @@ export function lowValueChangeFindings(
       (term) =>
         !target.currentValue.includes(term) && target.proposedValue.includes(term)
     );
-    if (terms.length > 0 && !addedQueryTerm) {
+    const currentAxes = concreteAxes(target.currentValue);
+    const addedConcreteAxis = [...concreteAxes(target.proposedValue)].some(
+      (axis) => !currentAxes.has(axis)
+    );
+    if (
+      isShortText &&
+      terms.length > 0 &&
+      !addedQueryTerm &&
+      !addedConcreteAxis
+    ) {
       perTarget.push({
         flag: 'no_new_query_term',
-        message: `対象クエリ語を新たに含めていません（${terms.join(' / ')}）`,
+        message: `対象クエリ語も具体的な比較軸も新たに含めていません（${terms.join(' / ')}）`,
       });
     }
     return perTarget;

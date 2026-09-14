@@ -11,6 +11,7 @@ export interface LLMCallOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 }
 
 export interface LLMResponse {
@@ -78,10 +79,12 @@ function openAiChatDefaultMaxTokens(model: string, requested: number): number {
  * - `gpt-5-mini` / `gpt-5-nano` 等: minimal, low, …（none は不可）
  */
 function openAiReasoningEffort(
-  model: string
-): 'none' | 'minimal' | undefined {
+  model: string,
+  requested?: LLMCallOptions['reasoningEffort']
+): LLMCallOptions['reasoningEffort'] {
   const m = model.toLowerCase();
   if (!m.startsWith('gpt-5')) return undefined;
+  if (requested) return requested;
   if (/^gpt-5\.\d/.test(m)) return 'none';
   return 'minimal';
 }
@@ -132,7 +135,10 @@ async function callOpenAI(options: LLMCallOptions): Promise<LLMResponse> {
       ? { response_format: { type: 'json_object' as const } }
       : {}),
     ...((() => {
-      const effort = openAiReasoningEffort(options.model);
+      const effort = openAiReasoningEffort(
+        options.model,
+        options.reasoningEffort
+      );
       return effort ? { reasoning_effort: effort } : {};
     })()),
   };

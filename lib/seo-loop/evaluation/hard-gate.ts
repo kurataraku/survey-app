@@ -17,6 +17,7 @@ import {
 } from '../types';
 import type { HardGateRuleResult } from './types';
 import type { RulebookContent } from '../rulebook/schema';
+import type { InternalLinkReachability } from './internal-link-reachability';
 
 const CONTENT_STRUCTURE_SEVERITY: HardGateRuleResult['severity'] = 'warn';
 
@@ -57,6 +58,7 @@ export function runHardGate(params: {
   dailyProposalCount: number;
   maxDailyProposals: number;
   maxTargetsPerProposal: number;
+  internalLinkReachability?: InternalLinkReachability;
   actionValueLimits?: RulebookContent['risk']['actionValueLimits'];
   forbiddenExpressionIds?: RulebookContent['risk']['forbiddenExpressionIds'];
 }): { passed: boolean; proposal: ProposalPayloadV2 | null; results: HardGateRuleResult[] } {
@@ -239,6 +241,26 @@ export function runHardGate(params: {
       '追加リンクは対象ページの既存リンクと重複しません',
       '追加リンクが既存リンクまたは対象ページ自身と重複します',
       duplicatedLinks.length > 0 ? { regressions: duplicatedLinks } : undefined
+    ),
+    rule(
+      'internal_link_reachable',
+      Boolean(
+        proposal &&
+          (proposal.action !== 'addApprovedInternalLink' ||
+            params.internalLinkReachability?.reachable !== false)
+      ),
+      proposal?.action === 'addApprovedInternalLink' &&
+        params.internalLinkReachability?.reachable === null
+        ? '内部リンク先の到達性は一時的に判定不能でした'
+        : '内部リンク先は到達可能です',
+      '内部リンク先が404等で到達できません',
+      proposal?.action === 'addApprovedInternalLink'
+        ? {
+            checked: params.internalLinkReachability?.checked ?? false,
+            checks: params.internalLinkReachability?.checks ?? [],
+          }
+        : undefined,
+      'risk.internal_link_reachable.v1'
     ),
     rule(
       'content_structure_preserved',

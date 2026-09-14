@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { callLLM, resolveModel } from '@/lib/seo-generation/llm-client';
+import { callLLM } from '@/lib/seo-generation/llm-client';
 import type { SeoLoopConfig } from '../config';
 import { collectFactContext } from '../context/collector';
 import { validateProposalAgainstContext } from '../context/validate';
@@ -18,6 +18,7 @@ import {
   loadRulebookForRun,
 } from '../rulebook/runtime';
 import { allRuleIds } from '../rulebook/schema';
+import { resolveSeoLoopStrategistModel } from '../models';
 import {
   REVISION_STRATEGIST_PROMPT_VERSION,
   REVISION_STRATEGIST_SYSTEM_PROMPT,
@@ -556,7 +557,7 @@ export async function reviseRequestedProposal(params: {
       });
     }
   });
-  const model = resolveModel('SEO_LOOP_LLM_MODEL', 'gpt-4o-mini', 'openai');
+  const model = resolveSeoLoopStrategistModel();
   const revisionRun = await runStructuredStage({
     schema: guardedSchema,
     maxAttempts: STRUCTURED_MAX_ATTEMPTS,
@@ -585,6 +586,7 @@ export async function reviseRequestedProposal(params: {
         jsonMode: true,
         maxTokens: 2200,
         temperature: 0.2,
+        reasoningEffort: 'medium',
       }),
   });
   try {
