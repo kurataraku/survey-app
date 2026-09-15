@@ -10,6 +10,7 @@ export default function Footer() {
       { href: appPath('/schools'), label: '学校検索' },
       { href: appPath('/rankings'), label: 'ランキング' },
       { href: appPath('/features'), label: '特集' },
+      { href: appPath('/press-releases'), label: 'プレスリリース' },
       { href: appPath('/survey'), label: '口コミ投稿' },
     ],
     about: [

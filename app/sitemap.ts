@@ -7,6 +7,7 @@ import {
   countReviewsBySchool,
   type ReviewSchoolLink,
 } from '@/lib/seo/school-review-counts';
+import { ATTENDANCE_SATISFACTION_RELEASE } from '@/lib/press-releases';
 
 const PAGE_SIZE = 1000;
 /** .in() のURL長を抑えるためのIDチャンクサイズ */
@@ -91,6 +92,18 @@ function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitema
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/press-releases`,
+      lastModified: new Date(ATTENDANCE_SATISFACTION_RELEASE.publishedAt),
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/press-releases/${ATTENDANCE_SATISFACTION_RELEASE.slug}`,
+      lastModified: new Date(ATTENDANCE_SATISFACTION_RELEASE.publishedAt),
+      changeFrequency: 'yearly',
+      priority: 0.75,
     },
     {
       url: `${baseUrl}/about`,
