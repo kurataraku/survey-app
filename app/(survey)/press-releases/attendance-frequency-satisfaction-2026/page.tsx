@@ -9,6 +9,7 @@ import {
 import PressSatisfactionValleyChart from '@/components/PressSatisfactionValleyChart';
 import PressMonthlyMetricCompareChart from '@/components/PressMonthlyMetricCompareChart';
 import PressOnlineVsWeeklyChart from '@/components/PressOnlineVsWeeklyChart';
+import PressMonthlyFreeTextCompareChart from '@/components/PressMonthlyFreeTextCompareChart';
 
 const appBaseUrl = getAppBaseUrl();
 const release = ATTENDANCE_SATISFACTION_RELEASE;
@@ -117,7 +118,7 @@ const METHOD_ROWS: [string, string][] = [
     '学費の低評価',
     '学費の納得感で1または2を選んだ割合。強い不満に絞った集計のため、低満足層（1〜3）とは切り方が異なる',
   ],
-  ['自由記述分析', '改善点・合わない点に含まれる関連語の出現を分類（複数分類を含む）'],
+  ['自由記述分析', '「改善してほしい点／合わない点」に含まれる関連テーマの言及を分類（複数分類を含む）'],
 ];
 
 export default function AttendanceFrequencySatisfactionReleasePage() {
@@ -333,48 +334,10 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               月1〜数回の登校では、一度先生と話せても、次の接点まで数週間空く場合があります。その間に、レポートの遅れ、体調や学習状況の変化、進路関係の締め切りなどを学校側が把握しにくくなることが考えられます。
             </p>
 
-            <figure className="mt-6">
-              <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-                表5. 月1〜数回層の自由記述における関連語の出現割合（総合満足度による層分け）
-              </figcaption>
-              <div className="overflow-x-auto border-y border-neutral-800 bg-white">
-                <table className="press-doc__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">内容</th>
-                      <th scope="col" className="num">
-                        低満足層
-                        <br />
-                        <span className="font-normal text-neutral-500">（1〜3／21人）</span>
-                      </th>
-                      <th scope="col" className="num">
-                        高満足層
-                        <br />
-                        <span className="font-normal text-neutral-500">（4〜5／80人）</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>進路・大学・受験・就職への言及</td>
-                      <td className="num">42.9％</td>
-                      <td className="num">16.3％</td>
-                    </tr>
-                    <tr>
-                      <td>連絡・相談・フォローへの言及</td>
-                      <td className="num">28.6％</td>
-                      <td className="num">10.0％</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-3 text-xs leading-5 text-neutral-500">
-                ここでの高満足層・低満足層は、いずれも月1〜数回層内での総合満足度による区分です。
-              </p>
-            </figure>
+            <PressMonthlyFreeTextCompareChart />
 
             <p>
-              月1〜数回層のうち、低満足層21人の自由記述を関連語で分類すると、進路への言及が高満足層の約2.6倍、学校からの働きかけへの言及が約2.9倍確認されました。
+              低満足層では進路42.9％・連絡28.6％、高満足層では16.3％・10.0％でした。同じ「改善してほしい点／合わない点」の欄でも、低満足層の方が進路や学校からの働きかけに触れる割合が高くなっています。
             </p>
 
             <blockquote className="press-doc__quote">

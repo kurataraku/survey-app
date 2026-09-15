@@ -107,3 +107,29 @@ export const ONLINE_VS_WEEKLY_COMPARE = {
     },
   ],
 } as const;
+
+/** 図4: 月1〜数回層の「改善してほしい点」テーマ言及率（総合満足度別）。 */
+export const MONTHLY_FREE_TEXT_COMPARE = {
+  lowLabel: '低満足層',
+  highLabel: '高満足層',
+  lowN: 21,
+  highN: 80,
+  rows: [
+    {
+      key: 'career',
+      label: '進路・大学・受験・就職',
+      shortLabel: ['進路・大学・', '受験・就職'],
+      low: 42.9,
+      high: 16.3,
+      multipleLabel: '約2.6倍',
+    },
+    {
+      key: 'contact',
+      label: '連絡・相談・フォロー',
+      shortLabel: ['連絡・相談・', 'フォロー'],
+      low: 28.6,
+      high: 10.0,
+      multipleLabel: '約2.9倍',
+    },
+  ],
+} as const;
