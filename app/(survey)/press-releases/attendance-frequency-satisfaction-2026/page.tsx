@@ -4,9 +4,9 @@ import StructuredData from '@/components/StructuredData';
 import { appPath } from '@/lib/base-path';
 import { getAppBaseUrl } from '@/lib/env-check';
 import {
-  ATTENDANCE_SATISFACTION_DATA,
   ATTENDANCE_SATISFACTION_RELEASE,
 } from '@/lib/press-releases';
+import PressSatisfactionValleyChart from '@/components/PressSatisfactionValleyChart';
 
 const appBaseUrl = getAppBaseUrl();
 const release = ATTENDANCE_SATISFACTION_RELEASE;
@@ -188,41 +188,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               高満足率は、総合満足度を5段階で尋ね、4または5を選んだ回答者の割合です。
             </p>
 
-            <figure className="mt-6">
-              <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-                表1. 主な通学頻度別・総合満足度4〜5の割合（単位：％／有効回答849件）
-              </figcaption>
-              <div className="overflow-x-auto border-y border-neutral-800 bg-white">
-                <table className="press-doc__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">主な通学頻度</th>
-                      <th scope="col" className="num">
-                        高満足率
-                      </th>
-                      <th scope="col" className="num">
-                        人数
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ATTENDANCE_SATISFACTION_DATA.map((item) => (
-                      <tr
-                        key={item.label}
-                        data-emphasis={'highlighted' in item && item.highlighted ? 'true' : undefined}
-                      >
-                        <td>{item.label}</td>
-                        <td className="num">{item.value}％</td>
-                        <td className="num">{item.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-3 text-xs leading-5 text-neutral-500">
-                出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計
-              </p>
-            </figure>
+            <PressSatisfactionValleyChart />
 
             <p>
               「通学日数が少ないほど負担も少ない」「通学日数が多いほどサポートを受けやすい」という単純な関係ではなく、完全なオンライン学習と定期通学の中間にあたる「月1〜数回」層で、満足度が低くなる結果となりました。
