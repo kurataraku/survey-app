@@ -22,69 +22,52 @@ export const metadata: Metadata = {
 
 export default function PressReleasesPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-blue-100 bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
-          <p className="mb-3 text-sm font-bold tracking-widest text-blue-600">
-            PRESS RELEASE
-          </p>
-          <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
+    <div className="min-h-screen">
+      <header className="border-b border-neutral-800 bg-white">
+        <div className="mx-auto max-w-[42rem] px-4 py-10 sm:px-6 sm:py-12">
+          <p className="press-doc__meta">株式会社キャリアエッセンス</p>
+          <h1 className="press-doc__serif mt-3 text-3xl font-bold leading-tight text-neutral-900">
             プレスリリース・調査発表
           </h1>
-          <p className="mt-4 max-w-3xl leading-7 text-gray-600">
-            在校生・卒業生・保護者から寄せられた口コミをもとに、
-            通信制高校選びに役立つ独自調査や運営からのお知らせを掲載します。
+          <p className="mt-4 text-[15px] leading-8 text-neutral-700">
+            在校生・卒業生・保護者から寄せられた口コミをもとにした、独自調査と運営からのお知らせです。
           </p>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-        <div className="space-y-5">
+      <main className="mx-auto max-w-[42rem] px-4 py-10 sm:px-6 sm:py-12">
+        <ul className="divide-y divide-neutral-300 border-y border-neutral-800">
           {PRESS_RELEASES.map((release) => (
-            <article
-              key={release.slug}
-              className="rounded-2xl border border-gray-200 bg-white p-6 sm:p-8"
-            >
-              <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-                <span className="rounded-full bg-blue-50 px-3 py-1 font-semibold text-blue-700">
-                  {release.category}
+            <li key={release.slug} className="py-7">
+              <p className="press-doc__meta">
+                <time dateTime={release.publishedAt}>{release.displayDate}</time>
+                <span className="mx-2" aria-hidden>
+                  ｜
                 </span>
-                <time dateTime={release.publishedAt} className="text-gray-500">
-                  {release.displayDate}
-                </time>
-              </div>
-              <h2 className="text-xl font-bold leading-8 text-gray-900 sm:text-2xl">
+                {release.category}
+              </p>
+              <h2 className="press-doc__serif mt-3 text-xl font-bold leading-8 text-neutral-900">
                 <Link
                   href={appPath(`/press-releases/${release.slug}`)}
-                  className="transition-colors hover:text-blue-700"
+                  className="no-underline hover:underline"
                 >
                   {release.title}
                 </Link>
               </h2>
-              <p className="mt-4 leading-7 text-gray-600">{release.description}</p>
-              <Link
-                href={appPath(`/press-releases/${release.slug}`)}
-                className="mt-5 inline-flex items-center gap-1.5 font-semibold text-blue-700 hover:text-blue-800"
-              >
-                詳細を見る
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden
+              <p className="mt-3 text-[15px] leading-8 text-neutral-700">
+                {release.description}
+              </p>
+              <p className="mt-4">
+                <Link
+                  href={appPath(`/press-releases/${release.slug}`)}
+                  className="text-sm font-medium"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </Link>
-            </article>
+                  本文を読む
+                </Link>
+              </p>
+            </li>
           ))}
-        </div>
+        </ul>
       </main>
     </div>
   );

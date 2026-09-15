@@ -15,7 +15,7 @@ import {
   HOME_PRIORITY_PREFECTURES,
 } from '@/lib/seo/gsc-priority-schools';
 import { getPrefecturePath } from '@/lib/prefectures';
-import { ATTENDANCE_SATISFACTION_RELEASE } from '@/lib/press-releases';
+import PressReleaseHomeTeaser from '@/components/PressReleaseHomeTeaser';
 import type { Metadata } from 'next';
 
 export const revalidate = 300;
@@ -312,78 +312,7 @@ export default async function Home() {
           </DiagnosisStartLink>
         </section>
 
-        <section className="mb-12" aria-labelledby="home-press-release-heading">
-          <div className="mb-6 flex items-end justify-between gap-4">
-            <div>
-              <p className="mb-1 text-xs font-bold tracking-widest text-blue-600">
-                PRESS RELEASE
-              </p>
-              <h2
-                id="home-press-release-heading"
-                className="text-2xl font-bold text-gray-900"
-              >
-                調査・プレスリリース
-              </h2>
-            </div>
-            <Link
-              href={appPath('/press-releases')}
-              className="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-700"
-            >
-              一覧を見る
-            </Link>
-          </div>
-
-          <Link
-            href={appPath(`/press-releases/${ATTENDANCE_SATISFACTION_RELEASE.slug}`)}
-            className="group block rounded-2xl border border-blue-100 bg-white p-6 transition-colors hover:border-blue-300 sm:p-8"
-          >
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
-              <div className="flex-1">
-                <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
-                  <span className="rounded-full bg-blue-50 px-3 py-1 font-semibold text-blue-700">
-                    {ATTENDANCE_SATISFACTION_RELEASE.category}
-                  </span>
-                  <time
-                    dateTime={ATTENDANCE_SATISFACTION_RELEASE.publishedAt}
-                    className="text-gray-500"
-                  >
-                    {ATTENDANCE_SATISFACTION_RELEASE.displayDate}
-                  </time>
-                </div>
-                <h3 className="text-xl font-bold leading-8 text-gray-900 transition-colors group-hover:text-blue-700 sm:text-2xl">
-                  {ATTENDANCE_SATISFACTION_RELEASE.shortTitle}
-                </h3>
-                <p className="mt-3 max-w-3xl leading-7 text-gray-600">
-                  公開口コミ851件を点検。通学頻度別に分析すると、月1〜数回層だけ
-                  高満足率が大きく低下する「谷」が見つかりました。
-                </p>
-              </div>
-              <div className="grid shrink-0 grid-cols-3 gap-2 text-center">
-                {[
-                  ['ほぼオンライン', '94.3％'],
-                  ['月1〜数回', '79.2％'],
-                  ['週5', '94.3％'],
-                ].map(([label, value], index) => (
-                  <div
-                    key={label}
-                    className={`rounded-xl px-3 py-4 ${
-                      index === 1 ? 'bg-amber-50' : 'bg-blue-50'
-                    }`}
-                  >
-                    <p className="text-[11px] font-semibold text-gray-600">{label}</p>
-                    <p
-                      className={`mt-1 text-lg font-bold ${
-                        index === 1 ? 'text-amber-700' : 'text-blue-800'
-                      }`}
-                    >
-                      {value}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Link>
-        </section>
+        <PressReleaseHomeTeaser />
 
         {data.latestArticles.length > 0 && (
           <section className="mb-12">
