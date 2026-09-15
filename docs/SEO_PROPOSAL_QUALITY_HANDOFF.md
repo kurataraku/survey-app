@@ -54,10 +54,17 @@ Typed Executor はまだ Phase1 dry-run（`blockedUntilPhase2`）。`SEO_LOOP_EX
 
 **撤退ライン**: 次ループで提案がゼロになったら `soft-eval.ts` の `LOW_VALUE_DIMENSION_CAP` を6→10に上げる（理論最大80点で通過余地が生まれる）。
 
+### 2026-09-15 追加（提案枯渇対策）
+
+- 分析時に対象ページの上位クエリ内訳をGSCから取得し、Fact inventoryへ`gsc.page_queries`として載せる
+- Analyst prompt `seo-analyst-v2`: 競合SERP/端末別/変更履歴が無いことだけで`sufficient=false`にしない
+- Strategist prompt `seo-strategist-v4` / Revision `seo-revision-strategist-v4`: クエリ語が既にtitle等にあっても、口コミ・学費等の具体比較軸を足せるなら提案可
+- Soft Evalの閾値や重度判定は変更しない
+
 ### 2026-09-14 追加（バランス型の品質改善）
 
 - 工程別モデル: Analyst=`gpt-5.6-luna`（reasoning low）、Strategist/Revision=`gpt-5.6-terra`（reasoning medium）。旧`SEO_LOOP_LLM_MODEL`は後方互換fallback
-- prompt version: `seo-strategist-v3` / `seo-revision-strategist-v3`
+- prompt version: `seo-strategist-v4` / `seo-revision-strategist-v4`（以前はv3）
 - クラーク型（学費・コース等の具体軸を「多様な学び」「充実したサポート体制」へ置換）を`concrete_axis_removed`として重度判定
 - 短文でクエリ語も新しい具体軸も増えない`no_new_query_term`を重度判定。ただし通学・コース等を新しく足すあずさ型は対象外
 - 重度`lowValueChangeFindings`を生成時validateへ接続し、Slack保存前に最大3回再生成

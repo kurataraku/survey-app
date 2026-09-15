@@ -98,8 +98,53 @@ describe('AnalystのFact grounding', () => {
       gscSnapshot: { impressions: 1000, ctr: 0.01 },
       scores: { confidence: 0.75 },
     },
-    context
+    context,
+    {
+      pageTopQueries: [
+        {
+          query: '匿名校 口コミ',
+          clicks: 2,
+          impressions: 400,
+          ctr: 0.005,
+          position: 9.2,
+          deltaClicks: -1,
+        },
+        {
+          query: '匿名校 学費',
+          clicks: 1,
+          impressions: 220,
+          ctr: 0.0045,
+          position: 11.0,
+          deltaClicks: 0,
+        },
+      ],
+    }
   );
+
+  it('ページ上位クエリ内訳をFact inventoryへ載せる', () => {
+    expect(inventory.some((fact) => fact.id === 'gsc.page_queries')).toBe(true);
+    expect(
+      inventory.find((fact) => fact.id === 'gsc.page_queries')?.statement
+    ).toContain('匿名校 学費');
+  });
+
+  it('取得失敗時はunavailable Factを載せる', () => {
+    const withError = buildFactInventory(
+      {
+        issueType: 'low_ctr_high_impressions',
+        title: 'CTRが低い',
+        description: null,
+        query: null,
+        gscSnapshot: { impressions: 1000, ctr: 0.01 },
+        scores: null,
+      },
+      context,
+      { pageTopQueriesError: 'GSC timeout' }
+    );
+    expect(
+      withError.find((fact) => fact.id === 'gsc.page_queries_unavailable')?.statement
+    ).toContain('GSC timeout');
+  });
 
   it('inventoryにないFact IDを拒否する', () => {
     const analyst = analystOutputSchema.parse({
@@ -227,9 +272,16 @@ describe('Strategistへ渡す生成ポリシー', () => {
     expect(STRATEGIST_CONTENT_POLICY.forbidden).toContain(
       'currentValueよりproposedValueの文字数が減るだけのupdateSeoSummary'
     );
-    expect(STRATEGIST_CONTENT_POLICY.required).toContain(
-      'proposedValueには、selectedFactsのQueryに含まれ、かつcurrentValueには無い語を少なくとも1つ含める'
-    );
+    expect(
+      STRATEGIST_CONTENT_POLICY.required.some((rule) =>
+        rule.includes('具体的比較軸')
+      )
+    ).toBe(true);
+    expect(
+      STRATEGIST_CONTENT_POLICY.required.some((rule) =>
+        rule.includes('クエリ語がすでにcurrentValueに含まれていても')
+      )
+    ).toBe(true);
     expect(STRATEGIST_NULL_CONDITIONS).toContain(
       'currentValueの言い換え・語順入れ替え・語尾調整しか思いつかないとき'
     );

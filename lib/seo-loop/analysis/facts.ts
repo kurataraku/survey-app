@@ -1,5 +1,6 @@
 import { stableJson } from '../hash';
 import type { FactContextSnapshot } from '../context/types';
+import type { PageQueryFactRow } from './page-queries';
 import type { AnalysisFact, AnalystOutput } from './types';
 
 type IssueForFacts = {
@@ -9,6 +10,11 @@ type IssueForFacts = {
   query: string | null;
   gscSnapshot: unknown;
   scores: unknown;
+};
+
+export type FactInventoryExtras = {
+  pageTopQueries?: PageQueryFactRow[];
+  pageTopQueriesError?: string | null;
 };
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -73,7 +79,8 @@ function compact(value: unknown, maxLength = 1200): string {
 
 export function buildFactInventory(
   issue: IssueForFacts,
-  context: FactContextSnapshot
+  context: FactContextSnapshot,
+  extras: FactInventoryExtras = {}
 ): AnalysisFact[] {
   const facts: AnalysisFact[] = [
     {
@@ -98,6 +105,24 @@ export function buildFactInventory(
       id: 'gsc.query',
       source: 'gsc',
       statement: `Query: ${issue.query}`,
+    });
+  }
+
+  const pageTopQueries = extras.pageTopQueries ?? [];
+  if (pageTopQueries.length > 0) {
+    facts.push({
+      id: 'gsc.page_queries',
+      source: 'gsc',
+      statement: `Top queries for this page (impressions desc available in GSC order): ${compact(
+        pageTopQueries,
+        2000
+      )}`,
+    });
+  } else if (extras.pageTopQueriesError) {
+    facts.push({
+      id: 'gsc.page_queries_unavailable',
+      source: 'gsc',
+      statement: `Page query breakdown unavailable: ${extras.pageTopQueriesError}`,
     });
   }
 

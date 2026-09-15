@@ -11,6 +11,7 @@ import {
   selectedFacts,
   validateAnalystGrounding,
 } from './analysis/facts';
+import { fetchPageTopQueries } from './analysis/page-queries';
 import { candidateActionsForIssue } from './analysis/policy';
 import {
   assembleProposalV2,
@@ -221,6 +222,19 @@ export async function analyzeIssuesToProposals(params: {
       continue;
     }
 
+    let pageTopQueries: Awaited<ReturnType<typeof fetchPageTopQueries>> = [];
+    let pageTopQueriesError: string | null = null;
+    try {
+      pageTopQueries = await fetchPageTopQueries({
+        pageUrl: issue.target_url,
+        gscDays: params.config.gscDays,
+      });
+    } catch (error) {
+      // ページ内訳は診断品質を上げる補助Fact。取得失敗だけで課題を捨てない
+      pageTopQueriesError =
+        error instanceof Error ? error.message : String(error);
+    }
+
     const factInventory = buildFactInventory(
       {
         issueType: issue.issue_type,
@@ -230,7 +244,8 @@ export async function analyzeIssuesToProposals(params: {
         gscSnapshot: issue.gsc_snapshot,
         scores: issue.scores,
       },
-      context
+      context,
+      { pageTopQueries, pageTopQueriesError }
     );
     const groundedAnalystSchema = analystOutputSchema.superRefine((output, ctx) => {
       for (const error of validateAnalystGrounding(output, factInventory)) {
