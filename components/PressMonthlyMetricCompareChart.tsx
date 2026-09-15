@@ -41,7 +41,7 @@ export default function PressMonthlyMetricCompareChart() {
   return (
     <figure className="mt-6">
       <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-        図2. 通学頻度別の個別評価・高評価率（心身サポート／雰囲気／進路）
+        図2. 通学頻度別の個別評価・高評価率（各項目4〜5／心身サポート／雰囲気／進路）
       </figcaption>
 
       <div className="border border-neutral-800 bg-white px-2 py-3 sm:px-4">
@@ -260,7 +260,7 @@ export default function PressMonthlyMetricCompareChart() {
       </table>
 
       <p className="mt-3 text-xs leading-5 text-neutral-500">
-        出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計。縦軸は50〜90％。線種の違いは指標の区別で、優劣を表すものではありません。
+        出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計。縦軸は50〜90％。ここでの高評価率は個別項目（4〜5）であり、総合満足度の高満足率とは別指標です。線種の違いは指標の区別で、優劣を表すものではありません。
       </p>
     </figure>
   );

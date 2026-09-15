@@ -23,7 +23,7 @@ export default function PressSatisfactionValleyChart() {
   return (
     <figure className="mt-6">
       <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-        図1. 主な通学頻度別・総合満足度4〜5の割合（単位：％／有効回答849件）
+        図1. 主な通学頻度別・高満足率（高満足層の割合／単位：％／有効回答849件）
       </figcaption>
 
       <div className="border border-neutral-800 bg-white px-2 py-3 sm:px-4">
@@ -181,7 +181,7 @@ export default function PressSatisfactionValleyChart() {
       </table>
 
       <p className="mt-3 text-xs leading-5 text-neutral-500">
-        出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計。縦軸は70〜100％。
+        出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計。高満足率＝総合満足度4〜5（高満足層）の割合。縦軸は70〜100％。
       </p>
     </figure>
   );

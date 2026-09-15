@@ -55,7 +55,7 @@ export default function PressReleaseHomeTeaser() {
           {release.shortTitle}
         </h3>
         <p className="mt-3 text-sm leading-7 text-neutral-700">
-          公開口コミ851件を通学頻度別に見ると、ほぼオンライン層と週5通学層の高満足率は
+          公開口コミ851件を通学頻度別に見ると、ほぼオンライン層と週5通学層の高満足率（総合満足度4〜5）は
           ともに94.3％。そのあいだの「月1〜数回」層だけ79.2％まで落ち、谷のような形が
           現れました。詳細はプレスリリース本文でご覧ください。
         </p>

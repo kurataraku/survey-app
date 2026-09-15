@@ -100,8 +100,23 @@ const METHOD_ROWS: [string, string][] = [
   ['在籍状況', '在籍中210件、卒業604件、以前在籍35件'],
   ['集計日', '2026年9月15日'],
   ['収集方法', 'サイト投稿およびクラウドソーシングを利用したアンケート'],
-  ['高評価の定義', '5段階評価の4または5'],
-  ['低評価の定義', '5段階評価の1または2'],
+  [
+    '高満足層',
+    '総合満足度（5段階）で4または5を選んだ回答者。本調査では「十分に満足している側」として扱う',
+  ],
+  [
+    '低満足層',
+    '総合満足度（5段階）で1〜3を選んだ回答者。明確な不満（1〜2）に加え、中立寄りの3も含め、「高く満足しているとは言えない側」として扱う',
+  ],
+  ['高満足率', '各群における高満足層の割合（％）'],
+  [
+    '個別項目の高評価',
+    '心身サポート・進路・雰囲気などの個別評価で4または5を選んだ割合。総合満足度の層分けとは別指標',
+  ],
+  [
+    '学費の低評価',
+    '学費の納得感で1または2を選んだ割合。強い不満に絞った集計のため、低満足層（1〜3）とは切り方が異なる',
+  ],
   ['自由記述分析', '改善点・合わない点に含まれる関連語の出現を分類（複数分類を含む）'],
 ];
 
@@ -158,7 +173,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             </h2>
             <ol className="mt-4 list-decimal space-y-2 pl-5 text-[15px] leading-8 text-neutral-800">
               <li>
-                「月1〜数回」層の高満足率は<strong>79.2％</strong>で、通学頻度別で最低
+                「月1〜数回」層の高満足率（高満足層の割合）は<strong>79.2％</strong>で、通学頻度別で最低
               </li>
               <li>
                 同層では、心身サポート・進路サポート・雰囲気の高評価がすべて6割未満
@@ -170,15 +185,40 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             </ol>
           </section>
 
+          <section className="mt-10" aria-labelledby="definitions-heading">
+            <h2 id="definitions-heading" className="press-doc__serif text-base font-bold text-neutral-950">
+              本調査での満足度の分け方
+            </h2>
+            <div className="mt-4 border border-neutral-800 bg-white px-5 py-5 text-[15px] leading-8 text-neutral-800 sm:px-6">
+              <p>
+                総合満足度は5段階評価で尋ねています。本調査では、読みやすさと層比較のために、次の2群に分けます。
+              </p>
+              <ul className="mt-3 list-disc space-y-2 pl-5">
+                <li>
+                  <strong>高満足層</strong>：総合満足度で<strong>4または5</strong>を選んだ回答者（十分に満足している側）
+                </li>
+                <li>
+                  <strong>低満足層</strong>：総合満足度で<strong>1〜3</strong>を選んだ回答者（高く満足しているとは言えない側）
+                </li>
+              </ul>
+              <p className="mt-4">
+                3を低満足層に含めるのは、1・2だけを「不満」、4・5だけを「満足」と見る二分法では、中央の3がどちらにも属さず比較しづらいためです。本調査では「十分に満足しているか／そうでないか」を見る目的で、4〜5を高満足層、1〜3を低満足層と定義しました。これは学術上の唯一の定義ではなく、本分析上の便宜です。
+              </p>
+              <p className="mt-3">
+                本文の<strong>高満足率</strong>は、各通学頻度などにおける高満足層の割合を指します。なお、心身サポートや進路などの<strong>個別項目</strong>では、同様に4または5を「高評価」と呼びますが、総合満足度の高満足層とは別指標です。学費については、強い不満に絞るため<strong>1または2</strong>を「低評価」として別に集計しています。
+              </p>
+            </div>
+          </section>
+
           <section className="mt-10">
             <p>
               通信制高校の口コミサイト「通信制高校リアルレビュー」を運営する株式会社キャリアエッセンスは、204校に寄せられた公開口コミ851件を対象に、実際の通学頻度と学校評価の関係を分析しました。
             </p>
             <p>
-              重複登録2件を除いた有効回答849件を集計したところ、総合満足度で4または5を選んだ割合は、「ほぼオンライン／自宅」層と「週5通学」層で、ともに94.3％でした。
+              重複登録2件を除いた有効回答849件を集計したところ、高満足層の割合は、「ほぼオンライン／自宅」層と「週5通学」層で、ともに94.3％でした。
             </p>
             <p>
-              一方、「月1〜数回」層では79.2％に低下。他の通学頻度より11〜15ポイント低く、満足度に「谷」が生じていることが分かりました。
+              一方、「月1〜数回」層では79.2％に低下。他の通学頻度より11〜15ポイント低く、高満足率に「谷」が生じていることが分かりました。
             </p>
           </section>
 
@@ -187,13 +227,13 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               1. 通学頻度別の高満足率
             </h2>
             <p className="!mt-4 text-sm leading-7 text-neutral-600">
-              高満足率は、総合満足度を5段階で尋ね、4または5を選んだ回答者の割合です。
+              高満足率＝各通学頻度における高満足層（総合満足度4〜5）の割合です。
             </p>
 
             <PressSatisfactionValleyChart />
 
             <p>
-              「通学日数が少ないほど負担も少ない」「通学日数が多いほどサポートを受けやすい」という単純な関係ではなく、完全なオンライン学習と定期通学の中間にあたる「月1〜数回」層で、満足度が低くなる結果となりました。
+              「通学日数が少ないほど負担も少ない」「通学日数が多いほどサポートを受けやすい」という単純な関係ではなく、完全なオンライン学習と定期通学の中間にあたる「月1〜数回」層で、高満足率が低くなる結果となりました。言い換えると、同層では低満足層（総合満足度1〜3）の割合が他より高くなっています。
             </p>
           </section>
 
@@ -202,7 +242,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               2. 月1〜数回層では、サポート・進路・雰囲気の高評価が6割未満
             </h2>
             <p>
-              各項目を5段階で評価してもらい、4または5を選んだ人を「高評価」として集計しました。月1〜数回層だけでなく、5つの通学頻度すべてで同じ3項目を比較すると、次のようになります。
+              総合満足度とは別に、各項目を5段階で評価してもらい、4または5を選んだ人を「高評価」として集計しました。月1〜数回層だけでなく、5つの通学頻度すべてで同じ3項目を比較すると、次のようになります。
             </p>
 
             <PressMonthlyMetricCompareChart />
@@ -211,22 +251,22 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               心身サポート、雰囲気の適合、進路サポートは、いずれも月1〜数回層が5区分中でもっとも低く、57.4％、58.4％、55.4％にとどまりました。
             </p>
             <p>
-              単位取得や学び方の柔軟性には満足している一方、学校とのつながりや進路支援には満足しきれていない、という評価構造が見られます。
+              単位取得や学び方の柔軟性には満足している一方、学校とのつながりや進路支援には満足しきれていない、という評価構造が見られます。総合満足度の谷と重なる形で、個別項目の高評価も同層で低く出ています。
             </p>
           </section>
 
           <section className="mt-12" aria-labelledby="comparison-heading">
             <h2 id="comparison-heading" className="press-doc__h2">
-              3. 同じ満足度94.3％でも、ほぼオンライン層と週5通学層では中身が異なる
+              3. 同じ高満足率94.3％でも、ほぼオンライン層と週5通学層では中身が異なる
             </h2>
             <p>
-              両者は総合満足度が同じですが、個別評価には大きな違いがありました。
+              両者は高満足率が同じですが、個別評価には大きな違いがありました。
             </p>
 
             <PressOnlineVsWeeklyChart />
 
             <p>
-              ほぼオンライン層は、サポートや進路支援の評価が週5通学層より低い一方、学費への低評価は少ない結果でした。週5通学層はサポートや進路支援を高く評価していますが、学費低評価はほぼオンライン層の約2.5倍です。
+              ほぼオンライン層は、サポートや進路支援の高評価が週5通学層より低い一方、学費の低評価（1〜2）は少ない結果でした。週5通学層はサポートや進路支援を高く評価していますが、学費の低評価はほぼオンライン層の約2.5倍です。
             </p>
             <p>
               同じ高満足率でも、ほぼオンライン層は自由度や費用面、週5通学層は対面サポートを評価している可能性があります。
@@ -250,7 +290,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
 
             <figure className="mt-6">
               <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-                表4. 心身サポート評価が1〜3の人における総合満足度4〜5の割合
+                表4. 心身サポートが「高評価でない」（1〜3）人のうち、高満足層の割合
               </figcaption>
               <div className="overflow-x-auto border-y border-neutral-800 bg-white">
                 <table className="press-doc__table">
@@ -258,7 +298,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
                     <tr>
                       <th scope="col">通学頻度</th>
                       <th scope="col" className="num">
-                        総合満足度4〜5
+                        高満足層の割合
                       </th>
                     </tr>
                   </thead>
@@ -274,13 +314,16 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
                   </tbody>
                 </table>
               </div>
+              <p className="mt-3 text-xs leading-5 text-neutral-500">
+                心身サポートの評価が1〜3の回答者に限定し、その中で総合満足度が4〜5（高満足層）だった割合です。
+              </p>
             </figure>
 
             <p>
-              サポートを高く評価していない場合でも、ほぼオンライン層では9割が学校全体に満足しています。一方、月1〜数回層では約6割まで低下しています。
+              サポートを高く評価していない場合でも、ほぼオンライン層では9割が高満足層です。一方、月1〜数回層では約6割まで低下しています。
             </p>
             <p>
-              ほぼオンライン層はサポートの手厚さより自由度を優先する一方、月1〜数回層は「登校機会があるから、その日に支援を受けられる」と期待している可能性があります。その期待に対して十分な支援が提供されない場合、満足度へ直接影響しやすいと考えられます。
+              ほぼオンライン層はサポートの手厚さより自由度を優先する一方、月1〜数回層は「登校機会があるから、その日に支援を受けられる」と期待している可能性があります。その期待に対して十分な支援が提供されない場合、総合満足度へ直接影響しやすいと考えられます。
             </p>
 
             <h3 className="press-doc__serif mt-10 text-lg font-bold text-neutral-950">
@@ -292,7 +335,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
 
             <figure className="mt-6">
               <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-                表5. 月1〜数回層の自由記述における関連語の出現割合
+                表5. 月1〜数回層の自由記述における関連語の出現割合（総合満足度による層分け）
               </figcaption>
               <div className="overflow-x-auto border-y border-neutral-800 bg-white">
                 <table className="press-doc__table">
@@ -301,9 +344,13 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
                       <th scope="col">内容</th>
                       <th scope="col" className="num">
                         低満足層
+                        <br />
+                        <span className="font-normal text-neutral-500">（1〜3／21人）</span>
                       </th>
                       <th scope="col" className="num">
                         高満足層
+                        <br />
+                        <span className="font-normal text-neutral-500">（4〜5／80人）</span>
                       </th>
                     </tr>
                   </thead>
@@ -321,10 +368,13 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
                   </tbody>
                 </table>
               </div>
+              <p className="mt-3 text-xs leading-5 text-neutral-500">
+                ここでの高満足層・低満足層は、いずれも月1〜数回層内での総合満足度による区分です。
+              </p>
             </figure>
 
             <p>
-              月1〜数回層のうち、総合満足度1〜3だった21人の自由記述を関連語で分類すると、低満足層では、進路への言及が高満足層の約2.6倍、学校からの働きかけへの言及が約2.9倍確認されました。
+              月1〜数回層のうち、低満足層21人の自由記述を関連語で分類すると、進路への言及が高満足層の約2.6倍、学校からの働きかけへの言及が約2.9倍確認されました。
             </p>
 
             <blockquote className="press-doc__quote">
@@ -432,7 +482,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <div className="mt-6 border border-neutral-400 bg-white px-4 py-4 text-sm leading-7 text-neutral-700">
               <p className="font-semibold text-neutral-900">調査結果を読む際の注意</p>
               <p className="mt-2">
-                本調査は無作為抽出ではなく、全国の通信制高校在籍者・卒業者全体を代表するものではありません。通学頻度は希望や学校指定の頻度ではなく、回答者の実際の主な通学頻度です。学校、コース、キャンパス、回答者の状況などの違いを完全には調整していません。本調査は各通学頻度と満足度の関連を示すもので、因果関係を証明するものではありません。
+                本調査は無作為抽出ではなく、全国の通信制高校在籍者・卒業者全体を代表するものではありません。通学頻度は希望や学校指定の頻度ではなく、回答者の実際の主な通学頻度です。学校、コース、キャンパス、回答者の状況などの違いを完全には調整していません。高満足層・低満足層は総合満足度に基づく本調査上の区分です。本調査は各通学頻度と満足度の関連を示すもので、因果関係を証明するものではありません。
               </p>
             </div>
           </section>

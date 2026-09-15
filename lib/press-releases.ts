@@ -73,8 +73,8 @@ export const ONLINE_VS_WEEKLY_COMPARE = {
   rows: [
     {
       key: 'overall',
-      label: '総合満足度4〜5',
-      note: '同率',
+      label: '高満足層の割合',
+      note: '総合・同率',
       online: 94.3,
       weekly: 94.3,
       onlineCount: '216／229人',
@@ -82,7 +82,7 @@ export const ONLINE_VS_WEEKLY_COMPARE = {
     },
     {
       key: 'support',
-      label: '心身サポート4〜5',
+      label: '心身サポート高評価',
       online: 60.3,
       weekly: 87.4,
       onlineCount: '138／229人',
@@ -90,7 +90,7 @@ export const ONLINE_VS_WEEKLY_COMPARE = {
     },
     {
       key: 'career',
-      label: '進路サポート4〜5',
+      label: '進路サポート高評価',
       online: 62.0,
       weekly: 81.6,
       onlineCount: '142／229人',
@@ -98,8 +98,8 @@ export const ONLINE_VS_WEEKLY_COMPARE = {
     },
     {
       key: 'tuition',
-      label: '学費納得感1〜2',
-      note: '低評価の割合',
+      label: '学費の低評価',
+      note: '1〜2の割合',
       online: 7.9,
       weekly: 20.0,
       onlineCount: '15／191人',
