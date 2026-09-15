@@ -127,18 +127,18 @@ body {
 
 /* プレスリリース専用：調査資料・報道向けの紙面スタイル */
 .press-doc {
-  --press-ink: #17212b;
-  --press-muted: #536271;
-  --press-line: #cdd6de;
+  --press-ink: #202833;
+  --press-muted: #5b6875;
+  --press-line: #d7e0e7;
   --press-paper: #ffffff;
-  --press-page: #f6f8fa;
-  --press-navy: #214f6f;
-  --press-blue: #397796;
-  --press-blue-soft: #e8f1f5;
-  --press-orange: #b55239;
-  --press-orange-soft: #f8e9e4;
-  --press-gold: #9a6a22;
-  --press-track: #edf1f4;
+  --press-page: #f7fbfe;
+  --press-navy: #146d9f;
+  --press-blue: #168bd2;
+  --press-blue-soft: #edf8fe;
+  --press-orange: #ff5426;
+  --press-orange-soft: #fff0ea;
+  --press-gold: #ff9f0a;
+  --press-track: #edf3f7;
   color: var(--press-ink);
   background: var(--press-page);
   font-family: var(--font-press-sans), "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -147,13 +147,13 @@ body {
 }
 
 .press-doc a {
-  color: #1f3a5f;
+  color: #0877b9;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
 
 .press-doc a:hover {
-  color: #0f2744;
+  color: #075d8e;
 }
 
 .press-doc__serif {
@@ -226,10 +226,8 @@ body {
 }
 
 .press-chart {
-  border: 1px solid #b8c4ce;
-  border-top: 3px solid var(--press-navy);
   background: var(--press-paper);
-  padding: 1rem;
+  padding: 1rem 0.5rem;
 }
 
 .press-chart__title {

@@ -190,23 +190,20 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <h2 id="definitions-heading" className="press-doc__serif text-base font-bold text-neutral-950">
               本調査での満足度の分け方
             </h2>
-            <div className="mt-4 border border-slate-300 bg-white px-5 py-5 text-[15px] leading-8 text-neutral-800 sm:px-6">
+            <div className="mt-4 border-y border-slate-300 bg-white px-4 py-4 text-[15px] leading-7 text-neutral-800 sm:px-5">
               <p>
-                総合満足度は5段階評価で尋ねています。本調査では、読みやすさと層比較のために、次の2群に分けます。
+                総合満足度（5段階）を、次の2群に分けて集計しました。
               </p>
-              <ul className="mt-3 list-disc space-y-2 pl-5">
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                 <li>
-                  <strong>高満足層</strong>：総合満足度で<strong>4または5</strong>を選んだ回答者（十分に満足している側）
+                  <strong>高満足層</strong>：評価4・5
                 </li>
                 <li>
-                  <strong>低満足層</strong>：総合満足度で<strong>1〜3</strong>を選んだ回答者（高く満足しているとは言えない側）
+                  <strong>低満足層</strong>：評価1〜3
                 </li>
               </ul>
-              <p className="mt-4">
-                3を低満足層に含めるのは、1・2だけを「不満」、4・5だけを「満足」と見る二分法では、中央の3がどちらにも属さず比較しづらいためです。本調査では「十分に満足しているか／そうでないか」を見る目的で、4〜5を高満足層、1〜3を低満足層と定義しました。これは学術上の唯一の定義ではなく、本分析上の便宜です。
-              </p>
-              <p className="mt-3">
-                本文の<strong>高満足率</strong>は、各通学頻度などにおける高満足層の割合を指します。なお、心身サポートや進路などの<strong>個別項目</strong>では、同様に4または5を「高評価」と呼びますが、総合満足度の高満足層とは別指標です。学費については、強い不満に絞るため<strong>1または2</strong>を「低評価」として別に集計しています。
+              <p className="mt-3 text-sm text-slate-600">
+                「十分に満足している（4・5）か」を比較するための本調査上の区分です。本文の「高満足率」は、高満足層が各群に占める割合を指します。個別項目の高評価は4・5、学費の低評価は1・2です。
               </p>
             </div>
           </section>

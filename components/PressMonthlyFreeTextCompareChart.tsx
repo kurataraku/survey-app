@@ -1,8 +1,29 @@
 import { MONTHLY_FREE_TEXT_COMPARE } from '@/lib/press-releases';
+import PressGroupedBarChart from '@/components/PressGroupedBarChart';
 
-/** 図4: テーマごとに倍率と直接ラベル付きの棒を並べる。 */
+/** 図4: 低満足層と高満足層をテーマごとの集合横棒で比較する。 */
 export default function PressMonthlyFreeTextCompareChart() {
   const { rows, lowLabel, highLabel, lowN, highN } = MONTHLY_FREE_TEXT_COMPARE;
+  const series = [
+    {
+      key: 'low',
+      label: `${lowLabel}（${lowN}人）`,
+      color: '#ff4f1f',
+    },
+    {
+      key: 'high',
+      label: `${highLabel}（${highN}人）`,
+      color: '#ff9f0a',
+    },
+  ] as const;
+  const categories = rows.map((row) => ({
+    label: row.label,
+    annotation: `低満足層が${row.multipleLabel}`,
+    values: {
+      low: row.low,
+      high: row.high,
+    },
+  }));
 
   return (
     <figure className="mt-6">
@@ -10,41 +31,14 @@ export default function PressMonthlyFreeTextCompareChart() {
         図4. 月1〜数回の低満足層では、「改善してほしい点」に進路への言及が約2.6倍、連絡・相談への言及が約2.9倍
       </figcaption>
 
-      <div
-        className="press-chart space-y-7"
-        role="img"
-        aria-label="進路への言及は低満足層42.9％、高満足層16.3％で約2.6倍。連絡・相談への言及は28.6％、10.0％で約2.9倍"
-      >
-        {rows.map((row) => (
-          <section key={row.key}>
-            <div className="mb-3 flex items-start justify-between gap-4 border-b border-slate-300 pb-2">
-              <h3 className="text-sm font-bold leading-6 text-slate-800 sm:text-[15px]">
-                {row.label}
-              </h3>
-              <div className="shrink-0 border-l-2 border-[var(--press-orange)] pl-3 text-right">
-                <strong className="block text-xl leading-6 text-[var(--press-orange)] sm:text-2xl">
-                  {row.multipleLabel}
-                </strong>
-                <span className="block text-[10px] text-slate-500">
-                  低満足層／高満足層
-                </span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <ThemeBar
-                label={`${lowLabel}（${lowN}人）`}
-                value={row.low}
-                color="var(--press-orange)"
-              />
-              <ThemeBar
-                label={`${highLabel}（${highN}人）`}
-                value={row.high}
-                color="var(--press-blue)"
-              />
-            </div>
-          </section>
-        ))}
-      </div>
+      <PressGroupedBarChart
+        ariaLabel="進路への言及は低満足層42.9％、高満足層16.3％で約2.6倍。連絡・相談への言及は28.6％、10.0％で約2.9倍"
+        series={series}
+        categories={categories}
+        max={50}
+        tickStep={10}
+        labelWidth="13rem"
+      />
 
       <table className="sr-only">
         <caption>
@@ -78,32 +72,5 @@ export default function PressMonthlyFreeTextCompareChart() {
         対象は月1〜数回層。「改善してほしい点／合わない点」の自由記述に、当該テーマの言葉が1回でも出た人の割合です。低満足層＝総合満足度1〜3（21人）、高満足層＝4〜5（80人）。棒は0％を起点に表示。倍率は低満足層÷高満足層です。
       </p>
     </figure>
-  );
-}
-
-function ThemeBar({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: string;
-}) {
-  return (
-    <div className="grid grid-cols-[7.75rem_1fr_3.25rem] items-center gap-2 sm:grid-cols-[9.5rem_1fr_4rem] sm:gap-3">
-      <span className="text-xs font-semibold text-slate-700 sm:text-sm">
-        {label}
-      </span>
-      <span className="press-chart__track">
-        <span
-          className="block h-full"
-          style={{ width: `${value}%`, backgroundColor: color }}
-        />
-      </span>
-      <span className="text-right text-sm font-bold tabular-nums text-slate-800">
-        {value}％
-      </span>
-    </div>
   );
 }
