@@ -44,11 +44,11 @@ describe('selectPriorityUrls', () => {
     ).toEqual([]);
   });
 
-  it('同じURL・issueTypeのpageとpage×query課題を1件にまとめる', () => {
+  it('page集約のスコアが高くても同じURLのpage×query課題を残す', () => {
     const url = 'https://example.invalid/schools/alpha';
-    const pageIssue = extractGscOpportunities([row(url, 1000)]);
+    const pageIssue = extractGscOpportunities([row(url, 1800)]);
     const pageQueryIssue = extractGscOpportunities([
-      { ...row(url, 1000), keys: [url, '匿名クエリ'] },
+      { ...row(url, 800), keys: [url, '匿名クエリ'] },
     ]);
 
     const result = rankAndDedupeOpportunities(
@@ -60,5 +60,18 @@ describe('selectPriorityUrls', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.query).toBe('匿名クエリ');
+  });
+
+  it('同じURLのquery付き候補同士ではopportunityが高いものを残す', () => {
+    const url = 'https://example.invalid/schools/alpha';
+    const queryIssues = extractGscOpportunities([
+      { ...row(url, 300), keys: [url, '低優先クエリ'] },
+      { ...row(url, 900), keys: [url, '高優先クエリ'] },
+    ]).filter((item) => item.issueType === 'low_ctr_high_impressions');
+
+    const result = rankAndDedupeOpportunities(queryIssues, 10);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.query).toBe('高優先クエリ');
   });
 });

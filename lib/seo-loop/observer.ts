@@ -33,6 +33,7 @@ export function rankAndDedupeOpportunities(
   const ranked = [...opportunities].sort(
     (a, b) =>
       Number(Boolean(b.targetUrl)) - Number(Boolean(a.targetUrl)) ||
+      Number(Boolean(b.query)) - Number(Boolean(a.query)) ||
       b.scores.opportunity - a.scores.opportunity
   );
   const deduped = new Map<string, GscOpportunity>();
