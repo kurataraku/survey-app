@@ -312,8 +312,6 @@ export default async function Home() {
           </DiagnosisStartLink>
         </section>
 
-        <PressReleaseHomeTeaser />
-
         {data.latestArticles.length > 0 && (
           <section className="mb-12">
             <div className="flex justify-between items-center mb-6">
@@ -348,6 +346,7 @@ export default async function Home() {
           </section>
         )}
         <PrefectureMapLinks />
+        <PressReleaseHomeTeaser />
       </div>
     </div>
   );
