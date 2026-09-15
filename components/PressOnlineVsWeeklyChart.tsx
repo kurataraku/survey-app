@@ -110,12 +110,13 @@ export default function PressOnlineVsWeeklyChart() {
             const same = row.online === row.weekly;
             const left = Math.min(xOnline, xWeekly);
             const right = Math.max(xOnline, xWeekly);
+            const note = 'note' in row ? row.note : undefined;
 
             return (
               <g key={row.key}>
                 <text
                   x={pad.left - 12}
-                  y={y - (row.note ? 4 : 0)}
+                  y={y - (note ? 4 : 0)}
                   textAnchor="end"
                   fill="#1a1a1a"
                   fontSize="13"
@@ -123,7 +124,7 @@ export default function PressOnlineVsWeeklyChart() {
                 >
                   {row.label}
                 </text>
-                {row.note ? (
+                {note ? (
                   <text
                     x={pad.left - 12}
                     y={y + 14}
@@ -132,7 +133,7 @@ export default function PressOnlineVsWeeklyChart() {
                     fontSize="11"
                     fontFamily="var(--font-press-sans), sans-serif"
                   >
-                    （{row.note}）
+                    （{note}）
                   </text>
                 ) : null}
 
@@ -168,7 +169,6 @@ export default function PressOnlineVsWeeklyChart() {
                   fill="#1a1a1a"
                   fontSize="12"
                   fontFamily="var(--font-press-sans), sans-serif"
-                  fontVariantNumeric="tabular-nums"
                 >
                   {same
                     ? `${row.online}％`

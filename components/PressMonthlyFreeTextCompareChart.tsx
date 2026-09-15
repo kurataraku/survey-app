@@ -155,7 +155,6 @@ export default function PressMonthlyFreeTextCompareChart() {
                   fill="#1a1a1a"
                   fontSize="13"
                   fontFamily="var(--font-press-sans), sans-serif"
-                  fontVariantNumeric="tabular-nums"
                 >
                   {row.low}％
                 </text>
@@ -175,7 +174,6 @@ export default function PressMonthlyFreeTextCompareChart() {
                   fill="#1a1a1a"
                   fontSize="13"
                   fontFamily="var(--font-press-sans), sans-serif"
-                  fontVariantNumeric="tabular-nums"
                 >
                   {row.high}％
                 </text>
