@@ -20,3 +20,38 @@ export const ATTENDANCE_SATISFACTION_DATA = [
   { label: '週3〜4', value: 90.1, count: '173／192人' },
   { label: '週5', value: 94.3, count: '82／87人' },
 ] as const;
+
+/** 通学頻度×個別評価の高評価率（4〜5）。図2用。 */
+export const ATTENDANCE_METRIC_COMPARE = {
+  frequencies: [
+    'ほぼオンライン／自宅',
+    '月1〜数回',
+    '週1〜2',
+    '週3〜4',
+    '週5',
+  ] as const,
+  series: [
+    {
+      key: 'support',
+      label: '心身サポート',
+      values: [60.3, 57.4, 78.8, 81.8, 87.4],
+    },
+    {
+      key: 'atmosphere',
+      label: '雰囲気の適合',
+      strokeDasharray: '6 4',
+      values: [69.0, 58.4, 72.9, 73.4, 73.6],
+    },
+    {
+      key: 'career',
+      label: '進路サポート',
+      strokeDasharray: '2 3',
+      values: [62.0, 55.4, 72.1, 79.2, 81.6],
+    },
+  ],
+  /** 月1〜数回層の内部対比（学習面は高い） */
+  monthlyLearning: [
+    { label: '単位取得のしやすさ', value: 84.2 },
+    { label: '学びの柔軟さ', value: 83.2 },
+  ],
+} as const;

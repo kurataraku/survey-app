@@ -7,6 +7,7 @@ import {
   ATTENDANCE_SATISFACTION_RELEASE,
 } from '@/lib/press-releases';
 import PressSatisfactionValleyChart from '@/components/PressSatisfactionValleyChart';
+import PressMonthlyMetricCompareChart from '@/components/PressMonthlyMetricCompareChart';
 
 const appBaseUrl = getAppBaseUrl();
 const release = ATTENDANCE_SATISFACTION_RELEASE;
@@ -200,49 +201,13 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               2. 月1〜数回層では、サポート・進路・雰囲気の高評価が6割未満
             </h2>
             <p>
-              各項目を5段階で評価してもらい、4または5を選んだ人を「高評価」として集計しました。「月1〜数回」層101人の結果は次のとおりです。
+              各項目を5段階で評価してもらい、4または5を選んだ人を「高評価」として集計しました。月1〜数回層だけでなく、5つの通学頻度すべてで同じ3項目を比較すると、次のようになります。
             </p>
 
-            <figure className="mt-6">
-              <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-                表2. 月1〜数回層における個別評価の高評価率
-              </figcaption>
-              <div className="overflow-x-auto border-y border-neutral-800 bg-white">
-                <table className="press-doc__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">評価項目</th>
-                      <th scope="col" className="num">
-                        高評価率
-                      </th>
-                      <th scope="col" className="num">
-                        人数
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>心や体調の波・不安へのサポート</td>
-                      <td className="num">57.4％</td>
-                      <td className="num">58／101人</td>
-                    </tr>
-                    <tr>
-                      <td>在校生の雰囲気が自分に合っている</td>
-                      <td className="num">58.4％</td>
-                      <td className="num">59／101人</td>
-                    </tr>
-                    <tr>
-                      <td>進路サポート</td>
-                      <td className="num">55.4％</td>
-                      <td className="num">56／101人</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </figure>
+            <PressMonthlyMetricCompareChart />
 
             <p>
-              いずれも、5つの通学頻度区分の中で最も低い割合でした。一方、同じ層でも単位取得のしやすさは84.2％、学びの柔軟さは83.2％が高評価でした。
+              心身サポート、雰囲気の適合、進路サポートは、いずれも月1〜数回層が5区分中でもっとも低く、57.4％、58.4％、55.4％にとどまりました。
             </p>
             <p>
               単位取得や学び方の柔軟性には満足している一方、学校とのつながりや進路支援には満足しきれていない、という評価構造が見られます。
