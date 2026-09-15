@@ -8,6 +8,7 @@ import {
 } from '@/lib/press-releases';
 import PressSatisfactionValleyChart from '@/components/PressSatisfactionValleyChart';
 import PressMonthlyMetricCompareChart from '@/components/PressMonthlyMetricCompareChart';
+import PressOnlineVsWeeklyChart from '@/components/PressOnlineVsWeeklyChart';
 
 const appBaseUrl = getAppBaseUrl();
 const release = ATTENDANCE_SATISFACTION_RELEASE;
@@ -222,48 +223,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               両者は総合満足度が同じですが、個別評価には大きな違いがありました。
             </p>
 
-            <figure className="mt-6">
-              <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
-                表3. ほぼオンライン層と週5通学層の比較
-              </figcaption>
-              <div className="overflow-x-auto border-y border-neutral-800 bg-white">
-                <table className="press-doc__table">
-                  <thead>
-                    <tr>
-                      <th scope="col">項目</th>
-                      <th scope="col" className="num">
-                        ほぼオンライン／自宅
-                      </th>
-                      <th scope="col" className="num">
-                        週5通学
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>総合満足度4〜5</td>
-                      <td className="num">94.3％（216／229人）</td>
-                      <td className="num">94.3％（82／87人）</td>
-                    </tr>
-                    <tr>
-                      <td>心身サポート4〜5</td>
-                      <td className="num">60.3％（138／229人）</td>
-                      <td className="num">87.4％（76／87人）</td>
-                    </tr>
-                    <tr>
-                      <td>進路サポート4〜5</td>
-                      <td className="num">62.0％（142／229人）</td>
-                      <td className="num">81.6％（71／87人）</td>
-                    </tr>
-                    <tr>
-                      <td>学費納得感1〜2</td>
-                      <td className="num">7.9％（15／191人）</td>
-                      <td className="num">20.0％（15／75人）</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </figure>
+            <PressOnlineVsWeeklyChart />
 
             <p>
               ほぼオンライン層は、サポートや進路支援の評価が週5通学層より低い一方、学費への低評価は少ない結果でした。週5通学層はサポートや進路支援を高く評価していますが、学費低評価はほぼオンライン層の約2.5倍です。

@@ -55,3 +55,55 @@ export const ATTENDANCE_METRIC_COMPARE = {
     { label: '学びの柔軟さ', value: 83.2 },
   ],
 } as const;
+
+/** 図3: ほぼオンライン層と週5通学層の比較（総合は同率、中身が異なる）。 */
+export const ONLINE_VS_WEEKLY_COMPARE = {
+  groups: [
+    {
+      key: 'online',
+      label: 'ほぼオンライン／自宅',
+      short: 'ほぼオンライン',
+    },
+    {
+      key: 'weekly',
+      label: '週5通学',
+      short: '週5通学',
+    },
+  ],
+  rows: [
+    {
+      key: 'overall',
+      label: '総合満足度4〜5',
+      note: '同率',
+      online: 94.3,
+      weekly: 94.3,
+      onlineCount: '216／229人',
+      weeklyCount: '82／87人',
+    },
+    {
+      key: 'support',
+      label: '心身サポート4〜5',
+      online: 60.3,
+      weekly: 87.4,
+      onlineCount: '138／229人',
+      weeklyCount: '76／87人',
+    },
+    {
+      key: 'career',
+      label: '進路サポート4〜5',
+      online: 62.0,
+      weekly: 81.6,
+      onlineCount: '142／229人',
+      weeklyCount: '71／87人',
+    },
+    {
+      key: 'tuition',
+      label: '学費納得感1〜2',
+      note: '低評価の割合',
+      online: 7.9,
+      weekly: 20.0,
+      onlineCount: '15／191人',
+      weeklyCount: '15／75人',
+    },
+  ],
+} as const;
