@@ -323,8 +323,13 @@ export async function replenishGscIssues(params: {
 
   const coverage = await loadExistingIssueCoverage(params.supabase, params.runId);
   const batchSize = Math.max(1, params.batchSize ?? REPLENISH_BATCH_SIZE);
+  const replenishConfig: SeoLoopConfig = {
+    ...params.config,
+    // 朝の上位ページを使い切ったあとも、より深い順位のページ候補を拾う
+    gscRowLimit: Math.min(100, Math.max(params.config.gscRowLimit, params.config.gscRowLimit * 2)),
+  };
   const collected = await collectGscOpportunities({
-    config: params.config,
+    config: replenishConfig,
     excludeUrls: coverage.targetUrls,
     priorityUrlLimit: Math.min(MAX_PRIORITY_PAGE_QUERY_URLS, batchSize + 3),
   });
