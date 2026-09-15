@@ -1,18 +1,11 @@
 import Link from 'next/link';
-import { IBM_Plex_Sans_JP, Noto_Serif_JP } from 'next/font/google';
+import { Noto_Sans_JP } from 'next/font/google';
 import { appPath } from '@/lib/base-path';
 import { ATTENDANCE_SATISFACTION_RELEASE } from '@/lib/press-releases';
 
-const pressSerif = Noto_Serif_JP({
+const pressSans = Noto_Sans_JP({
   subsets: ['latin'],
-  weight: ['700'],
-  variable: '--font-press-serif',
-  display: 'swap',
-});
-
-const pressSans = IBM_Plex_Sans_JP({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-press-sans',
   display: 'swap',
 });
@@ -22,10 +15,10 @@ export default function PressReleaseHomeTeaser() {
 
   return (
     <section
-      className={`press-doc mb-4 mt-4 ${pressSerif.variable} ${pressSans.variable}`}
+      className={`press-doc mb-4 mt-4 ${pressSans.variable}`}
       aria-labelledby="home-press-release-heading"
     >
-      <div className="mb-3 flex items-end justify-between gap-4 border-b border-neutral-400 pb-2">
+      <div className="mb-3 flex items-end justify-between gap-4 border-b-2 border-[var(--press-navy)] pb-2">
         <h2
           id="home-press-release-heading"
           className="press-doc__serif text-lg font-bold text-neutral-900 sm:text-xl"

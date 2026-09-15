@@ -1,194 +1,75 @@
 import { ONLINE_VS_WEEKLY_COMPARE } from '@/lib/press-releases';
 
-/**
- * 図3: ほぼオンライン vs 週5通学のダンベル図。
- * 総合は同率、サポート／進路／学費で差が開くことを示す。
- */
+/** 図3: 2群を直接ラベル付きの棒で比較し、学費は評価方向が逆だと分離して示す。 */
 export default function PressOnlineVsWeeklyChart() {
   const { groups, rows } = ONLINE_VS_WEEKLY_COMPARE;
-  const width = 640;
-  const rowH = 56;
-  const pad = { top: 36, right: 72, bottom: 52, left: 148 };
-  const height = pad.top + rows.length * rowH + pad.bottom;
-  const plotW = width - pad.left - pad.right;
-  const xMax = 100;
-  const xTicks = [0, 25, 50, 75, 100];
-
-  const xAt = (v: number) => pad.left + (v / xMax) * plotW;
-  const yAt = (i: number) => pad.top + i * rowH + rowH / 2;
 
   return (
     <figure className="mt-6">
-      <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
+      <figcaption className="press-chart__title">
         図3. ほぼオンライン層と週5通学層の比較（単位：％）
       </figcaption>
 
-      <div className="border border-neutral-800 bg-white px-2 py-3 sm:px-4">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-auto w-full"
-          role="img"
-          aria-labelledby="online-weekly-title online-weekly-desc"
-        >
-          <title id="online-weekly-title">
-            高満足率は同率94.3％だが、サポート・進路・学費の評価は両層で異なる
-          </title>
-          <desc id="online-weekly-desc">
-            白丸がほぼオンライン、黒丸が週5通学。高満足層の割合は重なり、心身サポート高評価は60.3％対87.4％、進路は62.0％対81.6％、学費の低評価（1〜2）は7.9％対20.0％
-          </desc>
-
-          {/* 凡例 */}
-          <g transform={`translate(${pad.left}, 18)`}>
-            <circle
-              cx={0}
-              cy={0}
-              r={5.5}
-              fill="#ffffff"
-              stroke="#1a1a1a"
-              strokeWidth="1.75"
-            />
-            <text
-              x={12}
-              y={4}
-              fill="#1a1a1a"
-              fontSize="12"
-              fontFamily="var(--font-press-sans), sans-serif"
+      <div
+        className="press-chart space-y-7"
+        role="img"
+        aria-label="高満足率は両群94.3％で同率。心身サポート高評価はほぼオンライン60.3％、週5通学87.4％。進路サポート高評価は62.0％、81.6％。学費の低評価は7.9％、20.0％"
+      >
+        {rows.map((row, index) => {
+          const isTuition = row.key === 'tuition';
+          const note = 'note' in row ? row.note : undefined;
+          return (
+            <section
+              key={row.key}
+              className={
+                isTuition
+                  ? 'border-t-2 border-slate-300 bg-slate-50 px-3 pt-5 pb-3'
+                  : ''
+              }
             >
-              {groups[0].short}
-            </text>
-            <circle cx={128} cy={0} r={5.5} fill="#1a1a1a" />
-            <text
-              x={140}
-              y={4}
-              fill="#1a1a1a"
-              fontSize="12"
-              fontFamily="var(--font-press-sans), sans-serif"
-            >
-              {groups[1].short}
-            </text>
-          </g>
-
-          {xTicks.map((tick) => {
-            const x = xAt(tick);
-            return (
-              <g key={tick}>
-                <line
-                  x1={x}
-                  y1={pad.top - 4}
-                  x2={x}
-                  y2={pad.top + rows.length * rowH - 8}
-                  stroke="#e8e8e8"
-                  strokeWidth="1"
-                />
-                <text
-                  x={x}
-                  y={pad.top + rows.length * rowH + 14}
-                  textAnchor="middle"
-                  fill="#595959"
-                  fontSize="11"
-                  fontFamily="var(--font-press-sans), sans-serif"
-                >
-                  {tick}
-                </text>
-              </g>
-            );
-          })}
-
-          <line
-            x1={pad.left}
-            y1={pad.top + rows.length * rowH - 8}
-            x2={width - pad.right}
-            y2={pad.top + rows.length * rowH - 8}
-            stroke="#1a1a1a"
-            strokeWidth="1.25"
-          />
-
-          {rows.map((row, i) => {
-            const y = yAt(i);
-            const xOnline = xAt(row.online);
-            const xWeekly = xAt(row.weekly);
-            const same = row.online === row.weekly;
-            const left = Math.min(xOnline, xWeekly);
-            const right = Math.max(xOnline, xWeekly);
-            const note = 'note' in row ? row.note : undefined;
-
-            return (
-              <g key={row.key}>
-                <text
-                  x={pad.left - 12}
-                  y={y - (note ? 4 : 0)}
-                  textAnchor="end"
-                  fill="#1a1a1a"
-                  fontSize="13"
-                  fontFamily="var(--font-press-sans), sans-serif"
-                >
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h3 className="text-sm font-bold text-slate-800 sm:text-[15px]">
                   {row.label}
-                </text>
+                </h3>
                 {note ? (
-                  <text
-                    x={pad.left - 12}
-                    y={y + 14}
-                    textAnchor="end"
-                    fill="#595959"
-                    fontSize="11"
-                    fontFamily="var(--font-press-sans), sans-serif"
+                  <span
+                    className={`text-xs font-semibold ${
+                      isTuition
+                        ? 'text-[var(--press-orange)]'
+                        : 'text-[var(--press-navy)]'
+                    }`}
                   >
-                    （{note}）
-                  </text>
+                    {note}
+                  </span>
                 ) : null}
-
-                {!same ? (
-                  <line
-                    x1={left}
-                    y1={y}
-                    x2={right}
-                    y2={y}
-                    stroke="#1a1a1a"
-                    strokeWidth="1.5"
-                  />
-                ) : null}
-
-                {/* ほぼオンライン（白丸）を先に、週5（黒丸）を重ねる */}
-                <circle
-                  cx={xOnline}
-                  cy={y}
-                  r={same ? 7 : 6}
-                  fill="#ffffff"
-                  stroke="#1a1a1a"
-                  strokeWidth="1.75"
+              </div>
+              {isTuition ? (
+                <p className="!mt-0 !mb-3 text-xs font-medium text-slate-600">
+                  ※この項目のみ「低評価」の割合。数値が低いほど、学費に強い不満を持つ人が少ない
+                </p>
+              ) : null}
+              <div className="space-y-3">
+                <ComparisonBar
+                  label={groups[0].short}
+                  value={row.online}
+                  count={row.onlineCount}
+                  color="var(--press-blue)"
                 />
-                {!same ? (
-                  <circle cx={xWeekly} cy={y} r={6} fill="#1a1a1a" />
-                ) : (
-                  <circle cx={xWeekly} cy={y} r={3.25} fill="#1a1a1a" />
-                )}
-
-                <text
-                  x={same ? xOnline + 14 : right + 10}
-                  y={y + 4}
-                  fill="#1a1a1a"
-                  fontSize="12"
-                  fontFamily="var(--font-press-sans), sans-serif"
-                >
-                  {same
-                    ? `${row.online}％`
-                    : `${row.online}／${row.weekly}`}
-                </text>
-              </g>
-            );
-          })}
-
-          <text
-            x={pad.left + plotW / 2}
-            y={height - 10}
-            textAnchor="middle"
-            fill="#595959"
-            fontSize="11"
-            fontFamily="var(--font-press-sans), sans-serif"
-          >
-            割合（％）
-          </text>
-        </svg>
+                <ComparisonBar
+                  label={groups[1].short}
+                  value={row.weekly}
+                  count={row.weeklyCount}
+                  color="var(--press-gold)"
+                />
+              </div>
+              {index === 0 ? (
+                <p className="!mt-2 text-xs font-bold text-[var(--press-navy)]">
+                  両群とも94.3％
+                </p>
+              ) : null}
+            </section>
+          );
+        })}
       </div>
 
       <table className="sr-only">
@@ -215,9 +96,41 @@ export default function PressOnlineVsWeeklyChart() {
         </tbody>
       </table>
 
-      <p className="mt-3 text-xs leading-5 text-neutral-500">
-        出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計。白丸＝ほぼオンライン、黒丸＝週5通学。高満足層＝総合満足度4〜5。個別項目の高評価＝各項目4〜5。学費の低評価のみ1〜2の割合で、他項目とは見方が逆になります。数値ラベルは「ほぼオンライン／週5」の順です。
+      <p className="press-chart__note">
+        出典：通信制高校リアルレビュー公開口コミ／2026年9月15日集計。棒は0％を起点に表示。高満足層＝総合満足度4〜5。個別項目の高評価＝各項目4〜5。学費の低評価のみ1〜2の割合です。
       </p>
     </figure>
+  );
+}
+
+function ComparisonBar({
+  label,
+  value,
+  count,
+  color,
+}: {
+  label: string;
+  value: number;
+  count: string;
+  color: string;
+}) {
+  return (
+    <div className="grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1 sm:grid-cols-[8rem_1fr]">
+      <span className="text-xs font-semibold text-slate-700 sm:text-sm">
+        {label}
+      </span>
+      <span className="text-right text-sm font-bold tabular-nums text-slate-800">
+        {value}％
+        <span className="ml-1 text-[10px] font-normal text-slate-500 sm:text-xs">
+          （{count}）
+        </span>
+      </span>
+      <span className="col-start-2 press-chart__track">
+        <span
+          className="block h-full"
+          style={{ width: `${value}%`, backgroundColor: color }}
+        />
+      </span>
+    </div>
   );
 }

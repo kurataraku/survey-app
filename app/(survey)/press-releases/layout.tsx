@@ -1,13 +1,6 @@
-import { IBM_Plex_Sans_JP, Noto_Serif_JP } from 'next/font/google';
+import { Noto_Sans_JP } from 'next/font/google';
 
-const pressSerif = Noto_Serif_JP({
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  variable: '--font-press-serif',
-  display: 'swap',
-});
-
-const pressSans = IBM_Plex_Sans_JP({
+const pressSans = Noto_Sans_JP({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-press-sans',
@@ -20,7 +13,7 @@ export default function PressReleasesLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`press-doc ${pressSerif.variable} ${pressSans.variable}`}>
+    <div className={`press-doc ${pressSans.variable}`}>
       {children}
     </div>
   );

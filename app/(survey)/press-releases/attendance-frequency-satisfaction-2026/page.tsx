@@ -126,8 +126,8 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
     <>
       <StructuredData data={structuredData} />
       <article className="min-h-screen bg-[var(--press-page)]">
-        <header className="border-b border-neutral-800 bg-white">
-          <div className="mx-auto max-w-[42rem] px-4 py-10 sm:px-6 sm:py-12">
+        <header className="border-b border-slate-300 bg-white">
+          <div className="mx-auto max-w-[46rem] px-4 py-10 sm:px-6 sm:py-12">
             <nav className="press-doc__meta mb-6" aria-label="パンくず">
               <Link href={appPath('/')} className="no-underline hover:underline">
                 ホーム
@@ -155,10 +155,10 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               {release.category}
             </p>
 
-            <h1 className="press-doc__serif mt-5 text-[1.75rem] font-bold leading-[1.45] text-neutral-950 sm:text-[2rem]">
+            <h1 className="press-doc__serif mt-5 text-[1.75rem] font-bold leading-[1.45] tracking-tight text-slate-950 sm:text-[2rem]">
               通信制高校に「満足度の谷」
             </h1>
-            <p className="press-doc__serif mt-4 text-lg font-semibold leading-8 text-neutral-800 sm:text-xl">
+            <p className="mt-4 text-lg font-semibold leading-8 text-slate-800 sm:text-xl">
               「月1〜数回通学」の高満足率は79.2％、ほぼオンライン・週5通学はともに94.3％
             </p>
             <p className="mt-6 border-t border-neutral-300 pt-5 text-[15px] leading-8 text-neutral-700">
@@ -167,8 +167,8 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
           </div>
         </header>
 
-        <div className="press-doc__body mx-auto max-w-[42rem] px-4 py-10 sm:px-6 sm:py-12">
-          <section className="border border-neutral-800 bg-white px-5 py-5 sm:px-6">
+        <div className="press-doc__body mx-auto max-w-[46rem] px-4 py-10 sm:px-6 sm:py-12">
+          <section className="border border-slate-300 border-t-4 border-t-[var(--press-navy)] bg-white px-5 py-5 sm:px-6">
             <h2 className="press-doc__serif text-base font-bold text-neutral-950">
               調査結果の要点
             </h2>
@@ -190,7 +190,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <h2 id="definitions-heading" className="press-doc__serif text-base font-bold text-neutral-950">
               本調査での満足度の分け方
             </h2>
-            <div className="mt-4 border border-neutral-800 bg-white px-5 py-5 text-[15px] leading-8 text-neutral-800 sm:px-6">
+            <div className="mt-4 border border-slate-300 bg-white px-5 py-5 text-[15px] leading-8 text-neutral-800 sm:px-6">
               <p>
                 総合満足度は5段階評価で尋ねています。本調査では、読みやすさと層比較のために、次の2群に分けます。
               </p>
@@ -278,7 +278,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <h2 id="hypotheses-heading" className="press-doc__h2">
               4. なぜ「月1〜数回」に満足度の谷が生まれるのか
             </h2>
-            <p className="border border-neutral-400 bg-white px-4 py-3 text-sm leading-7 text-neutral-700">
+            <p className="border-l-4 border-[var(--press-gold)] bg-amber-50 px-4 py-3 text-sm leading-7 text-neutral-700">
               以下は、定量評価と自由記述から考えられる仮説です。本調査だけで因果関係を断定するものではありません。
             </p>
 
@@ -293,7 +293,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               <figcaption className="mb-3 text-sm font-semibold text-neutral-900">
                 表4. 心身サポートが「高評価でない」（1〜3）人のうち、高満足層の割合
               </figcaption>
-              <div className="overflow-x-auto border-y border-neutral-800 bg-white">
+              <div className="overflow-x-auto border-y border-slate-400 bg-white">
                 <table className="press-doc__table">
                   <thead>
                     <tr>
@@ -395,7 +395,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <h2 id="representative-heading" className="press-doc__h2">
               7. 代表コメント
             </h2>
-            <div className="mt-6 border border-neutral-800 bg-white px-5 py-6 sm:px-6">
+            <div className="mt-6 border border-slate-300 border-t-4 border-t-[var(--press-navy)] bg-white px-5 py-6 sm:px-6">
               <p className="text-sm font-semibold text-neutral-950">
                 株式会社キャリアエッセンス
               </p>
@@ -424,7 +424,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <h2 id="method-heading" className="press-doc__h2">
               8. 調査概要
             </h2>
-            <div className="mt-6 overflow-x-auto border-y border-neutral-800 bg-white">
+            <div className="mt-6 overflow-x-auto border-y border-slate-400 bg-white">
               <table className="press-doc__table">
                 <tbody>
                   {METHOD_ROWS.map(([term, description]) => (
@@ -442,7 +442,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
               </table>
             </div>
 
-            <div className="mt-6 border border-neutral-400 bg-white px-4 py-4 text-sm leading-7 text-neutral-700">
+            <div className="mt-6 border-l-4 border-[var(--press-blue)] bg-[var(--press-blue-soft)] px-4 py-4 text-sm leading-7 text-neutral-700">
               <p className="font-semibold text-neutral-900">調査結果を読む際の注意</p>
               <p className="mt-2">
                 本調査は無作為抽出ではなく、全国の通信制高校在籍者・卒業者全体を代表するものではありません。通学頻度は希望や学校指定の頻度ではなく、回答者の実際の主な通学頻度です。学校、コース、キャンパス、回答者の状況などの違いを完全には調整していません。高満足層・低満足層は総合満足度に基づく本調査上の区分です。本調査は各通学頻度と満足度の関連を示すもので、因果関係を証明するものではありません。
@@ -466,7 +466,7 @@ export default function AttendanceFrequencySatisfactionReleasePage() {
             <h2 id="company-heading" className="press-doc__h2">
               10. 会社概要・お問い合わせ
             </h2>
-            <div className="mt-6 overflow-x-auto border-y border-neutral-800 bg-white">
+            <div className="mt-6 overflow-x-auto border-y border-slate-400 bg-white">
               <table className="press-doc__table">
                 <tbody>
                   <tr>

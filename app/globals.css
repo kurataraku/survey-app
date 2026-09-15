@@ -127,16 +127,23 @@ body {
 
 /* プレスリリース専用：調査資料・報道向けの紙面スタイル */
 .press-doc {
-  --press-ink: #1a1a1a;
-  --press-muted: #595959;
-  --press-line: #d4d4d4;
+  --press-ink: #17212b;
+  --press-muted: #536271;
+  --press-line: #cdd6de;
   --press-paper: #ffffff;
-  --press-page: #f3f3f3;
-  --press-emphasis: #111111;
+  --press-page: #f6f8fa;
+  --press-navy: #214f6f;
+  --press-blue: #397796;
+  --press-blue-soft: #e8f1f5;
+  --press-orange: #b55239;
+  --press-orange-soft: #f8e9e4;
+  --press-gold: #9a6a22;
+  --press-track: #edf1f4;
   color: var(--press-ink);
   background: var(--press-page);
   font-family: var(--font-press-sans), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-feature-settings: "palt";
+  font-kerning: normal;
 }
 
 .press-doc a {
@@ -150,9 +157,9 @@ body {
 }
 
 .press-doc__serif {
-  font-family: var(--font-press-serif), "Hiragino Mincho ProN", "Yu Mincho", serif;
+  font-family: var(--font-press-sans), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-feature-settings: "palt";
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .press-doc__table {
@@ -179,7 +186,7 @@ body {
 }
 
 .press-doc__table tbody tr[data-emphasis="true"] td {
-  background: #f0f0f0;
+  background: var(--press-orange-soft);
   font-weight: 600;
 }
 
@@ -196,24 +203,58 @@ body {
 }
 
 .press-doc__h2 {
-  font-family: var(--font-press-serif), "Hiragino Mincho ProN", "Yu Mincho", serif;
+  font-family: var(--font-press-sans), "Hiragino Sans", "Noto Sans JP", sans-serif;
   font-size: 1.375rem;
   font-weight: 700;
   line-height: 1.55;
   margin: 0;
   padding-bottom: 0.65rem;
-  border-bottom: 1px solid var(--press-ink);
+  border-bottom: 2px solid var(--press-navy);
 }
 
 .press-doc__body p {
   margin: 1.15rem 0 0;
-  line-height: 1.95;
+  line-height: 1.85;
 }
 
 .press-doc__quote {
   margin: 1.25rem 0 0;
   padding: 0.15rem 0 0.15rem 1rem;
-  border-left: 2px solid var(--press-ink);
+  border-left: 3px solid var(--press-blue);
   color: var(--press-ink);
   line-height: 1.85;
+}
+
+.press-chart {
+  border: 1px solid #b8c4ce;
+  border-top: 3px solid var(--press-navy);
+  background: var(--press-paper);
+  padding: 1rem;
+}
+
+.press-chart__title {
+  margin-bottom: 0.75rem;
+  color: var(--press-ink);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.press-chart__note {
+  margin-top: 0.75rem !important;
+  color: var(--press-muted);
+  font-size: 0.75rem;
+  line-height: 1.65 !important;
+}
+
+.press-chart__track {
+  height: 0.75rem;
+  overflow: hidden;
+  background: var(--press-track);
+}
+
+@media (min-width: 640px) {
+  .press-chart {
+    padding: 1.25rem;
+  }
 }

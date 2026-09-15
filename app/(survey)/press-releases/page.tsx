@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 export default function PressReleasesPage() {
   return (
     <div className="min-h-screen">
-      <header className="border-b border-neutral-800 bg-white">
-        <div className="mx-auto max-w-[42rem] px-4 py-10 sm:px-6 sm:py-12">
+      <header className="border-b border-slate-300 bg-white">
+        <div className="mx-auto max-w-[46rem] px-4 py-10 sm:px-6 sm:py-12">
           <p className="press-doc__meta">株式会社キャリアエッセンス</p>
           <h1 className="press-doc__serif mt-3 text-3xl font-bold leading-tight text-neutral-900">
             プレスリリース・調査発表
@@ -35,8 +35,8 @@ export default function PressReleasesPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[42rem] px-4 py-10 sm:px-6 sm:py-12">
-        <ul className="divide-y divide-neutral-300 border-y border-neutral-800">
+      <main className="mx-auto max-w-[46rem] px-4 py-10 sm:px-6 sm:py-12">
+        <ul className="divide-y divide-slate-300 border-y border-slate-400">
           {PRESS_RELEASES.map((release) => (
             <li key={release.slug} className="py-7">
               <p className="press-doc__meta">
