@@ -22,12 +22,24 @@ describe('nextRunStateAfterExecute', () => {
     ).toBe('analyzing');
   });
 
+  it('課題が尽きても補充可能ならanalyzingへ戻す', () => {
+    expect(
+      nextRunStateAfterExecute({
+        remainingPending: 0,
+        openIssues: 0,
+        remainingBudget: 4,
+        canReplenish: true,
+      })
+    ).toBe('analyzing');
+  });
+
   it('課題または予算が尽きていればcompletedにする', () => {
     expect(
       nextRunStateAfterExecute({
         remainingPending: 0,
         openIssues: 0,
         remainingBudget: 4,
+        canReplenish: false,
       })
     ).toBe('completed');
     expect(

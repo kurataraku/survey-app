@@ -6,7 +6,8 @@ import { payloadHash } from './hash';
 import { acquireRunLock, createOrLoadRun, dailyRunKey, releaseRunLock } from './lock';
 import { analyzeIssuesToProposals, countOpenIssues } from './analyzer';
 import { remainingDailyProposalBudget } from './limits';
-import { observeGscIssues } from './observer';
+import { observeGscIssues, replenishGscIssues } from './observer';
+import { isWithinSeoLoopReplenishWindow } from './schedule';
 import {
   notifySlackApproval,
   notifySlackLoopStatus,
@@ -188,20 +189,35 @@ async function selectRunnableRun(
 
 /**
  * Slack通知まで終えたあと、未分析課題と当日予算が残っていれば同じrunで分析へ戻す。
- * 承認待ちで止めず、1日のうちに提案を積み増すための折り返し。
- * 時間切れでも analyzing に戻す。completed にすると次の毎時tickが再開できない。
+ * 課題が尽きても 9〜18時（JST）で予算が残っていれば、未処理ページのGSC候補を補充する。
  */
 async function resumeAnalysisIfPossible(
   supabase: SupabaseClient,
   run: SeoLoopRun,
   config: ReturnType<typeof getSeoLoopConfig>,
   _deadlineAt: number
-): Promise<boolean> {
+): Promise<{ resumed: boolean; replenished: number; message?: string }> {
   void _deadlineAt;
-  const openIssues = await countOpenIssues(supabase, run.id);
-  if (openIssues === 0) return false;
   const budget = await remainingDailyProposalBudget(supabase, config);
-  if (budget <= 0) return false;
+  if (budget <= 0) return { resumed: false, replenished: 0 };
+
+  let openIssues = await countOpenIssues(supabase, run.id);
+  let replenished = 0;
+  let replenishMessage: string | undefined;
+  if (openIssues === 0) {
+    if (!isWithinSeoLoopReplenishWindow()) {
+      return { resumed: false, replenished: 0 };
+    }
+    const replenish = await replenishGscIssues({
+      supabase,
+      runId: run.id,
+      config,
+    });
+    replenished = replenish.issueCount;
+    replenishMessage = replenish.message;
+    if (replenished <= 0) return { resumed: false, replenished: 0, message: replenishMessage };
+    openIssues = replenished;
+  }
 
   await updateRun(supabase, run.id, {
     status: 'analyzing',
@@ -209,7 +225,7 @@ async function resumeAnalysisIfPossible(
     completed_at: null,
     next_action_at: new Date().toISOString(),
   });
-  return true;
+  return { resumed: openIssues > 0, replenished, message: replenishMessage };
 }
 
 async function handlePendingApproval(
@@ -315,11 +331,15 @@ async function handlePendingApproval(
     .eq('status', 'pending_approval');
   if (pendingError) throw pendingError;
   if ((pendingCount ?? 0) === 0) {
-    if (await resumeAnalysisIfPossible(supabase, run, config, deadlineAt)) {
+    const resumed = await resumeAnalysisIfPossible(supabase, run, config, deadlineAt);
+    if (resumed.resumed) {
       return {
         status: 'analyzed',
         runId: run.id,
-        message: `${blockedCount}件が品質ゲート不合格のため、残りの課題分析を続けます`,
+        message:
+          resumed.replenished > 0
+            ? `${blockedCount}件が品質ゲート不合格のため、GSC課題を${resumed.replenished}件補充して分析を続けます`
+            : `${blockedCount}件が品質ゲート不合格のため、残りの課題分析を続けます`,
       };
     }
     await updateRun(supabase, run.id, {
@@ -345,11 +365,15 @@ async function handlePendingApproval(
     };
   }
 
-  if (await resumeAnalysisIfPossible(supabase, run, config, deadlineAt)) {
+  const resumed = await resumeAnalysisIfPossible(supabase, run, config, deadlineAt);
+  if (resumed.resumed) {
     return {
       status: 'analyzed',
       runId: run.id,
-      message: 'Slack通知後、残りの課題分析を続けます',
+      message:
+        resumed.replenished > 0
+          ? `Slack通知後、GSC課題を${resumed.replenished}件補充して分析を続けます`
+          : 'Slack通知後、残りの課題分析を続けます',
     };
   }
 
@@ -363,15 +387,24 @@ async function handlePendingApproval(
 /**
  * execute後にrunを閉じるか、残り課題の分析へ戻すかを決める。
  * 承認1件で当日runがcompletedになり、毎時tickが止まるのを防ぐ。
+ * 課題が尽きても補充ウィンドウ内かつ予算があればanalyzingへ戻し、次tickでGSC補充する。
  */
 export function nextRunStateAfterExecute(params: {
   remainingPending: number;
   openIssues: number;
   remainingBudget: number;
+  canReplenish?: boolean;
 }): 'pending_approval' | 'analyzing' | 'completed' {
   if (params.remainingPending > 0) return 'pending_approval';
   // 時間切れでも completed にしない。analyzing のまま残せば次の毎時tickが再開できる。
   if (params.openIssues > 0 && params.remainingBudget > 0) return 'analyzing';
+  if (
+    params.openIssues === 0 &&
+    params.remainingBudget > 0 &&
+    params.canReplenish
+  ) {
+    return 'analyzing';
+  }
   return 'completed';
 }
 
@@ -398,6 +431,7 @@ async function finishAfterExecute(params: {
     remainingPending: remainingPending ?? 0,
     openIssues,
     remainingBudget,
+    canReplenish: isWithinSeoLoopReplenishWindow(),
   });
 
   if (nextState === 'pending_approval') {
@@ -423,13 +457,18 @@ async function finishAfterExecute(params: {
       params.config,
       params.deadlineAt
     );
-    if (resumed) {
+    if (resumed.resumed) {
       return {
         status: 'analyzed',
         runId: params.run.id,
-        message: params.processedApproved
-          ? '承認済みproposalの実行ゲート処理が完了し、残りの課題分析を続けます'
-          : '実行対象の承認済みproposalがないため、残りの課題分析を続けます',
+        message:
+          resumed.replenished > 0
+            ? params.processedApproved
+              ? `承認済みproposalの実行ゲート処理が完了し、GSC課題を${resumed.replenished}件補充して分析を続けます`
+              : `実行対象の承認済みproposalがないため、GSC課題を${resumed.replenished}件補充して分析を続けます`
+            : params.processedApproved
+              ? '承認済みproposalの実行ゲート処理が完了し、残りの課題分析を続けます'
+              : '実行対象の承認済みproposalがないため、残りの課題分析を続けます',
       };
     }
   }
@@ -569,8 +608,29 @@ async function processOneStep(
 ): Promise<SeoLoopStepResult> {
   const config = getSeoLoopConfig();
 
-  if (run.status === 'completed' || run.status === 'failed' || run.status === 'skipped') {
+  if (run.status === 'failed' || run.status === 'skipped') {
     return { status: 'skipped', runId: run.id, message: `runは既に${run.status}です` };
+  }
+
+  if (run.status === 'completed') {
+    const resumed = await resumeAnalysisIfPossible(supabase, run, config, deadlineAt);
+    if (!resumed.resumed) {
+      return {
+        status: 'skipped',
+        runId: run.id,
+        message: resumed.message
+          ? `runは既にcompletedです（${resumed.message}）`
+          : 'runは既にcompletedです',
+      };
+    }
+    return {
+      status: 'analyzed',
+      runId: run.id,
+      message:
+        resumed.replenished > 0
+          ? `completed runを再開し、GSC課題を${resumed.replenished}件補充しました`
+          : 'completed runを再開し、残りの課題分析を続けます',
+    };
   }
 
   if (run.status === 'observing') {
@@ -636,7 +696,9 @@ async function advanceRunUntilIdle(
   for (let step = 0; step < MAX_STEPS_PER_TICK; step += 1) {
     const run = await loadRun(supabase, initialRun.id);
 
-    if (isTerminalStatus(run.status)) {
+    // completed の初回だけは補充再開を試す。途中でcompletedになったら止める。
+    const allowCompletedReopen = step === 0 && run.status === 'completed';
+    if (isTerminalStatus(run.status) && !allowCompletedReopen) {
       if (messages.length === 0) {
         return { status: 'skipped', runId: run.id, message: `runは既に${run.status}です` };
       }
