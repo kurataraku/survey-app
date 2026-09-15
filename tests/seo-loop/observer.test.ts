@@ -111,6 +111,24 @@ describe('selectReplenishOpportunities', () => {
     expect(result.some((item) => item.query === '新しいクエリ')).toBe(true);
   });
 
+  it('対象URLがないクエリ単独課題は補充しない', () => {
+    const opportunities = extractGscOpportunities([
+      {
+        keys: ['通信制高校 口コミ'],
+        clicks: 1,
+        impressions: 2000,
+        ctr: 0.005,
+        position: 8,
+        previous: null,
+        delta: null,
+      },
+    ]);
+
+    expect(
+      selectReplenishOpportunities(opportunities, new Set(), new Set(), 5)
+    ).toEqual([]);
+  });
+
   it('既存issue_keyは再追加しない', () => {
     const url = 'https://example.invalid/schools/alpha';
     const opportunities = extractGscOpportunities([row(url, 800, '匿名クエリ')]);

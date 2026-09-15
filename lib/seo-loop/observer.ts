@@ -74,6 +74,7 @@ export function selectReplenishOpportunities(
   const ranked = opportunities
     .filter(
       (opportunity) =>
+        Boolean(opportunity.targetUrl) &&
         !existingIssueKeys.has(opportunity.issueKey) &&
         !coveredKeys.has(coverageKey(opportunity))
     )
