@@ -280,6 +280,28 @@ const GENERIC_FILLER_WORDS = [
   '魅力',
   '体制',
   '学び',
+  '掲載',
+  '公開',
+  '一挙',
+];
+
+/**
+ * 既出の固有名詞を並べ直しただけに見せるためのラベル語。
+ * 「地域別」など、軸名だけ足して中身が増えない変更を除外する。
+ */
+const FRAMING_LABEL_WORDS = [
+  '地域別',
+  '種類別',
+  '目的別',
+  '条件別',
+  '項目別',
+  'タイプ別',
+  '分野別',
+  '年代別',
+  '学年別',
+  'コース別',
+  '方式別',
+  '形式別',
 ];
 
 const FUNCTION_CHARS = /[はがをにでとのもやへかられますしるでだあっ]/gu;
@@ -308,27 +330,103 @@ function addedFragment(currentValue: string, proposedValue: string): string {
   return proposed.slice(prefix, proposed.length - suffix);
 }
 
-/** 一般語・助詞・記号を除いて残る文字数。語尾追加だけの変更は0に近づく */
-function substantiveLength(fragment: string): number {
+/**
+ * proposedから、currentに既にある最長一致部分を除いた残り。
+ * 語順入れ替え・括弧位置の移動ではほぼ空になる（単純チャンク分割より再配置に強い）。
+ */
+export function novelRawText(currentValue: string, proposedValue: string): string {
+  const current = currentValue.trim();
+  const proposed = proposedValue.trim();
+  if (!proposed) return '';
+  if (!current) return proposed;
+
+  let novel = '';
+  let index = 0;
+  while (index < proposed.length) {
+    let matchedLength = 0;
+    const maxLength = proposed.length - index;
+    for (let length = maxLength; length >= 2; length -= 1) {
+      if (current.includes(proposed.slice(index, index + length))) {
+        matchedLength = length;
+        break;
+      }
+    }
+    if (matchedLength >= 2) {
+      index += matchedLength;
+      continue;
+    }
+    novel += proposed[index]!;
+    index += 1;
+  }
+  return novel;
+}
+
+/** currentに語幹がある「〜別」ラベルを除去する */
+function stripExistingFramingLabels(text: string, currentValue: string): string {
+  let cleaned = FRAMING_LABEL_WORDS.reduce(
+    (value, label) => value.split(label).join(''),
+    text
+  );
+  cleaned = cleaned.replace(/([一-龥ぁ-んァ-ヶーA-Za-z0-9]{1,8})別/gu, (full, stem: string) => {
+    if (currentValue.includes(full) || currentValue.includes(stem)) return '';
+    return full;
+  });
+  return cleaned;
+}
+
+/** 一般語・助詞・記号・既出ラベルを除いて残る文字数 */
+function substantiveLength(fragment: string, currentValue = ''): number {
+  const withoutFraming = stripExistingFramingLabels(fragment, currentValue);
   const withoutFillers = GENERIC_FILLER_WORDS.reduce(
     (text, word) => text.split(word).join(''),
-    fragment
+    withoutFraming
   );
   return withoutFillers
     .replace(NON_WORD_CHARS, '')
     .replace(FUNCTION_CHARS, '').length;
 }
 
-/** GSC Factに含まれる検索クエリ語 */
+/**
+ * 短文変更の実質的な新規情報量。
+ * 末尾追加はLCS断片、語順入れ替えは既出除去の方が鋭いので小さい方を採用する。
+ */
+export function novelSubstantiveLength(
+  currentValue: string,
+  proposedValue: string
+): number {
+  const byFragment = substantiveLength(
+    addedFragment(currentValue, proposedValue),
+    currentValue
+  );
+  const byNovelRaw = substantiveLength(
+    novelRawText(currentValue, proposedValue),
+    currentValue
+  );
+  return Math.min(byFragment, byNovelRaw);
+}
+
+/** GSC Factに含まれる検索クエリ語（単一Queryとページ上位クエリ内訳） */
 function queryTerms(proposal: ProposalPayloadV2): string[] {
-  return proposal.facts
-    .filter((fact) => fact.source === 'gsc')
-    .flatMap((fact) => {
-      const matched = fact.statement.match(/^Query:\s*(.+)$/u);
-      return matched ? matched[1]!.split(/[\s\u3000]+/u) : [];
-    })
-    .map((term) => term.trim())
-    .filter((term) => term.length >= 2);
+  const terms: string[] = [];
+  for (const fact of proposal.facts) {
+    if (fact.source !== 'gsc') continue;
+    const matched = fact.statement.match(/^Query:\s*(.+)$/u);
+    if (matched) {
+      terms.push(...matched[1]!.split(/[\s\u3000]+/u));
+    }
+    if (/Top queries for this page/u.test(fact.statement)) {
+      for (const row of fact.statement.matchAll(/"query"\s*:\s*"([^"]+)"/gu)) {
+        terms.push(...row[1]!.split(/[\s\u3000]+/u));
+      }
+    }
+  }
+  return [
+    ...new Set(
+      terms
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2)
+    ),
+  ];
 }
 
 function structuredTextFindings(
@@ -394,15 +492,22 @@ function shortTextFindings(
 
   const currentLength = currentValue.trim().length;
   const proposedLength = proposedValue.trim().length;
+  // SERP幅向けの大幅短縮は短文化自体を罰しない（既存テスト・運用方針）
   if (proposedLength < currentLength * SHORT_TEXT_SHORTENING_RATIO) {
     return findings;
   }
 
-  const added = addedFragment(currentValue, proposedValue);
-  if (substantiveLength(added) < SHORT_TEXT_MIN_ADDED_LENGTH) {
+  const novelty = novelSubstantiveLength(currentValue, proposedValue);
+  if (novelty < SHORT_TEXT_MIN_ADDED_LENGTH) {
+    const preview =
+      stripExistingFramingLabels(
+        novelRawText(currentValue, proposedValue) ||
+          addedFragment(currentValue, proposedValue),
+        currentValue
+      ).trim() || 'なし';
     findings.push({
       flag: 'paraphrase_only',
-      message: `一般語の追加・語尾調整だけで情報が増えていません（追加部分: ${added || 'なし'}）`,
+      message: `既出語の再配置・ラベル付け替えだけで情報が増えていません（新規部分: ${preview}）`,
     });
   }
   return findings;

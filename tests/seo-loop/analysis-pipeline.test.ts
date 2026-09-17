@@ -279,7 +279,7 @@ describe('Strategistへ渡す生成ポリシー', () => {
     ).toBe(true);
     expect(
       STRATEGIST_CONTENT_POLICY.required.some((rule) =>
-        rule.includes('クエリ語がすでにcurrentValueに含まれていても')
+        rule.includes('既出の地名・固有名詞の並べ替え')
       )
     ).toBe(true);
     expect(STRATEGIST_NULL_CONDITIONS).toContain(

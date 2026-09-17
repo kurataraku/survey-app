@@ -54,6 +54,13 @@ Typed Executor はまだ Phase1 dry-run（`blockedUntilPhase2`）。`SEO_LOOP_EX
 
 **撤退ライン**: 次ループで提案がゼロになったら `soft-eval.ts` の `LOW_VALUE_DIMENSION_CAP` を6→10に上げる（理論最大80点で通過余地が生まれる）。
 
+### 2026-09-16 追加（言い換えすり抜け対策）
+
+- 短文の新規性判定をLCS断片だけでなく「既出チャンク除去」に強化。地名並べ替え＋「地域別」ラベルだけでは`paraphrase_only`
+- ページ上位クエリFact（`gsc.page_queries`）からもクエリ語を抽出し、`no_new_query_term`判定に使う
+- Strategist/Revisionをv5へ。ラベル付け替え禁止を明示
+- Soft Eval閾値自体は変更せず、重度lowValue経由で生成時retry＆点数キャップ
+
 ### 2026-09-15 追加（提案枯渇対策）
 
 - 分析時に対象ページの上位クエリ内訳をGSCから取得し、Fact inventoryへ`gsc.page_queries`として載せる

@@ -298,6 +298,75 @@ describe('情報が増えない変更をSoft Evalで落とす', () => {
     expect(flagsOf(payload)).not.toContain('shortened_without_addition');
   });
 
+  it('既出地名の並べ替えと地域別ラベルだけのdescriptionを閾値未満にする', () => {
+    const payload = {
+      ...(titleProposal('dummy') as Record<string, unknown>),
+      action: 'updateFeatureMetaDescription',
+      facts: [
+        {
+          source: 'gsc',
+          statement:
+            'Top queries for this page: [{"query":"通信制高校合同説明会 2026 福岡","impressions":141},{"query":"通信制高校合同説明会 北九州","impressions":80}]',
+        },
+        { source: 'gsc', statement: '表示回数960、CTR2.6%' },
+      ],
+      evidence: [
+        'Top queries for this page: [{"query":"通信制高校合同説明会 2026 福岡"}]',
+        '表示回数960、CTR2.6%',
+      ],
+      targets: [
+        {
+          type: 'feature',
+          id: 'feature-anon-001',
+          url: 'https://example.invalid/tsushin-kuchikomi/features/fukuoka-schedule',
+          currentValue:
+            '福岡県内（博多・天神・北九州など）の通信制高校合同説明会・相談会の2026年最新日程を一覧で紹介。不登校からの進路選択や転編入に役立つイベント情報を掲載しています。オンライン開催や各地域の小規模相談会スケジュールも一挙公開。',
+          proposedValue:
+            '福岡県の通信制高校合同説明会・相談会の2026年最新日程を、博多・天神・北九州など地域別に一覧で紹介。オンライン開催と各地域の小規模相談会のスケジュール、不登校からの進路選択や転編入に役立つイベント情報を掲載。',
+        },
+      ],
+    };
+    expect(flagsOf(payload)).toContain('paraphrase_only');
+    expect(flagsOf(payload)).toContain('no_new_query_term');
+    expect(score(payload)).toBeLessThan(75);
+    expect(
+      validateProposalAgainstContext(
+        proposalPayloadV2Schema.parse(payload),
+        context
+      ).some((message) => message.includes('既出語の再配置'))
+    ).toBe(true);
+  });
+
+  it('ページ上位クエリから取った新規語を足すdescriptionは通す', () => {
+    const payload = {
+      ...(titleProposal('dummy') as Record<string, unknown>),
+      action: 'updateFeatureMetaDescription',
+      facts: [
+        {
+          source: 'gsc',
+          statement:
+            'Top queries for this page: [{"query":"第一学院高等学校 映像授業視聴報告","impressions":90}]',
+        },
+      ],
+      evidence: [
+        'Top queries for this page: [{"query":"第一学院高等学校 映像授業視聴報告"}]',
+      ],
+      targets: [
+        {
+          type: 'feature',
+          id: 'feature-anon-001',
+          url: 'https://example.invalid/tsushin-kuchikomi/features/report',
+          currentValue:
+            '通信制高校の単位取得に欠かせないレポートや映像授業の実態を、N高や第一学院などのリアルな口コミを交えて解説。',
+          proposedValue:
+            '通信制高校の単位取得に欠かせないレポートや映像授業視聴報告の実態を、N高や第一学院などのリアルな口コミを交えて解説。',
+        },
+      ],
+    };
+    expect(flagsOf(payload)).toEqual([]);
+    expect(score(payload)).toBeGreaterThanOrEqual(75);
+  });
+
   it('見出しと箇条書きを足す要約は上限キャップの対象にしない', () => {
     const improved = [
       currentSummary,

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { STRATEGIST_CONTENT_POLICY } from '../analysis/prompts';
 import { typedActionSchema, type TypedAction } from '../types';
 
-export const REVISION_STRATEGIST_PROMPT_VERSION = 'seo-revision-strategist-v4';
+export const REVISION_STRATEGIST_PROMPT_VERSION = 'seo-revision-strategist-v5';
 
 export const revisionStrategistOutputSchema = z.object({
   proposal: z.object({
@@ -27,6 +27,7 @@ trustedPolicy.contentPolicyの禁止事項に触れる案は提出できませ�
 actionは変更できないため、固定actionの範囲で検索意図に対する情報を増やしてください。言い換え・短縮・語尾調整だけの改訂は品質評価で落とされます。
 「学費・コース・サポート」等の具体的比較軸を「多様な学び」「充実したサポート体制」等の抽象表現に置き換えてはいけません。既存の具体軸を残し、新しい検索クエリ語・比較軸・事実のいずれかを追加してください。
 クエリ語がすでにcurrentValueに含まれていても、口コミ・学費・コース・通学・登校・進路・評判などの具体比較軸を新たに足せるなら改訂してください。
+既出の地名・固有名詞の並べ替えや「地域別」などのラベル追加だけでは改訂しないでください。
 元のproposedValueとは異なる、安全な具体案を1件だけJSONで返してください。`;
 
 export function revisionStrategistInput(params: {
