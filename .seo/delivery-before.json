@@ -1,0 +1,118 @@
+{
+  "measuredAt": "2026-09-17T15:52:33.847Z",
+  "baseUrl": "https://careeressence.jp/tsushin-kuchikomi",
+  "averageHtmlKb": 1810,
+  "averageTtfbMs": 2996,
+  "overBudgetCount": 9,
+  "notCacheableCount": 9,
+  "results": [
+    {
+      "prefecture": "東京都",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/tokyo",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 2434848,
+      "ttfbMs": 3318,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "神奈川県",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/kanagawa",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1910956,
+      "ttfbMs": 4748,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "愛知県",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/aichi",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 2071801,
+      "ttfbMs": 2775,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "大阪府",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/osaka",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1944828,
+      "ttfbMs": 2686,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "埼玉県",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/saitama",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1766673,
+      "ttfbMs": 2321,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "千葉県",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/chiba",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1686012,
+      "ttfbMs": 2829,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "兵庫県",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/hyogo",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1564234,
+      "ttfbMs": 2231,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "福岡県",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/fukuoka",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1831120,
+      "ttfbMs": 2939,
+      "withinBudget": false,
+      "cacheable": false
+    },
+    {
+      "prefecture": "北海道",
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/hokkaido",
+      "status": 200,
+      "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+      "vercelCache": "MISS",
+      "contentEncoding": "br",
+      "htmlBytes": 1470272,
+      "ttfbMs": 3113,
+      "withinBudget": false,
+      "cacheable": false
+    }
+  ]
+}

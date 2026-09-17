@@ -1,0 +1,90 @@
+{
+  "inspectedAt": "2026-09-17T15:50:46.130Z",
+  "siteUrl": "https://careeressence.jp/",
+  "baseUrl": "https://careeressence.jp/tsushin-kuchikomi",
+  "total": 4,
+  "passCount": 1,
+  "canonicalMismatchCount": 1,
+  "results": [
+    {
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/tokyo",
+      "ok": true,
+      "indexStatus": {
+        "verdict": "NEUTRAL",
+        "coverageState": "重複しています。Google により、ユーザーがマークしたページとは異なるページが正規ページとして選択されました",
+        "robotsTxtState": "ALLOWED",
+        "indexingState": "INDEXING_ALLOWED",
+        "lastCrawlTime": "2026-05-25T14:44:29Z",
+        "pageFetchState": "SUCCESSFUL",
+        "googleCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%9D%B1%E4%BA%AC%E9%83%BD",
+        "userCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/tokyo",
+        "crawledAs": "MOBILE"
+      },
+      "mobileUsabilityVerdict": "VERDICT_UNSPECIFIED",
+      "prefecture": "東京都",
+      "kind": "slug"
+    },
+    {
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%9D%B1%E4%BA%AC%E9%83%BD",
+      "ok": true,
+      "indexStatus": {
+        "verdict": "NEUTRAL",
+        "coverageState": "クロール済み - インデックス未登録",
+        "robotsTxtState": "ALLOWED",
+        "indexingState": "INDEXING_ALLOWED",
+        "lastCrawlTime": "2026-05-22T15:43:16Z",
+        "pageFetchState": "SUCCESSFUL",
+        "googleCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%9D%B1%E4%BA%AC%E9%83%BD",
+        "userCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%9D%B1%E4%BA%AC%E9%83%BD",
+        "crawledAs": "MOBILE"
+      },
+      "mobileUsabilityVerdict": "VERDICT_UNSPECIFIED",
+      "prefecture": "東京都",
+      "kind": "legacy"
+    },
+    {
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/aichi",
+      "ok": true,
+      "indexStatus": {
+        "verdict": "PASS",
+        "coverageState": "送信して登録されました",
+        "robotsTxtState": "ALLOWED",
+        "indexingState": "INDEXING_ALLOWED",
+        "lastCrawlTime": "2026-09-14T05:07:10Z",
+        "pageFetchState": "SUCCESSFUL",
+        "googleCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/aichi",
+        "userCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/aichi",
+        "sitemap": [
+          "https://careeressence.jp/sitemap.xml",
+          "https://careeressence.jp/tsushin-kuchikomi/sitemap.xml"
+        ],
+        "referringUrls": [
+          "https://careeressence.jp/tsushin-kuchikomi/features/aichi-tsushin-setsumeikai-2026-schedule"
+        ],
+        "crawledAs": "MOBILE"
+      },
+      "mobileUsabilityVerdict": "VERDICT_UNSPECIFIED",
+      "richResultsVerdict": "PASS",
+      "prefecture": "愛知県",
+      "kind": "slug"
+    },
+    {
+      "url": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%84%9B%E7%9F%A5%E7%9C%8C",
+      "ok": true,
+      "indexStatus": {
+        "verdict": "NEUTRAL",
+        "coverageState": "クロール済み - インデックス未登録",
+        "robotsTxtState": "ALLOWED",
+        "indexingState": "INDEXING_ALLOWED",
+        "lastCrawlTime": "2026-05-08T20:10:13Z",
+        "pageFetchState": "SUCCESSFUL",
+        "googleCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%84%9B%E7%9F%A5%E7%9C%8C",
+        "userCanonical": "https://careeressence.jp/tsushin-kuchikomi/schools/prefecture/%E6%84%9B%E7%9F%A5%E7%9C%8C",
+        "crawledAs": "MOBILE"
+      },
+      "mobileUsabilityVerdict": "VERDICT_UNSPECIFIED",
+      "prefecture": "愛知県",
+      "kind": "legacy"
+    }
+  ]
+}

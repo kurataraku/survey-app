@@ -15,6 +15,22 @@ export type PrefectureFaqStats = {
   averageOverallSatisfaction?: number | null;
 };
 
+/** 都道府県ごとに同じ文章が並ばないよう、確認できた実数だけを文末に足す */
+function buildStatsSentence(prefecture: string, stats?: PrefectureFaqStats): string {
+  if (!stats?.totalSchools) return '';
+  const parts = [`このページでは${prefecture}で検討できる${stats.totalSchools}校を掲載しています`];
+  if (stats.totalReviewCount) {
+    parts.push(`公開口コミは${stats.totalReviewCount}件`);
+  }
+  if (stats.schoolsWithReviewsCount) {
+    parts.push(`うち口コミがある学校は${stats.schoolsWithReviewsCount}校`);
+  }
+  if (stats.averageOverallSatisfaction != null) {
+    parts.push(`平均総合満足度は${stats.averageOverallSatisfaction.toFixed(1)}（5点満点）`);
+  }
+  return `${parts.join('、')}です。`;
+}
+
 export function buildPrefectureFaqItems(
   prefecture: string,
   stats?: PrefectureFaqStats
@@ -22,7 +38,11 @@ export function buildPrefectureFaqItems(
   return [
     {
       question: `${prefecture}で通信制高校を選ぶとき、まず何を比較すればいいですか？`,
-      answer: `${prefecture}の通信制高校は、キャンパスの場所、通学頻度、オンライン学習の有無、先生・職員の対応、学費、卒業までのサポート体制を比べるのがおすすめです。このページでは、口コミの良かった点・改善してほしい点と、項目別の満足度をあわせて確認できます。`,
+      answer: `${prefecture}の通信制高校は、キャンパスの場所、通学頻度、オンライン学習の有無、先生・職員の対応、学費、卒業までのサポート体制を比べるのがおすすめです。${buildStatsSentence(prefecture, stats)}口コミの良かった点・改善してほしい点と、項目別の満足度をあわせて確認できます。`,
+    },
+    {
+      question: `${prefecture}に本校がない学校も選べますか？`,
+      answer: `選べる場合があります。本校が他県にあっても、${prefecture}内にキャンパスがあれば通学して学べる学校があり、オンライン中心のコースなら居住地から学べる学校もあります。ただし在籍できる地域（募集区域）は学校ごとに決まっているため、比較表の「${prefecture}内の拠点」を確認したうえで、最終的な出願資格は必ず各学校の募集要項で確認してください。`,
     },
     {
       question: `${prefecture}の通信制高校は、毎日通う必要がありますか？`,
@@ -37,7 +57,7 @@ export function buildPrefectureFaqItems(
     {
       question: `${prefecture}で学費が気になる場合、どこを見ればいいですか？`,
       answer:
-        '学費は授業料だけでなく、通学コース費、サポート費、教材費、スクーリング費、行事費などを含めて確認する必要があります。このページでは学費満足度の高い学校や、口コミ内の「学費の納得感」に関する声を参考にできます。最終的な金額は必ず学校公式サイトや募集要項で確認してください。',
+        '学費は授業料だけでなく、通学コース費、サポート費、教材費、スクーリング費、行事費などを含めて確認する必要があります。コースや通学頻度で金額が変わるため、このページでは公開情報で確認できた学校のみ「目安あり」と表示し、確認できていない学校は「要確認」としています。「要確認」は学費が安いことを意味しません。最終的な金額は必ず学校公式サイトや募集要項で確認してください。',
     },
     {
       question: '口コミを見るときは、どんな点に注目すればいいですか？',
@@ -54,16 +74,12 @@ export function buildPrefectureFaqItems(
 
 export function buildPrefectureLandingJsonLd(params: {
   prefecture: string;
-  page: number;
   schools: SchoolRow[];
   total: number;
   stats?: PrefectureFaqStats;
 }): Record<string, unknown> {
   const appBase = getAppBaseUrl().replace(/\/$/, '');
-  const pageUrl =
-    params.page > 1
-      ? `${appBase}${getPrefecturePath(params.prefecture)}?page=${params.page}`
-      : `${appBase}${getPrefecturePath(params.prefecture)}`;
+  const pageUrl = `${appBase}${getPrefecturePath(params.prefecture)}`;
 
   const itemListElements = params.schools
     .filter((s) => s.slug)
@@ -104,7 +120,7 @@ export function buildPrefectureLandingJsonLd(params: {
       },
       {
         '@type': 'ItemList',
-        name: `${params.prefecture}の通信制高校一覧（口コミ比較・${params.page}ページ目）`,
+        name: `${params.prefecture}の通信制高校一覧（口コミ比較）`,
         description: getPrefectureLandingItemListDescription(params.prefecture),
         numberOfItems: itemListElements.length,
         itemListElement: itemListElements,

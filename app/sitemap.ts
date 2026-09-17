@@ -19,10 +19,36 @@ type SitemapSchool = {
   slug: string | null;
   intro: string | null;
   updated_at: string | null;
+  prefecture: string | null;
+  prefectures: string[] | null;
+  campus_locations: { prefecture?: string | null }[] | null;
 };
 
 function encodePathSegment(segment: string): string {
   return encodeURIComponent(segment);
+}
+
+/**
+ * 一時的な取得失敗でサイトマップからURL群が丸ごと消えるのを防ぐ。
+ *
+ * ビルド中は大量のDBアクセスが並行するため、1回の失敗で break すると
+ * 学校URL全件が欠落したサイトマップを配信してしまう。
+ */
+async function fetchPageWithRetry<T>(
+  label: string,
+  // PostgrestFilterBuilder は Promise ではなく thenable なので PromiseLike で受ける
+  fetchPage: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  attempts = 3
+): Promise<{ data: T[] | null; failed: boolean }> {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const { data, error } = await fetchPage();
+    if (!error) return { data, failed: false };
+    console.error(`[sitemap] ${label} 取得失敗 (${attempt}/${attempts}):`, error.message);
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
+  }
+  return { data: null, failed: true };
 }
 
 /**
@@ -58,17 +84,59 @@ async function fetchPublishedSchoolIds(
   return out;
 }
 
+/**
+ * 都道府県LPの lastModified を、その都道府県に関連する学校の更新日と口コミ投稿日の最大値で決める。
+ *
+ * 全URLを生成時刻にすると、内容が変わっていないページも毎回更新扱いになり lastmod が信用されなくなる。
+ */
+function buildPrefectureEntries(
+  baseUrl: string,
+  lastModifiedByPrefecture: Map<string, Date>
+): MetadataRoute.Sitemap {
+  return prefectures.map((pref) => ({
+    url: `${baseUrl}${getPrefecturePath(pref)}`,
+    lastModified: lastModifiedByPrefecture.get(pref) ?? new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.85,
+  }));
+}
+
+function collectPrefectureLastModified(
+  schools: SitemapSchool[],
+  latestReviewBySchool: Map<string, string>
+): Map<string, Date> {
+  const result = new Map<string, Date>();
+
+  for (const school of schools) {
+    const related = new Set<string>();
+    if (school.prefecture) related.add(school.prefecture);
+    for (const pref of school.prefectures ?? []) related.add(pref);
+    for (const location of school.campus_locations ?? []) {
+      if (location?.prefecture) related.add(location.prefecture);
+    }
+    if (related.size === 0) continue;
+
+    const candidates = [school.updated_at, latestReviewBySchool.get(school.id)]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => new Date(value))
+      .filter((date) => !Number.isNaN(date.getTime()));
+    if (candidates.length === 0) continue;
+
+    const schoolLatest = new Date(Math.max(...candidates.map((date) => date.getTime())));
+    for (const pref of related) {
+      const current = result.get(pref);
+      if (!current || schoolLatest > current) result.set(pref, schoolLatest);
+    }
+  }
+
+  return result;
+}
+
 function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitemap {
   return [
     { url: apexUrl, lastModified: new Date(), changeFrequency: 'weekly', priority: 1.0 },
     { url: baseUrl, lastModified: new Date(), changeFrequency: 'daily', priority: 0.95 },
     { url: `${baseUrl}/schools`, lastModified: new Date(), changeFrequency: 'daily', priority: 0.9 },
-    ...prefectures.map((pref) => ({
-      url: `${baseUrl}${getPrefecturePath(pref)}`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
-      priority: 0.85,
-    })),
     {
       url: `${baseUrl}/reviews`,
       lastModified: new Date(),
@@ -140,6 +208,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceKey) {
+    out.push(...buildPrefectureEntries(baseUrl, new Map()));
     return out;
   }
 
@@ -149,36 +218,56 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const allSchools: SitemapSchool[] = [];
   let schoolFrom = 0;
   for (;;) {
-    const { data: schools, error } = await supabase
-      .from('schools')
-      .select('id, name, slug, intro, updated_at')
-      .eq('status', 'active')
-      .eq('is_public', true)
-      .not('slug', 'is', null)
-      .order('slug')
-      .range(schoolFrom, schoolFrom + PAGE_SIZE - 1);
+    const { data: schools, failed } = await fetchPageWithRetry<SitemapSchool>('schools', () =>
+      supabase
+        .from('schools')
+        .select('id, name, slug, intro, updated_at, prefecture, prefectures, campus_locations')
+        .eq('status', 'active')
+        .eq('is_public', true)
+        .not('slug', 'is', null)
+        .order('slug')
+        .range(schoolFrom, schoolFrom + PAGE_SIZE - 1)
+    );
 
-    if (error || !schools?.length) break;
+    if (failed || !schools?.length) break;
     allSchools.push(...schools);
     if (schools.length < PAGE_SIZE) break;
     schoolFrom += PAGE_SIZE;
   }
 
   const allReviewLinks: ReviewSchoolLink[] = [];
+  const latestReviewBySchool = new Map<string, string>();
   let reviewLinkFrom = 0;
   for (;;) {
-    const { data: reviews, error } = await supabase
-      .from('survey_responses')
-      .select('school_id, school_name, schools(id, status)')
-      .eq('is_public', true)
-      .order('created_at', { ascending: false })
-      .range(reviewLinkFrom, reviewLinkFrom + PAGE_SIZE - 1);
+    const { data: reviews, failed } = await fetchPageWithRetry<
+      ReviewSchoolLink & { created_at: string | null }
+    >('survey_responses', () =>
+      supabase
+        .from('survey_responses')
+        .select('school_id, school_name, created_at, schools(id, status)')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .range(reviewLinkFrom, reviewLinkFrom + PAGE_SIZE - 1)
+    );
 
-    if (error || !reviews?.length) break;
+    if (failed || !reviews?.length) break;
     allReviewLinks.push(...reviews);
+    for (const review of reviews) {
+      // created_at 降順なので、学校ごとの初出が最新
+      if (review.school_id && review.created_at && !latestReviewBySchool.has(review.school_id)) {
+        latestReviewBySchool.set(review.school_id, review.created_at);
+      }
+    }
     if (reviews.length < PAGE_SIZE) break;
     reviewLinkFrom += PAGE_SIZE;
   }
+
+  out.push(
+    ...buildPrefectureEntries(
+      baseUrl,
+      collectPrefectureLastModified(allSchools, latestReviewBySchool)
+    )
+  );
 
   const reviewCountsBySchool = countReviewsBySchool(allSchools, allReviewLinks);
 
@@ -224,14 +313,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 記事: 全件取得（ページネーション）
   let articleFrom = 0;
   for (;;) {
-    const { data: articles, error } = await supabase
-      .from('articles')
-      .select('slug, updated_at')
-      .eq('is_public', true)
-      .order('slug')
-      .range(articleFrom, articleFrom + PAGE_SIZE - 1);
+    const { data: articles, failed } = await fetchPageWithRetry<{
+      slug: string;
+      updated_at: string | null;
+    }>('articles', () =>
+      supabase
+        .from('articles')
+        .select('slug, updated_at')
+        .eq('is_public', true)
+        .order('slug')
+        .range(articleFrom, articleFrom + PAGE_SIZE - 1)
+    );
 
-    if (error || !articles?.length) break;
+    if (failed || !articles?.length) break;
 
     for (const article of articles) {
       const slug = encodePathSegment(article.slug);

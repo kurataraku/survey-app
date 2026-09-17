@@ -6,6 +6,7 @@ import type { PublicTuitionEstimate } from '@/lib/types/tuition';
 import { buildTuitionCardSummary, TUITION_FIRST_YEAR_LABEL } from '@/lib/tuition/format';
 import type { PublicCourseListing } from '@/lib/types/courses';
 import { buildCourseCardSummary } from '@/lib/courses/format';
+import { sanitizeAiText } from '@/lib/content/aiTextGuard';
 
 interface SchoolCardServerProps {
   id: string;
@@ -268,6 +269,8 @@ export default function SchoolCardServer({
   })();
   const tuitionSummary = tuitionEstimate ? buildTuitionCardSummary(tuitionEstimate) : null;
   const courseSummary = buildCourseCardSummary(courseListing);
+  /** 生成失敗文・引用番号が残った紹介文は表示しない */
+  const safeIntro = sanitizeAiText(intro);
   const nearestStationSummary = buildNearestStationSummary(campusLocations, matchedPrefecture);
   /** ヘッダーに総合があるため、ここでは詳細項目のみ（重複を避ける） */
   const categoryRatings = [
@@ -370,7 +373,7 @@ export default function SchoolCardServer({
         )}
 
         {/* 学校紹介 */}
-        {intro && (
+        {safeIntro && (
           <div>
             <SectionBadge
               color="bg-slate-100 text-slate-600"
@@ -380,7 +383,7 @@ export default function SchoolCardServer({
             <p
               className="text-sm text-gray-700 leading-relaxed line-clamp-6"
             >
-              {intro}
+              {safeIntro}
             </p>
           </div>
         )}

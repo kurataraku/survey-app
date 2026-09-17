@@ -61,7 +61,7 @@ export interface SearchSchoolsResult {
   limit: number;
 }
 
-type SchoolEntry = {
+export type SchoolEntry = {
   id: string;
   name: string;
   prefecture: string;
@@ -79,12 +79,12 @@ function parseRating(val: unknown): number | null {
   return !isNaN(n) && n >= 1 && n <= 5 && n !== 6 ? n : null;
 }
 
-type SupabaseForSchools = ReturnType<typeof createSupabaseClientWithLargeHeaders>;
+export type SupabaseForSchools = ReturnType<typeof createSupabaseClientWithLargeHeaders>;
 
 /**
  * 学校マスタ行に対し、公開口コミ・項目別評価・傾向を付与して SearchSchool 配列を返す（searchSchools と共有）
  */
-async function fetchSearchSchoolsWithStats(
+export async function fetchSearchSchoolsWithStats(
   supabase: SupabaseForSchools,
   schoolsList: SchoolEntry[]
 ): Promise<SearchSchool[]> {

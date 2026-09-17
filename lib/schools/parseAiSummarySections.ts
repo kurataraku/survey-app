@@ -2,6 +2,7 @@
  * 学校AI要約（summary_text）からセクションを抽出する。
  * generateMetadata / ページSSR とクライアント表示で共通利用。
  */
+import { hasGenerationFailureText, stripCitationMarkers } from '@/lib/content/aiTextGuard';
 
 export type ParsedAiSummarySections = {
   /** 「## 概要」ブロック本文、またはレガシー時は最初の ## 手前まで */
@@ -31,6 +32,11 @@ export function stripTuitionCommuteMarkdownSection(markdown: string): string {
     .trimEnd();
 }
 
+/** 「項目1:」「項目2：」など、生成プロンプト由来の番号ラベルを除去する */
+export function stripAiBulletLabel(text: string): string {
+  return text.replace(/^項目[0-9０-９]+[:：.．、]?\s*/, '').trim();
+}
+
 function extractAfterHeading(text: string, headingLineRe: RegExp): string {
   const match = text.match(headingLineRe);
   if (!match || match.index === undefined) return '';
@@ -46,7 +52,7 @@ function bulletsFromMarkdown(block: string): string[] {
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => /^[-・*]\s/.test(l))
-    .map((l) => l.replace(/^[-・*]\s/, '').trim())
+    .map((l) => stripAiBulletLabel(l.replace(/^[-・*]\s/, '')))
     .filter(Boolean);
 }
 
@@ -57,8 +63,10 @@ export function parseAiSummarySections(
   raw: string | null | undefined
 ): ParsedAiSummarySections {
   if (!raw?.trim()) return { ...EMPTY };
+  // 生成失敗文が本番へ出ないよう、パース前に表示を止める
+  if (hasGenerationFailureText(raw)) return { ...EMPTY };
 
-  const stripped = stripAiSummaryDisclaimer(raw);
+  const stripped = stripCitationMarkers(stripAiSummaryDisclaimer(raw));
 
   let overview = extractAfterHeading(stripped, /^##\s*判断材料のリード[^\n]*\n/m);
   if (!overview) {
