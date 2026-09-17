@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
+import { BASE_PATH } from '@/lib/base-path';
 import type { SeoLoopConfig } from './config';
 import { assertExecutionLimits } from './limits';
 import {
@@ -26,6 +28,24 @@ export type ExecutorResult = {
 
 type LiveExecutorContext = ExecutorContext & { payload: ProposalPayloadV2 };
 type TypedExecutor = (context: LiveExecutorContext) => Promise<ExecutorResult>;
+
+function revalidateTargetPage(targetUrl: string): void {
+  try {
+    const publicPath = new URL(targetUrl).pathname.replace(/\/+$/u, '') || '/';
+    const internalPath = publicPath.startsWith(`${BASE_PATH}/`)
+      ? publicPath.slice(BASE_PATH.length)
+      : publicPath;
+    for (const path of new Set([publicPath, internalPath])) {
+      revalidatePath(path, 'page');
+      revalidatePath(path, 'layout');
+    }
+  } catch (error) {
+    console.error('SEO Loop cache revalidation failed; DB update remains audited', {
+      targetUrl,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 function singleTarget(context: LiveExecutorContext) {
   return context.payload.targets.length === 1
@@ -60,6 +80,7 @@ async function updateSchoolSummaryColumn(
       message: `公開済みoverall要約が1件でないか、${column}が承認時から変更されています`,
     };
   }
+  revalidateTargetPage(target.url);
 
   return {
     executed: true,
@@ -109,6 +130,7 @@ const updateFeatureMetaDescription: TypedExecutor = async (context) => {
         '公開記事が1件でないか、meta_descriptionが承認時から変更されています',
     };
   }
+  revalidateTargetPage(target.url);
 
   return {
     executed: true,
@@ -220,6 +242,7 @@ const addApprovedInternalLink: TypedExecutor = async (context) => {
         message: '公開要約が同時更新されたため内部リンク追記を停止しました',
       };
     }
+    revalidateTargetPage(target.url);
     return {
       executed: true,
       message: '公開要約の末尾へ承認済み内部リンクを追記しました',
@@ -274,6 +297,7 @@ const addApprovedInternalLink: TypedExecutor = async (context) => {
         message: '公開記事が同時更新されたため内部リンク追記を停止しました',
       };
     }
+    revalidateTargetPage(target.url);
     return {
       executed: true,
       message: '公開記事本文の末尾へ承認済み内部リンクを追記しました',
