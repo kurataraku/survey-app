@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     .select(
       'id,run_id,version,payload_hash,action,payload,context_snapshot,rulebook_version,rulebook_hash,status,created_at,seo_approvals!inner(id,status,proposal_version,proposal_payload_hash)'
     )
-    .eq('status', 'execution_blocked')
+    .in('status', ['execution_blocked', 'approved'])
     .eq('seo_approvals.status', 'approved')
     .order('created_at', { ascending: false })
     .limit(200);
@@ -78,6 +78,7 @@ async function main(): Promise<void> {
   const config = getSeoLoopConfig();
   const eligible: Candidate[] = [];
   const blocked: Array<{ id: string; reasons: string[] }> = [];
+  const definitivelyBlocked: Candidate[] = [];
   for (const candidate of unique.values()) {
     const evaluation = await evaluateProposalForApproval({
       supabase,
@@ -91,6 +92,7 @@ async function main(): Promise<void> {
       eligible.push(candidate);
     } else {
       blocked.push({ id: candidate.id, reasons: evaluation.blockReasons });
+      if (!evaluation.retryable) definitivelyBlocked.push(candidate);
     }
   }
 
@@ -98,7 +100,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         mode: apply ? 'apply' : 'dry-run',
-        uniqueApprovedBlocked: unique.size,
+        uniqueApprovedCandidates: unique.size,
         eligible: eligible.map((item) => ({
           id: item.id,
           runId: item.run_id,
@@ -112,7 +114,33 @@ async function main(): Promise<void> {
     )
   );
 
-  if (!apply || eligible.length === 0) return;
+  if (!apply) return;
+
+  for (const candidate of definitivelyBlocked.filter(
+    (item) => item.status === 'approved'
+  )) {
+    const approval = candidate.seo_approvals.find(
+      (item) =>
+        item.status === 'approved' &&
+        item.proposal_version === candidate.version &&
+        item.proposal_payload_hash === candidate.payload_hash
+    );
+    const { error: blockError } = await supabase
+      .from('seo_proposals')
+      .update({ status: 'execution_blocked', risk_level: 'blocked' })
+      .eq('id', candidate.id)
+      .eq('status', 'approved');
+    if (blockError) throw blockError;
+    if (approval) {
+      const { error: invalidateError } = await supabase
+        .from('seo_approvals')
+        .update({ status: 'invalidated' })
+        .eq('id', approval.id)
+        .eq('status', 'approved');
+      if (invalidateError) throw invalidateError;
+    }
+  }
+  if (eligible.length === 0) return;
 
   const runIds = [...new Set(eligible.map((item) => item.run_id))];
   const proposalIds = eligible.map((item) => item.id);
@@ -120,7 +148,7 @@ async function main(): Promise<void> {
     .from('seo_proposals')
     .update({ status: 'approved' })
     .in('id', proposalIds)
-    .eq('status', 'execution_blocked');
+    .in('status', ['execution_blocked', 'approved']);
   if (proposalError) throw proposalError;
 
   const { error: runError } = await supabase
