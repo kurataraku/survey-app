@@ -181,7 +181,11 @@ export function retryableContentChangeRegressions(
   const lowValue = lowValueChangeFindings(proposal)
     .filter((finding) => isSevereLowValueFlag(finding.flag))
     .map((finding) => finding.message);
-  return [...new Set([...regressions, ...lowValue])];
+  const unsupported = factualSupportRegressions(proposal, context);
+  const retention = shortTextRetentionRegressions(proposal);
+  return [
+    ...new Set([...regressions, ...lowValue, ...unsupported, ...retention]),
+  ];
 }
 
 export function isStructuredTextAction(action: TypedAction): boolean {
@@ -193,7 +197,9 @@ export type LowValueChangeFlag =
   | 'shortened_without_addition'
   | 'structure_flattened'
   | 'concrete_axis_removed'
-  | 'no_new_query_term';
+  | 'no_new_query_term'
+  | 'unsupported_added_term'
+  | 'feature_description_overcompressed';
 
 export type LowValueChangeFinding = {
   flag: LowValueChangeFlag;
@@ -207,6 +213,8 @@ const SEVERE_LOW_VALUE_FLAGS: ReadonlySet<LowValueChangeFlag> = new Set([
   'structure_flattened',
   'concrete_axis_removed',
   'no_new_query_term',
+  'unsupported_added_term',
+  'feature_description_overcompressed',
 ]);
 
 /** 言い換え判定の上限。これ未満の文字数変化は情報量が変わっていないとみなす */
@@ -428,6 +436,98 @@ function queryTerms(proposal: ProposalPayloadV2): string[] {
     ),
   ];
 }
+
+function normalizeForSupport(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(NON_WORD_CHARS, '')
+    .toLocaleLowerCase('ja');
+}
+
+function contextSupportText(context: FactContextSnapshot): string {
+  return normalizeForSupport(
+    JSON.stringify({
+      html: {
+        title: context.html.title,
+        description: context.html.description,
+        h1: context.html.h1,
+      },
+      database: context.database,
+    })
+  );
+}
+
+/**
+ * GSCは需要の証拠でありページ内容の事実ではない。
+ * 新たに加えるクエリ語・比較軸はHTMLまたはDBにも根拠が必要。
+ */
+export function factualSupportRegressions(
+  proposal: ProposalPayloadV2,
+  context: FactContextSnapshot
+): string[] {
+  if (!SHORT_TEXT_ACTIONS.has(proposal.action)) return [];
+
+  const support = contextSupportText(context);
+  const regressions: string[] = [];
+  for (const target of proposal.targets) {
+    const current = normalizeForSupport(target.currentValue);
+    const proposed = normalizeForSupport(target.proposedValue);
+    const addedQueryTerms = queryTerms(proposal).filter((term) => {
+      const normalized = normalizeForSupport(term);
+      return (
+        normalized.length >= 2 &&
+        !current.includes(normalized) &&
+        proposed.includes(normalized)
+      );
+    });
+    const unsupportedQueryTerms = addedQueryTerms.filter(
+      (term) => !support.includes(normalizeForSupport(term))
+    );
+
+    const currentAxes = concreteAxes(target.currentValue);
+    const addedAxes = [...concreteAxes(target.proposedValue)].filter(
+      (axis) => !currentAxes.has(axis)
+    );
+    const unsupportedAxes = addedAxes.filter(
+      (axis) => !support.includes(normalizeForSupport(axis))
+    );
+
+    const unsupported = [...new Set([...unsupportedQueryTerms, ...unsupportedAxes])];
+    if (unsupported.length > 0) {
+      regressions.push(
+        `追加語がGSC以外のページFactで裏付けられていません: ${unsupported.join(' / ')}`
+      );
+    }
+  }
+  return regressions;
+}
+
+/**
+ * 既にSERP上限内のfeature descriptionを大きく短縮する案を止める。
+ * 160字超から表示幅へ収める短縮は許可する。
+ */
+export function shortTextRetentionRegressions(
+  proposal: ProposalPayloadV2
+): string[] {
+  if (proposal.action !== 'updateFeatureMetaDescription') return [];
+  return proposal.targets.flatMap((target) => {
+    const currentLength = target.currentValue.trim().length;
+    const proposedLength = target.proposedValue.trim().length;
+    if (
+      currentLength <= ACTION_VALUE_LIMITS_FOR_RETENTION.featureDescriptionMax &&
+      proposedLength < currentLength * SHORT_TEXT_SHORTENING_RATIO
+    ) {
+      return [
+        `既に160字以内のdescriptionを${currentLength}文字から${proposedLength}文字へ10%以上短縮し、既存情報を失う可能性があります`,
+      ];
+    }
+    return [];
+  });
+}
+
+const ACTION_VALUE_LIMITS_FOR_RETENTION = {
+  featureDescriptionMax: 160,
+} as const;
 
 function structuredTextFindings(
   currentValue: string,

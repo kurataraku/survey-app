@@ -56,7 +56,7 @@ const context: FactContextSnapshot = {
     slug: 'anonymous',
     isPublic: true,
     aiSummary: {
-      summaryText: '匿名化された現在の要約です。',
+      summaryText: '学校生活に関する口コミと評判をまとめた匿名化された現在の要約です。',
       metaTitle: currentValue,
       metaDescription: null,
     },

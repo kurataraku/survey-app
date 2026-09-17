@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { STRATEGIST_CONTENT_POLICY } from '../analysis/prompts';
 import { typedActionSchema, type TypedAction } from '../types';
 
-export const REVISION_STRATEGIST_PROMPT_VERSION = 'seo-revision-strategist-v5';
+export const REVISION_STRATEGIST_PROMPT_VERSION = 'seo-revision-strategist-v6';
 
 export const revisionStrategistOutputSchema = z.object({
   proposal: z.object({
@@ -28,6 +28,7 @@ actionは変更できないため、固定actionの範囲で検索意図に対�
 「学費・コース・サポート」等の具体的比較軸を「多様な学び」「充実したサポート体制」等の抽象表現に置き換えてはいけません。既存の具体軸を残し、新しい検索クエリ語・比較軸・事実のいずれかを追加してください。
 クエリ語がすでにcurrentValueに含まれていても、口コミ・学費・コース・通学・登校・進路・評判などの具体比較軸を新たに足せるなら改訂してください。
 既出の地名・固有名詞の並べ替えや「地域別」などのラベル追加だけでは改訂しないでください。
+GSCクエリは需要の証拠でありページ内容の事実ではありません。新たに加える語はfreshFactContextのHTMLまたはDBでも裏付けられるものに限定してください。
 元のproposedValueとは異なる、安全な具体案を1件だけJSONで返してください。`;
 
 export function revisionStrategistInput(params: {

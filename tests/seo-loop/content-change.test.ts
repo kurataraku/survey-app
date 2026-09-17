@@ -3,7 +3,9 @@ import type { FactContextSnapshot } from '../../lib/seo-loop/context/types';
 import { validateProposalAgainstContext } from '../../lib/seo-loop/context/validate';
 import {
   contentChangeRegressions,
+  factualSupportRegressions,
   lowValueChangeFindings,
+  shortTextRetentionRegressions,
   structuredTextRegressions,
   summarizeTextChange,
 } from '../../lib/seo-loop/content-change';
@@ -135,14 +137,14 @@ describe('本文の情報削減を止める', () => {
     expect(structuredTextRegressions(currentSummary, shortened)).toHaveLength(3);
   });
 
-  it('Hard Gateはcontent_structure_preservedを警告として通す', () => {
+  it('Hard Gateは本番書き込み前にcontent_structure_preservedで停止する', () => {
     const result = hardGate(summaryProposal(shortened));
-    expect(result.passed).toBe(true);
+    expect(result.passed).toBe(false);
     expect(result.results).toContainEqual(
       expect.objectContaining({
         ruleId: 'content_structure_preserved',
         passed: false,
-        severity: 'warn',
+        severity: 'block',
       })
     );
   });
@@ -161,7 +163,7 @@ describe('本文の情報削減を止める', () => {
       expect.objectContaining({
         ruleId: 'content_structure_preserved',
         passed: true,
-        severity: 'warn',
+        severity: 'block',
       })
     );
   });
@@ -376,6 +378,93 @@ describe('情報が増えない変更をSoft Evalで落とす', () => {
     ].join('\n');
     expect(flagsOf(summaryProposal(improved))).toEqual([]);
     expect(score(summaryProposal(improved))).toBeGreaterThanOrEqual(75);
+  });
+});
+
+describe('短文の追加語をページFactで検証する', () => {
+  function featureProposal(
+    currentValue: string,
+    proposedValue: string,
+    query: string
+  ) {
+    return proposalPayloadV2Schema.parse({
+      ...(summaryProposal('dummy') as Record<string, unknown>),
+      action: 'updateFeatureMetaDescription',
+      targetMetric: 'ctr',
+      facts: [
+        {
+          source: 'gsc',
+          statement: `Top queries for this page: [{"query":"${query}"}]`,
+        },
+      ],
+      evidence: [`Top queries for this page: [{"query":"${query}"}]`],
+      targets: [
+        {
+          type: 'feature',
+          id: 'feature-anon-001',
+          url: 'https://example.invalid/tsushin-kuchikomi/features/report',
+          currentValue,
+          proposedValue,
+        },
+      ],
+    });
+  }
+
+  it('GSCにだけある複合語をページ内容の事実として追加する案を止める', () => {
+    const proposal = featureProposal(
+      '通信制高校のレポートや映像授業の実態を口コミとともに解説します。',
+      '通信制高校のレポートや映像授業視聴報告の実態を口コミとともに解説します。',
+      '第一学院高等学校 映像授業視聴報告'
+    );
+    expect(factualSupportRegressions(proposal, context)).toContain(
+      '追加語がGSC以外のページFactで裏付けられていません: 映像授業視聴報告'
+    );
+  });
+
+  it('H1にもある新規クエリ語は許可する', () => {
+    const proposal = featureProposal(
+      '岡山操山高校通信制で学んだ経験を紹介します。',
+      '岡山操山高校通信制の口コミ体験談を紹介します。',
+      '岡山操山高校通信制 口コミ体験談'
+    );
+    const featureContext: FactContextSnapshot = {
+      ...context,
+      target: {
+        pageType: 'feature',
+        id: 'feature-anon-001',
+        slug: 'report',
+        url: 'https://example.invalid/tsushin-kuchikomi/features/report',
+      },
+      html: {
+        ...context.html,
+        h1: '岡山操山高校通信制 口コミ体験談',
+      },
+      database: {
+        type: 'feature',
+        id: 'feature-anon-001',
+        title: '岡山操山高校通信制 口コミ体験談',
+        slug: 'report',
+        isPublic: true,
+        metaTitle: null,
+        metaDescription: proposal.targets[0]!.currentValue,
+      },
+      currentValues: {
+        updateFeatureMetaDescription: proposal.targets[0]!.currentValue,
+        addApprovedInternalLink: 'links:0:sha256:test',
+      },
+    };
+    expect(factualSupportRegressions(proposal, featureContext)).toEqual([]);
+  });
+
+  it('既に160字以内のfeature descriptionを10%以上短縮する案を止める', () => {
+    const currentValue =
+      '私立全日制での体調不良により卒業の危機に面した生徒が、岡山操山高校の通信制課程を選び、公立ならではの学費と単位制を活かして短大進学を叶えるまでの体験談です。';
+    const proposal = featureProposal(
+      currentValue,
+      '岡山操山高校通信制の口コミ体験談。公立の学費と単位制を活かして短大進学を叶えた経験を紹介します。',
+      '岡山操山高校 通信制'
+    );
+    expect(shortTextRetentionRegressions(proposal)).toHaveLength(1);
   });
 });
 

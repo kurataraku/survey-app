@@ -559,6 +559,30 @@ async function handleExecute(
       continue;
     }
 
+    const executionKey = `proposal:${proposal.id}:v${proposal.version}:${proposal.payload_hash}`;
+    const beforeTargets =
+      proposal.payload &&
+      typeof proposal.payload === 'object' &&
+      'targets' in proposal.payload &&
+      Array.isArray((proposal.payload as { targets?: unknown }).targets)
+        ? (proposal.payload as { targets: unknown[] }).targets
+        : [];
+    const { error: pendingExperimentError } = await supabase
+      .from('seo_experiments')
+      .upsert(
+        {
+          proposal_id: proposal.id,
+          approval_id: approval.id,
+          execution_key: executionKey,
+          status: 'pending',
+          action: proposal.action,
+          before_state: { targets: beforeTargets },
+          error_message: null,
+        },
+        { onConflict: 'execution_key' }
+      );
+    if (pendingExperimentError) throw pendingExperimentError;
+
     const actualHash = payloadHash(proposal.payload);
     const result = await executeApprovedProposal({
       supabase,
@@ -570,19 +594,19 @@ async function handleExecute(
       actualHash,
     });
 
-    const executionKey = `proposal:${proposal.id}:v${proposal.version}:${proposal.payload_hash}`;
-    const { error: experimentError } = await supabase.from('seo_experiments').upsert(
-      {
-        proposal_id: proposal.id,
-        approval_id: approval.id,
-        execution_key: executionKey,
+    const { error: experimentError } = await supabase
+      .from('seo_experiments')
+      .update({
         status: result.executed ? 'executed' : 'blocked',
-        action: proposal.action,
-        baseline_metrics: { phase1_message: result.message },
+        baseline_metrics: {
+          executor_message: result.message,
+          after_state: result.afterState ?? null,
+        },
+        before_state: result.beforeState ?? { targets: beforeTargets },
         executed_at: result.executed ? new Date().toISOString() : null,
-      },
-      { onConflict: 'execution_key' }
-    );
+        error_message: result.executed ? null : result.message,
+      })
+      .eq('execution_key', executionKey);
     if (experimentError) throw experimentError;
 
     const { error: proposalUpdateError } = await supabase

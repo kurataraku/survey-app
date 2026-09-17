@@ -1,7 +1,9 @@
 import type { FactContextSnapshot } from '../context/types';
 import {
+  factualSupportRegressions,
   internalLinkRegressions,
   isStructuredTextAction,
+  shortTextRetentionRegressions,
   structuredTextRegressions,
 } from '../content-change';
 import {
@@ -19,7 +21,7 @@ import type { HardGateRuleResult } from './types';
 import type { RulebookContent } from '../rulebook/schema';
 import type { InternalLinkReachability } from './internal-link-reachability';
 
-const CONTENT_STRUCTURE_SEVERITY: HardGateRuleResult['severity'] = 'warn';
+const CONTENT_STRUCTURE_SEVERITY: HardGateRuleResult['severity'] = 'block';
 
 function normalizedUrl(value: string): string | null {
   try {
@@ -145,6 +147,10 @@ export function runHardGate(params: {
           structuredTextRegressions(target.currentValue, target.proposedValue)
         )
       : [];
+  const unsupportedAdditions =
+    proposal && context ? factualSupportRegressions(proposal, context) : [];
+  const shortTextRetention =
+    proposal ? shortTextRetentionRegressions(proposal) : [];
   const targetCount = proposal?.targets.length ?? 0;
   const approvalPhase = (params.phase ?? 'approval') === 'approval';
 
@@ -261,6 +267,24 @@ export function runHardGate(params: {
           }
         : undefined,
       'risk.internal_link_reachable.v1'
+    ),
+    rule(
+      'added_terms_fact_supported',
+      Boolean(proposal && context && unsupportedAdditions.length === 0),
+      '追加語はHTMLまたはDBのページFactで裏付けられています',
+      '追加語がGSC需要データだけにあり、ページ内容で裏付けられていません',
+      unsupportedAdditions.length > 0
+        ? { regressions: unsupportedAdditions }
+        : undefined
+    ),
+    rule(
+      'short_text_information_retained',
+      Boolean(proposal && shortTextRetention.length === 0),
+      '短文変更は既存の具体情報を保持しています',
+      'descriptionを過度に短縮し、既存情報を失う可能性があります',
+      shortTextRetention.length > 0
+        ? { regressions: shortTextRetention }
+        : undefined
     ),
     rule(
       'content_structure_preserved',

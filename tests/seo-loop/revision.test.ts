@@ -61,7 +61,7 @@ const context: FactContextSnapshot = {
     slug: 'anonymous',
     isPublic: true,
     aiSummary: {
-      summaryText: '匿名化された現在の要約です。',
+      summaryText: '学校生活に関する口コミと評判をまとめた匿名化された現在の要約です。',
       metaTitle: currentValue,
       metaDescription: null,
     },
@@ -269,7 +269,7 @@ function llmResponse(action = 'updateSchoolMetaTitle') {
     content: JSON.stringify({
       proposal: {
         action,
-        proposedValue: '匿名通信制高校の評判・口コミと学習環境',
+        proposedValue: '匿名通信制高校の評判・口コミと学校生活',
         rationale: '検索意図との対応を明確にするよう人間の修正理由を反映した',
         expectedImpact: '検索結果で内容が伝わりCTRの改善が期待できる',
         rollbackPlan: '問題があれば最新の元titleへ戻す',

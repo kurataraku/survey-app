@@ -5,12 +5,11 @@
 
 ## いまのゴール
 
-提案数は戻ったが、**言い換え・短縮・語尾追加**が多く、SEO効果のある提案が少ない。  
-dry-run期間なので本番書き込みリスクはない。低価値案はSlackで却下して学習材料にし、生成側ルールを強くする。
+提案数と品質が改善したため、Slack承認済みTyped Actionを本番DBへ安全に反映し、GSCで効果検証まで回す。低価値案は生成時・承認時・実行直前の品質ゲートで止める。
 
 ## 完了済み（実装済み・デプロイ済み）
 
-- Hard Gate 3層化: 構造退行は `warn`、重複リンクは `block`
+- Hard Gate 3層化: 構造退行・裏付けのない追加語・重複リンクは `block`
 - Soft Eval: 文字数変化5%未満・短縮のみを warning
 - Slackカード: Hard Gate警告表示
 - 改訂レーン: `wrong_target` は abandoned、中間失敗のSlackスパム抑制、LLM再試行3回
@@ -21,7 +20,16 @@ dry-run期間なので本番書き込みリスクはない。低価値案はSlac
   - `npm run seo:revision:status`
   - `npm run seo:rulebook:status`
 
-Typed Executor はまだ Phase1 dry-run（`blockedUntilPhase2`）。`SEO_LOOP_EXECUTION_ENABLED=false` 維持。
+Typed Executorは4 actionをAllowlist実装し、承認時currentValueとの楽観ロック、payload hash、最新Fact Context、日次上限、Kill Switchを通過した場合だけ本番DBへ反映する。
+
+### 2026-09-17 追加（本番実行・Fact裏付け）
+
+- Strategist/Revision v6: GSCクエリは需要の証拠であり、ページ内容の事実ではないことを明示
+- GSCにだけある追加語、複合語の微差追加を、HTML/DBで裏付けられない場合はHard Gate block
+- 既に160字以内のfeature descriptionを10%以上短縮する案をblock
+- Typed Executorを4 actionで本番化。1 proposal・1 target、payload hash、最新currentValue一致、更新件数1件を必須化
+- 内部リンクは専用`seo_approved_internal_links`へ保存し、公開ページの関連リンク枠から描画
+- 過去の`execution_blocked`承認は`npm run seo:requeue-approved`で再評価し、`--apply --yes`時だけ再キュー
 
 ### 2026-09-14 追加（改善1・2を実装）
 
@@ -179,6 +187,5 @@ Slackに届いた案がクエリ語・具体事実を足しているかを見て
 
 ## やらないこと
 
-- Typed Executor の本番書き込み有効化
 - Hard Gate を急に全面厳格化して提案ゼロに戻すこと
 - 無関係な SchoolDetailClient 等の未コミット変更を混ぜること

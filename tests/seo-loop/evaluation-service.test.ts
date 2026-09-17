@@ -44,7 +44,7 @@ const context: FactContextSnapshot = {
     slug: 'anonymous',
     isPublic: true,
     aiSummary: {
-      summaryText: '現在の匿名要約',
+      summaryText: '学校生活に関する口コミと評判をまとめた現在の匿名要約',
       metaTitle: currentValue,
       metaDescription: null,
     },
@@ -159,7 +159,7 @@ describe('evaluateProposalForApproval', () => {
       proposal_id: 'proposal-anon-001',
       hard_gate_passed: true,
       passed: true,
-      evaluation_version: 'quality-v1@rb0:ac0f3b6225ef',
+      evaluation_version: 'quality-v2@rb0:ac0f3b6225ef',
     });
   });
 
@@ -242,7 +242,7 @@ describe('evaluateProposalForApproval', () => {
 
     expect(result.passed).toBe(true);
     expect(savedRows[0]).toMatchObject({
-      evaluation_version: 'quality-v1-execution@rb0:ac0f3b6225ef',
+      evaluation_version: 'quality-v2-execution@rb0:ac0f3b6225ef',
       passed: true,
     });
   });

@@ -114,7 +114,7 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 - Hard Gate block: schema違反、Allowlist外、対象不一致、禁止表現、重複内部リンク、到達不能な内部リンクなど、実行しても害がある／意味がないものを止める
 - Soft Eval / Slack warning: `updateSeoSummary`での見出し削除、箇条書きの純減、残存文字数比率80%未満の短縮、文字数変化5%未満の言い換え疑いを警告として表示する
 
-判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。Phase 2でTyped Executorの本番書き込みを有効化する前に、構造退行warningをblockへ戻すか再判定します。
+判定は実測値だけで行います。既存リンクは提案評価時点の公開HTML（`html.internalLinks`）を正規化して比較し、要約構造はDBのcurrentValueと比較します。CTR課題では`updateSchoolMetaTitle`・`updateFeatureMetaDescription`を優先検討させ、本文要約の変更には検索意図との対応の明示を求めます。本番書き込みでは構造退行をHard Gate blockとし、GSCクエリだけにある追加語はHTMLまたはDBでも裏付けられない限り実行しません。
 
 ### 情報が増えない変更の上限キャップ
 
@@ -148,7 +148,8 @@ proposalには `version` と `payload_hash` を保存します。Slack承認時�
 ## Kill Switchと上限
 
 - `SEO_LOOP_ENABLED=false`: Orchestrator tick全体をno-op
-- `SEO_LOOP_EXECUTION_ENABLED=false`: 観測・分析・提案・承認は継続、変更実行のみ停止
+- `SEO_LOOP_EXECUTION_ENABLED=true`: Slack承認済みかつ実行直前Hard Gateを通過したTyped ActionだけをDBへ反映
+- 緊急停止時は`SEO_LOOP_EXECUTION_ENABLED=false`へ戻し、観測・分析・承認を継続したまま変更実行だけ停止
 - `SEO_RULEBOOK_SHADOW_ENABLED=false`: Rulebook新版のshadow評価・指標更新・昇格操作を停止
 - `SEO_LOOP_MAX_DAILY_PROPOSALS`
 - `SEO_LOOP_MAX_DAILY_EXECUTIONS`
@@ -162,7 +163,7 @@ Typed Rule Patchの第二承認は新版の即時active化ではなく、`shadow
 
 最低7 run、評価済み10 proposal、主系・shadow対象とも実判断5件を満たし、固定された回帰基準をすべて通過した場合だけ`ready`になります。`ready`になっても自動昇格せず、Slackの最終昇格承認で初めて旧版をretired、新版をactiveへ同一transactionで切り替えます。既存runのRulebook bindingは変わらず、次runから新版を使います。
 
-障害時は`SEO_RULEBOOK_SHADOW_ENABLED=false`でshadow経路だけを停止できます。主系proposal処理はshadowの失敗を理由に停止しません。昇格後に異常があれば`npm run seo:rulebook:status -- --rollback-current --yes --actor=<Slack User ID>`で直前active版へ戻します。`SEO_LOOP_EXECUTION_ENABLED=false`はExecutor本番設計と効果再計測が完成するまで維持します。
+障害時は`SEO_RULEBOOK_SHADOW_ENABLED=false`でshadow経路だけを停止できます。主系proposal処理はshadowの失敗を理由に停止しません。昇格後に異常があれば`npm run seo:rulebook:status -- --rollback-current --yes --actor=<Slack User ID>`で直前active版へ戻します。DB書き込みに異常があれば`SEO_LOOP_EXECUTION_ENABLED=false`で即時停止します。
 
 ## 効果検証
 

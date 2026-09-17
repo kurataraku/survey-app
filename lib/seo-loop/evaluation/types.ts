@@ -14,6 +14,8 @@ export type HardGateRuleId =
   | 'internal_link_same_origin'
   | 'internal_link_not_duplicated'
   | 'internal_link_reachable'
+  | 'added_terms_fact_supported'
+  | 'short_text_information_retained'
   | 'content_structure_preserved'
   | 'target_limit'
   | 'daily_proposal_limit';
@@ -42,7 +44,7 @@ export type SoftEvalResult = {
 };
 
 export type ProposalEvaluationResult = {
-  version: 'quality-v1';
+  version: 'quality-v2';
   passed: boolean;
   retryable: boolean;
   hardGatePassed: boolean;

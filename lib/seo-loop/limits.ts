@@ -53,10 +53,16 @@ export async function assertExecutionLimits(
   supabase: SupabaseClient,
   config: SeoLoopConfig
 ): Promise<void> {
-  const executionCount = await countSince(supabase, 'seo_experiments', startOfUtcDay());
-  if (executionCount >= config.maxDailyExecutions) {
+  const { count: executionCount, error } = await supabase
+    .from('seo_experiments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'executed')
+    .gte('executed_at', startOfUtcDay());
+  if (error) throw error;
+  const count = executionCount ?? 0;
+  if (count >= config.maxDailyExecutions) {
     throw new Error(
-      `1日あたりのexecution上限に達しています: ${executionCount}/${config.maxDailyExecutions}`
+      `1日あたりのexecution上限に達しています: ${count}/${config.maxDailyExecutions}`
     );
   }
 }
