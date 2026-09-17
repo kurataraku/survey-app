@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { BASE_PATH } from '@/lib/base-path';
+import { syncRagForArticleIds, syncRagForSchoolIds } from '@/lib/rag/sync';
 import type { SeoLoopConfig } from './config';
 import { assertExecutionLimits } from './limits';
 import {
@@ -47,6 +48,25 @@ function revalidateTargetPage(targetUrl: string): void {
   }
 }
 
+async function syncRagBestEffort(
+  targetType: 'school' | 'article',
+  targetId: string
+): Promise<void> {
+  try {
+    if (targetType === 'school') {
+      await syncRagForSchoolIds([targetId]);
+    } else {
+      await syncRagForArticleIds([targetId]);
+    }
+  } catch (error) {
+    console.error('SEO Loop RAG sync failed; DB update remains audited', {
+      targetType,
+      targetId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 function singleTarget(context: LiveExecutorContext) {
   return context.payload.targets.length === 1
     ? context.payload.targets[0]!
@@ -70,6 +90,7 @@ async function updateSchoolSummaryColumn(
     .update({ [column]: target.proposedValue })
     .eq('school_id', target.id)
     .eq('kind', 'overall')
+    .is('topic', null)
     .eq('status', 'published')
     .eq(column, target.currentValue)
     .select('id');
@@ -81,6 +102,7 @@ async function updateSchoolSummaryColumn(
     };
   }
   revalidateTargetPage(target.url);
+  await syncRagBestEffort('school', target.id);
 
   return {
     executed: true,
@@ -131,6 +153,7 @@ const updateFeatureMetaDescription: TypedExecutor = async (context) => {
     };
   }
   revalidateTargetPage(target.url);
+  await syncRagBestEffort('article', target.id);
 
   return {
     executed: true,
@@ -211,6 +234,7 @@ const addApprovedInternalLink: TypedExecutor = async (context) => {
       .select('id,summary_text')
       .eq('school_id', target.id)
       .eq('kind', 'overall')
+      .is('topic', null)
       .eq('status', 'published')
       .maybeSingle();
     if (readError) throw readError;
@@ -243,6 +267,7 @@ const addApprovedInternalLink: TypedExecutor = async (context) => {
       };
     }
     revalidateTargetPage(target.url);
+    await syncRagBestEffort('school', target.id);
     return {
       executed: true,
       message: '公開要約の末尾へ承認済み内部リンクを追記しました',
@@ -298,6 +323,7 @@ const addApprovedInternalLink: TypedExecutor = async (context) => {
       };
     }
     revalidateTargetPage(target.url);
+    await syncRagBestEffort('article', target.id);
     return {
       executed: true,
       message: '公開記事本文の末尾へ承認済み内部リンクを追記しました',

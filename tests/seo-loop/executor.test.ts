@@ -6,6 +6,11 @@ vi.mock('../../lib/seo-loop/limits', () => ({
   assertExecutionLimits: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../lib/rag/sync', () => ({
+  syncRagForSchoolIds: vi.fn().mockResolvedValue(1),
+  syncRagForArticleIds: vi.fn().mockResolvedValue(1),
+}));
+
 const config: SeoLoopConfig = {
   enabled: true,
   executionEnabled: true,
@@ -47,6 +52,7 @@ function updateSupabase(data: unknown[] = [{ id: 'row-1' }]) {
   const builder: Record<string, ReturnType<typeof vi.fn>> = {};
   builder.update = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
+  builder.is = vi.fn(() => builder);
   builder.select = vi.fn().mockResolvedValue({ data, error: null });
   const from = vi.fn(() => builder);
   return { client: { from } as never, from, builder };
@@ -80,6 +86,7 @@ describe('SEO Loop Typed Executor', () => {
     expect(db.builder.update).toHaveBeenCalledWith({
       meta_title: '現在の学校タイトル｜週1〜5日の通学',
     });
+    expect(db.builder.is).toHaveBeenCalledWith('topic', null);
     expect(db.builder.eq).toHaveBeenCalledWith('meta_title', '現在の学校タイトル');
   });
 
@@ -119,6 +126,7 @@ describe('SEO Loop Typed Executor', () => {
     const readBuilder: Record<string, ReturnType<typeof vi.fn>> = {};
     readBuilder.select = vi.fn(() => readBuilder);
     readBuilder.eq = vi.fn(() => readBuilder);
+    readBuilder.is = vi.fn(() => readBuilder);
     readBuilder.maybeSingle = vi.fn().mockResolvedValue({
       data: { id: 'article-1', content: currentContent },
       error: null,

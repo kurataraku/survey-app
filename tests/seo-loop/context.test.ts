@@ -33,6 +33,7 @@ function fakeSupabase(): SupabaseClient {
       const builder = {
         select: () => builder,
         eq: () => builder,
+        is: () => builder,
         single: async () => result,
         maybeSingle: async () => result,
       };

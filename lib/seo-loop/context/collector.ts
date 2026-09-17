@@ -25,6 +25,7 @@ async function collectSchoolDatabaseFacts(
     .select('summary_text,meta_title,meta_description')
     .eq('school_id', school.id)
     .eq('kind', 'overall')
+    .is('topic', null)
     .eq('status', 'published')
     .maybeSingle();
   if (summaryError) throw summaryError;
