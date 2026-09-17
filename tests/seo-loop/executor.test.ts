@@ -107,7 +107,7 @@ describe('SEO Loop Typed Executor', () => {
     expect(result.message).toContain('承認時から変更');
   });
 
-  it('承認済み内部リンクを専用Allowlistテーブルへupsertする', async () => {
+  it('承認済み内部リンクを公開記事本文へappend-onlyで追記する', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -115,8 +115,25 @@ describe('SEO Loop Typed Executor', () => {
         text: async () => '<html><title>通信制高校の学費ガイド</title></html>',
       })
     );
-    const upsert = vi.fn().mockResolvedValue({ error: null });
-    const from = vi.fn(() => ({ upsert }));
+    const currentContent = '# 通信制高校の選び方\n\n本文です。';
+    const readBuilder: Record<string, ReturnType<typeof vi.fn>> = {};
+    readBuilder.select = vi.fn(() => readBuilder);
+    readBuilder.eq = vi.fn(() => readBuilder);
+    readBuilder.maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: 'article-1', content: currentContent },
+      error: null,
+    });
+    const updateBuilder: Record<string, ReturnType<typeof vi.fn>> = {};
+    updateBuilder.update = vi.fn(() => updateBuilder);
+    updateBuilder.eq = vi.fn(() => updateBuilder);
+    updateBuilder.select = vi.fn().mockResolvedValue({
+      data: [{ id: 'article-1' }],
+      error: null,
+    });
+    const from = vi
+      .fn()
+      .mockReturnValueOnce(readBuilder)
+      .mockReturnValueOnce(updateBuilder);
 
     const result = await executeApprovedProposal({
       supabase: { from } as never,
@@ -125,8 +142,8 @@ describe('SEO Loop Typed Executor', () => {
       approvalId: 'approval-2',
       payload: payload('addApprovedInternalLink', {
         type: 'url',
-        id: 'school-1',
-        url: 'https://example.invalid/tsushin-kuchikomi/schools/test',
+        id: 'article-1',
+        url: 'https://example.invalid/tsushin-kuchikomi/features/test',
         currentValue: 'links:2:sha256:test',
         proposedValue:
           'https://example.invalid/tsushin-kuchikomi/features/tuition',
@@ -136,14 +153,12 @@ describe('SEO Loop Typed Executor', () => {
     });
 
     expect(result.executed).toBe(true);
-    expect(from).toHaveBeenCalledWith('seo_approved_internal_links');
-    expect(upsert).toHaveBeenCalledWith(
+    expect(from).toHaveBeenNthCalledWith(1, 'articles');
+    expect(from).toHaveBeenNthCalledWith(2, 'articles');
+    expect(updateBuilder.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        anchor_text: '通信制高校の学費ガイド',
-        proposal_id: 'proposal-2',
-        approval_id: 'approval-2',
-      }),
-      { onConflict: 'source_url,target_url' }
+        content: `${currentContent}\n\n関連ページ: [通信制高校の学費ガイド](https://example.invalid/tsushin-kuchikomi/features/tuition)`,
+      })
     );
     vi.unstubAllGlobals();
   });

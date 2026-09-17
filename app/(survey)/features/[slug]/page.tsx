@@ -9,7 +9,6 @@ import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
 import SurveyCtaLink from '@/components/SurveyCtaLink';
 import ThemeHubNav from '@/components/ThemeHubNav';
-import SeoApprovedInternalLinks from '@/components/SeoApprovedInternalLinks';
 import { getThemeHubsPagePath } from '@/lib/theme-hubs';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
@@ -139,8 +138,6 @@ export default async function ArticleDetailPage({ params }: PageProps) {
             <MarkdownRenderer content={article.content} />
           </div>
         )}
-
-        <SeoApprovedInternalLinks sourceUrl={canonical} />
 
         {article.schools && article.schools.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

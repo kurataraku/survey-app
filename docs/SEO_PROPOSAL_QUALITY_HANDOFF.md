@@ -28,7 +28,7 @@ Typed Executorは4 actionをAllowlist実装し、承認時currentValueとの楽�
 - GSCにだけある追加語、複合語の微差追加を、HTML/DBで裏付けられない場合はHard Gate block
 - 既に160字以内のfeature descriptionを10%以上短縮する案をblock
 - Typed Executorを4 actionで本番化。1 proposal・1 target、payload hash、最新currentValue一致、更新件数1件を必須化
-- 内部リンクは専用`seo_approved_internal_links`へ保存し、公開ページの関連リンク枠から描画
+- 内部リンクは公開要約または記事本文の末尾へappend-onlyで追記し、DB本文の楽観ロックと変更前全文の監査保存を行う
 - 過去の`execution_blocked`承認は`npm run seo:requeue-approved`で再評価し、`--apply --yes`時だけ再キュー
 
 ### 2026-09-14 追加（改善1・2を実装）

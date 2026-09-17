@@ -17,7 +17,6 @@ import { parseAiSummarySections } from '@/lib/schools/parseAiSummarySections';
 import { buildTuitionAttendStatsHint } from '@/lib/schools/school-decision-hints';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 import SchoolDetailViewTracker from '@/components/SchoolDetailViewTracker';
-import SeoApprovedInternalLinks from '@/components/SeoApprovedInternalLinks';
 import { getDecliningSchoolMetaOverride } from '@/lib/schools/declining-school-meta';
 import { getGscPrioritySchoolMetaOverride } from '@/lib/seo/gsc-priority-school-meta';
 import { normalizeSchoolMetaDescription } from '@/lib/schools/normalizeSchoolMetaDescription';
@@ -177,9 +176,6 @@ export default async function SchoolDetailPage({ params }: PageProps) {
     school.review_count >= MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND
       ? buildTuitionAttendStatsHint(school)
       : null;
-  const pageUrl = `${getAppBaseUrl().replace(/\/$/u, '')}/schools/${encodeURIComponent(
-    school.slug ?? decodedSlug
-  )}`;
 
   return (
     <div className="min-h-screen bg-blue-50/30 py-8">
@@ -236,7 +232,6 @@ export default async function SchoolDetailPage({ params }: PageProps) {
         </SchoolDetailClient>
 
         <SchoolRelatedArticlesServer schoolId={school.id} />
-        <SeoApprovedInternalLinks sourceUrl={pageUrl} />
       </div>
     </div>
   );

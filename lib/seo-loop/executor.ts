@@ -176,37 +176,125 @@ const addApprovedInternalLink: TypedExecutor = async (context) => {
     };
   }
   const anchorText = await fetchPageTitle(targetUrl);
-  const { error } = await context.supabase
-    .from('seo_approved_internal_links')
-    .upsert(
-      {
-        source_url: sourceUrl,
-        target_url: targetUrl,
-        anchor_text: anchorText,
-        proposal_id: context.proposalId,
-        approval_id: context.approvalId,
-        is_active: true,
+  const safeAnchorText = anchorText
+    .replace(/[[\]]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  const markdownLink = `関連ページ: [${safeAnchorText}](${targetUrl})`;
+  const sourcePath = new URL(sourceUrl).pathname;
+
+  if (sourcePath.includes('/schools/')) {
+    const { data: row, error: readError } = await context.supabase
+      .from('school_ai_summaries')
+      .select('id,summary_text')
+      .eq('school_id', target.id)
+      .eq('kind', 'overall')
+      .eq('status', 'published')
+      .maybeSingle();
+    if (readError) throw readError;
+    const currentContent =
+      row && typeof row.summary_text === 'string' ? row.summary_text : null;
+    if (!row || currentContent === null) {
+      return {
+        executed: false,
+        message: '内部リンクを追記できる公開済みoverall要約がありません',
+      };
+    }
+    if (currentContent.includes(targetUrl)) {
+      return {
+        executed: false,
+        message: '公開要約には既に同じ内部リンクがあります',
+      };
+    }
+    const proposedContent = `${currentContent.trimEnd()}\n\n${markdownLink}`;
+    const { data: updated, error: updateError } = await context.supabase
+      .from('school_ai_summaries')
+      .update({ summary_text: proposedContent })
+      .eq('id', row.id)
+      .eq('summary_text', currentContent)
+      .select('id');
+    if (updateError) throw updateError;
+    if ((updated ?? []).length !== 1) {
+      return {
+        executed: false,
+        message: '公開要約が同時更新されたため内部リンク追記を停止しました',
+      };
+    }
+    return {
+      executed: true,
+      message: '公開要約の末尾へ承認済み内部リンクを追記しました',
+      beforeState: {
+        table: 'school_ai_summaries',
+        targetId: row.id,
+        column: 'summary_text',
+        value: currentContent,
       },
-      { onConflict: 'source_url,target_url' }
-    );
-  if (error) throw error;
+      afterState: {
+        table: 'school_ai_summaries',
+        targetId: row.id,
+        column: 'summary_text',
+        value: proposedContent,
+      },
+    };
+  }
+
+  if (sourcePath.includes('/features/')) {
+    const { data: row, error: readError } = await context.supabase
+      .from('articles')
+      .select('id,content')
+      .eq('id', target.id)
+      .eq('is_public', true)
+      .maybeSingle();
+    if (readError) throw readError;
+    const currentContent =
+      row && typeof row.content === 'string' ? row.content : null;
+    if (!row || currentContent === null) {
+      return {
+        executed: false,
+        message: '内部リンクを追記できる公開記事本文がありません',
+      };
+    }
+    if (currentContent.includes(targetUrl)) {
+      return {
+        executed: false,
+        message: '公開記事には既に同じ内部リンクがあります',
+      };
+    }
+    const proposedContent = `${currentContent.trimEnd()}\n\n${markdownLink}`;
+    const { data: updated, error: updateError } = await context.supabase
+      .from('articles')
+      .update({ content: proposedContent })
+      .eq('id', row.id)
+      .eq('content', currentContent)
+      .select('id');
+    if (updateError) throw updateError;
+    if ((updated ?? []).length !== 1) {
+      return {
+        executed: false,
+        message: '公開記事が同時更新されたため内部リンク追記を停止しました',
+      };
+    }
+    return {
+      executed: true,
+      message: '公開記事本文の末尾へ承認済み内部リンクを追記しました',
+      beforeState: {
+        table: 'articles',
+        targetId: row.id,
+        column: 'content',
+        value: currentContent,
+      },
+      afterState: {
+        table: 'articles',
+        targetId: row.id,
+        column: 'content',
+        value: proposedContent,
+      },
+    };
+  }
 
   return {
-    executed: true,
-    message: '承認済み内部リンクを関連リンク枠へ保存しました',
-    beforeState: {
-      table: 'seo_approved_internal_links',
-      sourceUrl,
-      targetUrl,
-      active: false,
-    },
-    afterState: {
-      table: 'seo_approved_internal_links',
-      sourceUrl,
-      targetUrl,
-      anchorText,
-      active: true,
-    },
+    executed: false,
+    message: '内部リンク追記に未対応のsource URLです',
   };
 };
 
