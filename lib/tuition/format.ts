@@ -81,3 +81,59 @@ export function hasDisplayableTuition(estimate: PublicTuitionEstimate | null | u
   if (estimate.display_mode !== 'amounts') return true;
   return buildTuitionRangeLines(estimate).length > 0;
 }
+
+/**
+ * 掲載金額が就学支援金の適用前か適用後か。
+ *
+ * mixed=コースごとに前後が違う / unknown=公式記載から判断できない。
+ * 同じ「初年度納入金」でも適用前と適用後では数倍変わるため、学校間で基準が揃わない。
+ * 適用後の学校は安く、適用前の学校は高く見えるので、金額の隣に必ず基準を出す。
+ */
+export type TuitionSupportFundBasis = 'before' | 'after' | 'mixed' | 'unknown';
+
+export function resolveSupportFundBasis(
+  estimate: PublicTuitionEstimate
+): TuitionSupportFundBasis {
+  const bases = new Set(
+    estimate.plans
+      .filter((plan) => plan.first_year_min != null || plan.first_year_max != null)
+      .map((plan) => plan.support_fund ?? 'unknown')
+  );
+  if (bases.size === 0) return 'unknown';
+  if (bases.size > 1) return 'mixed';
+  const only = [...bases][0];
+  return only === 'before' || only === 'after' ? only : 'unknown';
+}
+
+/** 金額の隣に出す短いラベル。一覧カードでもそのまま使う */
+export const SUPPORT_FUND_BADGE_LABEL: Record<TuitionSupportFundBasis, string> = {
+  before: '就学支援金 適用前',
+  after: '就学支援金 適用後',
+  mixed: 'コースにより適用前後が異なる',
+  unknown: '適用前後は要確認',
+};
+
+/**
+ * 金額が高い・安いではなく前提の違いであることを伝える説明文。
+ * 適用後の学校を「安い」、適用前の学校を「高い」と誤読させないことが目的。
+ */
+export const SUPPORT_FUND_CAUTION: Record<TuitionSupportFundBasis, string> = {
+  before:
+    '国の就学支援金を差し引く前の学費です。2026年4月から所得制限が撤廃されたため、支援金が適用されると実際に納める額はこれより大きく下がります。適用後の金額を掲載している学校と並べると高く見えますが、前提が違うだけです。',
+  after:
+    '国の就学支援金を差し引いた後の、実際に納める額です。支援金を差し引く前の学費を掲載している学校と並べると低く見えますが、前提が違うだけで学費が安いとは限りません。支援金の額は履修単位数や前籍校での在籍期間によって変わります。',
+  mixed:
+    'コースによって就学支援金の適用前・適用後が異なります。金額の前提が揃っていないため、コース別の内訳で基準をご確認ください。',
+  unknown:
+    '公式サイトの記載からは、就学支援金の適用前か適用後かを判断できませんでした。実際に納める額は学校にご確認ください。',
+};
+
+/** 適用前後が確定している場合だけ、カード用の短い基準ラベルを返す */
+export function buildTuitionCardBasisLabel(estimate: PublicTuitionEstimate): string | null {
+  if (estimate.display_mode !== 'amounts') return null;
+  if (!buildTuitionRangeLines(estimate).length) return null;
+  const basis = resolveSupportFundBasis(estimate);
+  if (basis === 'before') return '就学支援金適用前';
+  if (basis === 'after') return '就学支援金適用後';
+  return null;
+}

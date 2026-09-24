@@ -6,7 +6,7 @@ import {
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
 import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
-import type { SchoolCampusLocation } from '@/lib/types/schools';
+import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 import type { PublicTuitionEstimate } from '@/lib/types/tuition';
 import { fetchPublicTuitionEstimates } from '@/lib/tuition/getTuitionEstimates';
 import type { PublicCourseListing } from '@/lib/types/courses';
@@ -39,6 +39,7 @@ export interface SchoolWithStats {
   career_support_rating_avg?: number | null;
   campus_life_rating_avg?: number | null;
   prefectures?: string[] | null;
+  institution_type?: SchoolInstitutionType | null;
   campus_locations?: SchoolCampusLocation[] | null;
   global_averages?: {
     overall_satisfaction_avg: number | null;
@@ -400,6 +401,7 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
     name: school.name,
     prefecture: school.prefecture,
     prefectures: school.prefectures || (school.prefecture ? [school.prefecture] : []),
+    institution_type: school.institution_type ?? null,
     campus_locations: campusLocations && campusLocations.length > 0 ? campusLocations : null,
     slug: school.slug,
     intro: school.intro,

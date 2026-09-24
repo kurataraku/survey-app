@@ -8,7 +8,8 @@ import { appPath } from '@/lib/base-path';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
 import { CheckCircle2, XCircle, Bus } from 'lucide-react';
 import { formatCampusNearestStations, getCampusNearestStations } from '@/lib/schools/campusLocations';
-import type { SchoolCampusLocation } from '@/lib/types/schools';
+import InstitutionTypeBadge from '@/components/InstitutionTypeBadge';
+import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
 function ratingVsGlobalLabel(
   value: number | null,
@@ -57,6 +58,7 @@ interface SchoolSummaryProps {
   name: string;
   prefecture: string;
   prefectures?: string[];
+  institutionType?: SchoolInstitutionType | null;
   campusLocations?: SchoolCampusLocation[] | null;
   slug: string;
   overallAvg: number | null;
@@ -88,6 +90,7 @@ export default function SchoolSummary({
   name,
   prefecture,
   prefectures,
+  institutionType,
   campusLocations,
   slug,
   overallAvg,
@@ -152,13 +155,19 @@ export default function SchoolSummary({
             在校生・卒業生・保護者の口コミを掲載しています。良かった点・気になる点・合う人の傾向をあわせて確認できます。
           </p>
         ) : null}
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {institutionType && <InstitutionTypeBadge type={institutionType} size="md" />}
           {displayPrefectures.map((pref, index) => (
             <Badge key={index} variant="primary" size="md">
               {pref}
             </Badge>
           ))}
         </div>
+        {institutionType === 'support' && (
+          <p className="mt-2 text-xs leading-relaxed text-emerald-900">
+            この学校はサポート校です。通信制高校ではなく、学習や生活を支援する施設のため、高校卒業資格は提携する通信制高校で取得します。
+          </p>
+        )}
         {visibleCampusLocations.length > 0 && (
           <div className="mt-3">
             <p className="text-xs font-semibold text-gray-500 mb-1.5">

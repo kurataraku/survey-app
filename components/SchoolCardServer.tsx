@@ -1,9 +1,14 @@
 import Link from 'next/link';
 import { appPath } from '@/lib/base-path';
+import InstitutionTypeBadge from '@/components/InstitutionTypeBadge';
 import { buildNearestStationSummary } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 import type { PublicTuitionEstimate } from '@/lib/types/tuition';
-import { buildTuitionCardSummary, TUITION_FIRST_YEAR_LABEL } from '@/lib/tuition/format';
+import {
+  buildTuitionCardBasisLabel,
+  buildTuitionCardSummary,
+  TUITION_FIRST_YEAR_LABEL,
+} from '@/lib/tuition/format';
 import type { PublicCourseListing } from '@/lib/types/courses';
 import { buildCourseCardSummary } from '@/lib/courses/format';
 import { sanitizeAiText } from '@/lib/content/aiTextGuard';
@@ -65,31 +70,6 @@ function StarRating({ value }: { value: number }) {
         </svg>
       ))}
     </div>
-  );
-}
-
-function InstitutionTypeBadge({ type }: { type: SchoolInstitutionType }) {
-  const config = {
-    public: {
-      label: '公立',
-      className: 'bg-sky-50 text-sky-700 ring-sky-200',
-    },
-    private: {
-      label: '私立',
-      className: 'bg-violet-50 text-violet-700 ring-violet-200',
-    },
-    support: {
-      label: 'サポート校',
-      className: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-    },
-  }[type];
-
-  return (
-    <span
-      className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset ${config.className}`}
-    >
-      {config.label}
-    </span>
   );
 }
 
@@ -268,6 +248,8 @@ export default function SchoolCardServer({
     };
   })();
   const tuitionSummary = tuitionEstimate ? buildTuitionCardSummary(tuitionEstimate) : null;
+  /** 一覧では適用前の学校と適用後の学校が隣に並ぶため、金額だけを出すと安い順に見えてしまう */
+  const tuitionBasisLabel = tuitionEstimate ? buildTuitionCardBasisLabel(tuitionEstimate) : null;
   const courseSummary = buildCourseCardSummary(courseListing);
   /** 生成失敗文・引用番号が残った紹介文は表示しない */
   const safeIntro = sanitizeAiText(intro);
@@ -360,6 +342,14 @@ export default function SchoolCardServer({
               {tuitionEstimate?.display_mode === 'amounts' ? `${TUITION_FIRST_YEAR_LABEL}：` : '学費目安：'}
             </span>
             {tuitionSummary}
+            {tuitionBasisLabel && (
+              <span className="text-gray-500 ml-1">（{tuitionBasisLabel}）</span>
+            )}
+            {institutionType === 'support' && (
+              <span className="mt-0.5 block text-emerald-800">
+                別途、提携する通信制高校の学費がかかります
+              </span>
+            )}
           </p>
         )}
 

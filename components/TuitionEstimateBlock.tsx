@@ -3,8 +3,12 @@ import {
   buildTuitionRangeLines,
   formatTuitionRange,
   hasDisplayableTuition,
+  resolveSupportFundBasis,
+  SUPPORT_FUND_BADGE_LABEL,
+  SUPPORT_FUND_CAUTION,
   TUITION_FALLBACK_TEXT,
   TUITION_FIRST_YEAR_LABEL,
+  type TuitionSupportFundBasis,
 } from '@/lib/tuition/format';
 interface TuitionEstimateBlockProps {
   estimate: PublicTuitionEstimate | null;
@@ -28,6 +32,21 @@ function buildPlanLabel(plan: PublicTuitionEstimate['plans'][number]): string {
   return parts.join('・') || '費用目安';
 }
 
+/** バッジの配色。適用後は実質負担額、適用前はここから下がることを色で示し分ける */
+const BASIS_BADGE_CLASS: Record<TuitionSupportFundBasis, string> = {
+  before: 'bg-amber-100 text-amber-900 border-amber-200',
+  after: 'bg-emerald-100 text-emerald-900 border-emerald-200',
+  mixed: 'bg-gray-100 text-gray-700 border-gray-200',
+  unknown: 'bg-gray-100 text-gray-700 border-gray-200',
+};
+
+const BASIS_BOX_CLASS: Record<TuitionSupportFundBasis, string> = {
+  before: 'bg-amber-50 border-amber-200 text-amber-900',
+  after: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+  mixed: 'bg-gray-50 border-gray-200 text-gray-700',
+  unknown: 'bg-gray-50 border-gray-200 text-gray-700',
+};
+
 /**
  * 学費目安（参考目安）の表示ブロック。
  * 公開済みデータがない場合は何も描画しない（無理に表示しない）。
@@ -43,6 +62,8 @@ export default function TuitionEstimateBlock({
   const rangeLines = buildTuitionRangeLines(estimate);
   const fallbackText =
     estimate.display_mode !== 'amounts' ? TUITION_FALLBACK_TEXT[estimate.display_mode] : null;
+  const basis = resolveSupportFundBasis(estimate);
+  const showBasis = estimate.display_mode === 'amounts' && rangeLines.length > 0;
 
   const visiblePlans = estimate.plans
     .map((plan) => ({ label: buildPlanLabel(plan), range: buildPlanRangeText(plan), note: plan.note?.trim() || null }))
@@ -55,23 +76,38 @@ export default function TuitionEstimateBlock({
         {TUITION_FIRST_YEAR_LABEL}
         <span className="ml-1.5 text-xs font-medium text-amber-800">（参考）</span>
       </h4>
-      {estimate.display_mode === 'amounts' && rangeLines.length > 0 && (
+      {showBasis && (
         <p className="text-xs text-gray-500 mb-3 leading-relaxed">
-          入学後1年目に学校へ納める費用の合計（就学支援金適用前・公式記載ベース）。教材費等は含まない場合があります。
+          入学後1年目に学校へ納める費用の合計（公式記載ベース）。教材費等は含まない場合があります。
         </p>
       )}
 
       {rangeLines.length > 0 ? (
         <dl className="space-y-1.5 mb-3">
           {rangeLines.map((line) => (
-            <div key={line.label} className="flex items-baseline gap-3">
+            <div key={line.label} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <dt className="w-14 flex-shrink-0 text-xs text-gray-500">{line.label}</dt>
-              <dd className="text-sm font-bold text-gray-800">{line.value}</dd>
+              <dd className="text-base font-bold text-gray-900">{line.value}</dd>
+              {showBasis && (
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${BASIS_BADGE_CLASS[basis]}`}
+                >
+                  {SUPPORT_FUND_BADGE_LABEL[basis]}
+                </span>
+              )}
             </div>
           ))}
         </dl>
       ) : (
         fallbackText && <p className="text-sm text-gray-700 leading-relaxed mb-3">{fallbackText}</p>
+      )}
+
+      {showBasis && (
+        <p
+          className={`mb-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${BASIS_BOX_CLASS[basis]}`}
+        >
+          {SUPPORT_FUND_CAUTION[basis]}
+        </p>
       )}
 
       {visiblePlans.length > 0 && (

@@ -7,10 +7,14 @@ type PublishAction = 'publish' | 'unpublish' | 'reject';
 
 /**
  * 学費目安の公開状態の切り替え
- * - publish: draft → published（既存の published は draft に降格）
+ * - publish: draft → published（既存の published / 他draft は rejected に退避）
  * - unpublish: published → draft
  * - reject: draft → rejected
  * 自動公開は不可（必ず管理者の操作で実行される）
+ *
+ * 注意: 旧 published を draft に戻すと、管理画面が「最新draft」として古い内容を
+ * 編集フォームに載せてしまい、再公開で適用前後などが unknown に戻る。
+ * そのため公開時は旧版を rejected に退避する。
  */
 export async function POST(
   request: NextRequest,
@@ -55,14 +59,25 @@ export async function POST(
         );
       }
 
-      // 既存の published を draft に降格（部分ユニークインデックスで published は1件のみ）
+      // 既存の published を rejected に退避（draft に戻すと編集フォームが旧内容を読む）
       const { error: demoteError } = await supabase
         .from('school_tuition_estimates')
-        .update({ status: 'draft' })
+        .update({ status: 'rejected' })
         .eq('school_id', schoolId)
         .eq('status', 'published');
       if (demoteError) {
-        console.error('[tuition publish] 既存公開の降格エラー:', demoteError);
+        console.error('[tuition publish] 既存公開の退避エラー:', demoteError);
+      }
+
+      // 公開対象以外の draft も rejected に（複数 draft があると保存・再公開で取り違える）
+      const { error: rejectSiblingsError } = await supabase
+        .from('school_tuition_estimates')
+        .update({ status: 'rejected' })
+        .eq('school_id', schoolId)
+        .eq('status', 'draft')
+        .neq('id', estimateId);
+      if (rejectSiblingsError) {
+        console.error('[tuition publish] 他draftの退避エラー:', rejectSiblingsError);
       }
 
       const { data: published, error: publishError } = await supabase

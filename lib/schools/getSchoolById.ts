@@ -1,10 +1,12 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import type { SchoolInstitutionType } from '@/lib/types/schools';
 
 export interface SchoolById {
   id: string;
   name: string;
   prefecture: string;
+  institution_type: SchoolInstitutionType | null;
   slug: string | null;
   intro: string | null;
   highlights: unknown;
@@ -230,6 +232,7 @@ export const getSchoolById = cache(async (id: string): Promise<SchoolById | null
     id: school.id,
     name: school.name,
     prefecture: school.prefecture,
+    institution_type: school.institution_type ?? null,
     slug: school.slug || null,
     intro: school.intro,
     highlights: school.highlights,

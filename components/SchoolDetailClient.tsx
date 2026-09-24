@@ -17,6 +17,7 @@ import type { ParsedAiSummarySections } from '@/lib/schools/parseAiSummarySectio
 import {
   sliceSummaryForFv,
   stripAiSummaryDisclaimer,
+  stripAiBulletLabel,
   stripTuitionCommuteMarkdownSection,
 } from '@/lib/schools/parseAiSummarySections';
 import { MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND } from '@/lib/schools/review-display-thresholds';
@@ -31,6 +32,7 @@ import TuitionEstimateBlock from '@/components/TuitionEstimateBlock';
 import TuitionDisclaimer from '@/components/TuitionDisclaimer';
 import CourseListBlock from '@/components/CourseListBlock';
 import { hasDisplayableTuition } from '@/lib/tuition/format';
+import { isSupportSchool, SUPPORT_SCHOOL_TUITION_CAUTION } from '@/lib/schools/institution-type';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { getPrefecturePath } from '@/lib/prefectures';
 
@@ -243,6 +245,7 @@ export default function SchoolDetailClient({
         name={school.name}
         prefecture={school.prefecture}
         prefectures={school.prefectures || undefined}
+        institutionType={school.institution_type}
         campusLocations={school.campus_locations}
         slug={encodedSlug}
         overallAvg={school.overall_avg}
@@ -356,7 +359,8 @@ export default function SchoolDetailClient({
               );
             }
             if (/^[-・*]\s/.test(trimmedLine)) {
-              const content = trimmedLine.replace(/^[-・*]\s/, '');
+              const content = stripAiBulletLabel(trimmedLine.replace(/^[-・*]\s/, ''));
+              if (!content) return null;
               if (currentSection === 'good' || currentSection === 'bad' || currentSection === 'tuition') {
                 const ic = currentSection === 'good' ? 'check' : currentSection === 'bad' ? 'x' : 'bus';
                 return (
@@ -665,6 +669,11 @@ export default function SchoolDetailClient({
 
         <section id="section-tuition" className="bg-white rounded-2xl shadow-md p-6 md:p-8 border border-gray-200">
           <h2 className="text-xl font-bold text-gray-900 mb-2">学費・費用感</h2>
+          {isSupportSchool(school.institution_type) && (
+            <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+              {SUPPORT_SCHOOL_TUITION_CAUTION}
+            </p>
+          )}
           {hasDisplayableTuition(school.tuition_estimate ?? null) && (
             <TuitionDisclaimer variant="lead" className="mb-4" />
           )}

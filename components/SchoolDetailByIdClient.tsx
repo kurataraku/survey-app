@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import StarRatingDisplay from '@/components/StarRatingDisplay';
 import RatingDisplay from '@/components/RatingDisplay';
+import InstitutionTypeBadge from '@/components/InstitutionTypeBadge';
 import { getQuestionLabel } from '@/lib/questionLabels';
 import { appPath } from '@/lib/base-path';
 import type { SchoolById } from '@/lib/schools/getSchoolById';
@@ -37,7 +38,17 @@ export default function SchoolDetailByIdClient({
           </Link>
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{school.name}</h1>
-        <p className="text-gray-600 mb-4">{school.prefecture}</p>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {school.institution_type && (
+            <InstitutionTypeBadge type={school.institution_type} size="md" />
+          )}
+          <span className="text-gray-600">{school.prefecture}</span>
+        </div>
+        {school.institution_type === 'support' && (
+          <p className="mb-4 text-xs leading-relaxed text-emerald-900">
+            この学校はサポート校です。通信制高校ではなく、学習や生活を支援する施設のため、高校卒業資格は提携する通信制高校で取得します。
+          </p>
+        )}
 
         <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
           {school.overall_avg !== null ? (

@@ -33,8 +33,28 @@ export async function GET(
     }
 
     const published = rows?.find((r) => r.status === 'published') ?? null;
-    const draft = rows?.find((r) => r.status === 'draft') ?? null;
+    let draft = rows?.find((r) => r.status === 'draft') ?? null;
     const rejected = rows?.find((r) => r.status === 'rejected') ?? null;
+
+    // 公開時に旧publishedをdraftへ降格していた頃の残骸:
+    // draft.updated_at <= published.updated_at なら「公開より古い下書き」＝編集対象にしない。
+    // 残しておくと管理画面が unknown 等の旧内容をフォームに載せ、再公開で上書きする。
+    if (
+      draft &&
+      published &&
+      draft.updated_at &&
+      published.updated_at &&
+      new Date(draft.updated_at).getTime() <= new Date(published.updated_at).getTime()
+    ) {
+      const { error: cleanupError } = await supabase
+        .from('school_tuition_estimates')
+        .update({ status: 'rejected' })
+        .eq('id', draft.id);
+      if (cleanupError) {
+        console.error('[tuition GET] 降格残骸draftの片付けエラー:', cleanupError);
+      }
+      draft = null;
+    }
 
     return NextResponse.json({ published, draft, rejected });
   } catch (error) {
@@ -80,19 +100,41 @@ export async function PUT(
     // 既存のdraftを取得（最新1件）
     const { data: existingDraft } = await supabase
       .from('school_tuition_estimates')
-      .select('id')
+      .select('id, updated_at')
       .eq('school_id', schoolId)
       .eq('status', 'draft')
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    // 公開中より古い draft は公開時降格の残骸なので、上書きせず rejected にして新規作成する
+    const { data: publishedRow } = await supabase
+      .from('school_tuition_estimates')
+      .select('id, updated_at')
+      .eq('school_id', schoolId)
+      .eq('status', 'published')
+      .maybeSingle();
+
+    let draftToUpdate = existingDraft;
+    if (
+      existingDraft &&
+      publishedRow?.updated_at &&
+      existingDraft.updated_at &&
+      new Date(existingDraft.updated_at).getTime() <= new Date(publishedRow.updated_at).getTime()
+    ) {
+      await supabase
+        .from('school_tuition_estimates')
+        .update({ status: 'rejected' })
+        .eq('id', existingDraft.id);
+      draftToUpdate = null;
+    }
+
     let result;
-    if (existingDraft) {
+    if (draftToUpdate) {
       result = await supabase
         .from('school_tuition_estimates')
         .update({ ...input, origin: 'manual' })
-        .eq('id', existingDraft.id)
+        .eq('id', draftToUpdate.id)
         .select()
         .single();
     } else {
