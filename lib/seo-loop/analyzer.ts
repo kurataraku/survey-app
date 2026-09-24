@@ -14,6 +14,12 @@ import {
 import { fetchPageTopQueries } from './analysis/page-queries';
 import { candidateActionsForIssue } from './analysis/policy';
 import {
+  loadUnfinishedProposalLocks,
+  normalizedTargetKey,
+  proposalLockKey,
+  targetTypeForAction,
+} from './proposal-locks';
+import {
   assembleProposalV2,
   strategistOutputSchema,
   validateStrategistAction,
@@ -99,6 +105,20 @@ export async function countOpenIssues(
   return count ?? 0;
 }
 
+/** Slack承認待ちのまま残っている提案。完了判定で取りこぼさないために数える */
+async function countAwaitingApproval(
+  supabase: SupabaseClient,
+  runId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from('seo_proposals')
+    .select('id', { count: 'exact', head: true })
+    .eq('run_id', runId)
+    .eq('status', 'pending_approval');
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function analyzeIssuesToProposals(params: {
   supabase: SupabaseClient;
   runId: string;
@@ -107,12 +127,30 @@ export async function analyzeIssuesToProposals(params: {
 }): Promise<{ proposalCount: number; message: string }> {
   const issues = await fetchOpenIssues(params.supabase, params.runId);
   if (issues.length === 0) {
+    const awaitingApproval = await countAwaitingApproval(
+      params.supabase,
+      params.runId
+    );
     const { error } = await params.supabase
       .from('seo_loop_runs')
-      .update({ status: 'completed', current_step: 'analyze', completed_at: new Date().toISOString() })
+      .update(
+        awaitingApproval > 0
+          ? { status: 'pending_approval', current_step: 'approve' }
+          : {
+              status: 'completed',
+              current_step: 'analyze',
+              completed_at: new Date().toISOString(),
+            }
+      )
       .eq('id', params.runId);
     if (error) throw error;
-    return { proposalCount: 0, message: '分析対象の課題がありません' };
+    return {
+      proposalCount: 0,
+      message:
+        awaitingApproval > 0
+          ? `分析対象の課題がありません／承認待ち${awaitingApproval}件を残します`
+          : '分析対象の課題がありません',
+    };
   }
 
   const analystModel = resolveSeoLoopAnalystModel();
@@ -130,6 +168,11 @@ export async function analyzeIssuesToProposals(params: {
   });
   let stoppedReason: 'budget' | 'deadline' | null = null;
   const dismissedStages: string[] = [];
+  // 未完了提案がある対象はSlackへ出せない。生成してから重複で落とすと
+  // LLM呼び出しと当日予算を無駄にするため、分析前に候補actionから外す。
+  const proposalLocks = await loadUnfinishedProposalLocks({
+    supabase: params.supabase,
+  });
 
   for (const issue of issues) {
     if (remainingBudget <= 0) {
@@ -199,11 +242,44 @@ export async function analyzeIssuesToProposals(params: {
       continue;
     }
 
-    const candidateActions = candidateActionsForIssue(
+    const policyActions = candidateActionsForIssue(
       issue.issue_type,
       context,
       rulebook.content.analyzer
     );
+    const lockKeyFor = (action: (typeof policyActions)[number]): string =>
+      proposalLockKey(
+        action,
+        normalizedTargetKey(
+          targetTypeForAction(action),
+          context.target.id ?? '',
+          context.target.url
+        )
+      );
+    const lockedActions = policyActions.filter((action) =>
+      proposalLocks.has(lockKeyFor(action))
+    );
+    const candidateActions = policyActions.filter(
+      (action) => !proposalLocks.has(lockKeyFor(action))
+    );
+    if (policyActions.length > 0 && candidateActions.length === 0) {
+      const { error } = await params.supabase
+        .from('seo_issues')
+        .update({
+          status: 'dismissed',
+          evidence: mergeIssueEvidence(issue, {
+            analysis_failure: {
+              stage: 'duplicate',
+              reason: '候補actionの対象に未完了提案が残っています',
+              lockedActions,
+            },
+          }),
+        })
+        .eq('id', issue.id);
+      if (error) throw error;
+      dismissedStages.push('duplicate');
+      continue;
+    }
     if (candidateActions.length === 0) {
       const { error } = await params.supabase
         .from('seo_issues')
@@ -482,6 +558,14 @@ export async function analyzeIssuesToProposals(params: {
         ));
       }
       if (error) throw error;
+      for (const target of insert.targets) {
+        proposalLocks.add(
+          proposalLockKey(
+            insert.action,
+            normalizedTargetKey(target.type, target.id, target.url)
+          )
+        );
+      }
       proposalCount += 1;
       issueProposalCount += 1;
       remainingBudget -= 1;
@@ -507,8 +591,14 @@ export async function analyzeIssuesToProposals(params: {
   // 予算切れ・時間切れのときも課題はopenのまま残し、次tickで再開する。
   const continueAnalyzing =
     openRemaining > 0 && remainingBudget > 0 && stoppedReason !== 'budget';
+  // 先のパスでSlackへ出した提案が承認待ちなら、このパスが0件でもrunを終わらせない。
+  // 終わらせると後から承認されてもexecuteが回らず、提案が承認済みのまま残る。
+  const awaitingApproval = await countAwaitingApproval(
+    params.supabase,
+    params.runId
+  );
   const nextStatus =
-    proposalCount > 0
+    proposalCount > 0 || awaitingApproval > 0
       ? 'pending_approval'
       : continueAnalyzing
         ? 'analyzing'
@@ -518,7 +608,7 @@ export async function analyzeIssuesToProposals(params: {
     .from('seo_loop_runs')
     .update({
       status: nextStatus,
-      current_step: proposalCount > 0 ? 'approve' : 'analyze',
+      current_step: nextStatus === 'pending_approval' ? 'approve' : 'analyze',
       completed_at: nextStatus === 'completed' ? new Date().toISOString() : null,
     })
     .eq('id', params.runId);

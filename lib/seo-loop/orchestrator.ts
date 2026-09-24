@@ -137,6 +137,48 @@ async function hasUnnotifiedPendingProposal(
 }
 
 /**
+ * runが終了したあとにSlackで承認された提案は、executeステップが回らないまま残る。
+ * 承認済みで未実行の提案を持つrunをexecuteへ戻し、承認が宙に浮かないようにする。
+ */
+async function reopenRunsWithApprovedProposals(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { data: approved, error } = await supabase
+    .from('seo_proposals')
+    .select('run_id')
+    .eq('status', 'approved')
+    .limit(100);
+  if (error) throw error;
+  const runIds = [...new Set((approved ?? []).map((row) => row.run_id as string))];
+  if (runIds.length === 0) return 0;
+
+  const { data: runs, error: runError } = await supabase
+    .from('seo_loop_runs')
+    .select('id,status')
+    .in('id', runIds)
+    .in('status', ['completed', 'failed', 'skipped']);
+  if (runError) throw runError;
+
+  let reopened = 0;
+  for (const run of runs ?? []) {
+    const { data: updated, error: updateError } = await supabase
+      .from('seo_loop_runs')
+      .update({
+        status: 'executing',
+        current_step: 'execute',
+        completed_at: null,
+        next_action_at: new Date().toISOString(),
+      })
+      .eq('id', run.id)
+      .eq('status', run.status)
+      .select('id');
+    if (updateError) throw updateError;
+    reopened += (updated ?? []).length;
+  }
+  return reopened;
+}
+
+/**
  * 日次Cronは1回なので、未完了runを優先して再開する。
  * 人間承認待ちのみのrunはスキップし、当日runの新規観測を妨げない。
  */
@@ -802,6 +844,16 @@ export async function runSeoLoopTick(): Promise<SeoLoopStepResult> {
         error instanceof Error ? error.message : String(error)
       }`,
     }).catch(() => undefined);
+  }
+  try {
+    const reopened = await reopenRunsWithApprovedProposals(supabase);
+    if (reopened > 0) {
+      console.log('SEO Loop reopened runs with approved proposals', { reopened });
+    }
+  } catch (error) {
+    console.error('SEO Loop approved proposal recovery failed; main continues', {
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
   const todayKey = dailyRunKey();
   const deadlineAt = Date.now() + TICK_TIME_BUDGET_MS;

@@ -5,6 +5,11 @@ import {
   factContextSnapshotSchema,
   type FactContextSnapshot,
 } from '../context/types';
+import {
+  loadUnfinishedProposalLocks,
+  normalizedTargetKey,
+  proposalLockKey,
+} from '../proposal-locks';
 import { determineRiskLevel } from '../risk-rules';
 import { proposalPayloadV2Schema } from '../types';
 import { runHardGate } from './hard-gate';
@@ -44,14 +49,6 @@ function evaluationVersion(
       ? `${QUALITY_EVALUATION_VERSION}-execution`
       : QUALITY_EVALUATION_VERSION;
   return `${base}@rb${rulebook.version}:${rulebook.contentHash.slice(0, 12)}`;
-}
-
-function normalizedTargetKey(type: string, id: string, urlValue: string): string {
-  const url = new URL(urlValue);
-  url.hash = '';
-  url.search = '';
-  url.pathname = url.pathname.replace(/\/+$/, '') || '/';
-  return `${type}:${id}:${url.toString()}`;
 }
 
 function startOfUtcDay(): string {
@@ -114,32 +111,19 @@ async function hasDuplicateProposal(
 ): Promise<boolean> {
   const parsed = proposalPayloadV2Schema.safeParse(proposal.payload);
   if (!parsed.success) return false;
-  const targetKeys = new Set(
-    parsed.data.targets.map((target) =>
-      normalizedTargetKey(target.type, target.id, target.url)
+  const locks = await loadUnfinishedProposalLocks({
+    supabase,
+    action: parsed.data.action,
+    excludeProposalId: proposal.id,
+  });
+  return parsed.data.targets.some((target) =>
+    locks.has(
+      proposalLockKey(
+        parsed.data.action,
+        normalizedTargetKey(target.type, target.id, target.url)
+      )
     )
   );
-  const duplicateWindow = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('seo_proposals')
-    .select('id,action,payload')
-    .neq('id', proposal.id)
-    .eq('action', parsed.data.action)
-    .in('status', ['pending_approval', 'approved'])
-    .gte('created_at', duplicateWindow)
-    .order('created_at', { ascending: false })
-    .limit(100);
-  if (error) throw error;
-
-  return (data ?? []).some((row) => {
-    const other = proposalPayloadV2Schema.safeParse(row.payload);
-    return (
-      other.success &&
-      other.data.targets.some((target) =>
-        targetKeys.has(normalizedTargetKey(target.type, target.id, target.url))
-      )
-    );
-  });
 }
 
 async function loadExistingEvaluation(
