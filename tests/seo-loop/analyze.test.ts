@@ -28,6 +28,7 @@ describe('extractGscOpportunities', () => {
       'striking_distance',
       'striking_distance',
       'declining_clicks',
+      'striking_distance',
       'low_ctr_high_impressions',
     ]);
     expect(opportunities[0]?.targetUrl).toBe('https://example.invalid/schools/alpha');
@@ -46,27 +47,38 @@ describe('extractGscOpportunities', () => {
     ).not.toContain('low_ctr_high_impressions');
   });
 
-  it('掲載順位5〜15位と表示100回の境界を含む', () => {
+  it('掲載順位5〜20位と表示30回の境界を含む', () => {
     const issues = extractGscOpportunities([
       row({ keys: ['https://example.invalid/five'], position: 5 }),
-      row({ keys: ['https://example.invalid/fifteen'], position: 15 }),
+      row({ keys: ['https://example.invalid/twenty'], position: 20 }),
       row({ keys: ['https://example.invalid/below'], position: 4.99 }),
-      row({ keys: ['https://example.invalid/above'], position: 15.01 }),
-      row({ keys: ['https://example.invalid/few'], position: 10, impressions: 99 }),
+      row({ keys: ['https://example.invalid/above'], position: 20.01 }),
+      row({ keys: ['https://example.invalid/thirty'], position: 10, impressions: 30 }),
+      row({ keys: ['https://example.invalid/few'], position: 10, impressions: 29 }),
     ]);
 
-    expect(issues.map((item) => item.targetUrl)).toEqual([
+    expect(
+      issues
+        .filter((item) => item.issueType === 'striking_distance')
+        .map((item) => item.targetUrl)
+        .sort()
+    ).toEqual([
       'https://example.invalid/five',
-      'https://example.invalid/fifteen',
+      'https://example.invalid/thirty',
+      'https://example.invalid/twenty',
     ]);
   });
 
   it('クリック下落-10を境界として抽出する', () => {
-    expect(extractGscOpportunities([row({ delta: { clicks: -10, impressions: 0, ctr: 0, position: 0 } })])).toHaveLength(1);
-    expect(extractGscOpportunities([row({ delta: { clicks: -9, impressions: 0, ctr: 0, position: 0 } })])).toHaveLength(0);
+    const declining = (clicks: number) =>
+      extractGscOpportunities([
+        row({ position: 25, delta: { clicks, impressions: 0, ctr: 0, position: 0 } }),
+      ]).filter((item) => item.issueType === 'declining_clicks');
+    expect(declining(-10)).toHaveLength(1);
+    expect(declining(-9)).toHaveLength(0);
   });
 
-  it('入力を破壊せず、結果を20件に制限する', () => {
+  it('入力を破壊せず、結果を指定件数に制限する', () => {
     const rows = Array.from({ length: 25 }, (_, index) =>
       row({
         keys: [`https://example.invalid/${index}`],
@@ -75,10 +87,11 @@ describe('extractGscOpportunities', () => {
       })
     );
     const before = JSON.stringify(rows);
-    const result = extractGscOpportunities(rows);
 
-    expect(result).toHaveLength(20);
-    expect(result[0]?.targetUrl).toBe('https://example.invalid/24');
+    expect(extractGscOpportunities(rows)).toHaveLength(25);
+    const limited = extractGscOpportunities(rows, 20);
+    expect(limited).toHaveLength(20);
+    expect(limited[0]?.targetUrl).toBe('https://example.invalid/24');
     expect(JSON.stringify(rows)).toBe(before);
   });
 });

@@ -8,10 +8,13 @@ import { getGscComparisonPeriods } from '@/lib/gsc/periods';
 import type { SeoLoopConfig } from './config';
 import { isWithinSeoLoopReplenishWindow } from './schedule';
 
-const MAX_PRIORITY_PAGE_QUERY_URLS = 8;
+const MAX_PRIORITY_PAGE_QUERY_URLS = 12;
 
-/** 検出する課題数はproposal上限より多く取り、見送り分を吸収する */
-const ISSUE_CAP_MULTIPLIER = 2;
+/**
+ * 検出する課題数はproposal上限より多く取り、見送り分を吸収する。
+ * 実績の課題→提案転換率は約1/3なので3倍を確保する。
+ */
+const ISSUE_CAP_MULTIPLIER = 3;
 
 /** 1回の補充で追加する課題数。毎時の分析バケットに合わせる */
 export const REPLENISH_BATCH_SIZE = 5;
@@ -34,10 +37,15 @@ export function selectPriorityUrls(
 
 export function rankAndDedupeOpportunities(
   opportunities: GscOpportunity[],
-  limit: number
+  limit: number,
+  recentlyTargetedUrls: ReadonlySet<string> = new Set()
 ): GscOpportunity[] {
+  const recentlyTargeted = (opportunity: GscOpportunity): boolean =>
+    Boolean(opportunity.targetUrl && recentlyTargetedUrls.has(opportunity.targetUrl));
   const ranked = [...opportunities].sort(
     (a, b) =>
+      // 直近に扱ったページは後回しにして、毎日同じ対象を選び続けないようにする
+      Number(recentlyTargeted(a)) - Number(recentlyTargeted(b)) ||
       Number(Boolean(b.targetUrl)) - Number(Boolean(a.targetUrl)) ||
       Number(Boolean(b.query)) - Number(Boolean(a.query)) ||
       b.scores.opportunity - a.scores.opportunity
@@ -50,6 +58,29 @@ export function rankAndDedupeOpportunities(
     if (!deduped.has(key)) deduped.set(key, opportunity);
   }
   return [...deduped.values()].slice(0, limit);
+}
+
+/** 同じページを毎日選び直さないための間隔 */
+const TARGET_ROTATION_DAYS = 7;
+
+/** 直近に課題として扱ったページ。観測時の優先度を下げる */
+export async function loadRecentlyTargetedUrls(
+  supabase: SupabaseClient,
+  days = TARGET_ROTATION_DAYS
+): Promise<Set<string>> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('seo_issues')
+    .select('target_url')
+    .gte('created_at', since)
+    .not('target_url', 'is', null)
+    .limit(1000);
+  if (error) throw error;
+  return new Set(
+    (data ?? [])
+      .map((row) => String(row.target_url ?? ''))
+      .filter((url) => url.length > 0)
+  );
 }
 
 function coverageKey(opportunity: {
@@ -69,8 +100,11 @@ export function selectReplenishOpportunities(
   opportunities: GscOpportunity[],
   coveredKeys: ReadonlySet<string>,
   existingIssueKeys: ReadonlySet<string>,
-  limit: number
+  limit: number,
+  recentlyTargetedUrls: ReadonlySet<string> = new Set()
 ): GscOpportunity[] {
+  const recentlyTargeted = (opportunity: GscOpportunity): boolean =>
+    Boolean(opportunity.targetUrl && recentlyTargetedUrls.has(opportunity.targetUrl));
   const ranked = opportunities
     .filter(
       (opportunity) =>
@@ -80,6 +114,7 @@ export function selectReplenishOpportunities(
     )
     .sort(
       (a, b) =>
+        Number(recentlyTargeted(a)) - Number(recentlyTargeted(b)) ||
         Number(Boolean(b.query)) - Number(Boolean(a.query)) ||
         Number(Boolean(b.targetUrl)) - Number(Boolean(a.targetUrl)) ||
         b.scores.opportunity - a.scores.opportunity
@@ -258,11 +293,16 @@ export async function observeGscIssues(params: {
   runId: string;
   config: SeoLoopConfig;
 }): Promise<{ issueCount: number; message: string }> {
-  const collected = await collectGscOpportunities({ config: params.config });
+  const recentlyTargetedUrls = await loadRecentlyTargetedUrls(params.supabase);
+  const collected = await collectGscOpportunities({
+    config: params.config,
+    excludeUrls: recentlyTargetedUrls,
+  });
   const issueCap = issueCapForRun(params.config.maxDailyProposals);
   const opportunities = rankAndDedupeOpportunities(
     collected.opportunities,
-    issueCap
+    issueCap,
+    recentlyTargetedUrls
   );
 
   await saveOpportunities({
@@ -288,6 +328,12 @@ export async function observeGscIssues(params: {
         page_query_failures: collected.pageQueryFailures,
         page_query_rows: collected.pageQueryRows,
         issue_count: opportunities.length,
+        recently_targeted_urls: recentlyTargetedUrls.size,
+        fresh_target_count: opportunities.filter(
+          (opportunity) =>
+            !opportunity.targetUrl ||
+            !recentlyTargetedUrls.has(opportunity.targetUrl)
+        ).length,
       },
     })
     .eq('id', params.runId);
@@ -322,11 +368,12 @@ export async function replenishGscIssues(params: {
   }
 
   const coverage = await loadExistingIssueCoverage(params.supabase, params.runId);
+  const recentlyTargetedUrls = await loadRecentlyTargetedUrls(params.supabase);
   const batchSize = Math.max(1, params.batchSize ?? REPLENISH_BATCH_SIZE);
   const replenishConfig: SeoLoopConfig = {
     ...params.config,
     // 朝の上位ページを使い切ったあとも、より深い順位のページ候補を拾う
-    gscRowLimit: Math.min(100, Math.max(params.config.gscRowLimit, params.config.gscRowLimit * 2)),
+    gscRowLimit: Math.min(1000, params.config.gscRowLimit * 2),
   };
   const collected = await collectGscOpportunities({
     config: replenishConfig,
@@ -337,7 +384,8 @@ export async function replenishGscIssues(params: {
     collected.opportunities,
     coverage.coveredKeys,
     coverage.issueKeys,
-    batchSize
+    batchSize,
+    recentlyTargetedUrls
   );
 
   if (opportunities.length === 0) {

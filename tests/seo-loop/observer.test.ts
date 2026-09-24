@@ -89,6 +89,34 @@ describe('rankAndDedupeOpportunities', () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.query).toBe('高優先クエリ');
   });
+
+  it('直近に扱ったURLはスコアが高くても後回しにする', () => {
+    const recent = 'https://example.invalid/schools/recent';
+    const fresh = 'https://example.invalid/schools/fresh';
+    const opportunities = extractGscOpportunities([
+      row(recent, 2000, '高スコアクエリ'),
+      row(fresh, 300, '新規クエリ'),
+    ]).filter((item) => item.issueType === 'low_ctr_high_impressions');
+
+    const result = rankAndDedupeOpportunities(
+      opportunities,
+      10,
+      new Set([recent])
+    );
+
+    expect(result.map((item) => item.targetUrl)).toEqual([fresh, recent]);
+  });
+
+  it('新規URLだけで上限に届かないときは直近URLで埋める', () => {
+    const recent = 'https://example.invalid/schools/recent';
+    const opportunities = extractGscOpportunities([
+      row(recent, 2000, '高スコアクエリ'),
+    ]).filter((item) => item.issueType === 'low_ctr_high_impressions');
+
+    expect(
+      rankAndDedupeOpportunities(opportunities, 5, new Set([recent]))
+    ).toHaveLength(1);
+  });
 });
 
 describe('selectReplenishOpportunities', () => {
@@ -137,6 +165,25 @@ describe('selectReplenishOpportunities', () => {
     expect(
       selectReplenishOpportunities(opportunities, new Set(), existingKeys, 5)
     ).toEqual([]);
+  });
+
+  it('補充でも直近に扱ったURLより新規URLを先に選ぶ', () => {
+    const recent = 'https://example.invalid/schools/recent';
+    const fresh = 'https://example.invalid/schools/fresh';
+    const opportunities = extractGscOpportunities([
+      row(recent, 2000, '高スコアクエリ'),
+      row(fresh, 300, '新規クエリ'),
+    ]).filter((item) => item.issueType === 'low_ctr_high_impressions');
+
+    const result = selectReplenishOpportunities(
+      opportunities,
+      new Set(),
+      new Set(),
+      1,
+      new Set([recent])
+    );
+
+    expect(result.map((item) => item.targetUrl)).toEqual([fresh]);
   });
 });
 

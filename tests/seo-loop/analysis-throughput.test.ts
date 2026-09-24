@@ -213,9 +213,9 @@ describe('分析スループット', () => {
     callLLMMock.mockReset();
   });
 
-  it('検出する課題数はproposal上限の2倍にする', () => {
-    expect(issueCapForRun(10)).toBe(20);
-    expect(issueCapForRun(1)).toBe(2);
+  it('検出する課題数はproposal上限の3倍にする', () => {
+    expect(issueCapForRun(10)).toBe(30);
+    expect(issueCapForRun(1)).toBe(3);
   });
 
   it('時間上限を超えたらLLMを呼ばず、課題をopenのまま次tickへ残す', async () => {

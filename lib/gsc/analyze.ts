@@ -39,7 +39,16 @@ function snapshot(row: GscComparedRow): Record<string, unknown> {
   };
 }
 
-export function extractGscOpportunities(rows: GscComparedRow[]): GscOpportunity[] {
+/**
+ * 1回の抽出で返す最大件数。課題上限より十分多く取り、
+ * ページのローテーションと重複除去の余地を残す。
+ */
+const DEFAULT_OPPORTUNITY_LIMIT = 200;
+
+export function extractGscOpportunities(
+  rows: GscComparedRow[],
+  limit: number = DEFAULT_OPPORTUNITY_LIMIT
+): GscOpportunity[] {
   const opportunities: GscOpportunity[] = [];
 
   for (const row of rows) {
@@ -63,7 +72,7 @@ export function extractGscOpportunities(rows: GscComparedRow[]): GscOpportunity[
       });
     }
 
-    if (row.position >= 5 && row.position <= 15 && row.impressions >= 100) {
+    if (row.position >= 5 && row.position <= 20 && row.impressions >= 30) {
       opportunities.push({
         issueKey: `striking-distance:${row.keys.join('|')}`,
         issueType: 'striking_distance',
@@ -100,5 +109,5 @@ export function extractGscOpportunities(rows: GscComparedRow[]): GscOpportunity[
 
   return opportunities
     .sort((a, b) => b.scores.opportunity - a.scores.opportunity)
-    .slice(0, 20);
+    .slice(0, Math.max(1, limit));
 }

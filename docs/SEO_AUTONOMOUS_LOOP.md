@@ -96,13 +96,24 @@ Cronは毎時17分に起動します。GSC観測は`seo-loop:YYYY-MM-DD`のrun k
 
 1 tickの流れは次のとおりです。
 
-- 観測でproposal上限の2倍（既定20件）まで課題を保存する
+- 観測でproposal上限の3倍（既定30件）まで課題を保存する
 - 分析は5件ずつ処理し、Slack通知後に未分析課題と当日予算が残っていれば同じrunで分析へ戻る
 - 承認済みproposalの実行ゲート後も同様に、未分析課題と当日予算が残っていれば`completed`にせず分析へ戻る
 - 未分析課題が0件でも補充ウィンドウ内なら未処理ページのGSC候補を補充し、`completed` runも次の毎時tickで再開する
 - Function実行時間の予算（180秒）を超えたら新しい課題に着手せず、残りをopenのまま次tickへ回す
 
 1日のproposal数はRulebookの`ops.maxDailyProposals`が上限です（既定10件）。`SEO_LOOP_MAX_DAILY_PROPOSALS`を大きくしてもRulebook値が優先されるため、10件を超えるにはRulebook新版とshadow昇格が必要です。
+
+### 観測母数とページローテーション
+
+同じページを毎日選び直すと、すでに最適化済みの対象ばかりを再分析して提案が0件で終わります。母数とローテーションは次の設定で確保します。
+
+- `SEO_LOOP_GSC_ROW_LIMIT`（既定500）でGSCのpage/query取得行数を決める。補充時はこの2倍（上限1000）
+- `extractGscOpportunities(rows, limit)` の既定上限は200件。課題上限より十分多く取り、ローテーションの余地を残す
+- `striking_distance` は掲載順位5〜20位かつ表示30回以上を対象にする
+- 直近7日に課題として扱ったURLは、観測・補充の並び替えで後回しにする。新規URLだけで上限に届かない場合は既出URLで埋める
+
+`seo_loop_runs.metadata` の `recently_targeted_urls` と `fresh_target_count` で、その日の課題のうち何件が新規ページだったかを確認できます。
 
 提案が0件で終わったtickでは、Slackの実行結果通知に見送り理由（`context` / `facts` / `policy` / `analyst` / `strategist` / `assemble`）と未分析課題数が入ります。どの段で落ちたかを見て、プロンプトかRulebookのどちらを直すか判断してください。
 

@@ -30,11 +30,11 @@ export function getSeoLoopConfig(): SeoLoopConfig {
     executionEnabled: boolEnv('SEO_LOOP_EXECUTION_ENABLED', false),
     shadowRolloutEnabled: boolEnv('SEO_RULEBOOK_SHADOW_ENABLED', false),
     maxDailyProposals: intEnv('SEO_LOOP_MAX_DAILY_PROPOSALS', 10),
-    maxDailyExecutions: intEnv('SEO_LOOP_MAX_DAILY_EXECUTIONS', 3),
+    maxDailyExecutions: intEnv('SEO_LOOP_MAX_DAILY_EXECUTIONS', 10),
     maxTargetsPerProposal: intEnv('SEO_LOOP_MAX_TARGETS_PER_PROPOSAL', 3),
     lockTtlSeconds: intEnv('SEO_LOOP_LOCK_TTL_SECONDS', 240),
     gscDays: intEnv('SEO_LOOP_GSC_DAYS', 28),
-    gscRowLimit: intEnv('SEO_LOOP_GSC_ROW_LIMIT', 50),
+    gscRowLimit: intEnv('SEO_LOOP_GSC_ROW_LIMIT', 500),
     softEvalMinScore: Math.min(100, Math.max(0, intEnv('SEO_LOOP_SOFT_EVAL_MIN_SCORE', 75))),
   };
 }
