@@ -1,5 +1,6 @@
 import type { FactContextSnapshot } from '../context/types';
 import {
+  attendanceFrequencyRegressions,
   factualSupportRegressions,
   internalLinkRegressions,
   isStructuredTextAction,
@@ -151,6 +152,9 @@ export function runHardGate(params: {
     proposal && context ? factualSupportRegressions(proposal, context) : [];
   const shortTextRetention =
     proposal ? shortTextRetentionRegressions(proposal) : [];
+  const attendanceFrequency = proposal
+    ? attendanceFrequencyRegressions(proposal)
+    : [];
   const targetCount = proposal?.targets.length ?? 0;
   const approvalPhase = (params.phase ?? 'approval') === 'approval';
 
@@ -275,6 +279,15 @@ export function runHardGate(params: {
       '追加語がGSC需要データだけにあり、ページ内容で裏付けられていません',
       unsupportedAdditions.length > 0
         ? { regressions: unsupportedAdditions }
+        : undefined
+    ),
+    rule(
+      'attendance_frequency_not_asserted',
+      Boolean(proposal && attendanceFrequency.length === 0),
+      'スクーリング・登校頻度を単一値で断定していません',
+      'コースで異なるスクーリング・登校頻度を単一値で断定しています',
+      attendanceFrequency.length > 0
+        ? { regressions: attendanceFrequency }
         : undefined
     ),
     rule(

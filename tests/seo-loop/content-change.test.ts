@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { FactContextSnapshot } from '../../lib/seo-loop/context/types';
 import { validateProposalAgainstContext } from '../../lib/seo-loop/context/validate';
 import {
+  attendanceFrequencyRegressions,
   contentChangeRegressions,
   factualSupportRegressions,
   lowValueChangeFindings,
@@ -465,6 +466,80 @@ describe('短文の追加語をページFactで検証する', () => {
       '岡山操山高校 通信制'
     );
     expect(shortTextRetentionRegressions(proposal)).toHaveLength(1);
+  });
+});
+
+describe('スクーリング頻度の単一値断定を止める', () => {
+  const currentTitle = '匿名通信制高校の口コミ・評判｜コース・サポート・学費を解説';
+
+  function titleProposal(proposedValue: string, currentValue = currentTitle) {
+    return proposalPayloadV2Schema.parse({
+      ...(summaryProposal('dummy') as Record<string, unknown>),
+      action: 'updateSchoolMetaTitle',
+      targets: [
+        {
+          type: 'school',
+          id: 'school-anon-001',
+          url: targetUrl,
+          currentValue,
+          proposedValue,
+        },
+      ],
+    });
+  }
+
+  it('「月1回のスクーリング」のような単一値の断定を検出する', () => {
+    const proposal = titleProposal(
+      `${currentTitle}、オンライン授業と月1回のスクーリングを解説`
+    );
+    expect(attendanceFrequencyRegressions(proposal)[0]).toContain('月1回');
+  });
+
+  it('「月に一度の登校」のような漢数字表現も検出する', () => {
+    const proposal = titleProposal(`${currentTitle}、月に一度の登校で卒業を目指す`);
+    expect(attendanceFrequencyRegressions(proposal)).toHaveLength(1);
+  });
+
+  it('「週1〜5日から選べる通学」のような幅の表現は許可する', () => {
+    const proposal = titleProposal(
+      `${currentTitle}、週1〜5日から選べる通学スタイルを紹介`
+    );
+    expect(attendanceFrequencyRegressions(proposal)).toEqual([]);
+  });
+
+  it('コースにより異なると明示していれば許可する', () => {
+    const proposal = titleProposal(
+      `${currentTitle}、スクーリングは月1回からコースにより異なる`
+    );
+    expect(attendanceFrequencyRegressions(proposal)).toEqual([]);
+  });
+
+  it('currentValueに既にある頻度表現は新たな断定として扱わない', () => {
+    const withFrequency = `${currentTitle}、月1回のスクーリング`;
+    const proposal = titleProposal(
+      `${withFrequency}と学費の口コミを紹介`,
+      withFrequency
+    );
+    expect(attendanceFrequencyRegressions(proposal)).toEqual([]);
+  });
+
+  it('通学と無関係な回数表現は止めない', () => {
+    const proposal = titleProposal(`${currentTitle}、年1回の学費改定情報も掲載`);
+    expect(attendanceFrequencyRegressions(proposal)).toEqual([]);
+  });
+
+  it('Hard Gateがattendance_frequency_not_assertedで停止する', () => {
+    const result = hardGate(
+      titleProposal(`${currentTitle}、オンライン授業と月1回のスクーリングを解説`)
+    );
+    expect(result.passed).toBe(false);
+    expect(result.results).toContainEqual(
+      expect.objectContaining({
+        ruleId: 'attendance_frequency_not_asserted',
+        passed: false,
+        severity: 'block',
+      })
+    );
   });
 });
 

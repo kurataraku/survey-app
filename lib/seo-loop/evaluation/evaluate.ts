@@ -21,7 +21,7 @@ import {
 import { allRuleIds } from '../rulebook/schema';
 import { FALLBACK_RULEBOOK } from '../rulebook/schema';
 
-export const QUALITY_EVALUATION_VERSION = 'quality-v2';
+export const QUALITY_EVALUATION_VERSION = 'quality-v3';
 
 export type ProposalForEvaluation = {
   id: string;

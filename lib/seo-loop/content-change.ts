@@ -183,8 +183,15 @@ export function retryableContentChangeRegressions(
     .map((finding) => finding.message);
   const unsupported = factualSupportRegressions(proposal, context);
   const retention = shortTextRetentionRegressions(proposal);
+  const attendance = attendanceFrequencyRegressions(proposal);
   return [
-    ...new Set([...regressions, ...lowValue, ...unsupported, ...retention]),
+    ...new Set([
+      ...regressions,
+      ...lowValue,
+      ...unsupported,
+      ...retention,
+      ...attendance,
+    ]),
   ];
 }
 
@@ -500,6 +507,66 @@ export function factualSupportRegressions(
     }
   }
   return regressions;
+}
+
+/** スクーリング・登校頻度を断定していると判定する文脈語 */
+const ATTENDANCE_CONTEXT_TERMS = [
+  'スクーリング',
+  '登校',
+  '通学',
+  '面接指導',
+  '出席',
+  '授業日',
+];
+
+/** 「月1回」「月に一度」「年5日」のような単一値の頻度表現 */
+const FIXED_FREQUENCY_EXPRESSION =
+  /(?:毎週|毎月|隔週|隔月|週|月|年)\s*(?:に)?\s*(?:[0-9０-９]{1,3}|[一二三四五六七八九十]{1,3})\s*(?:回|日間|日|度)/gu;
+
+/** 幅・選択制として示していると判定する表現 */
+const FREQUENCY_FLEXIBILITY_MARKERS =
+  /[〜～~∼]|から|または|もしくは|選べ|選択|自由|によって|により|応じ|異な/u;
+
+/** 頻度表現の前後で文脈語・幅表現を探す範囲 */
+const ATTENDANCE_CONTEXT_WINDOW = 14;
+
+/**
+ * スクーリング・登校の頻度はコース・学習スタイルによって異なる。
+ * 「月1回のスクーリング」のような単一値の断定を新たに持ち込む案を止める。
+ * 「週1〜5日」「コースにより異なる」のような幅・選択制の表現は許可する。
+ */
+export function attendanceFrequencyRegressions(
+  proposal: ProposalPayloadV2
+): string[] {
+  if (proposal.action === 'addApprovedInternalLink') return [];
+
+  return proposal.targets.flatMap((target) => {
+    const proposed = target.proposedValue;
+    const assertions: string[] = [];
+    for (const match of proposed.matchAll(FIXED_FREQUENCY_EXPRESSION)) {
+      const expression = match[0];
+      // 既存値にある頻度表現は、この変更が新たに持ち込んだ断定ではない
+      if (target.currentValue.includes(expression)) continue;
+
+      const start = Math.max(0, match.index - ATTENDANCE_CONTEXT_WINDOW);
+      const end = match.index + expression.length + ATTENDANCE_CONTEXT_WINDOW;
+      const window = proposed.slice(start, end);
+      const mentionsAttendance = ATTENDANCE_CONTEXT_TERMS.some((term) =>
+        window.includes(term)
+      );
+      if (!mentionsAttendance) continue;
+      if (FREQUENCY_FLEXIBILITY_MARKERS.test(window)) continue;
+
+      assertions.push(expression);
+    }
+
+    if (assertions.length === 0) return [];
+    return [
+      `スクーリング・登校頻度を「${[...new Set(assertions)].join(
+        '」「'
+      )}」と単一値で断定しています。頻度はコース・学習スタイルで異なるため、幅（週1〜5日など）や選択制として示せない場合は追加しないでください`,
+    ];
+  });
 }
 
 /**

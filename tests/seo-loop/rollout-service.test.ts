@@ -29,7 +29,7 @@ import {
 } from '../../lib/seo-loop/rollout/service';
 
 const passedEvaluation: ProposalEvaluationResult = {
-  version: 'quality-v2',
+  version: 'quality-v3',
   passed: true,
   retryable: false,
   hardGatePassed: true,

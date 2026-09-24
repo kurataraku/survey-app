@@ -31,6 +31,14 @@ Typed Executorは4 actionをAllowlist実装し、承認時currentValueとの楽�
 - 内部リンクは公開要約または記事本文の末尾へappend-onlyで追記し、DB本文の楽観ロックと変更前全文の監査保存を行う
 - 過去の`execution_blocked`承認は`npm run seo:requeue-approved`で再評価し、`--apply --yes`時だけ再キュー
 
+### 2026-09-24 追加（スクーリング頻度の断定を全校で禁止）
+
+- スクーリング・登校・通学の頻度は学校ごとにコースで異なるため、「月1回」「週2日」「年5日」のような単一値の断定を新たに加える提案を全校で禁止
+- `attendanceFrequencyRegressions`（`lib/seo-loop/content-change.ts`）で検出。頻度表現の前後14字に通学系の語があり、幅（`〜`）や選択制（選べる・コースにより異なる等）の表現がない場合だけ検出する
+- 生成時validateの再生成条件、Hard Gate `attendance_frequency_not_asserted`（block）に接続。既にcurrentValueにある頻度表現は対象外
+- 「週1〜5日から選べる通学」のようなあずさ型の具体化は従来どおり許可
+- Strategist/Revision v7、評価version `quality-v3`（旧評価キャッシュを無効化し再評価させる）
+
 ### 2026-09-14 追加（改善1・2を実装）
 
 **1. 生成プロンプト強化**（`lib/seo-loop/analysis/prompts.ts`）
