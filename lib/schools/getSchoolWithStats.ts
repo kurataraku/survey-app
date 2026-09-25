@@ -90,8 +90,29 @@ export interface SchoolWithStats {
   official_url?: string | null;
 }
 
+const EMPTY_GLOBAL_AVERAGES = {
+  overall_satisfaction_avg: null as number | null,
+  flexibility_rating_avg: null as number | null,
+  staff_rating_avg: null as number | null,
+  support_rating_avg: null as number | null,
+  atmosphere_fit_rating_avg: null as number | null,
+  credit_rating_avg: null as number | null,
+  unique_course_rating_avg: null as number | null,
+  career_support_rating_avg: null as number | null,
+  campus_life_rating_avg: null as number | null,
+  tuition_rating_avg: null as number | null,
+};
+
 /** サイト全体の評価平均（1時間キャッシュ） */
 async function getGlobalAverages() {
+  // ビルド時 SSG で env 未設定のプロジェクトが prerender 失敗しないようにする
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.SUPABASE_SERVICE_ROLE_KEY
+  ) {
+    return EMPTY_GLOBAL_AVERAGES;
+  }
+
   const supabase = createAdminSupabaseClient();
   const { data: allGlobalReviews } = await supabase
     .from('survey_responses')
