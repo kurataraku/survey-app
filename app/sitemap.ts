@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getAppBaseUrl, getSiteUrl } from '@/lib/env-check';
 import { getPrefecturePath, prefectures } from '@/lib/prefectures';
+import { CITY_LANDINGS, getCityLandingPath } from '@/lib/regions/city-landing';
 import { isThinSchoolPage } from '@/lib/seo/thin-school-page';
 import {
   countReviewsBySchool,
@@ -93,12 +94,19 @@ function buildPrefectureEntries(
   baseUrl: string,
   lastModifiedByPrefecture: Map<string, Date>
 ): MetadataRoute.Sitemap {
-  return prefectures.map((pref) => ({
+  const prefectureEntries = prefectures.map((pref) => ({
     url: `${baseUrl}${getPrefecturePath(pref)}`,
     lastModified: lastModifiedByPrefecture.get(pref) ?? new Date(),
     changeFrequency: 'weekly' as const,
     priority: 0.85,
   }));
+  const cityEntries = CITY_LANDINGS.map((config) => ({
+    url: `${baseUrl}${getCityLandingPath(config)}`,
+    lastModified: lastModifiedByPrefecture.get(config.prefecture) ?? new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.8,
+  }));
+  return [...prefectureEntries, ...cityEntries];
 }
 
 function collectPrefectureLastModified(

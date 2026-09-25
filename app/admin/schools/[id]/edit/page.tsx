@@ -9,6 +9,7 @@ import AISummaryEditor from '@/components/AISummaryEditor';
 import SeoSectionsEditor from '@/components/SeoSectionsEditor';
 import TuitionEditor from '@/components/TuitionEditor';
 import CourseEditor from '@/components/CourseEditor';
+import AdmissionProfileEditor from '@/components/AdmissionProfileEditor';
 import { SchoolFormData, School } from '@/lib/types/schools';
 import { apiPath, appPath } from '@/lib/base-path';
 import { normalizeSearchQuery } from '@/lib/utils';
@@ -26,7 +27,9 @@ export default function EditSchoolPage() {
   const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'basic' | 'reviews' | 'ai-summary' | 'seo-sections' | 'tuition' | 'courses'>('basic');
+  const [activeTab, setActiveTab] = useState<
+    'basic' | 'reviews' | 'ai-summary' | 'seo-sections' | 'tuition' | 'courses' | 'admission'
+  >('basic');
   const [prefectureStats, setPrefectureStats] = useState<PrefectureStat[]>([]);
   const [totalResponses, setTotalResponses] = useState(0);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -360,6 +363,16 @@ export default function EditSchoolPage() {
             >
               コース
             </button>
+            <button
+              onClick={() => setActiveTab('admission')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'admission'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              入学条件・スクーリング
+            </button>
           </nav>
         </div>
 
@@ -626,6 +639,8 @@ export default function EditSchoolPage() {
             <TuitionEditor schoolId={id} />
           ) : activeTab === 'courses' ? (
             <CourseEditor schoolId={id} />
+          ) : activeTab === 'admission' ? (
+            <AdmissionProfileEditor schoolId={id} />
           ) : (
             <SeoSectionsEditor schoolId={id} />
           )}

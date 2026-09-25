@@ -8,6 +8,7 @@
  * 「その県の口コミ」に見えてしまう。地域別に数え直すことで、実際に県内で通った回答だけを
  * 地域の根拠として提示できるようにする。
  */
+import { normalizeAreaName } from '@/lib/regions/area-normalize';
 
 /** 都道府県単位に絞った口コミ集計。件数と平均のみを持ち、口コミ本文は学校詳細・口コミ一覧へ集約する */
 export type RegionalReviewStat = {
@@ -23,6 +24,11 @@ export type RegionalReviewStat = {
   attendanceFrequencies: Record<string, number>;
   /** 入学タイミングの回答分布。「新入学（中学卒業後）」「転入学（他校から転校）」など */
   enrollmentTypes: Record<string, number>;
+  /**
+   * 任意項目「通っていたキャンパスの市区町村」（answers.campus_city）に回答があった口コミの市区町村別集計。
+   * 政令指定都市は親市単位。未回答の口コミは含めない（都道府県の回答を市区町村へ振り分けない）。
+   */
+  municipalities: Record<string, { reviewCount: number; overallAvg: number | null }>;
 };
 
 type RatingKey = 'overall' | 'staff' | 'support' | 'credit' | 'careerSupport' | 'tuition';
@@ -32,6 +38,7 @@ type RegionalAccumulator = {
   ratings: Record<RatingKey, number[]>;
   attendanceFrequencies: Map<string, number>;
   enrollmentTypes: Map<string, number>;
+  municipalities: Map<string, { reviewCount: number; overall: number[] }>;
 };
 
 /** school_id → campus_prefecture → 集計 */
@@ -47,6 +54,7 @@ function emptyAccumulator(): RegionalAccumulator {
     ratings: { overall: [], staff: [], support: [], credit: [], careerSupport: [], tuition: [] },
     attendanceFrequencies: new Map(),
     enrollmentTypes: new Map(),
+    municipalities: new Map(),
   };
 }
 
@@ -91,6 +99,15 @@ export function addRegionalReview(
   bump(entry.attendanceFrequencies, answers.attendance_frequency);
   bump(entry.enrollmentTypes, answers.enrollment_type);
 
+  const municipality =
+    typeof answers.campus_city === 'string' ? normalizeAreaName(answers.campus_city)?.municipality : null;
+  if (municipality) {
+    const cityEntry = entry.municipalities.get(municipality) ?? { reviewCount: 0, overall: [] };
+    cityEntry.reviewCount += 1;
+    if (overallSatisfaction !== null) cityEntry.overall.push(overallSatisfaction);
+    entry.municipalities.set(municipality, cityEntry);
+  }
+
   bySchool.set(campusPrefecture, entry);
   index.set(schoolId, bySchool);
 }
@@ -119,6 +136,12 @@ export function finalizeRegionalReviews(
       tuitionAvg: average(entry.ratings.tuition),
       attendanceFrequencies: Object.fromEntries(entry.attendanceFrequencies),
       enrollmentTypes: Object.fromEntries(entry.enrollmentTypes),
+      municipalities: Object.fromEntries(
+        [...entry.municipalities.entries()].map(([name, cityEntry]) => [
+          name,
+          { reviewCount: cityEntry.reviewCount, overallAvg: average(cityEntry.overall) },
+        ])
+      ),
     }))
     .sort((a, b) => b.reviewCount - a.reviewCount || a.prefecture.localeCompare(b.prefecture, 'ja'));
 }

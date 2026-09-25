@@ -1,4 +1,7 @@
-import { getCampusNearestStations } from '@/lib/schools/campusLocations';
+import {
+  getCampusNearestStations,
+  getStandingCampusLocationsInPrefecture,
+} from '@/lib/schools/campusLocations';
 import {
   normalizeAreaName,
   normalizeStationLabel,
@@ -108,23 +111,31 @@ function mergeOperatorPrefixedStations(
  */
 export function computePrefectureLocationInsights(
   schools: SearchSchool[],
-  prefecture: string
+  prefecture: string,
+  options: {
+    /** 指定時はこの市区町村（政令指定都市は親市単位）の拠点だけを集計する */
+    municipality?: string;
+    wardLimit?: number;
+  } = {}
 ): PrefectureLocationInsights {
   const cityMap = new Map<string, CityEntry>();
   const stationMap = new Map<string, StationEntry>();
   let schoolsWithCampusLocation = 0;
   let schoolsWithNearestStation = 0;
+  const wardLimit = options.wardLimit ?? 6;
 
   for (const school of schools) {
-    const locations =
-      school.campus_locations?.filter((location) => location.prefecture === prefecture) ?? [];
+    const locations = getStandingCampusLocationsInPrefecture(school.campus_locations, prefecture)
+      .map((location) => ({ location, area: normalizeAreaName(location.city) }))
+      .filter(
+        ({ area }) => !options.municipality || area?.municipality === options.municipality
+      );
     if (locations.length === 0) continue;
 
     schoolsWithCampusLocation += 1;
     let hasStation = false;
 
-    for (const location of locations) {
-      const area = normalizeAreaName(location.city);
+    for (const { location, area } of locations) {
       if (!area) continue;
 
       const cityEntry = cityMap.get(area.municipality) ?? {
@@ -181,7 +192,7 @@ export function computePrefectureLocationInsights(
       wards: [...entry.wards.entries()]
         .map(([name, schoolIds]) => ({ name, schoolCount: schoolIds.size }))
         .sort((a, b) => b.schoolCount - a.schoolCount || a.name.localeCompare(b.name, 'ja'))
-        .slice(0, 6),
+        .slice(0, wardLimit),
     }))
     .sort((a, b) => b.schoolCount - a.schoolCount || a.city.localeCompare(b.city, 'ja'));
 

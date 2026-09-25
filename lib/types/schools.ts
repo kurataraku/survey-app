@@ -1,8 +1,23 @@
 export type SchoolInstitutionType = 'public' | 'private' | 'support';
 
+/**
+ * 拠点の種類。未設定の既存データは「通学できる拠点」として扱う（後方互換）。
+ * exam_venue / event_only は地域LPの拠点数・所在地集計に含めない。
+ */
+export type CampusLocationType =
+  | 'headquarters'
+  | 'commute_campus'
+  | 'required_schooling_venue'
+  | 'support_campus'
+  | 'exam_venue'
+  | 'event_only';
+
 export type SchoolCampusLocation = {
   prefecture: string;
   city: string;
+  /** 番地まで含む所在地（公立校など一部のみ） */
+  address?: string;
+  location_type?: CampusLocationType;
   /** 最寄り駅（最大2件。例: ["JR山手線 新宿駅", "丸の内線 新宿三丁目駅"]） */
   nearest_stations?: string[];
   /** @deprecated nearest_stations を使用。旧データ読み込み用 */

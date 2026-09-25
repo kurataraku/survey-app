@@ -15,6 +15,10 @@ import {
   type RegionalReviewStat,
 } from '@/lib/schools/regionalReviews';
 import { normalizeAreaName, toComparableAreaNames } from '@/lib/regions/area-normalize';
+import {
+  fetchPublicAdmissionProfiles,
+  type PublicAdmissionProfile,
+} from '@/lib/schools/admissionProfiles';
 
 export interface SearchSchool {
   id: string;
@@ -51,6 +55,8 @@ export interface SearchSchool {
    * review_count（学校全体）と区別し、地域LPで「その県の口コミ」として使う。
    */
   regional_reviews: RegionalReviewStat[] | null;
+  /** 公開中かつ再確認期限内の入学条件・スクーリング確認データ。未確認なら null */
+  admission_profile: PublicAdmissionProfile | null;
 }
 
 export interface SearchSchoolsParams {
@@ -104,7 +110,8 @@ export async function fetchSearchSchoolsWithStats(
 
   const schoolIds = schoolsList.map((s) => s.id);
 
-  const [statsResult, tendencyResult, tuitionEstimates, courseListings] = await Promise.all([
+  const [statsResult, tendencyResult, tuitionEstimates, courseListings, admissionProfiles] =
+    await Promise.all([
     supabase
       .from('survey_responses')
       .select('school_id, overall_satisfaction, good_comment, bad_comment, created_at, answers')
@@ -119,6 +126,7 @@ export async function fetchSearchSchoolsWithStats(
       .eq('status', 'published'),
     fetchPublicTuitionEstimates(supabase, schoolIds),
     fetchPublicCourseListings(supabase, schoolIds),
+    fetchPublicAdmissionProfiles(supabase, schoolIds),
   ]);
 
   type StatsEntry = {
@@ -286,6 +294,7 @@ export async function fetchSearchSchoolsWithStats(
       tuition_estimate: tuitionEstimates.get(school.id) ?? null,
       course_listing: courseListings.get(school.id) ?? null,
       regional_reviews: finalizeRegionalReviews(regionalReviews, school.id),
+      admission_profile: admissionProfiles.get(school.id) ?? null,
     };
   });
 }

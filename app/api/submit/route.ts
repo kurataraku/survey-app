@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       // Step2: 学習/環境
       attendance_frequency: data.attendance_frequency,
       campus_prefecture: data.campus_prefecture,
+      campus_city: typeof data.campus_city === 'string' ? data.campus_city.trim().slice(0, 40) : undefined,
       teaching_style: data.teaching_style,
       student_atmosphere: data.student_atmosphere,
       atmosphere_other: data.atmosphere_other,

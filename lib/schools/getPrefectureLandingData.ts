@@ -13,7 +13,10 @@ import {
   PREFECTURE_LANDING_HIGHLIGHT_LIMIT,
   PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING,
 } from '@/lib/schools/prefecture-landing-constants';
-import { getCampusNearestStations } from '@/lib/schools/campusLocations';
+import {
+  getCampusNearestStations,
+  getStandingCampusLocationsInPrefecture,
+} from '@/lib/schools/campusLocations';
 import { normalizeAreaName, normalizeStationLabel } from '@/lib/regions/area-normalize';
 import {
   findRegionalReviewStat,
@@ -23,6 +26,8 @@ import {
 } from '@/lib/schools/regionalReviews';
 import type { PrefectureLandingCopyStats } from '@/lib/prefectures/prefecture-landing-copy';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
+import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissionProfiles';
+import { getCityLandingPath, getCityLandingsForPrefecture } from '@/lib/regions/city-landing';
 
 /** 学費情報の確認状態。金額を確認できていない学校を「安い」と誤解させないために区別する */
 export type TuitionConfirmationState = 'amounts' | 'varies' | 'contact_required' | 'unconfirmed';
@@ -51,6 +56,8 @@ export type PrefectureSchoolRow = {
   supportAvg: number | null;
   tuitionAvg: number | null;
   tuitionState: TuitionConfirmationState;
+  /** 公式情報で確認済み（12か月以内）の募集区域・スクーリング会場。未確認なら空配列 */
+  admissionBadges: AdmissionBadge[];
 };
 
 export type PrefectureRegionalCounts = {
@@ -67,6 +74,8 @@ export type PrefectureRegionalCounts = {
   publicCount: number;
   privateCount: number;
   supportCount: number;
+  /** 募集区域・スクーリング会場を公式情報で確認済み（12か月以内）の学校数 */
+  admissionVerifiedCount: number;
 };
 
 export type PrefectureRankingEntry = {
@@ -112,10 +121,12 @@ export type PrefectureLandingData = {
   copyStats: PrefectureLandingCopyStats;
   /** JSON-LD の ItemList 用 */
   itemListSchools: { id: string; name: string; slug: string | null }[];
+  /** この都道府県で公開中の都市LP（appPath 前のパス） */
+  cityLandings: { municipality: string; path: string }[];
 };
 
 function hasLocalCampus(school: SearchSchool, prefecture: string): boolean {
-  return school.campus_locations?.some((location) => location.prefecture === prefecture) ?? false;
+  return getStandingCampusLocationsInPrefecture(school.campus_locations, prefecture).length > 0;
 }
 
 function isRelatedToPrefecture(school: SearchSchool, prefecture: string): boolean {
@@ -124,15 +135,14 @@ function isRelatedToPrefecture(school: SearchSchool, prefecture: string): boolea
   return hasLocalCampus(school, prefecture);
 }
 
-function resolveTuitionState(school: SearchSchool): TuitionConfirmationState {
+export function resolveTuitionState(school: SearchSchool): TuitionConfirmationState {
   const mode = school.tuition_estimate?.display_mode;
   if (mode === 'amounts' || mode === 'varies' || mode === 'contact_required') return mode;
   return 'unconfirmed';
 }
 
 function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
-  const localLocations =
-    school.campus_locations?.filter((location) => location.prefecture === prefecture) ?? [];
+  const localLocations = getStandingCampusLocationsInPrefecture(school.campus_locations, prefecture);
   const localCities = [
     ...new Set(
       localLocations
@@ -167,6 +177,7 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     supportAvg: school.support_avg,
     tuitionAvg: school.tuition_avg,
     tuitionState: resolveTuitionState(school),
+    admissionBadges: buildAdmissionBadges(school.admission_profile, prefecture),
   };
 }
 
@@ -214,13 +225,7 @@ export const getPrefectureLandingData = cache(
 
     const rows = schools.map((school) => toRow(school, prefecture));
 
-    const localCampusLocationCount = schools.reduce(
-      (sum, school) =>
-        sum +
-        (school.campus_locations?.filter((location) => location.prefecture === prefecture).length ??
-          0),
-      0
-    );
+    const localCampusLocationCount = rows.reduce((sum, row) => sum + row.localCampusCount, 0);
 
     const counts: PrefectureRegionalCounts = {
       totalSchools: rows.length,
@@ -233,6 +238,7 @@ export const getPrefectureLandingData = cache(
       publicCount: rows.filter((row) => row.institutionType === 'public').length,
       privateCount: rows.filter((row) => row.institutionType === 'private').length,
       supportCount: rows.filter((row) => row.institutionType === 'support').length,
+      admissionVerifiedCount: rows.filter((row) => row.admissionBadges.length > 0).length,
     };
 
     const rowsByInstitutionType: Record<SchoolInstitutionType, PrefectureSchoolRow[]> = {
@@ -307,6 +313,10 @@ export const getPrefectureLandingData = cache(
         id: school.id,
         name: school.name,
         slug: school.slug,
+      })),
+      cityLandings: getCityLandingsForPrefecture(prefecture).map((config) => ({
+        municipality: config.municipality,
+        path: getCityLandingPath(config),
       })),
     };
   }

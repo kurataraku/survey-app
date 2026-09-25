@@ -28,6 +28,7 @@
     "seo:check:delivery": "tsx scripts/check-prefecture-lp-delivery.ts",
     "seo:audit:ai-text": "tsx scripts/audit-ai-text-artifacts.ts",
     "seo:audit:region": "tsx scripts/audit-region-data-quality.ts",
+    "seo:audit:admission": "tsx scripts/audit-admission-reverify.ts",
     "seo:eval": "tsx scripts/seo-loop-eval.ts",
     "seo:rulebook:status": "tsx scripts/seo-rulebook-status.ts",
     "seo:revision:status": "tsx scripts/seo-revision-status.ts",

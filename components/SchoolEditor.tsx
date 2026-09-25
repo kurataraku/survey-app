@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import {
+  CAMPUS_LOCATION_TYPE_LABELS,
   getCampusNearestStationSlots,
   moveCampusLocation,
   sortCampusLocationsByPrefecture,
 } from '@/lib/schools/campusLocations';
-import { SchoolCampusLocation, SchoolFormData } from '@/lib/types/schools';
+import { CampusLocationType, SchoolCampusLocation, SchoolFormData } from '@/lib/types/schools';
 import { generateSlug } from '@/lib/utils';
 import { prefectures } from '@/lib/prefectures';
 import { apiPath } from '@/lib/base-path';
@@ -39,6 +40,7 @@ function duplicateCampusLocation(location: SchoolCampusLocation): SchoolCampusLo
   return {
     prefecture: location.prefecture,
     city: location.city,
+    ...(location.location_type ? { location_type: location.location_type } : {}),
     nearest_stations: location.nearest_stations ? [...location.nearest_stations] : [],
   };
 }
@@ -380,6 +382,60 @@ export default function SchoolEditor({
                           setFormData((prev) => ({ ...prev, campus_locations: next }));
                         }}
                         placeholder="例: 新宿区"
+                        autoComplete="off"
+                        className={campusInputClass}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <div>
+                      <label
+                        htmlFor={`campus-location-type-${index}`}
+                        className={campusLabelClass}
+                      >
+                        拠点の種類
+                      </label>
+                      <select
+                        id={`campus-location-type-${index}`}
+                        value={location.location_type ?? ''}
+                        onChange={(e) => {
+                          const next = [...formData.campus_locations];
+                          const value = e.target.value as CampusLocationType | '';
+                          const updated = { ...next[index] };
+                          if (value) updated.location_type = value;
+                          else delete updated.location_type;
+                          next[index] = updated;
+                          setFormData((prev) => ({ ...prev, campus_locations: next }));
+                        }}
+                        className={campusInputClass}
+                      >
+                        <option value="">未設定（通学できる拠点として集計）</option>
+                        {(Object.keys(CAMPUS_LOCATION_TYPE_LABELS) as CampusLocationType[]).map(
+                          (type) => (
+                            <option key={type} value={type}>
+                              {CAMPUS_LOCATION_TYPE_LABELS[type]}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`campus-location-address-${index}`}
+                        className={campusLabelClass}
+                      >
+                        所在地（番地まで・任意）
+                      </label>
+                      <input
+                        id={`campus-location-address-${index}`}
+                        type="text"
+                        value={location.address ?? ''}
+                        onChange={(e) => {
+                          const next = [...formData.campus_locations];
+                          next[index] = { ...next[index], address: e.target.value };
+                          setFormData((prev) => ({ ...prev, campus_locations: next }));
+                        }}
+                        placeholder="例: 名古屋市中村区名駅1-1-1"
                         autoComplete="off"
                         className={campusInputClass}
                       />

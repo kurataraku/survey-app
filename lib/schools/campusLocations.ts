@@ -1,6 +1,44 @@
-import type { SchoolCampusLocation } from '@/lib/types/schools';
+import type { CampusLocationType, SchoolCampusLocation } from '@/lib/types/schools';
 
 const MAX_NEAREST_STATIONS_PER_CAMPUS = 2;
+
+export const CAMPUS_LOCATION_TYPE_LABELS: Record<CampusLocationType, string> = {
+  headquarters: '本校',
+  commute_campus: '通学キャンパス',
+  required_schooling_venue: 'スクーリング会場',
+  support_campus: 'サポート校・学習センター',
+  exam_venue: '試験会場のみ',
+  event_only: '説明会・相談会のみ',
+};
+
+const CAMPUS_LOCATION_TYPES = Object.keys(CAMPUS_LOCATION_TYPE_LABELS) as CampusLocationType[];
+
+/** 地域LPの拠点数に数えない種類（常設の学習拠点ではないもの） */
+const NON_STANDING_LOCATION_TYPES: ReadonlySet<CampusLocationType> = new Set([
+  'exam_venue',
+  'event_only',
+]);
+
+function parseLocationType(value: unknown): CampusLocationType | undefined {
+  return typeof value === 'string' && (CAMPUS_LOCATION_TYPES as string[]).includes(value)
+    ? (value as CampusLocationType)
+    : undefined;
+}
+
+/** 常設の学習拠点か（種類未設定の既存データは常設として扱う） */
+export function isStandingCampus(location: SchoolCampusLocation): boolean {
+  return !location.location_type || !NON_STANDING_LOCATION_TYPES.has(location.location_type);
+}
+
+/** 指定都道府県内の常設拠点（地域LPの拠点数・所在地・駅集計の母集団） */
+export function getStandingCampusLocationsInPrefecture(
+  locations: SchoolCampusLocation[] | null | undefined,
+  prefecture: string
+): SchoolCampusLocation[] {
+  return (locations ?? []).filter(
+    (location) => location.prefecture === prefecture && isStandingCampus(location)
+  );
+}
 
 function parseNearestStations(record: Record<string, unknown>): string[] {
   if (Array.isArray(record.nearest_stations)) {
@@ -18,13 +56,19 @@ function parseNearestStations(record: Record<string, unknown>): string[] {
 function buildCampusLocation(
   prefecture: string,
   city: string,
-  nearest_stations: string[]
+  record: Record<string, unknown>
 ): SchoolCampusLocation {
-  const stations = nearest_stations
+  const stations = parseNearestStations(record)
     .map((station) => station.trim())
     .filter(Boolean)
     .slice(0, MAX_NEAREST_STATIONS_PER_CAMPUS);
-  return stations.length > 0 ? { prefecture, city, nearest_stations: stations } : { prefecture, city };
+  const address = typeof record.address === 'string' ? record.address.trim() : '';
+  const locationType = parseLocationType(record.location_type);
+  const location: SchoolCampusLocation = { prefecture, city };
+  if (address) location.address = address;
+  if (locationType) location.location_type = locationType;
+  if (stations.length > 0) location.nearest_stations = stations;
+  return location;
 }
 
 export function getCampusNearestStations(location: SchoolCampusLocation): string[] {
@@ -57,7 +101,7 @@ export function normalizeCampusLocations(value: unknown): SchoolCampusLocation[]
       const prefecture = typeof record.prefecture === 'string' ? record.prefecture.trim() : '';
       const city = typeof record.city === 'string' ? record.city.trim() : '';
       if (!prefecture || !city) return null;
-      return buildCampusLocation(prefecture, city, parseNearestStations(record));
+      return buildCampusLocation(prefecture, city, record);
     })
     .filter((location): location is SchoolCampusLocation => Boolean(location));
   return locations.length > 0 ? locations : null;
@@ -72,7 +116,7 @@ export function sanitizeCampusLocationsInput(campus_locations: unknown): SchoolC
       const prefecture = String(record.prefecture || '').trim();
       const city = String(record.city || '').trim();
       if (!prefecture || !city) return null;
-      return buildCampusLocation(prefecture, city, parseNearestStations(record));
+      return buildCampusLocation(prefecture, city, record);
     })
     .filter((location): location is SchoolCampusLocation => Boolean(location));
 }

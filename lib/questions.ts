@@ -228,6 +228,16 @@ export const questions: Question[] = [
     ],
   },
   {
+    id: 'campus_city',
+    number: 10,
+    step: 2,
+    type: 'text',
+    label: '主に通っていたキャンパスの市区町村（任意・オンライン中心なら空欄）',
+    required: false,
+    placeholder: '例: 名古屋市中村区、横浜市、さいたま市大宮区',
+    maxLength: 40,
+  },
+  {
     id: 'teaching_style',
     number: 11,
     step: 2,

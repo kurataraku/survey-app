@@ -27,6 +27,7 @@ import RequestNotificationCta from '@/components/RequestNotificationCta';
 import TuitionDisclaimer from '@/components/TuitionDisclaimer';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING } from '@/lib/schools/prefecture-landing-constants';
+import AdmissionBadgeList from '@/components/AdmissionBadgeList';
 
 interface PrefectureLandingPageProps {
   data: PrefectureLandingData;
@@ -181,8 +182,14 @@ function MethodologyNote({ data }: { data: PrefectureLandingData }) {
           「コース別」、確認できない場合は「要確認」と表示しています。未確認を安い・無料という意味では使っていません。
         </li>
         <li>
-          キャンパス所在地・最寄り駅は学校公式サイト等で確認できた範囲の登録情報です。最新の所在地・募集状況は各学校の公式情報で確認してください。
+          キャンパス所在地・最寄り駅は学校公式サイト等で確認できた範囲の登録情報です。試験会場や説明会だけの会場は拠点数に含めていません。最新の所在地・募集状況は各学校の公式情報で確認してください。
         </li>
+        {counts.admissionVerifiedCount > 0 && (
+          <li>
+            「全国から出願可」「スクーリング会場」などの表示は、学校公式サイト・募集要項・教育委員会の公表資料で確認できた
+            {counts.admissionVerifiedCount}校のみです。確認日から12か月を過ぎた情報は表示せず、再確認後に表示します。
+          </li>
+        )}
       </ul>
     </section>
   );
@@ -246,6 +253,7 @@ function ComparisonTable({ data }: { data: PrefectureLandingData }) {
                         本校: {row.headquartersPrefecture}
                       </span>
                     )}
+                    <AdmissionBadgeList badges={row.admissionBadges} />
                   </th>
                   <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">
                     {row.institutionType ? institutionTypeLabels[row.institutionType] : '—'}
@@ -321,13 +329,16 @@ function RankingList({
 function LocationInsightsSection({
   prefecture,
   insights,
+  cityLandings,
 }: {
   prefecture: string;
   insights: PrefectureLocationInsights;
+  cityLandings: PrefectureLandingData['cityLandings'];
 }) {
   if (insights.topCities.length === 0 && insights.topStations.length === 0) return null;
 
   const prefParam = encodeURIComponent(prefecture);
+  const cityLandingPathByName = new Map(cityLandings.map((city) => [city.municipality, city.path]));
 
   return (
     <section
@@ -350,11 +361,16 @@ function LocationInsightsSection({
             <ul className="grid gap-2 sm:grid-cols-2">
               {insights.topCities.map((city) => {
                 const cityParam = encodeURIComponent(city.city);
+                const cityLandingPath = cityLandingPathByName.get(city.city);
                 return (
                   <li key={city.city}>
                     <Link
-                      href={appPath(`/schools?campus_prefecture=${prefParam}&campus_city=${cityParam}`)}
-                      rel="nofollow"
+                      href={
+                        cityLandingPath
+                          ? appPath(cityLandingPath)
+                          : appPath(`/schools?campus_prefecture=${prefParam}&campus_city=${cityParam}`)
+                      }
+                      rel={cityLandingPath ? undefined : 'nofollow'}
                       className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2.5 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"
                     >
                       <span className="block text-sm font-bold text-blue-700">
@@ -770,6 +786,16 @@ export default function PrefectureLandingPage({
                     エリア・最寄り駅から探す
                   </Link>
                 </li>
+                {data.cityLandings.map((city) => (
+                  <li key={city.path}>
+                    <Link
+                      href={appPath(city.path)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      {city.municipality}の通信制高校を区・駅から比較する
+                    </Link>
+                  </li>
+                ))}
                 <li>
                   <Link
                     href="#pref-regional-voice-heading"
@@ -817,7 +843,11 @@ export default function PrefectureLandingPage({
 
             <ComparisonTable data={data} />
 
-            <LocationInsightsSection prefecture={prefecture} insights={data.locationInsights} />
+            <LocationInsightsSection
+              prefecture={prefecture}
+              insights={data.locationInsights}
+              cityLandings={data.cityLandings}
+            />
 
             <RegionalVoiceSection data={data} />
 

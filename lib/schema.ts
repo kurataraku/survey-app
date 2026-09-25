@@ -34,6 +34,7 @@ const baseSchema = z.object({
   enrollment_year: z.string().regex(/^\d{4}$/, '4桁の年を入力してください（例：2024）'),
   attendance_frequency: z.enum(['週5', '週3〜4', '週1〜2', '月1〜数回', 'ほぼオンライン/自宅']),
   campus_prefecture: z.string().min(1, '都道府県を選択してください'),
+  campus_city: z.string().max(40, '市区町村は40文字以内で入力してください').optional(),
   teaching_style: z.array(z.string()).min(1, '授業スタイルを1つ以上選択してください'),
   student_atmosphere: z.array(z.string()).min(1, '生徒の雰囲気を1つ以上選択してください'),
   atmosphere_other: z.string().optional(),

@@ -34,6 +34,7 @@ function searchSchoolFallback(
     tuition_estimate: null,
     course_listing: null,
     regional_reviews: null,
+    admission_profile: null,
   };
 }
 
