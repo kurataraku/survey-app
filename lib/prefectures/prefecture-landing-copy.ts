@@ -16,10 +16,28 @@ export type PrefectureLandingCopyStats = {
   localCampusLocationCount: number;
   publicCount: number;
   supportCount: number;
+  /** 掲載校の学校全体の公開口コミ件数（全国の回答を含む） */
   totalReviewCount: number;
+  /** その都道府県のキャンパスに通ったと回答した口コミ件数 */
+  localReviewCount: number;
+  /** 地域口コミが1件以上ある掲載校数 */
+  localReviewSchoolCount: number;
+  cityCount: number;
   topCities: string[];
   topStations: string[];
 };
+
+/**
+ * 地域口コミ件数の表現。
+ *
+ * 全国に拠点を持つ学校は学校全体の口コミ件数がどの都道府県でも同じ値になるため、
+ * 「その県の口コミ○件」と書くと実態より多く見える。地域の根拠として出すのは
+ * キャンパス都道府県を回答した件数だけに限る。
+ */
+function buildLocalReviewPhrase(prefecture: string, stats: PrefectureLandingCopyStats): string {
+  if (stats.localReviewCount === 0) return '';
+  return `${prefecture}のキャンパスに通った回答${stats.localReviewCount}件（${stats.localReviewSchoolCount}校）`;
+}
 
 /** H1直下のリード文。テンプレート文ではなく当該都道府県の実数を入れる */
 export function getPrefectureLandingSubtitle(
@@ -31,13 +49,15 @@ export function getPrefectureLandingSubtitle(
   }
 
   const areaPart =
-    stats.topCities.length > 0 ? `主なエリアは${stats.topCities.slice(0, 3).join('・')}。` : '';
+    stats.topCities.length > 0
+      ? `掲載校が多いのは${stats.topCities.slice(0, 3).join('・')}で、${stats.cityCount}市区町村から絞り込めます。`
+      : '';
   const stationPart =
     stats.topStations.length > 0
-      ? `最寄り駅では${stats.topStations.slice(0, 2).join('・')}周辺の学校を確認できます。`
+      ? `${stats.topStations.slice(0, 2).join('・')}など最寄り駅からも確認できます。`
       : '';
-  const reviewPart =
-    stats.totalReviewCount > 0 ? `公開口コミ${stats.totalReviewCount}件をもとに、` : '';
+  const localPart = buildLocalReviewPhrase(prefecture, stats);
+  const reviewPart = localPart ? `${localPart}をもとに、` : '';
 
   return `${prefecture}で検討できる通信制高校・サポート校${stats.totalSchools}校（うち公立${stats.publicCount}校、サポート校${stats.supportCount}校）を、${prefecture}内${stats.localCampusLocationCount}拠点のキャンパス情報とあわせて比較できます。${reviewPart}学費の確認状態、通いやすさ、項目別評価を同じ表で並べています。${areaPart}${stationPart}`;
 }
@@ -51,7 +71,8 @@ export function getPrefectureLandingMetaDescription(
     return `${prefecture}の通信制高校を、良い点・改善点の両面と観点別満足度で比較できる一覧です。`;
   }
 
-  const reviewPart = stats.totalReviewCount > 0 ? `公開口コミ${stats.totalReviewCount}件・` : '';
+  const localPart = buildLocalReviewPhrase(prefecture, stats);
+  const reviewPart = localPart ? `${localPart}・` : '';
   const areaPart = stats.topCities.length > 0 ? `${stats.topCities.slice(0, 3).join('・')}など` : '';
 
   return `${prefecture}の通信制高校・サポート校${stats.totalSchools}校を比較。${reviewPart}${prefecture}内キャンパス${stats.localCampusLocationCount}拠点、${areaPart}のエリア別情報、公立${stats.publicCount}校の区分、学費の確認状態、良い点と改善点の両面を同じ条件で確認できます。`;

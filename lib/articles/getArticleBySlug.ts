@@ -33,6 +33,7 @@ function searchSchoolFallback(
     review_tendency: null,
     tuition_estimate: null,
     course_listing: null,
+    regional_reviews: null,
   };
 }
 

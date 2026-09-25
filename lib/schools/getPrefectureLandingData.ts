@@ -14,6 +14,13 @@ import {
   PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING,
 } from '@/lib/schools/prefecture-landing-constants';
 import { getCampusNearestStations } from '@/lib/schools/campusLocations';
+import { normalizeAreaName, normalizeStationLabel } from '@/lib/regions/area-normalize';
+import {
+  findRegionalReviewStat,
+  summarizeRegionalReviews,
+  type RegionalReviewStat,
+  type RegionalReviewSummary,
+} from '@/lib/schools/regionalReviews';
 import type { PrefectureLandingCopyStats } from '@/lib/prefectures/prefecture-landing-copy';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 
@@ -34,7 +41,12 @@ export type PrefectureSchoolRow = {
   localCampusCount: number;
   localCities: string[];
   localStations: string[];
+  /** 学校全体の公開口コミ件数（全国の回答を含む） */
   reviewCount: number;
+  /** この都道府県のキャンパスに通ったと回答した口コミ件数 */
+  localReviewCount: number;
+  /** この都道府県の回答だけで算出した総合満足度 */
+  localOverallAvg: number | null;
   overallAvg: number | null;
   supportAvg: number | null;
   tuitionAvg: number | null;
@@ -63,14 +75,32 @@ export type PrefectureRankingEntry = {
   metricLabel: string;
 };
 
+/** 学費の確認状態の内訳。網羅できているように見せないため確認率を明示する */
+export type PrefectureTuitionCoverage = {
+  amounts: number;
+  varies: number;
+  contactRequired: number;
+  unconfirmed: number;
+  /** 何らかの公式確認が取れている学校数（amounts + varies + contactRequired） */
+  confirmed: number;
+};
+
 export type PrefectureLandingData = {
   prefecture: string;
   rows: PrefectureSchoolRow[];
   counts: PrefectureRegionalCounts;
   schoolsWithReviewsCount: number;
   totalReviewCount: number;
+  /** この都道府県のキャンパスに通ったと回答した口コミ件数 */
+  localReviewCount: number;
+  /** 地域口コミが1件以上ある掲載校数 */
+  localReviewSchoolCount: number;
+  /** 地域口コミの通学頻度・入学タイミング分布 */
+  regionalReviewSummary: RegionalReviewSummary;
+  tuitionCoverage: PrefectureTuitionCoverage;
   averageOverallSatisfaction: number | null;
   averageTuitionSatisfaction: number | null;
+  topByLocalReviewCount: PrefectureRankingEntry[];
   topByReviewCount: PrefectureRankingEntry[];
   topByRating: PrefectureRankingEntry[];
   topBySupport: PrefectureRankingEntry[];
@@ -103,10 +133,22 @@ function resolveTuitionState(school: SearchSchool): TuitionConfirmationState {
 function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
   const localLocations =
     school.campus_locations?.filter((location) => location.prefecture === prefecture) ?? [];
-  const localCities = [...new Set(localLocations.map((location) => location.city).filter(Boolean))];
-  const localStations = [
-    ...new Set(localLocations.flatMap((location) => getCampusNearestStations(location))),
+  const localCities = [
+    ...new Set(
+      localLocations
+        .map((location) => normalizeAreaName(location.city)?.city)
+        .filter((city): city is string => Boolean(city))
+    ),
   ];
+  const localStations = [
+    ...new Set(
+      localLocations
+        .flatMap((location) => getCampusNearestStations(location))
+        .map((station) => normalizeStationLabel(station)?.station)
+        .filter((station): station is string => Boolean(station))
+    ),
+  ];
+  const regional = findRegionalReviewStat(school.regional_reviews, prefecture);
 
   return {
     id: school.id,
@@ -119,6 +161,8 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     localCities,
     localStations: localStations.slice(0, 2),
     reviewCount: school.review_count,
+    localReviewCount: regional?.reviewCount ?? 0,
+    localOverallAvg: regional?.overallAvg ?? null,
     overallAvg: school.overall_avg,
     supportAvg: school.support_avg,
     tuitionAvg: school.tuition_avg,
@@ -204,6 +248,26 @@ export const getPrefectureLandingData = cache(
 
     const locationInsights = computePrefectureLocationInsights(schools, prefecture);
     const totalReviewCount = rows.reduce((sum, row) => sum + row.reviewCount, 0);
+    const localReviewCount = rows.reduce((sum, row) => sum + row.localReviewCount, 0);
+
+    const localStats: RegionalReviewStat[] = schools
+      .map((school) => findRegionalReviewStat(school.regional_reviews, prefecture))
+      .filter((stat): stat is RegionalReviewStat => stat !== null);
+    const regionalReviewSummary = summarizeRegionalReviews(localStats, prefecture);
+
+    const topByLocalReviewCount = [...rows]
+      .filter((row) => row.localReviewCount > 0)
+      .sort((a, b) => b.localReviewCount - a.localReviewCount || b.reviewCount - a.reviewCount)
+      .slice(0, PREFECTURE_LANDING_HIGHLIGHT_LIMIT)
+      .map((row) => ({ row, metricLabel: `${prefecture}の回答${row.localReviewCount}件` }));
+
+    const tuitionCoverage: PrefectureTuitionCoverage = {
+      amounts: rows.filter((row) => row.tuitionState === 'amounts').length,
+      varies: rows.filter((row) => row.tuitionState === 'varies').length,
+      contactRequired: rows.filter((row) => row.tuitionState === 'contact_required').length,
+      unconfirmed: rows.filter((row) => row.tuitionState === 'unconfirmed').length,
+      confirmed: rows.filter((row) => row.tuitionState !== 'unconfirmed').length,
+    };
 
     const copyStats: PrefectureLandingCopyStats = {
       totalSchools: counts.totalSchools,
@@ -211,6 +275,9 @@ export const getPrefectureLandingData = cache(
       publicCount: counts.publicCount,
       supportCount: counts.supportCount,
       totalReviewCount,
+      localReviewCount,
+      localReviewSchoolCount: regionalReviewSummary.schoolCount,
+      cityCount: locationInsights.cityCount,
       topCities: locationInsights.topCities.map((city) => city.city),
       topStations: locationInsights.topStations.map((station) => station.name),
     };
@@ -221,8 +288,13 @@ export const getPrefectureLandingData = cache(
       counts,
       schoolsWithReviewsCount: rows.filter((row) => row.reviewCount > 0).length,
       totalReviewCount,
+      localReviewCount,
+      localReviewSchoolCount: regionalReviewSummary.schoolCount,
+      regionalReviewSummary,
+      tuitionCoverage,
       averageOverallSatisfaction: computeWeightedAverage(schools, 'overall_avg'),
       averageTuitionSatisfaction: computeWeightedAverage(schools, 'tuition_avg'),
+      topByLocalReviewCount,
       topByReviewCount,
       topByRating: buildRanking(rows, 'overallAvg', (value) => `総合${value.toFixed(1)}`),
       topBySupport: buildRanking(rows, 'supportAvg', (value) => `サポート${value.toFixed(1)}`),

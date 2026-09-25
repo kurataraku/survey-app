@@ -12,6 +12,10 @@ export type PrefectureFaqStats = {
   totalSchools?: number;
   schoolsWithReviewsCount?: number;
   totalReviewCount?: number;
+  /** その都道府県のキャンパスに通ったと回答した口コミ件数 */
+  localReviewCount?: number;
+  /** 地域口コミが1件以上ある掲載校数 */
+  localReviewSchoolCount?: number;
   averageOverallSatisfaction?: number | null;
 };
 
@@ -19,11 +23,13 @@ export type PrefectureFaqStats = {
 function buildStatsSentence(prefecture: string, stats?: PrefectureFaqStats): string {
   if (!stats?.totalSchools) return '';
   const parts = [`このページでは${prefecture}で検討できる${stats.totalSchools}校を掲載しています`];
-  if (stats.totalReviewCount) {
-    parts.push(`公開口コミは${stats.totalReviewCount}件`);
+  if (stats.localReviewCount) {
+    parts.push(
+      `${prefecture}のキャンパスに通ったと回答した口コミは${stats.localReviewCount}件（${stats.localReviewSchoolCount ?? 0}校）`
+    );
   }
-  if (stats.schoolsWithReviewsCount) {
-    parts.push(`うち口コミがある学校は${stats.schoolsWithReviewsCount}校`);
+  if (stats.totalReviewCount) {
+    parts.push(`他県の回答を含む学校全体の公開口コミは${stats.totalReviewCount}件`);
   }
   if (stats.averageOverallSatisfaction != null) {
     parts.push(`平均総合満足度は${stats.averageOverallSatisfaction.toFixed(1)}（5点満点）`);

@@ -8,6 +8,13 @@ import type { PublicTuitionEstimate } from '@/lib/types/tuition';
 import { fetchPublicTuitionEstimates } from '@/lib/tuition/getTuitionEstimates';
 import type { PublicCourseListing } from '@/lib/types/courses';
 import { fetchPublicCourseListings } from '@/lib/courses/getCourseListings';
+import {
+  addRegionalReview,
+  createRegionalReviewIndex,
+  finalizeRegionalReviews,
+  type RegionalReviewStat,
+} from '@/lib/schools/regionalReviews';
+import { normalizeAreaName, toComparableAreaNames } from '@/lib/regions/area-normalize';
 
 export interface SearchSchool {
   id: string;
@@ -39,6 +46,11 @@ export interface SearchSchool {
   tuition_estimate: PublicTuitionEstimate | null;
   /** 公開済みのコース一覧（公式サイト引用）。未公開なら null */
   course_listing: PublicCourseListing | null;
+  /**
+   * 回答されたキャンパス都道府県ごとの口コミ集計。
+   * review_count（学校全体）と区別し、地域LPで「その県の口コミ」として使う。
+   */
+  regional_reviews: RegionalReviewStat[] | null;
 }
 
 export interface SearchSchoolsParams {
@@ -127,6 +139,7 @@ export async function fetchSearchSchoolsWithStats(
   };
 
   const schoolStats = new Map<string, StatsEntry>();
+  const regionalReviews = createRegionalReviewIndex();
   schoolIds.forEach((id) =>
     schoolStats.set(id, {
       count: 0,
@@ -191,6 +204,8 @@ export async function fetchSearchSchoolsWithStats(
           if (clr !== null) s.campusLife.push(clr);
           const tr = parseRating(ans.tuition_rating);
           if (tr !== null) s.tuition.push(tr);
+
+          addRegionalReview(regionalReviews, r.school_id, ans, ov, parseRating);
         } catch {
           // ignore malformed answers
         }
@@ -270,6 +285,7 @@ export async function fetchSearchSchoolsWithStats(
       review_tendency: tendencyMap.get(school.id) ?? null,
       tuition_estimate: tuitionEstimates.get(school.id) ?? null,
       course_listing: courseListings.get(school.id) ?? null,
+      regional_reviews: finalizeRegionalReviews(regionalReviews, school.id),
     };
   });
 }
@@ -441,10 +457,13 @@ export const searchSchools = cache(async (
     );
   }
   if (campus_city) {
+    // 登録値の表記揺れ（町名・番地付き、政令市の区あり/なし）を吸収して照合する
+    const target = normalizeAreaName(campus_city)?.city ?? campus_city;
     schoolsList = schoolsList.filter((school) =>
-      school.campus_locations?.some((location) =>
-        (!campus_prefecture || location.prefecture === campus_prefecture) &&
-        location.city === campus_city
+      school.campus_locations?.some(
+        (location) =>
+          (!campus_prefecture || location.prefecture === campus_prefecture) &&
+          toComparableAreaNames(location.city).includes(target)
       )
     );
   }

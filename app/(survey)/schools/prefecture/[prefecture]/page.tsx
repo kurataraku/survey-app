@@ -6,7 +6,7 @@ import { getPrefectureLandingData } from '@/lib/schools/getPrefectureLandingData
 
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 
-import { getPrefectureIntroLead } from '@/lib/regions/prefecture-intros';
+import { buildPrefectureIntroLead } from '@/lib/regions/prefecture-intros';
 
 import { getPrefecturePath, getPrefectureSlug, prefectures, resolvePrefectureParam } from '@/lib/prefectures';
 
@@ -93,7 +93,21 @@ export default async function PrefectureSchoolsPage({ params }: PageProps) {
     getCachedGlobalAverages(),
   ]);
 
-  const introLead = getPrefectureIntroLead(prefecture);
+  const introLead = buildPrefectureIntroLead(prefecture, {
+    totalSchools: data.counts.totalSchools,
+    publicCount: data.counts.publicCount,
+    privateCount: data.counts.privateCount,
+    supportCount: data.counts.supportCount,
+    localCampusLocationCount: data.counts.localCampusLocationCount,
+    cityCount: data.locationInsights.cityCount,
+    topCities: data.locationInsights.topCities,
+    topStations: data.locationInsights.topStations,
+    localReviewCount: data.localReviewCount,
+    localReviewSchoolCount: data.localReviewSchoolCount,
+    topAttendance: data.regionalReviewSummary.attendanceFrequencies[0] ?? null,
+    topEnrollment: data.regionalReviewSummary.enrollmentTypes[0] ?? null,
+    tuitionConfirmed: data.tuitionCoverage.confirmed,
+  });
   const hasSchools = data.rows.length > 0;
 
   const prefectureJsonLd = hasSchools
@@ -105,6 +119,8 @@ export default async function PrefectureSchoolsPage({ params }: PageProps) {
           totalSchools: data.counts.totalSchools,
           schoolsWithReviewsCount: data.schoolsWithReviewsCount,
           totalReviewCount: data.totalReviewCount,
+          localReviewCount: data.localReviewCount,
+          localReviewSchoolCount: data.localReviewSchoolCount,
           averageOverallSatisfaction: data.averageOverallSatisfaction,
         },
       })

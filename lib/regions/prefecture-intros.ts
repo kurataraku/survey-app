@@ -31,3 +31,89 @@ export function getPrefectureIntroLead(prefectureLabel: string): string {
   const slug = getRegionSlugForPrefecture(prefectureLabel);
   return INTRO_LEADS[slug] ?? defaultPrefectureIntroLead(prefectureLabel);
 }
+
+/** 導入文を実データから組み立てるための材料 */
+export type PrefectureIntroStats = {
+  totalSchools: number;
+  publicCount: number;
+  privateCount: number;
+  supportCount: number;
+  localCampusLocationCount: number;
+  cityCount: number;
+  topCities: Array<{ city: string; schoolCount: number }>;
+  topStations: Array<{ name: string; schoolCount: number }>;
+  localReviewCount: number;
+  localReviewSchoolCount: number;
+  topAttendance: { label: string; count: number } | null;
+  topEnrollment: { label: string; count: number } | null;
+  tuitionConfirmed: number;
+};
+
+/**
+ * 都道府県固有の導入文を実データから生成する。
+ *
+ * 47県で同じ汎用文を並べると、県名だけを差し替えたページに見える。
+ * キャンパス分布、学校種別、最寄り駅、地域口コミの傾向、学費の確認状況という
+ * 県ごとに必ず異なる実数だけで構成し、手書き文面の使い回しをやめる。
+ */
+export function buildPrefectureIntroLead(
+  prefectureLabel: string,
+  stats?: PrefectureIntroStats
+): string {
+  if (!stats || stats.totalSchools === 0) {
+    return getPrefectureIntroLead(prefectureLabel);
+  }
+
+  const sentences: string[] = [];
+
+  const cityPart = stats.topCities
+    .slice(0, 3)
+    .map((city) => `${city.city}${city.schoolCount}校`)
+    .join('、');
+  sentences.push(
+    stats.cityCount > 0
+      ? `${prefectureLabel}で比較できる通信制高校・サポート校は${stats.totalSchools}校あり、${prefectureLabel}内${stats.cityCount}市区町村の${stats.localCampusLocationCount}拠点に分かれています。掲載校が多いのは${cityPart}です。`
+      : `${prefectureLabel}で比較できる通信制高校・サポート校は${stats.totalSchools}校です。`
+  );
+
+  if (stats.topStations.length > 0) {
+    const stationPart = stats.topStations
+      .slice(0, 2)
+      .map((station) => `${station.name}から${station.schoolCount}校`)
+      .join('、');
+    sentences.push(
+      `通学のしやすさから絞り込む場合は最寄り駅が目安になり、${stationPart}を比較できます。`
+    );
+  }
+
+  sentences.push(
+    `公立${stats.publicCount}校は学費を抑えやすい一方でレポートやスクーリングの管理を自分で進める場面が多く、私立${stats.privateCount}校は通学コースとサポート体制の幅が学校ごとに大きく異なります。サポート校${stats.supportCount}校は単独では高校卒業資格にならないため、提携する通信制高校の学費と合わせて確認が必要です。`
+  );
+
+  if (stats.localReviewCount > 0) {
+    const parts: string[] = [];
+    if (stats.topAttendance) {
+      parts.push(`通学頻度は「${stats.topAttendance.label}」が最も多く${stats.topAttendance.count}件`);
+    }
+    if (stats.topEnrollment) {
+      parts.push(
+        `入学タイミングは「${stats.topEnrollment.label}」が最も多く${stats.topEnrollment.count}件`
+      );
+    }
+    sentences.push(
+      parts.length > 0
+        ? `${prefectureLabel}のキャンパスに通ったと回答した口コミは${stats.localReviewCount}件（${stats.localReviewSchoolCount}校）で、${parts.join('、')}でした。`
+        : `${prefectureLabel}のキャンパスに通ったと回答した口コミは${stats.localReviewCount}件（${stats.localReviewSchoolCount}校）です。`
+    );
+  } else {
+    sentences.push(
+      `${prefectureLabel}のキャンパスを回答した口コミはまだないため、学校全体の口コミと項目別評価を比較の起点にしてください。`
+    );
+  }
+
+  sentences.push(
+    `学費は${stats.tuitionConfirmed}校で公開情報から確認できており、残りはコースや通学頻度で金額が変わるため各校の募集要項での確認が必要です。良かった点と改善してほしい点の両面を同じ回答で見比べると、費用と通いやすさのどちらを優先するか判断しやすくなります。`
+  );
+
+  return sentences.join('');
+}
