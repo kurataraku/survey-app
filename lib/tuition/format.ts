@@ -75,6 +75,19 @@ export function buildTuitionCardSummary(estimate: PublicTuitionEstimate): string
   return formatTuitionRange(estimate.first_year_min, estimate.first_year_max);
 }
 
+/**
+ * 比較表の1セル用。金額が公開されている学校だけ金額と適用前後ラベルを返す。
+ * コース別・個別確認・未登録はいずれも null（表では「—」）にし、確認状態は見せない。
+ */
+export function buildTuitionTableCell(
+  estimate: PublicTuitionEstimate | null | undefined
+): { value: string; basisLabel: string | null } | null {
+  if (!estimate) return null;
+  const [line] = buildTuitionRangeLines(estimate);
+  if (!line) return null;
+  return { value: line.value, basisLabel: buildTuitionCardBasisLabel(estimate) };
+}
+
 /** 学費目安として表示可能なデータか（公開ページで描画するかの判定） */
 export function hasDisplayableTuition(estimate: PublicTuitionEstimate | null | undefined): estimate is PublicTuitionEstimate {
   if (!estimate) return false;

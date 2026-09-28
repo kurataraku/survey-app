@@ -8,8 +8,8 @@ import type {
   PrefectureLandingData,
   PrefectureRankingEntry,
   PrefectureSchoolRow,
-  TuitionConfirmationState,
 } from '@/lib/schools/getPrefectureLandingData';
+import RegionalReviewExcerptList from '@/components/RegionalReviewExcerptList';
 import type { PrefectureLocationInsights } from '@/lib/schools/getPrefectureLocationInsights';
 import type { SchoolCardGlobalAverages } from '@/lib/home/getHomeData';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
@@ -42,12 +42,20 @@ const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
   support: 'サポート校',
 };
 
-const tuitionStateLabels: Record<TuitionConfirmationState, string> = {
-  amounts: '目安あり',
-  varies: 'コース別',
-  contact_required: '個別確認',
-  unconfirmed: '要確認',
-};
+function TuitionCell({ tuition }: { tuition: PrefectureSchoolRow['tuition'] }) {
+  if (!tuition) return <span className="text-gray-400">—</span>;
+  return (
+    <>
+      <span className="whitespace-nowrap">{tuition.value}</span>
+      {tuition.basisLabel && <span className="block text-[11px] text-gray-500">{tuition.basisLabel}</span>}
+    </>
+  );
+}
+
+/** 本校所在地が未登録の学校では「本校: 不明」を出さない */
+function hasKnownHeadquarters(row: PrefectureSchoolRow): boolean {
+  return Boolean(row.headquartersPrefecture) && row.headquartersPrefecture !== '不明';
+}
 
 function schoolHref(row: PrefectureSchoolRow): string | null {
   return row.slug ? appPath(`/schools/${row.slug}`) : null;
@@ -65,19 +73,17 @@ function SchoolNameCell({ row }: { row: PrefectureSchoolRow }) {
   );
 }
 
-function formatLocalBase(row: PrefectureSchoolRow, prefecture: string): string {
+function formatLocalBase(row: PrefectureSchoolRow): string {
   const parts: string[] = [];
   if (row.hasLocalHeadquarters) parts.push('本校');
   if (row.localCampusCount > 0) {
     parts.push(
       row.localCities.length > 0
         ? `${row.localCities.slice(0, 2).join('・')}${row.localCampusCount > 2 ? 'ほか' : ''}`
-        : `キャンパス${row.localCampusCount}拠点`
+        : `キャンパス${row.localCampusCount}か所`
     );
   }
-  if (parts.length === 0) {
-    return `${prefecture}内の拠点は未登録`;
-  }
+  if (parts.length === 0) return '—';
   return parts.join(' / ');
 }
 
@@ -100,25 +106,21 @@ function SummaryStats({
     {
       label: '掲載校数',
       value: `${counts.totalSchools}校`,
-      hint: `本校${counts.localHeadquartersCount}校 / キャンパスあり${counts.localCampusSchoolCount}校`,
+      hint: `${prefecture}に本校${counts.localHeadquartersCount}校 / キャンパスがある学校${counts.localCampusSchoolCount}校`,
     },
     {
-      label: `${prefecture}内キャンパス`,
-      value: `${counts.localCampusLocationCount}拠点`,
-      hint: '学校数とは別に拠点数で数えています',
+      label: `${prefecture}内のキャンパス`,
+      value: `${counts.localCampusLocationCount}か所`,
+      hint: 'キャンパス・学習センター',
     },
     {
       label: '公立 / 私立 / サポート校',
       value: `${counts.publicCount} / ${counts.privateCount} / ${counts.supportCount}`,
-      hint: '同じ母数で混ぜずに区分しています',
     },
     {
-      label: `${prefecture}の口コミ`,
+      label: `${prefecture}内キャンパスの口コミ`,
       value: data.localReviewCount > 0 ? `${data.localReviewCount}件` : '—',
-      hint:
-        data.localReviewCount > 0
-          ? `${prefecture}のキャンパスに通った回答 / ${data.localReviewSchoolCount}校`
-          : `${prefecture}のキャンパスを回答した口コミはまだありません`,
+      hint: data.localReviewCount > 0 ? '実際に通った人の声' : 'まだ投稿がありません',
     },
     {
       label: '平均総合満足度',
@@ -151,7 +153,7 @@ function SummaryStats({
   );
 }
 
-/** 集計の定義と調査方法。数値の意味が分かるよう本文と同じ画面に置く */
+/** 掲載範囲・口コミ・学費の見方。数値の意味が分かるよう本文と同じ画面に置く */
 function MethodologyNote({ data }: { data: PrefectureLandingData }) {
   const { counts, prefecture } = data;
   return (
@@ -160,36 +162,30 @@ function MethodologyNote({ data }: { data: PrefectureLandingData }) {
       aria-labelledby="pref-methodology-heading"
     >
       <h2 id="pref-methodology-heading" className="text-base font-bold text-gray-900 mb-2">
-        このページの数え方と調査方法
+        このページに掲載している情報について
       </h2>
       <ul className="space-y-1.5 text-xs text-gray-600 leading-relaxed">
         <li>
-          掲載校は「本校が{prefecture}にある学校」{counts.localHeadquartersCount}校、「
-          {prefecture}にキャンパスがある学校」{counts.localCampusSchoolCount}校、
-          「対応地域として登録があり{prefecture}内の拠点が未登録の学校」
-          {counts.withoutLocalLocationCount}校の合計です。
+          {prefecture}に本校がある学校、{prefecture}にキャンパスがある学校、{prefecture}を対応地域としている学校を掲載しています。
+          入試や説明会だけに使う会場はキャンパスに含みません。
         </li>
         <li>
-          口コミは当サイトのアンケート回答のうち、AI審査と管理者確認を通過し公開されたものだけを集計しています。
-          回答時に申告された「主に通っていたキャンパス都道府県」が{prefecture}のものを
-          <strong className="font-semibold">{prefecture}の口コミ</strong>（{data.localReviewCount}件）、
-          他県の回答を含む学校単位の合計を
-          <strong className="font-semibold">学校全体の口コミ</strong>（{data.totalReviewCount}件）として
-          別に数えています。全国に拠点がある学校の学校全体の件数を、{prefecture}の件数としては扱いません。
+          口コミは、当サイトのアンケートに回答した在校生・卒業生・保護者の声で、公開前に内容を審査しています。
+          主に通っていたキャンパスが{prefecture}内だった口コミを
+          <strong className="font-semibold">{prefecture}内キャンパスの口コミ</strong>（{data.localReviewCount}件）、
+          他県のキャンパスも含めた口コミを
+          <strong className="font-semibold">学校全体の口コミ</strong>（{data.totalReviewCount}件）として分けて表示しています。
         </li>
         <li>
-          学費は各学校の公開情報で確認できた範囲のみを「目安あり」として表示し、コースや通学頻度で変わる場合は
-          「コース別」、確認できない場合は「要確認」と表示しています。未確認を安い・無料という意味では使っていません。
-        </li>
-        <li>
-          キャンパス所在地・最寄り駅は学校公式サイト等で確認できた範囲の登録情報です。試験会場や説明会だけの会場は拠点数に含めていません。最新の所在地・募集状況は各学校の公式情報で確認してください。
+          学費は、学校が初年度納入金の目安を公開している場合だけ金額を載せています。「—」は金額が公開されていないか、
+          コースや通学頻度で大きく変わる学校で、学費が安い・無料という意味ではありません。
         </li>
         {counts.admissionVerifiedCount > 0 && (
           <li>
-            「全国から出願可」「スクーリング会場」などの表示は、学校公式サイト・募集要項・教育委員会の公表資料で確認できた
-            {counts.admissionVerifiedCount}校のみです。確認日から12か月を過ぎた情報は表示せず、再確認後に表示します。
+            「全国から出願可」「スクーリング会場」などの表示は、学校公式サイト・募集要項・教育委員会の公表資料で確認できた内容です。
           </li>
         )}
+        <li>所在地・最寄り駅・学費は変わることがあります。出願前に各学校の公式情報で最新の内容を確認してください。</li>
       </ul>
     </section>
   );
@@ -205,8 +201,8 @@ function ComparisonTable({ data }: { data: PrefectureLandingData }) {
         {prefecture}の通信制高校・サポート校を一覧で比較
       </h2>
       <p className="text-sm text-gray-600 mb-4">
-        学校種別、{prefecture}内の拠点、最寄り駅、学費の確認状態、口コミ件数、総合満足度を同じ条件で並べています。
-        口コミ件数は「{prefecture}のキャンパスに通った回答」と「他県を含む学校全体」を分けて表示しています。
+        {prefecture}内のキャンパス、最寄り駅、初年度納入金の目安、口コミ件数、総合満足度を並べています。
+        「{prefecture}内の口コミ」は{prefecture}内のキャンパスに通った人の口コミ、「全体」は他県のキャンパスも含めた学校全体の口コミです。
         学校名から詳細ページへ移ると、口コミ本文と項目別評価を確認できます。
       </p>
       <PrefectureSchoolCardTracker prefecture={prefecture} block="list">
@@ -224,19 +220,19 @@ function ComparisonTable({ data }: { data: PrefectureLandingData }) {
                   種別
                 </th>
                 <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  {prefecture}内の拠点
+                  {prefecture}内のキャンパス
                 </th>
                 <th scope="col" className="px-3 py-2.5 text-left font-semibold">
                   最寄り駅
                 </th>
                 <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  学費
+                  初年度納入金の目安
                 </th>
                 <th scope="col" className="px-3 py-2.5 text-right font-semibold">
-                  {prefecture}の口コミ
+                  {prefecture}内の口コミ
                 </th>
                 <th scope="col" className="px-3 py-2.5 text-right font-semibold">
-                  学校全体の口コミ
+                  口コミ（全体）
                 </th>
                 <th scope="col" className="px-3 py-2.5 text-right font-semibold">
                   総合
@@ -248,7 +244,7 @@ function ComparisonTable({ data }: { data: PrefectureLandingData }) {
                 <tr key={row.id} className="align-top hover:bg-blue-50/40">
                   <th scope="row" className="px-3 py-2.5 text-left font-normal">
                     <SchoolNameCell row={row} />
-                    {!row.hasLocalHeadquarters && (
+                    {!row.hasLocalHeadquarters && hasKnownHeadquarters(row) && (
                       <span className="block text-[11px] text-gray-500">
                         本校: {row.headquartersPrefecture}
                       </span>
@@ -258,12 +254,12 @@ function ComparisonTable({ data }: { data: PrefectureLandingData }) {
                   <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">
                     {row.institutionType ? institutionTypeLabels[row.institutionType] : '—'}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-700">{formatLocalBase(row, prefecture)}</td>
+                  <td className="px-3 py-2.5 text-gray-700">{formatLocalBase(row)}</td>
                   <td className="px-3 py-2.5 text-gray-700">
                     {row.localStations.length > 0 ? row.localStations.join('・') : '—'}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">
-                    {tuitionStateLabels[row.tuitionState]}
+                  <td className="px-3 py-2.5 text-gray-700">
+                    <TuitionCell tuition={row.tuition} />
                   </td>
                   <td className="px-3 py-2.5 text-right whitespace-nowrap">
                     {row.localReviewCount > 0 ? (
@@ -284,7 +280,10 @@ function ComparisonTable({ data }: { data: PrefectureLandingData }) {
           </table>
         </div>
       </PrefectureSchoolCardTracker>
-      <TuitionDisclaimer className="mt-3" />
+      <p className="mt-2 text-xs text-gray-500">
+        「—」の学費は、学校が金額を公開していないか、コースや通学頻度によって大きく変わる学校です。資料請求や個別相談で確認できます。
+      </p>
+      <TuitionDisclaimer className="mt-2" />
     </section>
   );
 }
@@ -349,10 +348,8 @@ function LocationInsightsSection({
         {prefecture}の通信制高校をエリア・最寄り駅から探す
       </h2>
       <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-4xl">
-        {prefecture}内でキャンパス所在地を確認できたのは{insights.schoolsWithCampusLocation}校で、
-        {insights.cityCount}市区町村・{insights.stationCount}駅に分布しています。
-        そのうち最寄り駅まで確認できたのは{insights.schoolsWithNearestStation}校です。
-        通学のしやすさから絞り込みたい場合は、市区町村または駅から候補校を確認してください。
+        {prefecture}では{insights.cityCount}市区町村に通信制高校・サポート校のキャンパスがあります。
+        通学のしやすさから絞り込みたい場合は、市区町村または最寄り駅から候補校を確認してください。
       </p>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         {insights.topCities.length > 0 && (
@@ -378,7 +375,7 @@ function LocationInsightsSection({
                         {city.city}
                       </span>
                       <span className="block text-xs text-gray-600 leading-relaxed">
-                        掲載校 {city.schoolCount}校 / キャンパス {city.campusCount}拠点
+                        {city.schoolCount}校 / キャンパス{city.campusCount}か所
                         {city.nearestStations.length > 0
                           ? ` / 最寄り: ${city.nearestStations.join('・')}`
                           : ''}
@@ -421,7 +418,6 @@ function LocationInsightsSection({
               ))}
             </ul>
             <p className="mt-3 text-xs text-gray-500 leading-relaxed">
-              駅名は比較表の「最寄り駅」列と対応しています。路線が複数ある駅は同じ駅としてまとめています。
               通学頻度や必須スクーリングの場所は学校詳細で確認してください。
             </p>
           </div>
@@ -472,14 +468,22 @@ function RegionalVoiceSection({ data }: { data: PrefectureLandingData }) {
       aria-labelledby="pref-regional-voice-heading"
     >
       <h2 id="pref-regional-voice-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {prefecture}のキャンパスに通った人の回答から比べる
+        {prefecture}のキャンパスに通った人の口コミ
       </h2>
       <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-4xl">
-        {prefecture}のキャンパスに通ったと回答した口コミは{summary.reviewCount}件（
+        {prefecture}のキャンパスに通った人の口コミは{summary.reviewCount}件（
         {summary.schoolCount}校）です。
-        {summary.overallAvg != null && `この回答だけで算出した総合満足度は${summary.overallAvg.toFixed(1)}（5点満点）です。`}
-        全国の回答を含む学校全体の件数とは分けて集計しています。
+        {summary.overallAvg != null && `この口コミだけで見た総合満足度は${summary.overallAvg.toFixed(1)}（5点満点）です。`}
+        他県のキャンパスに通った人の口コミは含みません。
       </p>
+      {data.reviewExcerpts.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-bold text-gray-900 mb-3">
+            {prefecture}のキャンパスに通った人の口コミ（抜粋）
+          </h3>
+          <RegionalReviewExcerptList reviews={data.reviewExcerpts} prefecture={prefecture} />
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         {distributions.map(({ heading, note, items }) =>
           items.length === 0 ? null : (
@@ -521,31 +525,9 @@ function RegionalVoiceSection({ data }: { data: PrefectureLandingData }) {
   );
 }
 
-/** 学費は網羅できていないため、確認状態と確認率を先に示す */
-function TuitionCoverageSection({ data }: { data: PrefectureLandingData }) {
-  const { prefecture, tuitionCoverage, counts } = data;
-  const items: Array<{ state: TuitionConfirmationState; count: number; description: string }> = [
-    {
-      state: 'amounts',
-      count: tuitionCoverage.amounts,
-      description: '公開情報から金額の目安を確認できた学校。対象年度・コース・含む費目は学校詳細に記載しています。',
-    },
-    {
-      state: 'varies',
-      count: tuitionCoverage.varies,
-      description: 'コースや通学頻度、履修単位数で金額が変わるため、単一の金額では示せない学校。',
-    },
-    {
-      state: 'contact_required',
-      count: tuitionCoverage.contactRequired,
-      description: '公開資料では金額が確認できず、学校への個別確認が必要な学校。',
-    },
-    {
-      state: 'unconfirmed',
-      count: tuitionCoverage.unconfirmed,
-      description: '当サイトで学費を未確認の学校。金額が安い・無料という意味ではありません。',
-    },
-  ];
+/** 初年度納入金の目安を公開している学校だけを並べる。金額のない学校を安いと誤読させない */
+function TuitionSection({ data }: { data: PrefectureLandingData }) {
+  const { prefecture, tuitionRows, counts } = data;
 
   return (
     <section
@@ -553,25 +535,26 @@ function TuitionCoverageSection({ data }: { data: PrefectureLandingData }) {
       aria-labelledby="pref-tuition-heading"
     >
       <h2 id="pref-tuition-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {prefecture}の通信制高校の学費をどこまで確認できているか
+        {prefecture}の通信制高校の学費（初年度納入金の目安）
       </h2>
       <p className="text-sm text-gray-600 leading-relaxed mb-4 max-w-4xl">
-        学費確認済み <strong className="font-semibold">{tuitionCoverage.confirmed}校</strong> / 掲載
-        {counts.totalSchools}校です。通信制高校の学費はコース、通学頻度、履修単位数、就学支援金の
-        適用状況、サポート校の併用、スクーリングの交通宿泊費で大きく変わります。前提の違う金額を
-        横並びの「年間学費」として比較できないため、確認できた費目だけを表示し、確認状態を明記しています。
+        通信制高校の学費は、コース、通学頻度、履修単位数、就学支援金の適用、サポート校の併用、スクーリングの交通・宿泊費で大きく変わります。
+        {tuitionRows.length > 0
+          ? `初年度納入金の目安を公開している${tuitionRows.length}校を並べています。就学支援金の適用前・適用後が学校によって違うため、金額と一緒に確認してください。`
+          : `${prefecture}の掲載校では、比較できる形で初年度納入金を公開している学校がまだありません。気になる学校は資料請求や個別相談で確認してください。`}
       </p>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map(({ state, count, description }) => (
-          <li key={state} className="rounded-lg border border-gray-100 bg-gray-50/70 p-4">
-            <h3 className="text-sm font-bold text-gray-900 mb-1">
-              {tuitionStateLabels[state]}
-              <span className="ml-2 text-xs font-normal text-gray-500">{count}校</span>
-            </h3>
-            <p className="text-xs text-gray-600 leading-relaxed">{description}</p>
-          </li>
-        ))}
-      </ul>
+      {tuitionRows.length > 0 && (
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {tuitionRows.map((row) => (
+            <li key={row.id} className="rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2.5 text-sm">
+              <SchoolNameCell row={row} />
+              <span className="mt-0.5 block text-gray-800">
+                <TuitionCell tuition={row.tuition} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="mt-3 text-xs text-gray-500 leading-relaxed">
         公立{counts.publicCount}校と私立{counts.privateCount}校、サポート校
         {counts.supportCount}校は費用の考え方が異なります。サポート校の費用は提携する通信制高校の
@@ -801,7 +784,7 @@ export default function PrefectureLandingPage({
                     href="#pref-regional-voice-heading"
                     className="text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                    {prefecture}に通った人の回答を見る
+                    {prefecture}のキャンパスに通った人の口コミを読む
                   </Link>
                 </li>
                 <li>
@@ -817,7 +800,7 @@ export default function PrefectureLandingPage({
                     href="#pref-tuition-heading"
                     className="text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                    学費の確認状態を見る
+                    学費の目安を見る
                   </Link>
                 </li>
                 <li>
@@ -858,19 +841,18 @@ export default function PrefectureLandingPage({
               <p className="text-sm text-gray-600 mb-4">
                 口コミが{PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING}
                 件以上ある学校を対象に、観点ごとの平均が高い順に並べています（学費満足度は金額ではなく納得感の評価です）。
-                「{prefecture}の回答が多い学校」だけが{prefecture}の回答件数を根拠にした並びで、
-                他の3つは全国の回答を含む学校全体の平均です。
+                「{prefecture}内の口コミが多い学校」は{prefecture}内キャンパスの口コミ件数、ほかの3つは他県を含む学校全体の口コミの平均で並べています。
               </p>
               <div className="grid gap-5 lg:grid-cols-2">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 mb-2">
-                    {prefecture}の回答が多い学校
+                    {prefecture}内の口コミが多い学校
                   </h3>
                   <RankingList
                     prefecture={prefecture}
                     block="top_local_reviews"
                     entries={data.topByLocalReviewCount}
-                    emptyMessage={`${prefecture}のキャンパスを回答した口コミがまだありません。`}
+                    emptyMessage={`${prefecture}内のキャンパスに通った人の口コミはまだありません。`}
                   />
                 </div>
                 <div>
@@ -903,7 +885,7 @@ export default function PrefectureLandingPage({
               </div>
             </section>
 
-            <TuitionCoverageSection data={data} />
+            <TuitionSection data={data} />
 
             <MethodologyNote data={data} />
 

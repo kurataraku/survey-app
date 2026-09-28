@@ -59,7 +59,7 @@ export function getPrefectureLandingSubtitle(
   const localPart = buildLocalReviewPhrase(prefecture, stats);
   const reviewPart = localPart ? `${localPart}をもとに、` : '';
 
-  return `${prefecture}で検討できる通信制高校・サポート校${stats.totalSchools}校（うち公立${stats.publicCount}校、サポート校${stats.supportCount}校）を、${prefecture}内${stats.localCampusLocationCount}拠点のキャンパス情報とあわせて比較できます。${reviewPart}学費の確認状態、通いやすさ、項目別評価を同じ表で並べています。${areaPart}${stationPart}`;
+  return `${prefecture}で検討できる通信制高校・サポート校${stats.totalSchools}校（うち公立${stats.publicCount}校、サポート校${stats.supportCount}校）を、${prefecture}内${stats.localCampusLocationCount}か所のキャンパス情報とあわせて比較できます。${reviewPart}初年度納入金の目安、通いやすさ、項目別評価を同じ表で並べています。${areaPart}${stationPart}`;
 }
 
 /** generateMetadata 用の description（当該都道府県の実数のみを使う） */
@@ -75,12 +75,12 @@ export function getPrefectureLandingMetaDescription(
   const reviewPart = localPart ? `${localPart}・` : '';
   const areaPart = stats.topCities.length > 0 ? `${stats.topCities.slice(0, 3).join('・')}など` : '';
 
-  return `${prefecture}の通信制高校・サポート校${stats.totalSchools}校を比較。${reviewPart}${prefecture}内キャンパス${stats.localCampusLocationCount}拠点、${areaPart}のエリア別情報、公立${stats.publicCount}校の区分、学費の確認状態、良い点と改善点の両面を同じ条件で確認できます。`;
+  return `${prefecture}の通信制高校・サポート校${stats.totalSchools}校を比較。${reviewPart}${prefecture}内キャンパス${stats.localCampusLocationCount}か所、${areaPart}のエリア別情報、公立${stats.publicCount}校の区分、初年度納入金の目安、良い点と改善点の両面を同じ条件で確認できます。`;
 }
 
 /** CollectionPage / ItemList 用 */
 export function getPrefectureLandingCollectionDescription(prefecture: string): string {
-  return `${prefecture}の通信制高校・サポート校を、キャンパス所在地、学費の確認状態、良い点・改善点の両面と観点別満足度で比較できる一覧。`;
+  return `${prefecture}の通信制高校・サポート校を、キャンパス所在地、初年度納入金の目安、良い点・改善点の両面と観点別満足度で比較できる一覧。`;
 }
 
 export function getPrefectureLandingItemListDescription(prefecture: string): string {

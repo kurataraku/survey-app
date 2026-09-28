@@ -10,7 +10,8 @@ import {
   getCityLandingHeading,
   getCityLandingSubtitle,
 } from '@/lib/regions/city-landing-copy';
-import type { CityLandingData, CityReviewExcerpt } from '@/lib/schools/getCityLandingData';
+import RegionalReviewExcerptList from '@/components/RegionalReviewExcerptList';
+import type { CityLandingData } from '@/lib/schools/getCityLandingData';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 
 interface CityLandingPageProps {
@@ -171,50 +172,6 @@ function ComparisonTable({ data }: { data: CityLandingData }) {
   );
 }
 
-function StarRating({ value }: { value: number }) {
-  return (
-    <span className="text-amber-500" aria-label={`総合満足度 ${value} / 5`}>
-      {'★'.repeat(value)}
-      <span className="text-gray-300">{'★'.repeat(5 - value)}</span>
-    </span>
-  );
-}
-
-function ReviewExcerptCard({ review, municipality, prefecture }: { review: CityReviewExcerpt; municipality: string; prefecture: string }) {
-  return (
-    <li className="flex flex-col rounded-lg border border-gray-100 bg-gray-50/70 p-4">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs mb-2">
-        <SchoolName name={review.schoolName} slug={review.schoolSlug} />
-        <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-gray-600 border border-gray-200">
-          {review.isCityCampus ? `${municipality}のキャンパス` : `${prefecture}内のキャンパス`}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 text-xs text-gray-500 mb-2">
-        {review.overall != null && <StarRating value={review.overall} />}
-        {review.attendance && <span>通学: {review.attendance}</span>}
-      </div>
-      {review.good && (
-        <p className="text-sm text-gray-700 leading-relaxed">
-          <span className="mr-1 font-semibold text-emerald-700">良かった点</span>
-          {review.good}
-        </p>
-      )}
-      {review.bad && (
-        <p className="mt-1.5 text-sm text-gray-700 leading-relaxed">
-          <span className="mr-1 font-semibold text-rose-700">気になった点</span>
-          {review.bad}
-        </p>
-      )}
-      <Link
-        href={appPath(`/reviews/${review.id}`)}
-        className="mt-auto pt-3 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-      >
-        この口コミを全文で読む
-      </Link>
-    </li>
-  );
-}
-
 function ReviewSection({ data }: { data: CityLandingData }) {
   if (data.reviewExcerpts.length === 0) return null;
   const { municipality, prefecture } = data;
@@ -230,11 +187,7 @@ function ReviewSection({ data }: { data: CityLandingData }) {
         {municipality}にキャンパスがある学校について、{prefecture}内のキャンパスに通った在校生・卒業生・保護者の口コミを抜粋しています。
         {municipality}のキャンパスに通ったと回答した口コミには「{municipality}のキャンパス」と表示しています。
       </p>
-      <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {data.reviewExcerpts.map((review) => (
-          <ReviewExcerptCard key={review.id} review={review} municipality={municipality} prefecture={prefecture} />
-        ))}
-      </ul>
+      <RegionalReviewExcerptList reviews={data.reviewExcerpts} prefecture={prefecture} municipality={municipality} />
     </section>
   );
 }

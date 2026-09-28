@@ -17,7 +17,12 @@ import {
   getCampusNearestStations,
   getStandingCampusLocationsInPrefecture,
 } from '@/lib/schools/campusLocations';
-import { normalizeAreaName, normalizeStationLabel } from '@/lib/regions/area-normalize';
+import { normalizeAreaName, toDisplayStationName } from '@/lib/regions/area-normalize';
+import { buildTuitionTableCell } from '@/lib/tuition/format';
+import {
+  fetchRegionalReviewExcerpts,
+  type RegionalReviewExcerpt,
+} from '@/lib/schools/regionalReviewExcerpts';
 import {
   findRegionalReviewStat,
   summarizeRegionalReviews,
@@ -28,9 +33,6 @@ import type { PrefectureLandingCopyStats } from '@/lib/prefectures/prefecture-la
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissionProfiles';
 import { getCityLandingPath, getCityLandingsForPrefecture } from '@/lib/regions/city-landing';
-
-/** 学費情報の確認状態。金額を確認できていない学校を「安い」と誤解させないために区別する */
-export type TuitionConfirmationState = 'amounts' | 'varies' | 'contact_required' | 'unconfirmed';
 
 /** 比較表1行分。表示に必要な値だけを持たせ、口コミ本文や学校紹介は学校詳細へ集約する */
 export type PrefectureSchoolRow = {
@@ -55,7 +57,8 @@ export type PrefectureSchoolRow = {
   overallAvg: number | null;
   supportAvg: number | null;
   tuitionAvg: number | null;
-  tuitionState: TuitionConfirmationState;
+  /** 公開済みの初年度納入金の目安。金額が公開されていない学校は null */
+  tuition: ReturnType<typeof buildTuitionTableCell>;
   /** 公式情報で確認済み（12か月以内）の募集区域・スクーリング会場。未確認なら空配列 */
   admissionBadges: AdmissionBadge[];
 };
@@ -84,16 +87,6 @@ export type PrefectureRankingEntry = {
   metricLabel: string;
 };
 
-/** 学費の確認状態の内訳。網羅できているように見せないため確認率を明示する */
-export type PrefectureTuitionCoverage = {
-  amounts: number;
-  varies: number;
-  contactRequired: number;
-  unconfirmed: number;
-  /** 何らかの公式確認が取れている学校数（amounts + varies + contactRequired） */
-  confirmed: number;
-};
-
 export type PrefectureLandingData = {
   prefecture: string;
   rows: PrefectureSchoolRow[];
@@ -106,7 +99,10 @@ export type PrefectureLandingData = {
   localReviewSchoolCount: number;
   /** 地域口コミの通学頻度・入学タイミング分布 */
   regionalReviewSummary: RegionalReviewSummary;
-  tuitionCoverage: PrefectureTuitionCoverage;
+  /** 初年度納入金の目安を公開している掲載校（口コミ件数順） */
+  tuitionRows: PrefectureSchoolRow[];
+  /** 県内キャンパスに通った人の口コミ抜粋 */
+  reviewExcerpts: RegionalReviewExcerpt[];
   averageOverallSatisfaction: number | null;
   averageTuitionSatisfaction: number | null;
   topByLocalReviewCount: PrefectureRankingEntry[];
@@ -135,12 +131,6 @@ function isRelatedToPrefecture(school: SearchSchool, prefecture: string): boolea
   return hasLocalCampus(school, prefecture);
 }
 
-export function resolveTuitionState(school: SearchSchool): TuitionConfirmationState {
-  const mode = school.tuition_estimate?.display_mode;
-  if (mode === 'amounts' || mode === 'varies' || mode === 'contact_required') return mode;
-  return 'unconfirmed';
-}
-
 function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
   const localLocations = getStandingCampusLocationsInPrefecture(school.campus_locations, prefecture);
   const localCities = [
@@ -154,7 +144,7 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     ...new Set(
       localLocations
         .flatMap((location) => getCampusNearestStations(location))
-        .map((station) => normalizeStationLabel(station)?.station)
+        .map((station) => toDisplayStationName(station))
         .filter((station): station is string => Boolean(station))
     ),
   ];
@@ -176,7 +166,7 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     overallAvg: school.overall_avg,
     supportAvg: school.support_avg,
     tuitionAvg: school.tuition_avg,
-    tuitionState: resolveTuitionState(school),
+    tuition: buildTuitionTableCell(school.tuition_estimate),
     admissionBadges: buildAdmissionBadges(school.admission_profile, prefecture),
   };
 }
@@ -265,15 +255,10 @@ export const getPrefectureLandingData = cache(
       .filter((row) => row.localReviewCount > 0)
       .sort((a, b) => b.localReviewCount - a.localReviewCount || b.reviewCount - a.reviewCount)
       .slice(0, PREFECTURE_LANDING_HIGHLIGHT_LIMIT)
-      .map((row) => ({ row, metricLabel: `${prefecture}の回答${row.localReviewCount}件` }));
+      .map((row) => ({ row, metricLabel: `${prefecture}内の口コミ${row.localReviewCount}件` }));
 
-    const tuitionCoverage: PrefectureTuitionCoverage = {
-      amounts: rows.filter((row) => row.tuitionState === 'amounts').length,
-      varies: rows.filter((row) => row.tuitionState === 'varies').length,
-      contactRequired: rows.filter((row) => row.tuitionState === 'contact_required').length,
-      unconfirmed: rows.filter((row) => row.tuitionState === 'unconfirmed').length,
-      confirmed: rows.filter((row) => row.tuitionState !== 'unconfirmed').length,
-    };
+    const tuitionRows = rows.filter((row) => row.tuition !== null);
+    const reviewExcerpts = await fetchRegionalReviewExcerpts({ schools: rows, prefecture });
 
     const copyStats: PrefectureLandingCopyStats = {
       totalSchools: counts.totalSchools,
@@ -297,7 +282,8 @@ export const getPrefectureLandingData = cache(
       localReviewCount,
       localReviewSchoolCount: regionalReviewSummary.schoolCount,
       regionalReviewSummary,
-      tuitionCoverage,
+      tuitionRows,
+      reviewExcerpts,
       averageOverallSatisfaction: computeWeightedAverage(schools, 'overall_avg'),
       averageTuitionSatisfaction: computeWeightedAverage(schools, 'tuition_avg'),
       topByLocalReviewCount,

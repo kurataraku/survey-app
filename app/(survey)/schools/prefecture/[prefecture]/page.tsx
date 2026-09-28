@@ -106,7 +106,7 @@ export default async function PrefectureSchoolsPage({ params }: PageProps) {
     localReviewSchoolCount: data.localReviewSchoolCount,
     topAttendance: data.regionalReviewSummary.attendanceFrequencies[0] ?? null,
     topEnrollment: data.regionalReviewSummary.enrollmentTypes[0] ?? null,
-    tuitionConfirmed: data.tuitionCoverage.confirmed,
+    tuitionAmountCount: data.tuitionRows.length,
   });
   const hasSchools = data.rows.length > 0;
 

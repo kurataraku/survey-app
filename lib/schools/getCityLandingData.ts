@@ -5,18 +5,18 @@ import {
   getCampusNearestStations,
   getStandingCampusLocationsInPrefecture,
 } from '@/lib/schools/campusLocations';
-import { normalizeAreaName, normalizeStationLabel } from '@/lib/regions/area-normalize';
+import { normalizeAreaName, toDisplayStationName } from '@/lib/regions/area-normalize';
 import {
   computePrefectureLocationInsights,
   type PrefectureStationInsight,
 } from '@/lib/schools/getPrefectureLocationInsights';
 import { findRegionalReviewStat } from '@/lib/schools/regionalReviews';
 import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissionProfiles';
+import { buildTuitionTableCell } from '@/lib/tuition/format';
 import {
-  buildTuitionCardBasisLabel,
-  buildTuitionRangeLines,
-} from '@/lib/tuition/format';
-import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
+  fetchRegionalReviewExcerpts,
+  type RegionalReviewExcerpt,
+} from '@/lib/schools/regionalReviewExcerpts';
 import type { CityLandingConfig } from '@/lib/regions/city-landing';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 
@@ -37,7 +37,7 @@ export type CitySchoolRow = {
   reviewCount: number;
   overallAvg: number | null;
   /** 公開済みの初年度納入金の目安。金額が公開されていない学校は null */
-  tuition: { value: string; basisLabel: string | null } | null;
+  tuition: ReturnType<typeof buildTuitionTableCell>;
   admissionBadges: AdmissionBadge[];
 };
 
@@ -45,19 +45,6 @@ export type CityWardInsight = {
   name: string;
   schoolCount: number;
   schools: Array<{ id: string; name: string; slug: string | null; stations: string[] }>;
-};
-
-/** 県内キャンパスに通った人の口コミ抜粋（市内とは限らない） */
-export type CityReviewExcerpt = {
-  id: string;
-  schoolName: string;
-  schoolSlug: string | null;
-  overall: number | null;
-  attendance: string | null;
-  /** 回答者が市区町村まで申告し、それがこの市だった場合のみ true */
-  isCityCampus: boolean;
-  good: string | null;
-  bad: string | null;
 };
 
 export type CityLandingData = {
@@ -75,7 +62,8 @@ export type CityLandingData = {
   };
   wards: CityWardInsight[];
   topStations: PrefectureStationInsight[];
-  reviewExcerpts: CityReviewExcerpt[];
+  /** 県内キャンパスに通った人の口コミ抜粋（市内とは限らない） */
+  reviewExcerpts: RegionalReviewExcerpt[];
   cityReviewCount: number;
   prefectureReviewCount: number;
   prefectureReviewSchoolCount: number;
@@ -85,37 +73,21 @@ export type CityLandingData = {
   itemListSchools: { id: string; name: string; slug: string | null }[];
 };
 
-const REVIEW_EXCERPTS_PER_SCHOOL = 2;
-const REVIEW_EXCERPTS_LIMIT = 12;
-const GOOD_EXCERPT_LENGTH = 120;
-const BAD_EXCERPT_LENGTH = 90;
-
 function localLocationsInCity(school: SearchSchool, config: CityLandingConfig) {
   return getStandingCampusLocationsInPrefecture(school.campus_locations, config.prefecture)
     .map((location) => ({ location, area: normalizeAreaName(location.city) }))
     .filter(({ area }) => area?.municipality === config.municipality);
 }
 
-/** 「近鉄名古屋駅」のように事業者名が駅名の一部になる例があるため、JR・地下鉄だけを外す */
-const DISPLAY_STATION_PREFIX = /^(JR|名古屋市営地下鉄|市営地下鉄|地下鉄)(?=.+駅$)/;
-
 function stationNames(locations: ReturnType<typeof localLocationsInCity>): string[] {
   return [
     ...new Set(
       locations
         .flatMap(({ location }) => getCampusNearestStations(location))
-        .map((station) => normalizeStationLabel(station)?.station?.replace(DISPLAY_STATION_PREFIX, ''))
+        .map((station) => toDisplayStationName(station))
         .filter((station): station is string => Boolean(station))
     ),
   ];
-}
-
-function buildTuition(school: SearchSchool): CitySchoolRow['tuition'] {
-  const estimate = school.tuition_estimate;
-  if (!estimate) return null;
-  const [line] = buildTuitionRangeLines(estimate);
-  if (!line) return null;
-  return { value: line.value, basisLabel: buildTuitionCardBasisLabel(estimate) };
 }
 
 function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
@@ -139,7 +111,7 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
     prefectureReviewCount: regional?.reviewCount ?? 0,
     reviewCount: school.review_count,
     overallAvg: school.overall_avg,
-    tuition: buildTuition(school),
+    tuition: buildTuitionTableCell(school.tuition_estimate),
     admissionBadges: buildAdmissionBadges(school.admission_profile, config.prefecture),
   };
 }
@@ -172,79 +144,6 @@ function buildWards(schools: SearchSchool[], config: CityLandingConfig): CityWar
         })),
     }))
     .sort((a, b) => b.schoolCount - a.schoolCount || a.name.localeCompare(b.name, 'ja'));
-}
-
-function truncate(text: string | null | undefined, max: number): string | null {
-  const trimmed = text?.replace(/\s+/g, ' ').trim();
-  if (!trimmed) return null;
-  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
-}
-
-/**
- * 掲載校の口コミのうち、回答者が県内キャンパスに通ったと申告したものを新しい順に抜粋する。
- * 市区町村まで申告されていない口コミを市の口コミとは表示しない（isCityCampus で区別する）。
- */
-async function fetchPrefectureReviewExcerpts(
-  rows: CitySchoolRow[],
-  config: CityLandingConfig
-): Promise<CityReviewExcerpt[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const targetRows = rows.filter((row) => row.prefectureReviewCount > 0);
-  if (!url || !key || targetRows.length === 0) return [];
-
-  const supabase = createSupabaseClientWithLargeHeaders(url, key);
-  const { data, error } = await supabase
-    .from('survey_responses')
-    .select('id, school_id, overall_satisfaction, good_comment, bad_comment, created_at, answers')
-    .in('school_id', targetRows.map((row) => row.id))
-    .eq('is_public', true)
-    .eq('answers->>campus_prefecture', config.prefecture)
-    .order('created_at', { ascending: false })
-    .limit(200);
-
-  if (error) {
-    console.error('[getCityLandingData] 口コミ抜粋の取得エラー:', error.message);
-    return [];
-  }
-
-  const rowById = new Map(targetRows.map((row) => [row.id, row]));
-  const perSchool = new Map<string, CityReviewExcerpt[]>();
-  for (const review of data ?? []) {
-    const row = rowById.get(review.school_id);
-    if (!row) continue;
-    const list = perSchool.get(row.id) ?? [];
-    if (list.length >= REVIEW_EXCERPTS_PER_SCHOOL) continue;
-    const good = truncate(review.good_comment, GOOD_EXCERPT_LENGTH);
-    const bad = truncate(review.bad_comment, BAD_EXCERPT_LENGTH);
-    if (!good && !bad) continue;
-    const answers = (review.answers ?? {}) as Record<string, unknown>;
-    const campusCity = typeof answers.campus_city === 'string' ? normalizeAreaName(answers.campus_city) : null;
-    const overall = Number(review.overall_satisfaction);
-    list.push({
-      id: review.id,
-      schoolName: row.name,
-      schoolSlug: row.slug,
-      overall: overall >= 1 && overall <= 5 ? overall : null,
-      attendance: typeof answers.attendance_frequency === 'string' ? answers.attendance_frequency : null,
-      isCityCampus: campusCity?.municipality === config.municipality,
-      good,
-      bad,
-    });
-    perSchool.set(row.id, list);
-  }
-
-  // 口コミの多い学校から1件ずつ順番に並べ、特定校に偏らないようにする
-  const ordered = [...targetRows].sort((a, b) => b.prefectureReviewCount - a.prefectureReviewCount);
-  const result: CityReviewExcerpt[] = [];
-  for (let round = 0; round < REVIEW_EXCERPTS_PER_SCHOOL; round++) {
-    for (const row of ordered) {
-      const excerpt = perSchool.get(row.id)?.[round];
-      if (excerpt) result.push(excerpt);
-      if (result.length >= REVIEW_EXCERPTS_LIMIT) return result;
-    }
-  }
-  return result;
 }
 
 function weightedOverall(rows: CitySchoolRow[]): number | null {
@@ -283,6 +182,17 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     municipality: config.municipality,
   });
 
+  const reviewExcerpts = await fetchRegionalReviewExcerpts({
+    schools: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      localReviewCount: row.prefectureReviewCount,
+    })),
+    prefecture: config.prefecture,
+    municipality: config.municipality,
+  });
+
   return {
     config,
     prefecture: config.prefecture,
@@ -298,7 +208,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     },
     wards: buildWards(schools, config),
     topStations: insights.topStations,
-    reviewExcerpts: await fetchPrefectureReviewExcerpts(rows, config),
+    reviewExcerpts,
     cityReviewCount: rows.reduce((sum, row) => sum + row.cityReviewCount, 0),
     prefectureReviewCount: rows.reduce((sum, row) => sum + row.prefectureReviewCount, 0),
     prefectureReviewSchoolCount: rows.filter((row) => row.prefectureReviewCount > 0).length,

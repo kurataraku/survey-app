@@ -46,14 +46,15 @@ export type PrefectureIntroStats = {
   localReviewSchoolCount: number;
   topAttendance: { label: string; count: number } | null;
   topEnrollment: { label: string; count: number } | null;
-  tuitionConfirmed: number;
+  /** 初年度納入金の目安を公開している掲載校数 */
+  tuitionAmountCount: number;
 };
 
 /**
  * 都道府県固有の導入文を実データから生成する。
  *
  * 47県で同じ汎用文を並べると、県名だけを差し替えたページに見える。
- * キャンパス分布、学校種別、最寄り駅、地域口コミの傾向、学費の確認状況という
+ * キャンパス分布、学校種別、最寄り駅、地域口コミの傾向、学費を公開している学校数という
  * 県ごとに必ず異なる実数だけで構成し、手書き文面の使い回しをやめる。
  */
 export function buildPrefectureIntroLead(
@@ -72,7 +73,7 @@ export function buildPrefectureIntroLead(
     .join('、');
   sentences.push(
     stats.cityCount > 0
-      ? `${prefectureLabel}で比較できる通信制高校・サポート校は${stats.totalSchools}校あり、${prefectureLabel}内${stats.cityCount}市区町村の${stats.localCampusLocationCount}拠点に分かれています。掲載校が多いのは${cityPart}です。`
+      ? `${prefectureLabel}で比較できる通信制高校・サポート校は${stats.totalSchools}校あり、${prefectureLabel}内${stats.cityCount}市区町村の${stats.localCampusLocationCount}か所にキャンパスがあります。掲載校が多いのは${cityPart}です。`
       : `${prefectureLabel}で比較できる通信制高校・サポート校は${stats.totalSchools}校です。`
   );
 
@@ -112,7 +113,11 @@ export function buildPrefectureIntroLead(
   }
 
   sentences.push(
-    `学費は${stats.tuitionConfirmed}校で公開情報から確認できており、残りはコースや通学頻度で金額が変わるため各校の募集要項での確認が必要です。良かった点と改善してほしい点の両面を同じ回答で見比べると、費用と通いやすさのどちらを優先するか判断しやすくなります。`
+    `${
+      stats.tuitionAmountCount > 0
+        ? `初年度納入金の目安を公開している${stats.tuitionAmountCount}校は、比較表で金額を見比べられます。そのほかの学校はコースや通学頻度で金額が大きく変わるため、資料請求や個別相談で確認してください。`
+        : '学費はコースや通学頻度で大きく変わるため、気になる学校は資料請求や個別相談で確認してください。'
+    }良かった点と改善してほしい点の両面を同じ回答で見比べると、費用と通いやすさのどちらを優先するか判断しやすくなります。`
   );
 
   return sentences.join('');

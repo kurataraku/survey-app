@@ -187,6 +187,15 @@ const RAIL_OPERATOR_PREFIXES = [
   '新京成',
 ];
 
+/** 「近鉄名古屋駅」のように事業者名が駅名の一部になる例があるため、表示ではJR・地下鉄だけを外す */
+const DISPLAY_STATION_PREFIX = /^(JR|名古屋市営地下鉄|市営地下鉄|地下鉄)(?=.+駅$)/;
+
+/** 比較表などに出す駅名。路線名を外し、JR・地下鉄の接頭辞だけを省く */
+export function toDisplayStationName(raw: string | null | undefined): string | null {
+  const station = normalizeStationLabel(raw)?.station;
+  return station ? station.replace(DISPLAY_STATION_PREFIX, '') : null;
+}
+
 /** 事業者名の接頭辞を外した駅名を返す。接頭辞がなければ null */
 export function stripRailOperatorPrefix(station: string): string | null {
   for (const prefix of RAIL_OPERATOR_PREFIXES) {
