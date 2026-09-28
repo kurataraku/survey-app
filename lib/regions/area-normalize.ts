@@ -106,7 +106,11 @@ function splitLinePrefix(token: string): { station: string; line: string | null 
  * 同じ駅が路線名の違いで別エントリになるのを防ぐため、集計キーは駅名だけにする。
  */
 export function normalizeStationLabel(raw: string | null | undefined): NormalizedStation | null {
-  const trimmed = (raw ?? '').replace(/[\s　]+/g, ' ').trim();
+  const trimmed = (raw ?? '')
+    .replace(/[」』"”](?=駅)/g, '')
+    .replace(/[「」『』"“”]/g, ' ')
+    .replace(/[\s　]+/g, ' ')
+    .trim();
   if (!trimmed) return null;
 
   const parts = trimmed.split(/[ /・,、]+/).filter(Boolean);

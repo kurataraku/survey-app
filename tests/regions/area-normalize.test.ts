@@ -100,6 +100,12 @@ describe('normalizeStationLabel', () => {
     expect(normalizeStationLabel('JR名古屋駅')).toEqual({ station: 'JR名古屋駅', lines: [] });
   });
 
+  it('かぎ括弧で囲まれた駅名を取り出す', () => {
+    expect(normalizeStationLabel('地下鉄桜通線「瑞穂区役所駅」')?.station).toBe('瑞穂区役所駅');
+    expect(normalizeStationLabel('JR線・名鉄・近鉄「名古屋駅」')?.station).toBe('名古屋駅');
+    expect(normalizeStationLabel('「国際センター」駅')?.station).toBe('国際センター駅');
+  });
+
   it('空文字は null を返す', () => {
     expect(normalizeStationLabel('  ')).toBeNull();
   });
