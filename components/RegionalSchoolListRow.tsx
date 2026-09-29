@@ -1,0 +1,129 @@
+import Link from 'next/link';
+import { appPath } from '@/lib/base-path';
+import type {
+  RegionalReviewFilterKey,
+  RegionalSchoolTier,
+} from '@/lib/schools/regionalLanding';
+import type { SchoolInstitutionType } from '@/lib/types/schools';
+import type { buildTuitionTableCell } from '@/lib/tuition/format';
+
+export type RegionalSchoolListRowData = {
+  id: string;
+  name: string;
+  slug: string | null;
+  tier: RegionalSchoolTier;
+  institutionType: SchoolInstitutionType | null;
+  stations: string[];
+  regionalReviewCount: number;
+  totalReviewCount: number;
+  rating: number | null;
+  ratingScopeLabel: string;
+  tuition: ReturnType<typeof buildTuitionTableCell>;
+  excerpt: string | null;
+  stationFilterIds: string[];
+  reviewFilterKeys: RegionalReviewFilterKey[];
+};
+
+const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
+  public: '公立',
+  private: '私立',
+  support: 'サポート校',
+};
+
+export default function RegionalSchoolListRow({
+  school,
+  municipality,
+}: {
+  school: RegionalSchoolListRowData;
+  municipality: string;
+}) {
+  const schoolHref = school.slug ? appPath(`/schools/${school.slug}`) : null;
+  const location = school.stations.length > 0 ? school.stations.join('・') : `${municipality}内`;
+
+  return (
+    <li
+      data-regional-school
+      data-station-filters={school.stationFilterIds.join(' ')}
+      data-review-filters={school.reviewFilterKeys.join(' ')}
+      className="border-b border-gray-200 py-5 last:border-b-0"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 150px' }}
+    >
+      <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.8fr)_minmax(9rem,0.8fr)] md:items-start md:gap-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            {schoolHref ? (
+              <Link
+                href={schoolHref}
+                prefetch={false}
+                data-school-link="other_detail"
+                className="text-base font-bold text-gray-950 hover:text-blue-800 hover:underline"
+              >
+                {school.name}
+              </Link>
+            ) : (
+              <span className="text-base font-bold text-gray-950">{school.name}</span>
+            )}
+            {school.institutionType && (
+              <span className="text-xs text-gray-500">
+                {institutionTypeLabels[school.institutionType]}
+              </span>
+            )}
+          </div>
+          {school.excerpt && (
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-600">
+              「{school.excerpt}」
+            </p>
+          )}
+        </div>
+
+        <dl className="space-y-1 text-sm">
+          <div className="flex gap-2 md:block">
+            <dt className="shrink-0 text-gray-500">最寄り</dt>
+            <dd className="font-medium text-gray-800">{location}</dd>
+          </div>
+          <div className="flex gap-2 md:block">
+            <dt className="shrink-0 text-gray-500">初年度納入金</dt>
+            <dd className="font-medium text-gray-800">{school.tuition?.value ?? '—'}</dd>
+          </div>
+        </dl>
+
+        <div className="text-sm">
+          {school.totalReviewCount > 0 ? (
+            <>
+              <p className="font-semibold text-gray-900">
+                {school.rating != null ? `★ ${school.rating.toFixed(1)}　` : ''}
+                口コミ{school.totalReviewCount}件
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {school.regionalReviewCount > 0
+                  ? `${school.ratingScopeLabel}の口コミ${school.regionalReviewCount}件`
+                  : '学校全体の口コミ'}
+              </p>
+              {school.slug && (
+                <Link
+                  href={appPath(`/schools/${school.slug}/reviews`)}
+                  prefetch={false}
+                  data-school-link="other_reviews"
+                  className="mt-2 inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+                >
+                  口コミを読む
+                </Link>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-gray-600">口コミ募集中</p>
+              <Link
+                href={appPath('/submit')}
+                prefetch={false}
+                className="mt-2 inline-flex min-h-11 items-center font-semibold text-emerald-700 underline decoration-emerald-200 underline-offset-4 hover:text-emerald-900"
+              >
+                口コミを書く
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}

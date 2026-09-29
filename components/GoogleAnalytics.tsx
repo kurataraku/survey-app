@@ -7,6 +7,8 @@ const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 /** 同一 path の短時間重複送信を防ぐ。モジュールレベルで ref リセットに依存しない。 */
 const DEDUPE_MS = 3000;
+const GTAG_READY_RETRY_MS = 100;
+const GTAG_READY_MAX_ATTEMPTS = 100;
 let lastSentPath: string | null = null;
 let lastSentTime = 0;
 
@@ -63,8 +65,8 @@ export function GoogleAnalytics() {
     const interval = setInterval(() => {
       attempts++;
       const ok = trySend();
-      if (ok || attempts >= 10) clearInterval(interval);
-    }, 80);
+      if (ok || attempts >= GTAG_READY_MAX_ATTEMPTS) clearInterval(interval);
+    }, GTAG_READY_RETRY_MS);
 
     return () => clearInterval(interval);
   }, [pathname]);

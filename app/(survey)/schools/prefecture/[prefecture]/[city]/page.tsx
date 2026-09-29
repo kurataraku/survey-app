@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!config) return { title: 'ページが見つかりません' };
 
   const data = await getCityLandingData(config);
-  const title = getCityLandingTitle(config.municipality);
+  const title = getCityLandingTitle(config.municipality, data.wards.length > 0);
   const description = getCityLandingMetaDescription(data);
   const canonical = `${getAppBaseUrl()}${getCityLandingPath(config)}`;
 

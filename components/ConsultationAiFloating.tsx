@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import ConsultationAiChat from '@/components/ConsultationAiChat';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/track';
+
+const ConsultationAiChat = dynamic(() => import('@/components/ConsultationAiChat'), {
+  ssr: false,
+  loading: () => <p className="p-4 text-sm text-gray-500">相談画面を読み込んでいます…</p>,
+});
 
 export default function ConsultationAiFloating() {
   const pathname = usePathname();
@@ -76,7 +81,7 @@ export default function ConsultationAiFloating() {
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <div>
                 <p className="text-xs font-semibold text-blue-600">通信制高校えらび相談AI</p>
-                <h2 className="text-sm font-black text-gray-900">お子さまに合う学校選びを口コミで整理</h2>
+                <h2 className="text-sm font-black text-gray-900">自分や家族に合う学校選びを口コミで整理</h2>
               </div>
               <button
                 type="button"

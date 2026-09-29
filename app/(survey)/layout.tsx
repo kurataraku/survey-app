@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Header from "@/components/Header";
+import PublicHeader from "@/components/PublicHeader";
 import Footer from "@/components/Footer";
 import StructuredData from "@/components/StructuredData";
 import ConsultationAiFloating from "@/components/ConsultationAiFloating";
@@ -99,7 +99,7 @@ export default function SurveyLayout({
   return (
     <>
       <StructuredData data={siteNameGraphSchema} />
-      <Header />
+      <PublicHeader />
       <main className="flex-grow">{children}</main>
       <Footer />
       <ConsultationAiFloating />

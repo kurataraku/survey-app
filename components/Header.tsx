@@ -43,6 +43,7 @@ export default function Header() {
           <div className="flex items-start self-start">
             <Link
               href={appPath('/')}
+              prefetch={false}
               className="flex items-start focus:outline-none focus:ring-0"
             >
               {/* 視覚障害者向けのテキストラベル */}
@@ -63,6 +64,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={item.href === appPath('/') ? false : undefined}
                   onClick={() =>
                     trackEvent(GA_EVENTS.consultationAiOpen, { source: 'header_nav' })
                   }
@@ -79,6 +81,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={item.href === appPath('/') ? false : undefined}
                   onClick={() =>
                     trackEvent(GA_EVENTS.diagnosisStartClick, { source: 'header_nav' })
                   }
@@ -95,6 +98,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={item.href === appPath('/') ? false : undefined}
                   className={`px-3 py-2 text-base font-medium transition-colors ${
                     isActive(item.href)
                       ? 'text-blue-500 border-b-2 border-blue-500'
@@ -185,6 +189,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={item.href === appPath('/') ? false : undefined}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`px-3 py-2 text-base font-medium rounded-md transition-colors ${
                     isActive(item.href)

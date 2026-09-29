@@ -1,8 +1,13 @@
 import Link from 'next/link';
-import PrefectureSchoolCardTracker from '@/components/PrefectureSchoolCardTracker';
-import AdmissionBadgeList from '@/components/AdmissionBadgeList';
-import TuitionDisclaimer from '@/components/TuitionDisclaimer';
+import RegionalSchoolCard, {
+  type RegionalSchoolCardData,
+} from '@/components/RegionalSchoolCard';
+import RegionalSchoolFinder from '@/components/RegionalSchoolFinder';
+import RegionalSchoolListRow, {
+  type RegionalSchoolListRowData,
+} from '@/components/RegionalSchoolListRow';
 import RequestNotificationCta from '@/components/RequestNotificationCta';
+import TuitionDisclaimer from '@/components/TuitionDisclaimer';
 import { appPath } from '@/lib/base-path';
 import { getPrefecturePath } from '@/lib/prefectures';
 import {
@@ -10,254 +15,103 @@ import {
   getCityLandingHeading,
   getCityLandingSubtitle,
 } from '@/lib/regions/city-landing-copy';
-import RegionalReviewExcerptList from '@/components/RegionalReviewExcerptList';
-import type { CityLandingData } from '@/lib/schools/getCityLandingData';
-import type { SchoolInstitutionType } from '@/lib/types/schools';
+import type { CityLandingData, CitySchoolRow } from '@/lib/schools/getCityLandingData';
 
 interface CityLandingPageProps {
   data: CityLandingData;
   intro: string;
 }
 
-const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
-  public: '公立',
-  private: '私立',
-  support: 'サポート校',
-};
-
-function SchoolName({ name, slug }: { name: string; slug: string | null }) {
-  if (!slug) return <span className="font-medium text-gray-900">{name}</span>;
-  return (
-    <Link
-      href={appPath(`/schools/${slug}`)}
-      className="font-medium text-blue-700 hover:text-blue-900 hover:underline"
-    >
-      {name}
-    </Link>
-  );
+function ratingFor(row: CitySchoolRow): number | null {
+  return row.prefectureReviewCount >= 3 ? row.regionalOverallAvg : row.overallAvg;
 }
 
-function SummaryStats({ data }: { data: CityLandingData }) {
-  const { counts, municipality, prefecture } = data;
-  const reviewCount = data.cityReviewCount > 0 ? data.cityReviewCount : data.prefectureReviewCount;
-  const cards = [
-    {
-      label: '掲載校数',
-      value: `${counts.totalSchools}校`,
-      hint: `公立${counts.publicCount} / 私立${counts.privateCount} / サポート校${counts.supportCount}`,
-    },
-    {
-      label: `${municipality}内のキャンパス`,
-      value: `${counts.campusLocationCount}か所`,
-      hint: 'キャンパス・学習センター',
-    },
-    {
-      label: data.cityReviewCount > 0 ? `${municipality}のキャンパスの口コミ` : `${prefecture}内キャンパスの口コミ`,
-      value: reviewCount > 0 ? `${reviewCount}件` : '—',
-      hint: '実際に通った人の声',
-    },
-    {
-      label: '掲載校の総合満足度',
-      value: data.averageOverallSatisfaction != null ? `${data.averageOverallSatisfaction.toFixed(1)} / 5` : '—',
-      hint: `口コミ${data.totalReviewCount}件の平均`,
-    },
-  ];
+function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
+  if (!row.excerpt || row.tier !== 'a') return null;
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    tier: row.tier,
+    institutionType: row.institutionType,
+    headquartersPrefecture: row.headquartersPrefecture,
+    stations: row.stations,
+    regionalReviewCount: row.prefectureReviewCount,
+    totalReviewCount: row.reviewCount,
+    rating: ratingFor(row),
+    staffAvg: row.staffAvg,
+    atmosphereAvg: row.atmosphereAvg,
+    ratingScopeLabel: row.ratingScopeLabel,
+    tuition: row.tuition,
+    admissionBadges: row.admissionBadges,
+    excerpt: row.excerpt,
+    stationFilterIds: row.stationFilterIds,
+    reviewFilterKeys: row.reviewFilterKeys,
+  };
+}
+
+function toListData(row: CitySchoolRow): RegionalSchoolListRowData {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    tier: row.tier,
+    institutionType: row.institutionType,
+    stations: row.stations,
+    regionalReviewCount: row.prefectureReviewCount,
+    totalReviewCount: row.reviewCount,
+    rating: ratingFor(row),
+    ratingScopeLabel: row.ratingScopeLabel,
+    tuition: row.tuition,
+    excerpt: row.listExcerpt,
+    stationFilterIds: row.stationFilterIds,
+    reviewFilterKeys: row.reviewFilterKeys,
+  };
+}
+
+function AreaGuide({ data }: { data: CityLandingData }) {
+  if (data.wards.length === 0 && data.topStations.length === 0) return null;
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {cards.map((card) => (
-        <div
-          key={card.label}
-          className="rounded-lg border border-gray-200 bg-white px-4 py-3 flex flex-col justify-center"
-        >
-          <p className="text-xs text-gray-500 mb-0.5 leading-snug">{card.label}</p>
-          <p className="text-lg font-bold text-gray-900">{card.value}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{card.hint}</p>
+    <section
+      className="mb-12 border-t border-emerald-100 pt-9"
+      aria-labelledby="city-area-heading"
+    >
+      <h2 id="city-area-heading" className="text-2xl font-bold text-gray-950">
+        {data.wards.length > 0 ? '区・駅' : '駅'}から通いやすさを見る
+      </h2>
+      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
+        登録されているキャンパス所在地をもとにした件数です。駅の条件は上の絞り込みにも使えます。
+      </p>
+      {data.wards.length > 0 && (
+        <div className="mt-5">
+          <h3 className="text-sm font-bold text-gray-800">キャンパスがある区</h3>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700">
+            {data.wards.map((ward) => (
+              <li key={ward.name}>
+                {ward.name} <span className="text-gray-500">{ward.schoolCount}校</span>
+              </li>
+            ))}
+          </ul>
         </div>
-      ))}
-    </div>
-  );
-}
-
-function ComparisonTable({ data }: { data: CityLandingData }) {
-  const { municipality, prefecture, rows } = data;
-  const showCityReviews = data.cityReviewCount > 0;
-  return (
-    <section className="mb-8" aria-labelledby="city-comparison-heading">
-      <h2 id="city-comparison-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {municipality}にキャンパスがある通信制高校・サポート校を一覧で比較
-      </h2>
-      <p className="text-sm text-gray-600 mb-4">
-        最寄り駅、初年度納入金の目安、口コミ件数を並べています。「{prefecture}内の口コミ」は{prefecture}内のキャンパスに通った人の口コミ、
-        「全体」は他県のキャンパスも含めた学校全体の口コミです。
-      </p>
-      <PrefectureSchoolCardTracker prefecture={prefecture} block="city_list">
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-[44rem] w-full text-sm">
-            <caption className="sr-only">{municipality}の通信制高校・サポート校の比較一覧</caption>
-            <thead className="bg-gray-50 text-xs text-gray-600">
-              <tr>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">学校名</th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">種別</th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">最寄り駅</th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">初年度納入金の目安</th>
-                {showCityReviews && (
-                  <th scope="col" className="px-3 py-2.5 text-right font-semibold">{municipality}の口コミ</th>
-                )}
-                <th scope="col" className="px-3 py-2.5 text-right font-semibold">{prefecture}内の口コミ</th>
-                <th scope="col" className="px-3 py-2.5 text-right font-semibold">口コミ（全体）</th>
-                <th scope="col" className="px-3 py-2.5 text-right font-semibold">総合</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
-                <tr key={row.id} className="align-top hover:bg-blue-50/40">
-                  <th scope="row" className="px-3 py-2.5 text-left font-normal">
-                    <SchoolName name={row.name} slug={row.slug} />
-                    {row.headquartersPrefecture !== prefecture && row.headquartersPrefecture !== '不明' && (
-                      <span className="block text-[11px] text-gray-500">本校: {row.headquartersPrefecture}</span>
-                    )}
-                    <AdmissionBadgeList badges={row.admissionBadges} />
-                  </th>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">
-                    {row.institutionType ? institutionTypeLabels[row.institutionType] : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-gray-700">
-                    {row.stations.length > 0
-                      ? row.stations.join('・')
-                      : row.wards.length > 0
-                        ? `${municipality}${row.wards[0]}`
-                        : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-gray-700">
-                    {row.tuition ? (
-                      <>
-                        <span className="whitespace-nowrap">{row.tuition.value}</span>
-                        {row.tuition.basisLabel && (
-                          <span className="block text-[11px] text-gray-500">{row.tuition.basisLabel}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  {showCityReviews && (
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                      {row.cityReviewCount > 0 ? (
-                        <span className="font-semibold text-gray-900">{row.cityReviewCount}件</span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-700">
-                    {row.prefectureReviewCount > 0 ? `${row.prefectureReviewCount}件` : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-500">
-                    {row.reviewCount > 0 ? `${row.reviewCount}件` : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-700">
-                    {row.overallAvg != null ? row.overallAvg.toFixed(1) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      )}
+      {data.topStations.length > 0 && (
+        <div className="mt-5">
+          <h3 className="text-sm font-bold text-gray-800">主な最寄り駅</h3>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {data.topStations.slice(0, 12).map((station) => (
+              <li key={station.name}>
+                <a
+                  href="#city-school-finder-heading"
+                  className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+                >
+                  {station.name}
+                </a>
+                <span className="ml-1 text-gray-500">{station.schoolCount}校</span>
+              </li>
+            ))}
+          </ul>
         </div>
-      </PrefectureSchoolCardTracker>
-      <p className="mt-2 text-xs text-gray-500">
-        「—」の学費は、学校が金額を公開していないか、コースや通学頻度によって大きく変わる学校です。資料請求や個別相談で確認できます。
-      </p>
-      <TuitionDisclaimer className="mt-2" />
-    </section>
-  );
-}
-
-function ReviewSection({ data }: { data: CityLandingData }) {
-  if (data.reviewExcerpts.length === 0) return null;
-  const { municipality, prefecture } = data;
-  return (
-    <section
-      className="mb-8 rounded-xl border border-amber-100 bg-white p-5 md:p-6"
-      aria-labelledby="city-review-heading"
-    >
-      <h2 id="city-review-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {prefecture}内のキャンパスに通った人の口コミ
-      </h2>
-      <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-4xl">
-        {municipality}にキャンパスがある学校について、{prefecture}内のキャンパスに通った在校生・卒業生・保護者の口コミを抜粋しています。
-        {municipality}のキャンパスに通ったと回答した口コミには「{municipality}のキャンパス」と表示しています。
-      </p>
-      <RegionalReviewExcerptList reviews={data.reviewExcerpts} prefecture={prefecture} municipality={municipality} />
-    </section>
-  );
-}
-
-function WardSection({ data }: { data: CityLandingData }) {
-  if (data.wards.length === 0) return null;
-  return (
-    <section
-      className="mb-8 rounded-xl border border-blue-100 bg-white p-5 md:p-6"
-      aria-labelledby="city-ward-heading"
-    >
-      <h2 id="city-ward-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {data.municipality}の区から通信制高校を探す
-      </h2>
-      <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-4xl">
-        キャンパス・学習センターがある区ごとに学校をまとめています。複数の区にキャンパスがある学校は、それぞれの区に表示しています。
-      </p>
-      <ul className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {data.wards.map((ward) => (
-          <li key={ward.name} className="rounded-lg border border-gray-100 bg-gray-50/70 p-4">
-            <h3 className="text-sm font-bold text-gray-900 mb-1">
-              {data.municipality}
-              {ward.name}の通信制高校
-              <span className="ml-2 text-xs font-normal text-gray-500">{ward.schoolCount}校</span>
-            </h3>
-            <ul className="mt-2 space-y-1 text-xs">
-              {ward.schools.map((school) => (
-                <li key={school.id}>
-                  <SchoolName name={school.name} slug={school.slug} />
-                  {school.stations.length > 0 && (
-                    <span className="ml-1 text-gray-500">（{school.stations[0]}）</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function StationSection({ data }: { data: CityLandingData }) {
-  if (data.topStations.length === 0) return null;
-  return (
-    <section
-      className="mb-8 rounded-xl border border-gray-200 bg-white p-5 md:p-6"
-      aria-labelledby="city-station-heading"
-    >
-      <h2 id="city-station-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {data.municipality}の主な駅から探す
-      </h2>
-      <p className="text-sm text-gray-600 leading-relaxed mb-4 max-w-4xl">
-        キャンパスの最寄り駅ごとに、通える学校の数をまとめています。
-      </p>
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {data.topStations.map((station) => (
-          <li key={station.name} className="rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2">
-            <Link
-              href="#city-comparison-heading"
-              className="text-sm font-semibold text-blue-700 hover:text-blue-900 hover:underline"
-            >
-              {station.name}から通える{station.schoolCount}校
-            </Link>
-            {station.lines.length > 0 && (
-              <span className="block text-[11px] text-gray-500 leading-relaxed">{station.lines.join('・')}</span>
-            )}
-          </li>
-        ))}
-      </ul>
+      )}
     </section>
   );
 }
@@ -266,27 +120,28 @@ function AboutNote({ data }: { data: CityLandingData }) {
   const { municipality, prefecture, counts } = data;
   return (
     <section
-      className="mb-8 rounded-xl border border-gray-200 bg-white p-4 md:p-5"
+      className="mb-10 border-t border-gray-200 pt-8"
       aria-labelledby="city-about-heading"
     >
-      <h2 id="city-about-heading" className="text-base font-bold text-gray-900 mb-2">
+      <h2 id="city-about-heading" className="text-lg font-bold text-gray-950">
         このページに掲載している情報について
       </h2>
-      <ul className="space-y-1.5 text-xs text-gray-600 leading-relaxed">
+      <ul className="mt-3 max-w-4xl space-y-2 text-sm leading-relaxed text-gray-600">
         <li>
           {municipality}内に通えるキャンパス・学習センターがある学校を掲載しています。入試や説明会だけに使う会場は含みません。
-          {prefecture}のほかの市町村の学校は{prefecture}の一覧ページで比較できます。
         </li>
         <li>
-          口コミは、当サイトのアンケートに回答した在校生・卒業生・保護者の声です。主に通っていたキャンパスが{prefecture}内だった口コミを「{prefecture}内の口コミ」、
-          {municipality}だった口コミを「{municipality}の口コミ」として表示しています。
+          口コミは当サイトのアンケートに回答した在校生・卒業生・保護者の声です。
+          {prefecture}内の口コミを{municipality}内の口コミとは数えず、回答された地域を表示しています。
         </li>
         {counts.admissionVerifiedCount > 0 && (
           <li>
-            「全国から出願可」「スクーリング会場」などの表示は、学校公式サイト・募集要項・教育委員会の公表資料で確認できた内容です。
+            出願区域・スクーリング会場の表示は、学校公式サイト・募集要項・教育委員会の公表資料で確認できた内容です。
           </li>
         )}
-        <li>所在地・最寄り駅・学費は変わることがあります。出願前に各学校の公式情報で最新の内容を確認してください。</li>
+        <li>
+          所在地・最寄り駅・学費・通い方は変わることがあります。出願前に学校公式の最新情報を確認してください。
+        </li>
       </ul>
     </section>
   );
@@ -296,128 +151,180 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
   const { municipality, prefecture } = data;
   const prefecturePath = appPath(getPrefecturePath(prefecture));
   const faqItems = buildCityFaqItems(data);
+  const featured = data.rows
+    .map(toCardData)
+    .filter((row): row is RegionalSchoolCardData => row !== null);
+  const others = data.rows.filter((row) => row.tier !== 'a').map(toListData);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav className="text-sm text-gray-500 mb-4" aria-label="パンくず">
+    <div className="min-h-screen bg-[var(--ce-bg)] py-8">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <nav className="mb-5 text-sm text-gray-500" aria-label="パンくず">
           <ol className="flex flex-wrap items-center gap-1">
             <li>
-              <Link href={appPath('/')} className="hover:text-blue-600">トップ</Link>
+              <Link href={appPath('/')} prefetch={false} className="hover:text-blue-700">
+                トップ
+              </Link>
             </li>
             <li aria-hidden>/</li>
             <li>
-              <Link href={appPath('/schools')} className="hover:text-blue-600">学校一覧</Link>
+              <Link href={appPath('/schools')} prefetch={false} className="hover:text-blue-700">
+                学校一覧
+              </Link>
             </li>
             <li aria-hidden>/</li>
             <li>
-              <Link href={prefecturePath} className="hover:text-blue-600">{prefecture}の通信制高校</Link>
+              <Link href={prefecturePath} prefetch={false} className="hover:text-blue-700">
+                {prefecture}
+              </Link>
             </li>
             <li aria-hidden>/</li>
-            <li className="text-gray-800 font-medium">{municipality}の通信制高校</li>
+            <li className="font-medium text-gray-800">{municipality}</li>
           </ol>
         </nav>
 
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">{getCityLandingHeading(municipality)}</h1>
-          <p className="text-sm text-gray-600 mt-2 leading-relaxed max-w-4xl">{getCityLandingSubtitle(data)}</p>
+        <header className="mb-9 max-w-4xl">
+          <p className="mb-2 text-sm font-bold text-emerald-700">場所と実際の口コミから比べる</p>
+          <h1 className="text-3xl font-bold leading-tight text-gray-950 sm:text-4xl">
+            {getCityLandingHeading(municipality)}
+          </h1>
+          <p className="mt-4 text-base leading-8 text-gray-700">{getCityLandingSubtitle(data)}</p>
+          <p className="mt-3 text-sm text-gray-500">
+            {countsText(data)}
+          </p>
+        </header>
+
+        <RegionalSchoolFinder
+          targetId="city-school-results"
+          prefecture={prefecture}
+          reviewRegionLabel={`${prefecture}内の口コミ`}
+          totalSchools={data.counts.totalSchools}
+          stations={data.finderStations}
+          reviewOptions={data.reviewFilterOptions}
+        />
+
+        <div id="city-school-results" aria-labelledby="city-comparison-heading">
+          <h2 id="city-comparison-heading" className="sr-only">
+            {municipality}の通信制高校・サポート校全校一覧
+          </h2>
+
+          {featured.length > 0 && (
+            <section
+              className="mb-12"
+              aria-labelledby="city-review-heading"
+              data-regional-section
+              style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 7200px' }}
+            >
+              <div className="mb-5 max-w-3xl">
+                <h2 id="city-review-heading" className="text-2xl font-bold text-gray-950">
+                  口コミを詳しく読める学校
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                  {municipality}にキャンパスがある学校について、{prefecture}
+                  内で実際に通った人の声を学校ごとに紹介します。
+                </p>
+              </div>
+              <ul className="space-y-5">
+                {featured.map((school) => (
+                  <RegionalSchoolCard
+                    key={school.id}
+                    school={school}
+                    prefecture={prefecture}
+                    municipality={municipality}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {others.length > 0 && (
+            <section
+              className="mb-10 border-t border-gray-300 pt-9"
+              aria-labelledby="city-other-schools-heading"
+              data-regional-section
+              style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 5200px' }}
+            >
+              <h2 id="city-other-schools-heading" className="text-2xl font-bold text-gray-950">
+                そのほかの学校
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                口コミが少ない学校、まだ口コミがない学校も含め、{municipality}
+                内に通えるキャンパスがある学校をすべて掲載しています。
+              </p>
+              <ul className="mt-4 border-y border-gray-200">
+                {others.map((school) => (
+                  <RegionalSchoolListRow
+                    key={school.id}
+                    school={school}
+                    municipality={municipality}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
 
-        <SummaryStats data={data} />
+        <div className="mb-10">
+          <p className="text-xs leading-relaxed text-gray-500">
+            「—」の学費は、公開された金額を当サイトで確認できない学校です。コースや通学頻度で変わる場合もあるため、資料や個別相談で確認してください。
+          </p>
+          <TuitionDisclaimer className="mt-2" />
+        </div>
 
-        <nav
-          className="mb-6 rounded-xl border border-blue-100 bg-white px-4 py-3 sm:px-5 sm:py-4"
-          aria-label={`${municipality}の通信制高校比較で次に見るページ`}
-        >
-          <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <li>
-              <Link href="#city-comparison-heading" className="text-blue-600 hover:text-blue-800 hover:underline font-medium">
-                全掲載校の比較表を見る
-              </Link>
-            </li>
-            {data.reviewExcerpts.length > 0 && (
-              <li>
-                <Link href="#city-review-heading" className="text-blue-600 hover:text-blue-800 hover:underline">
-                  通った人の口コミを読む
-                </Link>
-              </li>
-            )}
-            <li>
-              <Link href="#city-ward-heading" className="text-blue-600 hover:text-blue-800 hover:underline">
-                区から探す
-              </Link>
-            </li>
-            <li>
-              <Link href="#city-station-heading" className="text-blue-600 hover:text-blue-800 hover:underline">
-                駅から探す
-              </Link>
-            </li>
-            <li>
-              <Link href={prefecturePath} className="text-blue-600 hover:text-blue-800 hover:underline">
-                {prefecture}全体の通信制高校を比較する
-              </Link>
-            </li>
-          </ul>
-        </nav>
+        <AreaGuide data={data} />
 
-        <ComparisonTable data={data} />
-
-        <ReviewSection data={data} />
-
-        <WardSection data={data} />
-
-        <StationSection data={data} />
-
-        <section
-          className="mb-8 rounded-xl border border-gray-200 bg-white p-5 md:p-6"
-          aria-labelledby="city-intro-heading"
-        >
-          <h2 id="city-intro-heading" className="text-xl font-bold text-gray-900 mb-3">
-            {municipality}で通信制高校を選ぶときのポイント
+        <section className="mb-12 border-t border-emerald-100 pt-9" aria-labelledby="city-intro-heading">
+          <h2 id="city-intro-heading" className="text-2xl font-bold text-gray-950">
+            {municipality}で学校を選ぶときに確認したいこと
           </h2>
-          <p className="text-sm sm:text-base text-gray-600 leading-relaxed max-w-4xl">{intro}</p>
+          <p className="mt-3 max-w-4xl text-sm leading-7 text-gray-700">{intro}</p>
         </section>
 
-        <section className="mt-12 mb-8 rounded-xl border border-gray-200 bg-white p-6 md:p-8" aria-labelledby="city-faq-heading">
-          <h2 id="city-faq-heading" className="text-xl font-bold text-gray-900 mb-4">
-            {municipality}の通信制高校でよくある質問
+        <section className="mb-12 border-t border-gray-200 pt-9" aria-labelledby="city-faq-heading">
+          <h2 id="city-faq-heading" className="text-2xl font-bold text-gray-950">
+            よくある質問
           </h2>
-          <dl className="space-y-6">
+          <div className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
             {faqItems.map((item) => (
-              <div key={item.question}>
-                <dt className="font-semibold text-gray-900 mb-2">{item.question}</dt>
-                <dd className="text-gray-700 text-sm leading-relaxed">{item.answer}</dd>
-              </div>
+              <details key={item.question} className="group py-1">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                  {item.question}
+                  <span aria-hidden className="text-emerald-700 transition-transform group-open:rotate-45">
+                    ＋
+                  </span>
+                </summary>
+                <p className="max-w-4xl pb-5 pr-8 text-sm leading-7 text-gray-700">{item.answer}</p>
+              </details>
             ))}
-          </dl>
+          </div>
         </section>
 
         <AboutNote data={data} />
 
-        <RequestNotificationCta source="prefecture_landing" prefecture={prefecture} className="mb-8" />
+        <RequestNotificationCta
+          source="city_landing"
+          prefecture={prefecture}
+          className="mb-10"
+        />
 
-        <nav className="mb-8 rounded-xl border border-gray-200 bg-white p-5 md:p-6" aria-label="関連ページ">
-          <p className="text-lg font-bold text-gray-900 mb-4">{municipality}周辺の通信制高校をさらに探す</p>
-          <ul className="grid gap-3 md:grid-cols-2">
+        <nav className="mb-8 border-t border-gray-200 pt-8" aria-label="関連ページ">
+          <h2 className="text-lg font-bold text-gray-950">さらに探す</h2>
+          <ul className="mt-3 flex flex-col gap-3 text-sm sm:flex-row sm:gap-8">
             <li>
               <Link
                 href={prefecturePath}
-                className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 p-4 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"
+                className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
               >
-                <span className="block text-sm font-bold text-blue-700 mb-1">{prefecture}の通信制高校一覧</span>
-                <span className="block text-xs text-gray-600 leading-relaxed">
-                  {municipality}以外の市町村のキャンパス、公立通信制高校、{prefecture}内の口コミをまとめて比較できます。
-                </span>
+                {prefecture}の通信制高校をすべて見る
               </Link>
             </li>
             <li>
               <Link
                 href={appPath(`/reviews?prefecture=${encodeURIComponent(prefecture)}`)}
                 rel="nofollow"
-                className="block h-full rounded-lg border border-gray-100 bg-gray-50/70 p-4 hover:border-blue-300 hover:bg-blue-50/70 transition-colors"
+                className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
               >
-                <span className="block text-sm font-bold text-blue-700 mb-1">{prefecture}の口コミを一覧で見る</span>
-                <span className="block text-xs text-gray-600 leading-relaxed">地域を絞った口コミを新着順で確認できます。</span>
+                {prefecture}の口コミを新着順で見る
               </Link>
             </li>
           </ul>
@@ -425,4 +332,14 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
       </div>
     </div>
   );
+}
+
+function countsText(data: CityLandingData): string {
+  const { counts, prefecture } = data;
+  const parts = [
+    `${counts.totalSchools}校`,
+    `${counts.campusLocationCount}か所`,
+    data.prefectureReviewCount > 0 ? `${prefecture}内の口コミ${data.prefectureReviewCount}件` : null,
+  ].filter((part): part is string => Boolean(part));
+  return parts.join(' ／ ');
 }

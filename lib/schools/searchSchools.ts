@@ -114,7 +114,9 @@ export async function fetchSearchSchoolsWithStats(
     await Promise.all([
     supabase
       .from('survey_responses')
-      .select('school_id, overall_satisfaction, good_comment, bad_comment, created_at, answers')
+      .select(
+        'school_id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, answers'
+      )
       .in('school_id', schoolIds)
       .eq('is_public', true),
     supabase
@@ -213,7 +215,14 @@ export async function fetchSearchSchoolsWithStats(
           const tr = parseRating(ans.tuition_rating);
           if (tr !== null) s.tuition.push(tr);
 
-          addRegionalReview(regionalReviews, r.school_id, ans, ov, parseRating);
+          addRegionalReview(
+            regionalReviews,
+            r.school_id,
+            ans,
+            ov,
+            parseRating,
+            r.respondent_role
+          );
         } catch {
           // ignore malformed answers
         }

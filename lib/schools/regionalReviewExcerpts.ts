@@ -1,11 +1,20 @@
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
 import { normalizeAreaName } from '@/lib/regions/area-normalize';
+import type { ReviewReasonGroupKey } from '@/lib/reviews/reason-groups';
+import {
+  matchReviewReasonGroupKeys,
+  type RegionalRespondentRole,
+} from '@/lib/schools/regionalReviews';
 
 /** 地域LPに載せる口コミ抜粋。回答者が申告したキャンパス所在地で絞り込んだもの */
 export type RegionalReviewExcerpt = {
   id: string;
+  schoolId: string;
   schoolName: string;
   schoolSlug: string | null;
+  respondentRole: RegionalRespondentRole | null;
+  enrollmentType: string | null;
+  reasonGroupKeys: ReviewReasonGroupKey[];
   overall: number | null;
   attendance: string | null;
   /** municipality 指定時、回答者が市区町村まで申告しそれが一致した場合のみ true */
@@ -22,10 +31,20 @@ type ExcerptSourceSchool = {
   localReviewCount: number;
 };
 
-const PER_SCHOOL = 2;
 const LIMIT = 12;
 const GOOD_LENGTH = 120;
 const BAD_LENGTH = 90;
+
+export type RegionalReviewExcerptSource = {
+  id: string;
+  school_id: string;
+  respondent_role?: unknown;
+  overall_satisfaction?: unknown;
+  good_comment?: string | null;
+  bad_comment?: string | null;
+  created_at?: string | null;
+  answers?: Record<string, unknown> | string | null;
+};
 
 function truncate(text: string | null | undefined, max: number): string | null {
   const trimmed = text?.replace(/\s+/g, ' ').trim();
@@ -33,15 +52,143 @@ function truncate(text: string | null | undefined, max: number): string | null {
   return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed;
 }
 
+function parseAnswers(value: RegionalReviewExcerptSource['answers']): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function optionalText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized || null;
+}
+
+function toOverall(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const overall = Number(value);
+  return Number.isFinite(overall) && overall >= 1 && overall <= 5 ? overall : null;
+}
+
+type RankedExcerpt = {
+  excerpt: RegionalReviewExcerpt;
+  completeness: number;
+  specificity: number;
+  createdAt: string;
+};
+
+function rankExcerpt(
+  review: RegionalReviewExcerptSource,
+  school: ExcerptSourceSchool,
+  municipality?: string
+): RankedExcerpt | null {
+  const fullGood = optionalText(review.good_comment);
+  const fullBad = optionalText(review.bad_comment);
+  if (!fullGood && !fullBad) return null;
+
+  const answers = parseAnswers(review.answers);
+  const combinedLength = (fullGood?.length ?? 0) + (fullBad?.length ?? 0);
+  const hasBoth = Boolean(fullGood && fullBad);
+  // 両面が書かれ、十分な情報量がある口コミを優先する。評価値や回答者属性の値は順位に使わない。
+  const completeness = hasBoth ? (combinedLength >= 120 ? 3 : 2) : combinedLength >= 80 ? 1 : 0;
+  const campusCity =
+    municipality && typeof answers.campus_city === 'string'
+      ? normalizeAreaName(answers.campus_city)
+      : null;
+  const respondentRole =
+    review.respondent_role === '本人' || review.respondent_role === '保護者'
+      ? review.respondent_role
+      : null;
+
+  return {
+    excerpt: {
+      id: review.id,
+      schoolId: school.id,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      respondentRole,
+      enrollmentType: optionalText(answers.enrollment_type),
+      reasonGroupKeys: matchReviewReasonGroupKeys(answers.reason_for_choosing),
+      overall: toOverall(review.overall_satisfaction),
+      attendance: optionalText(answers.attendance_frequency),
+      isCityCampus: Boolean(municipality) && campusCity?.municipality === municipality,
+      good: truncate(fullGood, GOOD_LENGTH),
+      bad: truncate(fullBad, BAD_LENGTH),
+    },
+    completeness,
+    // 原文の情報量を具体性の再現可能な代理指標にする。長文だけが過度に有利にならないよう上限を設ける。
+    specificity: Math.min(combinedLength, 400),
+    createdAt: review.created_at ?? '',
+  };
+}
+
 /**
- * 回答で「主に通っていたキャンパス都道府県」が prefecture の公開口コミを、新しい順に抜粋する。
- * 口コミの多い学校から1件ずつ順番に並べ、特定校に偏らないようにする。
+ * 地域口コミから学校ごとの代表1件を選ぶ純粋関数。
+ * 完全性、具体性、新しさの順で比較し、回答者属性・理由・入学区分・評価の値は順位に使わない。
+ */
+export function selectRepresentativeRegionalReviewExcerpts(input: {
+  schools: ExcerptSourceSchool[];
+  reviews: RegionalReviewExcerptSource[];
+  municipality?: string;
+  limit?: number;
+}): RegionalReviewExcerpt[] {
+  const requestedLimit = input.limit ?? LIMIT;
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(0, Math.floor(requestedLimit))
+    : LIMIT;
+  if (limit === 0) return [];
+
+  const targets = input.schools
+    .filter((school) => school.localReviewCount > 0)
+    .sort((a, b) => b.localReviewCount - a.localReviewCount || a.name.localeCompare(b.name, 'ja'));
+  const schoolById = new Map(targets.map((school) => [school.id, school]));
+  const bestBySchool = new Map<string, RankedExcerpt>();
+  const municipality = input.municipality
+    ? normalizeAreaName(input.municipality)?.municipality ?? input.municipality
+    : undefined;
+
+  for (const review of input.reviews) {
+    const school = schoolById.get(review.school_id);
+    if (!school) continue;
+    const candidate = rankExcerpt(review, school, municipality);
+    if (!candidate) continue;
+    const current = bestBySchool.get(school.id);
+    if (
+      !current ||
+      candidate.completeness > current.completeness ||
+      (candidate.completeness === current.completeness &&
+        candidate.specificity > current.specificity) ||
+      (candidate.completeness === current.completeness &&
+        candidate.specificity === current.specificity &&
+        candidate.createdAt > current.createdAt)
+    ) {
+      bestBySchool.set(school.id, candidate);
+    }
+  }
+
+  const result: RegionalReviewExcerpt[] = [];
+  for (const school of targets) {
+    const selected = bestBySchool.get(school.id);
+    if (selected) result.push(selected.excerpt);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+/**
+ * 回答で「主に通っていたキャンパス都道府県」が prefecture の公開口コミから、
+ * 各学校の代表1件を選ぶ。
  * 市区町村まで申告されていない口コミを市の口コミとは表示しない（isCityCampus で区別する）。
  */
 export async function fetchRegionalReviewExcerpts(input: {
   schools: ExcerptSourceSchool[];
   prefecture: string;
   municipality?: string;
+  limit?: number;
 }): Promise<RegionalReviewExcerpt[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -53,7 +200,9 @@ export async function fetchRegionalReviewExcerpts(input: {
   const supabase = createSupabaseClientWithLargeHeaders(url, key);
   const { data, error } = await supabase
     .from('survey_responses')
-    .select('id, school_id, overall_satisfaction, good_comment, bad_comment, created_at, answers')
+    .select(
+      'id, school_id, respondent_role, overall_satisfaction, good_comment, bad_comment, created_at, answers'
+    )
     .in('school_id', targets.map((school) => school.id))
     .eq('is_public', true)
     .eq('answers->>campus_prefecture', input.prefecture)
@@ -65,42 +214,10 @@ export async function fetchRegionalReviewExcerpts(input: {
     return [];
   }
 
-  const schoolById = new Map(targets.map((school) => [school.id, school]));
-  const perSchool = new Map<string, RegionalReviewExcerpt[]>();
-  for (const review of data ?? []) {
-    const school = schoolById.get(review.school_id);
-    if (!school) continue;
-    const list = perSchool.get(school.id) ?? [];
-    if (list.length >= PER_SCHOOL) continue;
-    const good = truncate(review.good_comment, GOOD_LENGTH);
-    const bad = truncate(review.bad_comment, BAD_LENGTH);
-    if (!good && !bad) continue;
-    const answers = (review.answers ?? {}) as Record<string, unknown>;
-    const campusCity =
-      input.municipality && typeof answers.campus_city === 'string'
-        ? normalizeAreaName(answers.campus_city)
-        : null;
-    const overall = Number(review.overall_satisfaction);
-    list.push({
-      id: review.id,
-      schoolName: school.name,
-      schoolSlug: school.slug,
-      overall: overall >= 1 && overall <= 5 ? overall : null,
-      attendance: typeof answers.attendance_frequency === 'string' ? answers.attendance_frequency : null,
-      isCityCampus: Boolean(input.municipality) && campusCity?.municipality === input.municipality,
-      good,
-      bad,
-    });
-    perSchool.set(school.id, list);
-  }
-
-  const result: RegionalReviewExcerpt[] = [];
-  for (let round = 0; round < PER_SCHOOL; round++) {
-    for (const school of targets) {
-      const excerpt = perSchool.get(school.id)?.[round];
-      if (excerpt) result.push(excerpt);
-      if (result.length >= LIMIT) return result;
-    }
-  }
-  return result;
+  return selectRepresentativeRegionalReviewExcerpts({
+    schools: targets,
+    reviews: (data ?? []) as RegionalReviewExcerptSource[],
+    municipality: input.municipality,
+    limit: input.limit,
+  });
 }

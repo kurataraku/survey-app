@@ -43,6 +43,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    prefetch={link.href === appPath('/') ? false : undefined}
                     className="text-sm hover:text-blue-400 transition-colors"
                   >
                     {link.label}

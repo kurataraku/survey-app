@@ -17,7 +17,8 @@ import type { SchoolInstitutionType } from '@/lib/types/schools';
 const SCHOOL_DATASET_COLUMNS =
   'id, name, prefecture, prefectures, institution_type, campus_locations, status, slug, highlights';
 
-async function fetchSchoolsDataset(): Promise<SearchSchool[]> {
+/** CLI計測ではunstable_cacheの外から同じデータ形を取得する。通常の画面はgetSchoolsDatasetを使う。 */
+export async function fetchSchoolsDatasetUncached(): Promise<SearchSchool[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceKey) return [];
@@ -52,6 +53,10 @@ async function fetchSchoolsDataset(): Promise<SearchSchool[]> {
   return fetchSearchSchoolsWithStats(supabase, rows);
 }
 
-export const getSchoolsDataset = unstable_cache(fetchSchoolsDataset, ['schools-dataset-v1'], {
-  revalidate: 3600,
-});
+export const getSchoolsDataset = unstable_cache(
+  fetchSchoolsDatasetUncached,
+  ['schools-dataset-v1'],
+  {
+    revalidate: 3600,
+  }
+);

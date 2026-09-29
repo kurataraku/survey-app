@@ -9,6 +9,14 @@
  * 地域の根拠として提示できるようにする。
  */
 import { normalizeAreaName } from '@/lib/regions/area-normalize';
+import {
+  REVIEW_REASON_GROUPS,
+  type ReviewReasonGroupKey,
+} from '@/lib/reviews/reason-groups';
+
+export type RegionalRespondentRole = '本人' | '保護者';
+export type RegionalReasonGroupCounts = Record<ReviewReasonGroupKey, number>;
+export type RegionalRespondentRoleCounts = Record<RegionalRespondentRole, number>;
 
 /** 都道府県単位に絞った口コミ集計。件数と平均のみを持ち、口コミ本文は学校詳細・口コミ一覧へ集約する */
 export type RegionalReviewStat = {
@@ -17,9 +25,14 @@ export type RegionalReviewStat = {
   overallAvg: number | null;
   staffAvg: number | null;
   supportAvg: number | null;
+  atmosphereAvg: number | null;
   creditAvg: number | null;
   careerSupportAvg: number | null;
   tuitionAvg: number | null;
+  /** 通信制を選んだ理由を3つの大分類にまとめた件数。1口コミは各分類につき最大1件として数える */
+  reasonGroups: RegionalReasonGroupCounts;
+  /** 回答者の立場。既知の2区分だけを数える */
+  respondentRoles: RegionalRespondentRoleCounts;
   /** 通学頻度の回答分布。「週5」「週1〜2」「ほぼオンライン/自宅」など */
   attendanceFrequencies: Record<string, number>;
   /** 入学タイミングの回答分布。「新入学（中学卒業後）」「転入学（他校から転校）」など */
@@ -31,11 +44,20 @@ export type RegionalReviewStat = {
   municipalities: Record<string, { reviewCount: number; overallAvg: number | null }>;
 };
 
-type RatingKey = 'overall' | 'staff' | 'support' | 'credit' | 'careerSupport' | 'tuition';
+type RatingKey =
+  | 'overall'
+  | 'staff'
+  | 'support'
+  | 'atmosphere'
+  | 'credit'
+  | 'careerSupport'
+  | 'tuition';
 
 type RegionalAccumulator = {
   reviewCount: number;
   ratings: Record<RatingKey, number[]>;
+  reasonGroups: RegionalReasonGroupCounts;
+  respondentRoles: RegionalRespondentRoleCounts;
   attendanceFrequencies: Map<string, number>;
   enrollmentTypes: Map<string, number>;
   municipalities: Map<string, { reviewCount: number; overall: number[] }>;
@@ -51,7 +73,21 @@ export function createRegionalReviewIndex(): RegionalReviewIndex {
 function emptyAccumulator(): RegionalAccumulator {
   return {
     reviewCount: 0,
-    ratings: { overall: [], staff: [], support: [], credit: [], careerSupport: [], tuition: [] },
+    ratings: {
+      overall: [],
+      staff: [],
+      support: [],
+      atmosphere: [],
+      credit: [],
+      careerSupport: [],
+      tuition: [],
+    },
+    reasonGroups: {
+      mental_relationship: 0,
+      learning_style: 0,
+      health_development: 0,
+    },
+    respondentRoles: { 本人: 0, 保護者: 0 },
     attendanceFrequencies: new Map(),
     enrollmentTypes: new Map(),
     municipalities: new Map(),
@@ -65,16 +101,31 @@ function bump(counter: Map<string, number>, value: unknown) {
   counter.set(trimmed, (counter.get(trimmed) ?? 0) + 1);
 }
 
+export function matchReviewReasonGroupKeys(value: unknown): ReviewReasonGroupKey[] {
+  if (!Array.isArray(value)) return [];
+  const reasons = new Set(
+    value
+      .filter((reason): reason is string => typeof reason === 'string')
+      .map((reason) => reason.trim())
+      .filter(Boolean)
+  );
+  return REVIEW_REASON_GROUPS
+    .filter((group) => group.reasons.some((reason) => reasons.has(reason)))
+    .map((group) => group.key);
+}
+
 /**
  * 1件の公開口コミを、回答されたキャンパス都道府県の集計へ加える。
  * campus_prefecture が空の回答は地域の根拠にしないため、どの都道府県にも加算しない。
+ * respondent_role は answers ではなく survey_responses のトップレベル列から渡す。
  */
 export function addRegionalReview(
   index: RegionalReviewIndex,
   schoolId: string,
   answers: Record<string, unknown>,
   overallSatisfaction: number | null,
-  parseRating: (value: unknown) => number | null
+  parseRating: (value: unknown) => number | null,
+  respondentRole?: unknown
 ): void {
   const campusPrefecture =
     typeof answers.campus_prefecture === 'string' ? answers.campus_prefecture.trim() : '';
@@ -92,12 +143,19 @@ export function addRegionalReview(
   };
   push('staff', answers.staff_rating);
   push('support', answers.support_rating);
+  push('atmosphere', answers.atmosphere_fit_rating);
   push('credit', answers.credit_rating);
   push('careerSupport', answers.career_support_rating);
   push('tuition', answers.tuition_rating);
 
   bump(entry.attendanceFrequencies, answers.attendance_frequency);
   bump(entry.enrollmentTypes, answers.enrollment_type);
+  for (const groupKey of matchReviewReasonGroupKeys(answers.reason_for_choosing)) {
+    entry.reasonGroups[groupKey] += 1;
+  }
+  if (respondentRole === '本人' || respondentRole === '保護者') {
+    entry.respondentRoles[respondentRole] += 1;
+  }
 
   const municipality =
     typeof answers.campus_city === 'string' ? normalizeAreaName(answers.campus_city)?.municipality : null;
@@ -131,9 +189,12 @@ export function finalizeRegionalReviews(
       overallAvg: average(entry.ratings.overall),
       staffAvg: average(entry.ratings.staff),
       supportAvg: average(entry.ratings.support),
+      atmosphereAvg: average(entry.ratings.atmosphere),
       creditAvg: average(entry.ratings.credit),
       careerSupportAvg: average(entry.ratings.careerSupport),
       tuitionAvg: average(entry.ratings.tuition),
+      reasonGroups: { ...entry.reasonGroups },
+      respondentRoles: { ...entry.respondentRoles },
       attendanceFrequencies: Object.fromEntries(entry.attendanceFrequencies),
       enrollmentTypes: Object.fromEntries(entry.enrollmentTypes),
       municipalities: Object.fromEntries(

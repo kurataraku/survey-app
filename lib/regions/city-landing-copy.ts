@@ -3,16 +3,12 @@ import { getPrefecturePath } from '@/lib/prefectures';
 import { getCityLandingPath } from '@/lib/regions/city-landing';
 import type { CityLandingData } from '@/lib/schools/getCityLandingData';
 
-export function getCityLandingTitle(municipality: string): string {
-  return `${municipality}の通信制高校一覧｜区・駅から口コミ・学費・通いやすさを比較`;
+export function getCityLandingTitle(municipality: string, hasWards = true): string {
+  return `${municipality}の通信制高校一覧｜${hasWards ? '区・駅' : '駅'}から口コミ・学費・通いやすさを比較`;
 }
 
 export function getCityLandingHeading(municipality: string): string {
   return `${municipality}の通信制高校・サポート校一覧`;
-}
-
-function topWardNames(data: CityLandingData, limit: number): string[] {
-  return data.wards.slice(0, limit).map((ward) => ward.name);
 }
 
 function topStationNames(data: CityLandingData, limit: number): string[] {
@@ -31,36 +27,24 @@ function reviewPhrase(data: CityLandingData): string {
 }
 
 export function getCityLandingSubtitle(data: CityLandingData): string {
-  const stations = topStationNames(data, 3);
-  const wards = topWardNames(data, 3);
   const review = reviewPhrase(data);
-  const stationPart = stations.length > 0 ? `${stations.join('・')}など駅から通える学校を探せます。` : '';
-  const wardPart = wards.length > 0 ? `キャンパスが多いのは${wards.join('・')}です。` : '';
-  return `${data.municipality}に通えるキャンパスがある通信制高校・サポート校${data.counts.totalSchools}校を比較できます。${stationPart}${wardPart}${review ? `${review}も読めます。` : ''}`;
+  return `${data.municipality}に通えるキャンパスがある通信制高校・サポート校${data.counts.totalSchools}校を掲載しています。最寄り駅や学費と、${review || `${data.prefecture}内の口コミ`}から、通えそうな学校を比べられます。`;
 }
 
 export function getCityLandingMetaDescription(data: CityLandingData): string {
   const stations = topStationNames(data, 3);
   const review = reviewPhrase(data);
-  return `${data.municipality}に通えるキャンパスがある通信制高校・サポート校${data.counts.totalSchools}校を比較。${stations.length > 0 ? `${stations.join('・')}など` : ''}最寄り駅・区から探せます。${review ? `${review}、` : ''}初年度納入金の目安、公立・私立・サポート校の違いも同じ表で確認できます。`;
+  return `${data.municipality}に通えるキャンパスがある通信制高校・サポート校${data.counts.totalSchools}校を掲載。${stations.length > 0 ? `${stations.join('・')}などの` : ''}最寄り駅、通学頻度・転入などの口コミ、初年度納入金の目安から比較できます。${review ? `${review}を掲載しています。` : ''}`;
 }
 
 export function buildCityLandingIntro(data: CityLandingData): string {
   const { municipality, counts } = data;
-  const wards = topWardNames(data, 4);
-  const topStation = data.topStations[0];
   const parts: string[] = [
-    `${municipality}で通信制高校を探すなら、まずは「自宅や通学経路の駅から通えるキャンパスがあるか」を確認するのがおすすめです。`,
-    `このページでは、${municipality}内に通えるキャンパス・学習センターがある${counts.totalSchools}校を掲載しています。`,
+    `${municipality}で学校を比べるときは、通える場所にキャンパスがあるかに加えて、毎日通わない学び方や転入の経験がある人の声も参考になります。`,
+    `このページでは、${municipality}内に通えるキャンパス・学習センターがある${counts.totalSchools}校を、場所と実際の口コミから探せます。`,
   ];
-  if (topStation) {
-    parts.push(`${topStation.name}周辺だけでも${topStation.schoolCount}校があり、`);
-  }
-  if (wards.length > 0) {
-    parts.push(`区では${wards.join('・')}にキャンパスが集まっています。`);
-  }
   parts.push(
-    `本校が他県にある広域通信制高校でも、${municipality}のキャンパスに通って学べる学校があります。一方で、年に数日のスクーリング（登校授業）は本校など別の場所で行う学校もあるため、気になる学校は学校詳細と募集要項で確認してください。`
+    `口コミにある通学頻度は回答者の経験で、現在のコースや制度を保証するものではありません。気になる学校は、学校詳細と最新の募集要項も確認してください。`
   );
   if (data.prefectureReviewCount > 0) {
     parts.push(
@@ -74,6 +58,14 @@ export function buildCityFaqItems(data: CityLandingData): { question: string; an
   const { municipality, prefecture, counts } = data;
   const stations = topStationNames(data, 3);
   return [
+    {
+      question: '毎日通えなくても卒業を目指せますか？',
+      answer: `通信制高校には、週1〜2日、月に数回、オンライン中心などさまざまな通い方があります。ただし、必要な登校日数やスクーリング会場は学校・コースによって異なります。このページの通学頻度は${prefecture}内で通った人の回答なので、候補を見つける参考にし、現在の制度は学校へ確認してください。`,
+    },
+    {
+      question: '高校の途中から転入できますか？',
+      answer: `転入学を受け付ける時期や、引き継げる単位は学校によって異なります。このページでは転入した人の口コミがある学校を絞れますが、出願時期・必要書類・単位の扱いは各学校へ確認してください。`,
+    },
     {
       question: `${municipality}に通信制高校のキャンパスはいくつありますか？`,
       answer: `このページでは、${municipality}内に通えるキャンパス・学習センターがある${counts.totalSchools}校（${counts.campusLocationCount}か所）を掲載しています${stations.length > 0 ? `。${stations.join('・')}周辺に多く集まっています` : ''}。最新の所在地や開校状況は各学校の公式サイトで確認してください。`,
@@ -96,13 +88,11 @@ export function buildCityFaqItems(data: CityLandingData): { question: string; an
 export function buildCityLandingJsonLd(data: CityLandingData): Record<string, unknown> {
   const appBase = getAppBaseUrl().replace(/\/$/, '');
   const pageUrl = `${appBase}${getCityLandingPath(data.config)}`;
-  const itemListElements = data.itemListSchools
-    .filter((school) => school.slug)
-    .map((school, index) => ({
+  const itemListElements = data.itemListSchools.map((school, index) => ({
       '@type': 'ListItem' as const,
       position: index + 1,
       name: school.name,
-      url: `${appBase}/schools/${school.slug}`,
+      ...(school.slug ? { url: `${appBase}/schools/${school.slug}` } : {}),
     }));
 
   return {
@@ -124,7 +114,7 @@ export function buildCityLandingJsonLd(data: CityLandingData): Record<string, un
       },
       {
         '@type': 'CollectionPage',
-        name: getCityLandingTitle(data.municipality),
+        name: getCityLandingTitle(data.municipality, data.wards.length > 0),
         url: pageUrl,
         description: getCityLandingMetaDescription(data),
         isPartOf: { '@type': 'WebSite', name: '通信制高校リアルレビュー', url: appBase },
