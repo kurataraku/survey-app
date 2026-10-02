@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { appPath } from '@/lib/base-path';
-import type {
-  RegionalReviewFilterKey,
-  RegionalSchoolTier,
+import {
+  regionalSchoolDataAttributes,
+  type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 import type { buildTuitionTableCell } from '@/lib/tuition/format';
@@ -16,12 +16,12 @@ export type RegionalSchoolListRowData = {
   stations: string[];
   regionalReviewCount: number;
   totalReviewCount: number;
+  /** 学校全体の総合満足度 */
   rating: number | null;
-  ratingScopeLabel: string;
+  defaultOrder: number;
   tuition: ReturnType<typeof buildTuitionTableCell>;
   excerpt: string | null;
   stationFilterIds: string[];
-  reviewFilterKeys: RegionalReviewFilterKey[];
 };
 
 const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
@@ -32,9 +32,11 @@ const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
 
 export default function RegionalSchoolListRow({
   school,
+  prefecture,
   municipality,
 }: {
   school: RegionalSchoolListRowData;
+  prefecture: string;
   municipality: string;
 }) {
   const schoolHref = school.slug ? appPath(`/schools/${school.slug}`) : null;
@@ -42,10 +44,8 @@ export default function RegionalSchoolListRow({
 
   return (
     <li
-      data-regional-school
-      data-station-filters={school.stationFilterIds.join(' ')}
-      data-review-filters={school.reviewFilterKeys.join(' ')}
-      className="border-b border-gray-200 py-5 last:border-b-0"
+      {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
+      className="border-b border-gray-200 px-1 pb-5"
       style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 150px' }}
     >
       <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.8fr)_minmax(9rem,0.8fr)] md:items-start md:gap-6">
@@ -95,9 +95,10 @@ export default function RegionalSchoolListRow({
                 口コミ{school.totalReviewCount}件
               </p>
               <p className="mt-0.5 text-xs text-gray-500">
+                学校全体
                 {school.regionalReviewCount > 0
-                  ? `${school.ratingScopeLabel}の口コミ${school.regionalReviewCount}件`
-                  : '学校全体の口コミ'}
+                  ? `（うち${prefecture}内${school.regionalReviewCount}件）`
+                  : ''}
               </p>
               {school.slug && (
                 <Link

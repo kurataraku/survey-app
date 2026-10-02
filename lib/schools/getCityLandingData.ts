@@ -5,7 +5,11 @@ import {
   getCampusNearestStations,
   getStandingCampusLocationsInPrefecture,
 } from '@/lib/schools/campusLocations';
-import { normalizeAreaName, toDisplayStationName } from '@/lib/regions/area-normalize';
+import {
+  normalizeAreaName,
+  stripRailOperatorPrefix,
+  toDisplayStationName,
+} from '@/lib/regions/area-normalize';
 import {
   computePrefectureLocationInsights,
   type PrefectureStationInsight,
@@ -18,10 +22,10 @@ import {
   type RegionalReviewExcerpt,
 } from '@/lib/schools/regionalReviewExcerpts';
 import {
-  buildRegionalReviewFilterKeys,
+  CITY_FINDER_STATION_LIMIT,
   CITY_REGIONAL_CARD_LIMIT,
-  REGIONAL_REVIEW_FILTERS,
-  type RegionalReviewFilterKey,
+  OTHER_STATION_FILTER_ID,
+  SCHOOL_TYPE_FILTERS,
   type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
 import type { CityLandingConfig } from '@/lib/regions/city-landing';
@@ -36,7 +40,10 @@ export type CitySchoolRow = {
   /** 市内の常設拠点数 */
   campusCount: number;
   wards: string[];
+  /** 表示用（最大2駅） */
   stations: string[];
+  /** 絞り込み用（市内の全キャンパスの最寄り駅） */
+  allStations: string[];
   /** 回答で市区町村まで申告された、この市のキャンパスの口コミ件数 */
   cityReviewCount: number;
   /** 県内キャンパスの口コミ件数（市内とは限らない。市の口コミとしては数えない） */
@@ -52,7 +59,8 @@ export type CitySchoolRow = {
   admissionBadges: AdmissionBadge[];
   /** A=代表口コミカード、B=口コミ付き行、C=基本情報行 */
   tier: RegionalSchoolTier;
-  reviewFilterKeys: RegionalReviewFilterKey[];
+  /** 標準の並び順（県内の口コミが多い順） */
+  defaultOrder: number;
   stationFilterIds: string[];
   excerpt: RegionalReviewExcerpt | null;
   listExcerpt: string | null;
@@ -83,10 +91,10 @@ export type CityLandingData = {
     id: string;
     label: string;
     schoolCount: number;
-    reviewCounts: Partial<Record<RegionalReviewFilterKey, number>>;
+    typeCounts: Partial<Record<SchoolInstitutionType, number>>;
   }>;
-  reviewFilterOptions: Array<{
-    key: RegionalReviewFilterKey;
+  schoolTypeOptions: Array<{
+    key: SchoolInstitutionType;
     label: string;
     schoolCount: number;
   }>;
@@ -125,6 +133,7 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
   ];
   const regional = findRegionalReviewStat(school.regional_reviews, config.prefecture);
   const city = regional?.municipalities?.[config.municipality] ?? null;
+  const allStations = stationNames(locations);
 
   return {
     id: school.id,
@@ -134,7 +143,8 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
     headquartersPrefecture: school.prefecture,
     campusCount: locations.length,
     wards,
-    stations: stationNames(locations).slice(0, 2),
+    stations: allStations.slice(0, 2),
+    allStations,
     cityReviewCount: city?.reviewCount ?? 0,
     prefectureReviewCount: regional?.reviewCount ?? 0,
     reviewCount: school.review_count,
@@ -153,7 +163,7 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
     tuition: buildTuitionTableCell(school.tuition_estimate),
     admissionBadges: buildAdmissionBadges(school.admission_profile, config.prefecture),
     tier: school.review_count > 0 ? 'b' : 'c',
-    reviewFilterKeys: buildRegionalReviewFilterKeys(regional),
+    defaultOrder: 0,
     stationFilterIds: [],
     excerpt: null,
     listExcerpt: school.latest_good_comment,
@@ -226,16 +236,27 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     municipality: config.municipality,
   });
 
-  const stationDefinitions = insights.topStations.slice(0, 8).map((station, index) => ({
-    id: `station-${index + 1}`,
-    label: station.name,
-  }));
-  const rowsWithStations = baseRows.map((row) => ({
-    ...row,
-    stationFilterIds: stationDefinitions
-      .filter((station) => row.stations.includes(station.label))
-      .map((station) => station.id),
-  }));
+  const stationDefinitions = insights.topStations
+    .slice(0, CITY_FINDER_STATION_LIMIT)
+    .map((station, index) => ({
+      id: `station-${index + 1}`,
+      label: station.name,
+    }));
+  const rowsWithStations = baseRows.map((row, index) => {
+    // 駅の集計（computePrefectureLocationInsights）と同じく、事業者名付きの駅は接頭辞なしの駅にまとめる
+    const stationFilterIds = stationDefinitions
+      .filter((station) =>
+        row.allStations.some(
+          (name) => name === station.label || stripRailOperatorPrefix(name) === station.label
+        )
+      )
+      .map((station) => station.id);
+    return {
+      ...row,
+      defaultOrder: index,
+      stationFilterIds: stationFilterIds.length > 0 ? stationFilterIds : [OTHER_STATION_FILTER_ID],
+    };
+  });
 
   const reviewExcerpts = await fetchRegionalReviewExcerpts({
     schools: rowsWithStations.map((row) => ({
@@ -260,23 +281,28 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     excerpt: excerptBySchool.get(row.id) ?? null,
   }));
 
-  const finderStations = stationDefinitions.map((station) => {
-    const stationRows = rows.filter((row) => row.stationFilterIds.includes(station.id));
-    return {
-      ...station,
-      schoolCount: stationRows.length,
-      reviewCounts: Object.fromEntries(
-        REGIONAL_REVIEW_FILTERS.map((filter) => [
-          filter.key,
-          stationRows.filter((row) => row.reviewFilterKeys.includes(filter.key)).length,
-        ])
-      ) as Partial<Record<RegionalReviewFilterKey, number>>,
-    };
-  });
-  const reviewFilterOptions = REGIONAL_REVIEW_FILTERS.map((filter) => ({
+  const finderStations = [
+    ...stationDefinitions,
+    { id: OTHER_STATION_FILTER_ID, label: 'その他の駅' },
+  ]
+    .map((station) => {
+      const stationRows = rows.filter((row) => row.stationFilterIds.includes(station.id));
+      return {
+        ...station,
+        schoolCount: stationRows.length,
+        typeCounts: Object.fromEntries(
+          SCHOOL_TYPE_FILTERS.map((filter) => [
+            filter.key,
+            stationRows.filter((row) => row.institutionType === filter.key).length,
+          ])
+        ) as Partial<Record<SchoolInstitutionType, number>>,
+      };
+    })
+    .filter((station) => station.schoolCount > 0);
+  const schoolTypeOptions = SCHOOL_TYPE_FILTERS.map((filter) => ({
     ...filter,
-    schoolCount: rows.filter((row) => row.reviewFilterKeys.includes(filter.key)).length,
-  }));
+    schoolCount: rows.filter((row) => row.institutionType === filter.key).length,
+  })).filter((option) => option.schoolCount > 0);
 
   return {
     config,
@@ -294,7 +320,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     wards: buildWards(schools, config),
     topStations: insights.topStations,
     finderStations,
-    reviewFilterOptions,
+    schoolTypeOptions,
     reviewExcerpts,
     cityReviewCount: rows.reduce((sum, row) => sum + row.cityReviewCount, 0),
     prefectureReviewCount: rows.reduce((sum, row) => sum + row.prefectureReviewCount, 0),

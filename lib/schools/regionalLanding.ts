@@ -1,59 +1,100 @@
+import type { SchoolInstitutionType } from '@/lib/types/schools';
+
 export type RegionalSchoolTier = 'a' | 'b' | 'c';
 
-export type RegionalReviewFilterKey =
-  | 'low-frequency'
-  | 'transfer'
-  | 'mental-relationship'
-  | 'parent';
-
 export const CITY_REGIONAL_CARD_LIMIT = 12;
+export const CITY_FINDER_STATION_LIMIT = 6;
+export const OTHER_STATION_FILTER_ID = 'station-other';
 
-export const REGIONAL_REVIEW_FILTERS: ReadonlyArray<{
-  key: RegionalReviewFilterKey;
+export const SCHOOL_TYPE_FILTERS: ReadonlyArray<{
+  key: SchoolInstitutionType;
   label: string;
 }> = [
-  { key: 'low-frequency', label: '少ない通学日数' },
-  { key: 'transfer', label: '転入の体験' },
-  { key: 'mental-relationship', label: '心の不調・人間関係' },
-  { key: 'parent', label: '保護者の声' },
+  { key: 'public', label: '公立の通信制高校' },
+  { key: 'private', label: '私立の通信制高校' },
+  { key: 'support', label: 'サポート校（通信制高校と併用）' },
 ];
 
-type FinderReviewStat = {
-  attendanceFrequencies: Record<string, number>;
-  enrollmentTypes: Record<string, number>;
-  reasonGroups?: Record<string, number>;
-  respondentRoles?: Record<string, number>;
+export type RegionalSortKey =
+  | 'default'
+  | 'rating-desc'
+  | 'rating-asc'
+  | 'reviews-desc'
+  | 'reviews-asc';
+
+export const REGIONAL_SORT_OPTIONS: ReadonlyArray<{ key: RegionalSortKey; label: string }> = [
+  { key: 'default', label: '標準' },
+  { key: 'rating-desc', label: '総合満足度が高い順' },
+  { key: 'rating-asc', label: '総合満足度が低い順' },
+  { key: 'reviews-desc', label: '口コミが多い順' },
+  { key: 'reviews-asc', label: '口コミが少ない順' },
+];
+
+/** 満足度順で順位を付ける最小の口コミ件数。未満の学校は順位付けせず後ろにまとめる */
+export const RATING_SORT_MIN_REVIEWS = 3;
+
+export type RegionalSortableSchool = {
+  name: string;
+  defaultOrder: number;
+  /** 学校全体の総合満足度 */
+  rating: number | null;
+  /** 学校全体の口コミ件数 */
+  reviewCount: number;
 };
 
-const LOW_FREQUENCY_VALUES = ['週1〜2', '月1〜数回', 'ほぼオンライン/自宅'];
+function ratingGroup(school: RegionalSortableSchool): number {
+  if (school.rating == null || school.reviewCount === 0) return 2;
+  return school.reviewCount >= RATING_SORT_MIN_REVIEWS ? 0 : 1;
+}
 
-/** 地域口コミの集計から、Finderで使う短いフラグだけを作る。 */
-export function buildRegionalReviewFilterKeys(
-  stat: FinderReviewStat | null | undefined
-): RegionalReviewFilterKey[] {
-  if (!stat) return [];
-  const keys: RegionalReviewFilterKey[] = [];
-  if (LOW_FREQUENCY_VALUES.some((value) => (stat.attendanceFrequencies[value] ?? 0) > 0)) {
-    keys.push('low-frequency');
+export function compareRegionalSchools(
+  a: RegionalSortableSchool,
+  b: RegionalSortableSchool,
+  sort: RegionalSortKey
+): number {
+  const byName = a.name.localeCompare(b.name, 'ja');
+  switch (sort) {
+    case 'rating-desc':
+    case 'rating-asc': {
+      const group = ratingGroup(a) - ratingGroup(b);
+      if (group !== 0) return group;
+      const direction = sort === 'rating-desc' ? -1 : 1;
+      const rating = ((a.rating ?? 0) - (b.rating ?? 0)) * direction;
+      return rating || b.reviewCount - a.reviewCount || byName;
+    }
+    case 'reviews-desc':
+      return b.reviewCount - a.reviewCount || byName;
+    case 'reviews-asc':
+      return a.reviewCount - b.reviewCount || byName;
+    default:
+      return a.defaultOrder - b.defaultOrder;
   }
-  if ((stat.enrollmentTypes['転入学（他校から転校）'] ?? 0) > 0) {
-    keys.push('transfer');
-  }
-  if ((stat.reasonGroups?.mental_relationship ?? 0) > 0) {
-    keys.push('mental-relationship');
-  }
-  if ((stat.respondentRoles?.保護者 ?? 0) > 0) {
-    keys.push('parent');
-  }
-  return keys;
 }
 
 export function matchesRegionalSchoolFilters(
-  school: { stationFilterIds: string[]; reviewFilterKeys: RegionalReviewFilterKey[] },
+  school: { stationFilterIds: string[]; institutionType: SchoolInstitutionType | null },
   stationId: string,
-  reviewFilter: RegionalReviewFilterKey | ''
+  schoolType: SchoolInstitutionType | ''
 ): boolean {
   const stationMatches = !stationId || school.stationFilterIds.includes(stationId);
-  const reviewMatches = !reviewFilter || school.reviewFilterKeys.includes(reviewFilter);
-  return stationMatches && reviewMatches;
+  const typeMatches = !schoolType || school.institutionType === schoolType;
+  return stationMatches && typeMatches;
+}
+
+/** Finder が絞り込み・並び替えに使う属性。行データを Client Component へ渡さずに済ませる */
+export function regionalSchoolDataAttributes(
+  school: RegionalSortableSchool & {
+    stationFilterIds: string[];
+    institutionType: SchoolInstitutionType | null;
+  }
+): Record<`data-${string}`, string | boolean> {
+  return {
+    'data-regional-school': true,
+    'data-station-filters': school.stationFilterIds.join(' '),
+    'data-school-type': school.institutionType ?? '',
+    'data-default-order': String(school.defaultOrder),
+    'data-rating': school.rating == null ? '' : String(school.rating),
+    'data-review-count': String(school.reviewCount),
+    'data-name': school.name,
+  };
 }

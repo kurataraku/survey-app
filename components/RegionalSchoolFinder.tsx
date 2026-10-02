@@ -1,77 +1,101 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/track';
-import type { RegionalReviewFilterKey } from '@/lib/schools/regionalLanding';
+import {
+  compareRegionalSchools,
+  RATING_SORT_MIN_REVIEWS,
+  REGIONAL_SORT_OPTIONS,
+  type RegionalSortableSchool,
+  type RegionalSortKey,
+} from '@/lib/schools/regionalLanding';
+import type { SchoolInstitutionType } from '@/lib/types/schools';
 
-type FinderOption = {
+type FinderStation = {
   id: string;
   label: string;
   schoolCount: number;
-  reviewCounts: Partial<Record<RegionalReviewFilterKey, number>>;
+  typeCounts: Partial<Record<SchoolInstitutionType, number>>;
+};
+
+type FinderSchoolType = {
+  key: SchoolInstitutionType;
+  label: string;
+  schoolCount: number;
 };
 
 interface RegionalSchoolFinderProps {
   targetId: string;
   prefecture: string;
-  reviewRegionLabel: string;
   totalSchools: number;
-  stations: FinderOption[];
-  reviewOptions: Array<{
-    key: RegionalReviewFilterKey;
-    label: string;
-    schoolCount: number;
-  }>;
+  stations: FinderStation[];
+  schoolTypes: FinderSchoolType[];
 }
 
-function tokens(value: string | undefined): string[] {
-  return value?.split(' ').filter(Boolean) ?? [];
+function readSortable(row: HTMLElement): RegionalSortableSchool {
+  const rating = row.dataset.rating ? Number(row.dataset.rating) : null;
+  return {
+    name: row.dataset.name ?? '',
+    defaultOrder: Number(row.dataset.defaultOrder ?? 0),
+    rating: rating != null && Number.isFinite(rating) ? rating : null,
+    reviewCount: Number(row.dataset.reviewCount ?? 0),
+  };
+}
+
+function sortNote(sort: RegionalSortKey, prefecture: string): string {
+  if (sort === 'rating-desc' || sort === 'rating-asc') {
+    return `総合満足度は学校全体の値です。口コミが${RATING_SORT_MIN_REVIEWS}件未満の学校は、満足度の順位とは別に後ろへ並べています。`;
+  }
+  if (sort === 'reviews-desc' || sort === 'reviews-asc') {
+    return '口コミ件数は学校全体の件数です。';
+  }
+  return `標準は${prefecture}内の口コミが多い順、次に学校全体の口コミが多い順です。`;
 }
 
 export default function RegionalSchoolFinder({
   targetId,
   prefecture,
-  reviewRegionLabel,
   totalSchools,
   stations,
-  reviewOptions,
+  schoolTypes,
 }: RegionalSchoolFinderProps) {
   const [stationId, setStationId] = useState('');
-  const [reviewFilter, setReviewFilter] = useState<RegionalReviewFilterKey | ''>('');
-  const [showAll, setShowAll] = useState(false);
-  const hasFilter = Boolean(stationId || reviewFilter);
+  const [schoolType, setSchoolType] = useState<SchoolInstitutionType | ''>('');
+  const [sort, setSort] = useState<RegionalSortKey>('default');
+  const reordered = useRef(false);
+  const hasFilter = Boolean(stationId || schoolType);
   const selectedStation = stations.find((station) => station.id === stationId);
-  const selectedReview = reviewOptions.find((option) => option.key === reviewFilter);
-  const matchingCount = useMemo(() => {
-    if (selectedStation && reviewFilter) {
-      return selectedStation.reviewCounts[reviewFilter] ?? 0;
-    }
-    if (selectedStation) return selectedStation.schoolCount;
-    if (selectedReview) return selectedReview.schoolCount;
-    return totalSchools;
-  }, [reviewFilter, selectedReview, selectedStation, totalSchools]);
+  const selectedType = schoolTypes.find((option) => option.key === schoolType);
+
+  let matchingCount = totalSchools;
+  if (selectedStation && schoolType) matchingCount = selectedStation.typeCounts[schoolType] ?? 0;
+  else if (selectedStation) matchingCount = selectedStation.schoolCount;
+  else if (selectedType) matchingCount = selectedType.schoolCount;
 
   useEffect(() => {
     const root = document.getElementById(targetId);
     if (!root) return;
-    if (!hasFilter && !showAll && !root.querySelector('[data-regional-school][hidden]')) return;
-    const rows = [...root.querySelectorAll<HTMLElement>('[data-regional-school]')];
-    for (const row of rows) {
-      const rowStations = tokens(row.dataset.stationFilters);
-      const rowReviews = tokens(row.dataset.reviewFilters) as RegionalReviewFilterKey[];
-      const stationMatches = !stationId || rowStations.includes(stationId);
-      const reviewMatches = !reviewFilter || rowReviews.includes(reviewFilter);
-      const matchesCurrent = stationMatches && reviewMatches;
-      row.hidden = hasFilter && !showAll && !matchesCurrent;
+    if (!hasFilter && !root.querySelector('[data-regional-school][hidden]')) return;
+    for (const row of root.querySelectorAll<HTMLElement>('[data-regional-school]')) {
+      const stationMatches =
+        !stationId || (row.dataset.stationFilters ?? '').split(' ').includes(stationId);
+      const typeMatches = !schoolType || row.dataset.schoolType === schoolType;
+      row.hidden = !(stationMatches && typeMatches);
     }
+  }, [hasFilter, schoolType, stationId, targetId]);
 
-    for (const section of root.querySelectorAll<HTMLElement>('[data-regional-section]')) {
-      section.hidden = ![...section.querySelectorAll<HTMLElement>('[data-regional-school]')].some(
-        (row) => !row.hidden
-      );
-    }
-  }, [hasFilter, reviewFilter, showAll, stationId, targetId]);
+  useEffect(() => {
+    if (sort === 'default' && !reordered.current) return;
+    const list = document.getElementById(targetId)?.querySelector<HTMLElement>('[data-regional-list]');
+    if (!list) return;
+    const rows = [...list.querySelectorAll<HTMLElement>(':scope > [data-regional-school]')];
+    rows
+      .map((row) => ({ row, school: readSortable(row) }))
+      .sort((a, b) => compareRegionalSchools(a.school, b.school, sort))
+      .forEach(({ row }) => list.appendChild(row));
+    reordered.current = sort !== 'default';
+  }, [sort, targetId]);
 
   useEffect(() => {
     const root = document.getElementById(targetId);
@@ -89,15 +113,9 @@ export default function RegionalSchoolFinder({
     return () => root.removeEventListener('click', onClick);
   }, [prefecture, targetId]);
 
-  const hiddenCount = useMemo(
-    () => (hasFilter ? Math.max(0, totalSchools - matchingCount) : 0),
-    [hasFilter, matchingCount, totalSchools]
-  );
-
   const clear = () => {
     setStationId('');
-    setReviewFilter('');
-    setShowAll(false);
+    setSchoolType('');
   };
 
   const buttonClass = (active: boolean, disabled: boolean) =>
@@ -112,43 +130,36 @@ export default function RegionalSchoolFinder({
 
   return (
     <section
-      className="mb-10 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-5 sm:px-6"
+      className="mb-8 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-5 sm:px-6"
       aria-labelledby={`${targetId}-finder-heading`}
     >
       <div className="mb-5">
         <h2 id={`${targetId}-finder-heading`} className="text-xl font-bold text-gray-900">
-          気になる条件で学校を絞る
+          通う場所と学校の種類で絞る
         </h2>
         <p className="mt-1 text-sm leading-relaxed text-gray-600">
-          選ばなくても全校を見られます。口コミの条件は学校の制度ではなく、
-          {reviewRegionLabel}で実際に回答があった学校を示します。
+          どちらも選ばなければ、全{totalSchools}校を表示します。
         </p>
       </div>
 
       {stations.length > 0 && (
         <fieldset className="mb-5">
-          <legend className="mb-2 text-sm font-bold text-gray-800">
-            通いやすい場所 <span className="font-normal text-gray-500">（1つ選択）</span>
-          </legend>
+          <legend className="mb-2 text-sm font-bold text-gray-800">最寄り駅</legend>
           <div className="flex flex-wrap gap-2">
             {stations.map((station) => {
-              const count = reviewFilter
-                ? station.reviewCounts[reviewFilter] ?? 0
-                : station.schoolCount;
-              const disabled = count === 0 && stationId !== station.id;
+              const count = schoolType ? station.typeCounts[schoolType] ?? 0 : station.schoolCount;
+              const active = stationId === station.id;
+              const disabled = count === 0 && !active;
               return (
                 <button
                   key={station.id}
                   type="button"
-                  aria-pressed={stationId === station.id}
+                  aria-pressed={active}
                   disabled={disabled}
-                  className={buttonClass(stationId === station.id, disabled)}
-                  onClick={() => {
-                    setStationId((current) => (current === station.id ? '' : station.id));
-                    setShowAll(false);
-                  }}
+                  className={buttonClass(active, disabled)}
+                  onClick={() => setStationId(active ? '' : station.id)}
                 >
-                  {station.label} <span aria-label={`${count}校`}>{count}</span>
+                  {station.label} <span className="font-normal">{count}校</span>
                 </button>
               );
             })}
@@ -157,70 +168,64 @@ export default function RegionalSchoolFinder({
       )}
 
       <fieldset>
-        <legend className="mb-2 text-sm font-bold text-gray-800">
-          口コミで確かめたいこと <span className="font-normal text-gray-500">（1つ選択）</span>
-        </legend>
+        <legend className="mb-2 text-sm font-bold text-gray-800">学校の種類</legend>
         <div className="flex flex-wrap gap-2">
-          {reviewOptions.map((option) => {
-            const count = stationId
-              ? selectedStation?.reviewCounts[option.key] ?? 0
+          {schoolTypes.map((option) => {
+            const count = selectedStation
+              ? selectedStation.typeCounts[option.key] ?? 0
               : option.schoolCount;
-            const disabled = count === 0 && reviewFilter !== option.key;
+            const active = schoolType === option.key;
+            const disabled = count === 0 && !active;
             return (
               <button
                 key={option.key}
                 type="button"
-                aria-pressed={reviewFilter === option.key}
+                aria-pressed={active}
                 disabled={disabled}
-                className={buttonClass(reviewFilter === option.key, disabled)}
-                onClick={() => {
-                  setReviewFilter((current) => (current === option.key ? '' : option.key));
-                  setShowAll(false);
-                }}
+                className={buttonClass(active, disabled)}
+                onClick={() => setSchoolType(active ? '' : option.key)}
               >
-                {option.label} <span aria-label={`${count}校`}>{count}</span>
+                {option.label} <span className="font-normal">{count}校</span>
               </button>
             );
           })}
         </div>
+        <p className="mt-2 text-xs leading-relaxed text-gray-500">
+          サポート校は、通信制高校に在籍しながら学習や生活の支援を受けるために通う学校です。多くの場合、通信制高校の学費も別にかかります。
+        </p>
       </fieldset>
 
-      <div className="mt-5 border-t border-emerald-200 pt-4">
-        <p className="text-sm font-semibold text-gray-800" aria-live="polite">
-          {hasFilter
-            ? showAll
-              ? `条件に合う${matchingCount}校を含む全${totalSchools}校を表示しています`
-              : `${matchingCount}校を表示しています`
-            : `全${totalSchools}校を表示しています`}
-        </p>
-        {hasFilter && matchingCount === 0 && (
-          <p className="mt-1 text-sm text-gray-600">
-            この組み合わせに該当する口コミはありません。条件を片方外すか、全校を表示してください。
+      <div className="mt-5 flex flex-col gap-3 border-t border-emerald-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <p className="text-sm font-semibold text-gray-800" aria-live="polite">
+            {hasFilter ? `${matchingCount}校を表示しています` : `全${totalSchools}校を表示しています`}
           </p>
-        )}
-        {hasFilter && (
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          {hasFilter && (
             <button
               type="button"
               onClick={clear}
-              className="min-h-11 font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-950"
+              className="min-h-11 text-sm font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-950"
             >
-              条件をすべて解除
+              条件を解除
             </button>
-            {hiddenCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowAll((current) => !current)}
-                className="min-h-11 text-gray-700 underline decoration-gray-300 underline-offset-4 hover:text-gray-950"
-              >
-                {showAll
-                  ? '条件に合う学校だけに戻す'
-                  : `口コミではこの条件を確認できない学校も見る（${hiddenCount}校）`}
-              </button>
-            )}
-          </div>
-        )}
+          )}
+        </div>
+        <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+          並び順
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value as RegionalSortKey)}
+            className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-gray-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          >
+            {REGIONAL_SORT_OPTIONS.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      <p className="mt-2 text-xs leading-relaxed text-gray-500">{sortNote(sort, prefecture)}</p>
     </section>
   );
 }

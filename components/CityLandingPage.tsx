@@ -15,16 +15,16 @@ import {
   getCityLandingHeading,
   getCityLandingSubtitle,
 } from '@/lib/regions/city-landing-copy';
+import { buildReasonGroupReviewsPath, REVIEW_REASON_GROUPS } from '@/lib/reviews/reason-groups';
 import type { CityLandingData, CitySchoolRow } from '@/lib/schools/getCityLandingData';
+import { getPrefectureAttendanceFrequencyLinks } from '@/lib/schools/prefecture-landing-attendance';
 
 interface CityLandingPageProps {
   data: CityLandingData;
   intro: string;
 }
 
-function ratingFor(row: CitySchoolRow): number | null {
-  return row.prefectureReviewCount >= 3 ? row.regionalOverallAvg : row.overallAvg;
-}
+const RESULTS_ID = 'city-school-results';
 
 function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
   if (!row.excerpt || row.tier !== 'a') return null;
@@ -38,7 +38,8 @@ function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
     stations: row.stations,
     regionalReviewCount: row.prefectureReviewCount,
     totalReviewCount: row.reviewCount,
-    rating: ratingFor(row),
+    rating: row.overallAvg,
+    defaultOrder: row.defaultOrder,
     staffAvg: row.staffAvg,
     atmosphereAvg: row.atmosphereAvg,
     ratingScopeLabel: row.ratingScopeLabel,
@@ -46,7 +47,6 @@ function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
     admissionBadges: row.admissionBadges,
     excerpt: row.excerpt,
     stationFilterIds: row.stationFilterIds,
-    reviewFilterKeys: row.reviewFilterKeys,
   };
 }
 
@@ -60,13 +60,62 @@ function toListData(row: CitySchoolRow): RegionalSchoolListRowData {
     stations: row.stations,
     regionalReviewCount: row.prefectureReviewCount,
     totalReviewCount: row.reviewCount,
-    rating: ratingFor(row),
-    ratingScopeLabel: row.ratingScopeLabel,
+    rating: row.overallAvg,
+    defaultOrder: row.defaultOrder,
     tuition: row.tuition,
     excerpt: row.listExcerpt,
     stationFilterIds: row.stationFilterIds,
-    reviewFilterKeys: row.reviewFilterKeys,
   };
+}
+
+const ATTENDANCE_THEME_LABELS: Record<string, string> = {
+  '週1〜2': '週1〜2日で通った人',
+  '月1〜数回': '月に数回通った人',
+  'ほぼオンライン/自宅': 'ほぼ自宅・オンラインで学んだ人',
+};
+
+const REASON_THEME_LABELS: Record<string, string> = {
+  mental_relationship: '人間関係や心の不調がきっかけの人',
+  learning_style: '全日制の学び方が合わなかった人',
+  health_development: '心身の状態や発達特性がきっかけの人',
+};
+
+function ThemeReviewLinks({ prefecture }: { prefecture: string }) {
+  const links = [
+    ...getPrefectureAttendanceFrequencyLinks(prefecture)
+      .filter((link) => ATTENDANCE_THEME_LABELS[link.label])
+      .map((link) => ({ label: ATTENDANCE_THEME_LABELS[link.label], href: link.href })),
+    ...REVIEW_REASON_GROUPS.map((group) => ({
+      label: REASON_THEME_LABELS[group.key] ?? group.shortLabel,
+      href: buildReasonGroupReviewsPath(prefecture, group),
+    })),
+  ];
+  return (
+    <section
+      className="mb-12 border-t border-emerald-100 pt-9"
+      aria-labelledby="city-theme-reviews-heading"
+    >
+      <h2 id="city-theme-reviews-heading" className="text-2xl font-bold text-gray-950">
+        テーマ別に口コミを読む
+      </h2>
+      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
+        {prefecture}内のキャンパスに通った人の口コミを、通い方や通信制を選んだきっかけ別にまとめて読めます。
+      </p>
+      <ul className="mt-4 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
+        {links.map((link) => (
+          <li key={link.href}>
+            <Link
+              href={link.href}
+              prefetch={false}
+              className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+            >
+              {link.label}の口コミ →
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function AreaGuide({ data }: { data: CityLandingData }) {
@@ -80,7 +129,7 @@ function AreaGuide({ data }: { data: CityLandingData }) {
         {data.wards.length > 0 ? '区・駅' : '駅'}から通いやすさを見る
       </h2>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
-        登録されているキャンパス所在地をもとにした件数です。駅の条件は上の絞り込みにも使えます。
+        登録されているキャンパス所在地をもとにした件数です。主な駅は上の絞り込みでも選べます。
       </p>
       {data.wards.length > 0 && (
         <div className="mt-5">
@@ -101,7 +150,7 @@ function AreaGuide({ data }: { data: CityLandingData }) {
             {data.topStations.slice(0, 12).map((station) => (
               <li key={station.name}>
                 <a
-                  href="#city-school-finder-heading"
+                  href={`#${RESULTS_ID}-finder-heading`}
                   className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
                 >
                   {station.name}
@@ -151,10 +200,6 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
   const { municipality, prefecture } = data;
   const prefecturePath = appPath(getPrefecturePath(prefecture));
   const faqItems = buildCityFaqItems(data);
-  const featured = data.rows
-    .map(toCardData)
-    .filter((row): row is RegionalSchoolCardData => row !== null);
-  const others = data.rows.filter((row) => row.tier !== 'a').map(toListData);
 
   return (
     <div className="min-h-screen bg-[var(--ce-bg)] py-8">
@@ -195,74 +240,44 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
         </header>
 
         <RegionalSchoolFinder
-          targetId="city-school-results"
+          targetId={RESULTS_ID}
           prefecture={prefecture}
-          reviewRegionLabel={`${prefecture}内の口コミ`}
           totalSchools={data.counts.totalSchools}
           stations={data.finderStations}
-          reviewOptions={data.reviewFilterOptions}
+          schoolTypes={data.schoolTypeOptions}
         />
 
-        <div id="city-school-results" aria-labelledby="city-comparison-heading">
-          <h2 id="city-comparison-heading" className="sr-only">
-            {municipality}の通信制高校・サポート校全校一覧
-          </h2>
-
-          {featured.length > 0 && (
-            <section
-              className="mb-12"
-              aria-labelledby="city-review-heading"
-              data-regional-section
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 7200px' }}
-            >
-              <div className="mb-5 max-w-3xl">
-                <h2 id="city-review-heading" className="text-2xl font-bold text-gray-950">
-                  口コミを詳しく読める学校
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                  {municipality}にキャンパスがある学校について、{prefecture}
-                  内で実際に通った人の声を学校ごとに紹介します。
-                </p>
-              </div>
-              <ul className="space-y-5">
-                {featured.map((school) => (
-                  <RegionalSchoolCard
-                    key={school.id}
-                    school={school}
-                    prefecture={prefecture}
-                    municipality={municipality}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {others.length > 0 && (
-            <section
-              className="mb-10 border-t border-gray-300 pt-9"
-              aria-labelledby="city-other-schools-heading"
-              data-regional-section
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 5200px' }}
-            >
-              <h2 id="city-other-schools-heading" className="text-2xl font-bold text-gray-950">
-                そのほかの学校
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                口コミが少ない学校、まだ口コミがない学校も含め、{municipality}
-                内に通えるキャンパスがある学校をすべて掲載しています。
-              </p>
-              <ul className="mt-4 border-y border-gray-200">
-                {others.map((school) => (
-                  <RegionalSchoolListRow
-                    key={school.id}
-                    school={school}
-                    municipality={municipality}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
+        <section id={RESULTS_ID} className="mb-10" aria-labelledby="city-comparison-heading">
+          <div className="mb-5 max-w-3xl">
+            <h2 id="city-comparison-heading" className="text-2xl font-bold text-gray-950">
+              {municipality}の通信制高校・サポート校 全{data.counts.totalSchools}校
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+              {prefecture}内のキャンパスに通った人の口コミがある学校は、その声を大きく紹介しています。口コミがまだない学校も含め、
+              {municipality}内に通えるキャンパスがある学校をすべて掲載しています。
+            </p>
+          </div>
+          <ul className="space-y-5" data-regional-list>
+            {data.rows.map((row) => {
+              const card = toCardData(row);
+              return card ? (
+                <RegionalSchoolCard
+                  key={row.id}
+                  school={card}
+                  prefecture={prefecture}
+                  municipality={municipality}
+                />
+              ) : (
+                <RegionalSchoolListRow
+                  key={row.id}
+                  school={toListData(row)}
+                  prefecture={prefecture}
+                  municipality={municipality}
+                />
+              );
+            })}
+          </ul>
+        </section>
 
         <div className="mb-10">
           <p className="text-xs leading-relaxed text-gray-500">
@@ -270,6 +285,8 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
           </p>
           <TuitionDisclaimer className="mt-2" />
         </div>
+
+        {data.prefectureReviewCount > 0 && <ThemeReviewLinks prefecture={prefecture} />}
 
         <AreaGuide data={data} />
 

@@ -3,9 +3,9 @@ import AdmissionBadgeList from '@/components/AdmissionBadgeList';
 import { appPath } from '@/lib/base-path';
 import { getReviewReasonGroup, type ReviewReasonGroupKey } from '@/lib/reviews/reason-groups';
 import type { RegionalReviewExcerpt } from '@/lib/schools/regionalReviewExcerpts';
-import type {
-  RegionalReviewFilterKey,
-  RegionalSchoolTier,
+import {
+  regionalSchoolDataAttributes,
+  type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
 import type { AdmissionBadge } from '@/lib/schools/admissionProfiles';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
@@ -27,7 +27,9 @@ export type RegionalSchoolCardData = {
   stations: string[];
   regionalReviewCount: number;
   totalReviewCount: number;
+  /** 学校全体の総合満足度 */
   rating: number | null;
+  defaultOrder: number;
   staffAvg: number | null;
   atmosphereAvg: number | null;
   ratingScopeLabel: string;
@@ -35,7 +37,6 @@ export type RegionalSchoolCardData = {
   admissionBadges: AdmissionBadge[];
   excerpt: CardExcerpt;
   stationFilterIds: string[];
-  reviewFilterKeys: RegionalReviewFilterKey[];
 };
 
 const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
@@ -88,9 +89,7 @@ export default function RegionalSchoolCard({
 
   return (
     <li
-      data-regional-school
-      data-station-filters={school.stationFilterIds.join(' ')}
-      data-review-filters={school.reviewFilterKeys.join(' ')}
+      {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 520px' }}
     >
       <article className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_8px_30px_rgba(22,101,52,0.06)]">
@@ -119,8 +118,11 @@ export default function RegionalSchoolCard({
             <dl className="mt-5 space-y-2 border-t border-emerald-100 pt-4 text-sm">
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-gray-600">総合満足度</dt>
-                <dd className="font-bold text-gray-950">
+                <dd className="text-right font-bold text-gray-950">
                   {school.rating != null ? `★ ${school.rating.toFixed(1)}` : '—'}
+                  <span className="ml-1 text-[11px] font-normal text-gray-500">
+                    （学校全体{school.totalReviewCount}件）
+                  </span>
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
