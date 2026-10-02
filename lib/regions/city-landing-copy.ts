@@ -68,7 +68,7 @@ export function buildCityFaqItems(data: CityLandingData): { question: string; an
     },
     {
       question: `${municipality}に通信制高校のキャンパスはいくつありますか？`,
-      answer: `このページでは、${municipality}内に通えるキャンパス・学習センターがある${counts.totalSchools}校（${counts.campusLocationCount}か所）を掲載しています${stations.length > 0 ? `。${stations.join('・')}周辺に多く集まっています` : ''}。最新の所在地や開校状況は各学校の公式サイトで確認してください。`,
+      answer: `このページでは、${municipality}内に通えるキャンパス・学習センターがある${counts.totalSchools}校（${counts.campusLocationCount}キャンパス）を掲載しています${stations.length > 0 ? `。${stations.join('・')}周辺に多く集まっています` : ''}。最新の所在地や開校状況は各学校の公式サイトで確認してください。`,
     },
     {
       question: `${municipality}に住んでいれば、どの通信制高校にも出願できますか？`,

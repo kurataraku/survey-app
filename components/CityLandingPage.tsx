@@ -338,7 +338,7 @@ function countsText(data: CityLandingData): string {
   const { counts, prefecture } = data;
   const parts = [
     `${counts.totalSchools}校`,
-    `${counts.campusLocationCount}か所`,
+    `${counts.campusLocationCount}キャンパス`,
     data.prefectureReviewCount > 0 ? `${prefecture}内の口コミ${data.prefectureReviewCount}件` : null,
   ].filter((part): part is string => Boolean(part));
   return parts.join(' ／ ');
