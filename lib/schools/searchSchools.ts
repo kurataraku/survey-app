@@ -45,7 +45,8 @@ export interface SearchSchool {
   career_support_avg: number | null;
   campus_life_avg: number | null;
   tuition_avg: number | null;
-  /** support_avg / tuition_avg の算出に使った回答件数（項目は任意回答のため review_count と一致しない） */
+  /** staff_avg / support_avg / tuition_avg の算出に使った回答件数（項目は任意回答のため review_count と一致しない） */
+  staff_rating_count: number;
   support_rating_count: number;
   tuition_rating_count: number;
   /** 学校全体の通学頻度の回答分布。「週5」「週1〜2」「ほぼオンライン/自宅」など */
@@ -310,6 +311,7 @@ export async function fetchSearchSchoolsWithStats(
       career_support_avg: avg(s.careerSupport),
       campus_life_avg: avg(s.campusLife),
       tuition_avg: avg(s.tuition),
+      staff_rating_count: s.staff.length,
       support_rating_count: s.support.length,
       tuition_rating_count: s.tuition.length,
       attendance_frequencies: s.attendance,

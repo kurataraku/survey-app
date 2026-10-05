@@ -18,15 +18,21 @@ import {
 import { buildReasonGroupReviewsPath, REVIEW_REASON_GROUPS } from '@/lib/reviews/reason-groups';
 import type { CityLandingData, CitySchoolRow } from '@/lib/schools/getCityLandingData';
 import { getPrefectureAttendanceFrequencyLinks } from '@/lib/schools/prefecture-landing-attendance';
+import { nationalAverageDiff } from '@/lib/schools/regionalLanding';
+import type { SchoolCardGlobalAverages } from '@/lib/home/getHomeData';
 
 interface CityLandingPageProps {
   data: CityLandingData;
   intro: string;
+  globalAverages: SchoolCardGlobalAverages | null;
 }
 
 const RESULTS_ID = 'city-school-results';
 
-function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
+function toCardData(
+  row: CitySchoolRow,
+  globalAverages: SchoolCardGlobalAverages | null
+): RegionalSchoolCardData | null {
   if (!row.excerpt || row.tier !== 'a') return null;
   return {
     id: row.id,
@@ -39,12 +45,21 @@ function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
     stations: row.stations,
     highlights: row.highlights,
     regionalReviewCount: row.prefectureReviewCount,
+    cityReviewCount: row.cityReviewCount,
     totalReviewCount: row.reviewCount,
     rating: row.overallAvg,
-    defaultOrder: row.defaultOrder,
+    ratingDiff: nationalAverageDiff(
+      row.overallAvg,
+      globalAverages?.overall_satisfaction_avg ?? null,
+      row.reviewCount
+    ),
     staffAvg: row.staffAvg,
-    atmosphereAvg: row.atmosphereAvg,
-    ratingScopeLabel: row.ratingScopeLabel,
+    staffDiff: nationalAverageDiff(
+      row.staffAvg,
+      globalAverages?.staff_rating_avg ?? null,
+      row.staffRatingCount
+    ),
+    defaultOrder: row.defaultOrder,
     tuition: row.tuition,
     admissionBadges: row.admissionBadges,
     excerpt: row.excerpt,
@@ -52,7 +67,10 @@ function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
   };
 }
 
-function toListData(row: CitySchoolRow): RegionalSchoolListRowData {
+function toListData(
+  row: CitySchoolRow,
+  globalAverages: SchoolCardGlobalAverages | null
+): RegionalSchoolListRowData {
   return {
     id: row.id,
     name: row.name,
@@ -65,6 +83,11 @@ function toListData(row: CitySchoolRow): RegionalSchoolListRowData {
     regionalReviewCount: row.prefectureReviewCount,
     totalReviewCount: row.reviewCount,
     rating: row.overallAvg,
+    ratingDiff: nationalAverageDiff(
+      row.overallAvg,
+      globalAverages?.overall_satisfaction_avg ?? null,
+      row.reviewCount
+    ),
     defaultOrder: row.defaultOrder,
     tuition: row.tuition,
     excerpt: row.listExcerpt,
@@ -265,7 +288,7 @@ function AboutNote({ data }: { data: CityLandingData }) {
   );
 }
 
-export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
+export default function CityLandingPage({ data, intro, globalAverages }: CityLandingPageProps) {
   const { municipality, prefecture } = data;
   const prefecturePath = appPath(getPrefecturePath(prefecture));
   const faqItems = buildCityFaqItems(data);
@@ -324,11 +347,12 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               {prefecture}内のキャンパスに通った人の口コミがある学校は、その声を大きく紹介しています。口コミがまだない学校も含め、
               {municipality}内に通えるキャンパスがある学校をすべて掲載しています。
+              満足度は学校全体の口コミの平均で、全国平均（当サイトに寄せられた全国の口コミの平均）との差も表示しています。
             </p>
           </div>
           <ul className="space-y-5" data-regional-list>
             {data.rows.map((row) => {
-              const card = toCardData(row);
+              const card = toCardData(row, globalAverages);
               return card ? (
                 <RegionalSchoolCard
                   key={row.id}
@@ -339,7 +363,7 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
               ) : (
                 <RegionalSchoolListRow
                   key={row.id}
-                  school={toListData(row)}
+                  school={toListData(row, globalAverages)}
                   prefecture={prefecture}
                   municipality={municipality}
                 />

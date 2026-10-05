@@ -64,9 +64,9 @@ export type CitySchoolRow = {
   /** 管理画面の特徴・推しポイント（場所に関する項目を除いて最大3件） */
   highlights: string[];
   regionalOverallAvg: number | null;
+  /** 学校全体の先生・職員の対応の満足度と回答件数 */
   staffAvg: number | null;
-  atmosphereAvg: number | null;
-  ratingScopeLabel: string;
+  staffRatingCount: number;
   /** 公開済みの初年度納入金の目安。金額が公開されていない学校は null */
   tuition: ReturnType<typeof buildTuitionTableCell>;
   admissionBadges: AdmissionBadge[];
@@ -171,16 +171,8 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
     attendanceFrequencies: school.attendance_frequencies,
     highlights: selectRegionalHighlights(school.highlights),
     regionalOverallAvg: regional?.overallAvg ?? null,
-    staffAvg:
-      (regional?.reviewCount ?? 0) >= 3 ? regional?.staffAvg ?? null : school.staff_avg,
-    atmosphereAvg:
-      (regional?.reviewCount ?? 0) >= 3
-        ? regional?.atmosphereAvg ?? null
-        : school.atmosphere_avg,
-    ratingScopeLabel:
-      (regional?.reviewCount ?? 0) >= 3
-        ? `${config.prefecture}内${regional?.reviewCount ?? 0}件`
-        : '学校全体',
+    staffAvg: school.staff_avg,
+    staffRatingCount: school.staff_rating_count,
     tuition: buildTuitionTableCell(school.tuition_estimate),
     admissionBadges: buildAdmissionBadges(school.admission_profile, config.prefecture),
     tier: school.review_count > 0 ? 'b' : 'c',

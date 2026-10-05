@@ -96,6 +96,25 @@ export function formatRegionalLocation(
   return wardLabel || stationLabel || fallback;
 }
 
+export const NATIONAL_DIFF_MIN_ANSWERS = 3;
+
+/**
+ * 全国平均との差（小数1桁）。表示と同じく小数1桁に丸めた値どうしで引き、同じ点数の学校は同じ差になるようにする。
+ * 回答が少ない学校は差が偶然に左右されるため null
+ */
+export function nationalAverageDiff(
+  value: number | null,
+  nationalAverage: number | null,
+  answerCount: number
+): number | null {
+  if (value == null || nationalAverage == null || answerCount < NATIONAL_DIFF_MIN_ANSWERS) {
+    return null;
+  }
+  const tenths = (v: number) => Math.round(Number(v.toFixed(1)) * 10);
+  const diffTenths = tenths(value) - tenths(nationalAverage);
+  return diffTenths === 0 ? 0 : diffTenths / 10;
+}
+
 /** Finder が絞り込み・並び替えに使う属性。行データを Client Component へ渡さずに済ませる */
 export function regionalSchoolDataAttributes(
   school: RegionalSortableSchool & {

@@ -30,6 +30,7 @@ function searchSchoolFallback(
     career_support_avg: null,
     campus_life_avg: null,
     tuition_avg: null,
+    staff_rating_count: 0,
     support_rating_count: 0,
     tuition_rating_count: 0,
     attendance_frequencies: {},

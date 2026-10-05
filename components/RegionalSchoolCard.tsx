@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import AdmissionBadgeList from '@/components/AdmissionBadgeList';
+import NationalAverageDiff from '@/components/NationalAverageDiff';
 import SchoolHighlightList from '@/components/SchoolHighlightList';
 import { appPath } from '@/lib/base-path';
 import { getReviewReasonGroup, type ReviewReasonGroupKey } from '@/lib/reviews/reason-groups';
@@ -30,13 +31,14 @@ export type RegionalSchoolCardData = {
   stations: string[];
   highlights: string[];
   regionalReviewCount: number;
+  cityReviewCount: number;
   totalReviewCount: number;
-  /** 学校全体の総合満足度 */
+  /** 学校全体の総合満足度・先生・職員の対応の満足度と、全国平均との差 */
   rating: number | null;
-  defaultOrder: number;
+  ratingDiff: number | null;
   staffAvg: number | null;
-  atmosphereAvg: number | null;
-  ratingScopeLabel: string;
+  staffDiff: number | null;
+  defaultOrder: number;
   tuition: ReturnType<typeof buildTuitionTableCell>;
   admissionBadges: AdmissionBadge[];
   excerpt: CardExcerpt;
@@ -58,7 +60,7 @@ function shortEnrollment(value: string | null | undefined): string | null {
 }
 
 function formatRating(value: number | null): string {
-  return value == null ? '—' : value.toFixed(1);
+  return value == null ? '—' : `★ ${value.toFixed(1)}`;
 }
 
 export default function RegionalSchoolCard({
@@ -124,19 +126,15 @@ export default function RegionalSchoolCard({
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-gray-600">総合満足度</dt>
                 <dd className="text-right font-bold text-gray-950">
-                  {school.rating != null ? `★ ${school.rating.toFixed(1)}` : '—'}
-                  <span className="ml-1 text-[11px] font-normal text-gray-500">
-                    （学校全体{school.totalReviewCount}件）
-                  </span>
+                  {formatRating(school.rating)}
+                  <NationalAverageDiff diff={school.ratingDiff} className="ml-2" />
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-gray-600">先生・雰囲気</dt>
+                <dt className="text-gray-600">先生・職員の対応</dt>
                 <dd className="text-right font-semibold text-gray-900">
-                  {formatRating(school.staffAvg)}・{formatRating(school.atmosphereAvg)}
-                  <span className="ml-1 text-[11px] font-normal text-gray-500">
-                    （{school.ratingScopeLabel}）
-                  </span>
+                  {formatRating(school.staffAvg)}
+                  <NationalAverageDiff diff={school.staffDiff} className="ml-2" />
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
@@ -156,8 +154,8 @@ export default function RegionalSchoolCard({
           <div className="mt-6 border-t border-blue-100 pt-5 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
             <p className="text-xs font-bold tracking-wide text-blue-800">
               {excerpt.isCityCampus && municipality
-                ? `${municipality}のキャンパスに通った人の声`
-                : `${prefecture}内のキャンパスに通った人の声`}
+                ? `${municipality}のキャンパスに通った人の声（${school.cityReviewCount}件）`
+                : `${prefecture}内のキャンパスに通った人の声（${school.regionalReviewCount}件）`}
             </p>
             {excerpt.good && (
               <blockquote className="relative mt-3 rounded-r-xl border-l-4 border-blue-300 bg-blue-50/70 py-4 pl-5 pr-4">

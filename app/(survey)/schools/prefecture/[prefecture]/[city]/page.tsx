@@ -16,6 +16,7 @@ import {
   getCityLandingTitle,
 } from '@/lib/regions/city-landing-copy';
 import { getCityLandingData } from '@/lib/schools/getCityLandingData';
+import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 
 export const revalidate = 3600;
 
@@ -59,13 +60,20 @@ export default async function CityLandingRoute({ params }: PageProps) {
   const config = await resolveConfig(params);
   if (!config) notFound();
 
-  const data = await getCityLandingData(config);
+  const [data, globalAverages] = await Promise.all([
+    getCityLandingData(config),
+    getCachedGlobalAverages(),
+  ]);
   if (data.rows.length === 0) notFound();
 
   return (
     <>
       <StructuredData data={buildCityLandingJsonLd(data)} />
-      <CityLandingPage data={data} intro={buildCityLandingIntro(data)} />
+      <CityLandingPage
+        data={data}
+        intro={buildCityLandingIntro(data)}
+        globalAverages={globalAverages}
+      />
     </>
   );
 }

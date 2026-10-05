@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import NationalAverageDiff from '@/components/NationalAverageDiff';
 import SchoolHighlightList from '@/components/SchoolHighlightList';
 import { appPath } from '@/lib/base-path';
 import {
@@ -20,8 +21,9 @@ export type RegionalSchoolListRowData = {
   highlights: string[];
   regionalReviewCount: number;
   totalReviewCount: number;
-  /** 学校全体の総合満足度 */
+  /** 学校全体の総合満足度と、全国平均との差 */
   rating: number | null;
+  ratingDiff: number | null;
   defaultOrder: number;
   tuition: ReturnType<typeof buildTuitionTableCell>;
   excerpt: string | null;
@@ -104,6 +106,7 @@ export default function RegionalSchoolListRow({
                 {school.regionalReviewCount > 0
                   ? `（うち${prefecture}内${school.regionalReviewCount}件）`
                   : ''}
+                <NationalAverageDiff diff={school.ratingDiff} className="ml-2" />
               </p>
               {school.slug && (
                 <Link

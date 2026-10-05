@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   compareRegionalSchools,
   matchesRegionalSchoolFilters,
+  nationalAverageDiff,
   type RegionalSortableSchool,
   type RegionalSortKey,
 } from '@/lib/schools/regionalLanding';
@@ -58,5 +59,24 @@ describe('regional landing finder', () => {
   it('口コミ件数順は件数のみで並べ、同数は学校名順', () => {
     expect(order('reviews-desc')).toEqual(['A校', 'B校', 'F校', 'C校', 'D校', 'E校']);
     expect(order('reviews-asc')).toEqual(['E校', 'C校', 'D校', 'F校', 'B校', 'A校']);
+  });
+});
+
+describe('nationalAverageDiff', () => {
+  it('表示と同じく小数1桁に丸めた値どうしで差をとる', () => {
+    expect(nationalAverageDiff(4.26, 3.97, 10)).toBe(0.3);
+    expect(nationalAverageDiff(3.71, 3.97, 10)).toBe(-0.3);
+    expect(nationalAverageDiff(4.26, 4.14, 10)).toBe(0.2);
+    expect(nationalAverageDiff(4.34, 4.14, 10)).toBe(0.2);
+  });
+
+  it('丸めて0になる差は0（-0にしない）', () => {
+    expect(Object.is(nationalAverageDiff(3.95, 3.97, 10), 0)).toBe(true);
+  });
+
+  it('回答が3件未満、または値か全国平均がない場合は出さない', () => {
+    expect(nationalAverageDiff(4.5, 3.97, 2)).toBeNull();
+    expect(nationalAverageDiff(null, 3.97, 10)).toBeNull();
+    expect(nationalAverageDiff(4.5, null, 10)).toBeNull();
   });
 });
