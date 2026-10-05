@@ -6,6 +6,7 @@
  *   npm run referral:send-requests -- --test-to=you@example.com     # 自分宛てにテスト送信（1通）
  *   npm run referral:send-requests -- --limit=50 --sleep-ms=600     # 先行配信
  *   npm run referral:send-requests -- --sleep-ms=600                # 残り全件
+ *   npm run referral:send-requests -- --only=someone@example.com    # 対象者のうち1人にだけ本番どおり送る
  *   --site-url=https://...  メール内のURLのドメイン（既定: https://careeressence.jp）
  *
  * 対象: moderation_status='approved'、メールあり、is_duplicate_email=false の回答者（メールで重複排除）
@@ -45,7 +46,9 @@ function parseArgs() {
   };
   const testTo = argv.find((x) => x.startsWith('--test-to='))?.split('=')[1]?.trim() || null;
   const siteUrl = argv.find((x) => x.startsWith('--site-url='))?.slice('--site-url='.length).trim();
+  const only = argv.find((x) => x.startsWith('--only='))?.slice('--only='.length).trim() || null;
   return {
+    only,
     // .env.local の NEXT_PUBLIC_SITE_URL は開発用（localhost）のことが多いため、メール内のURLは既定で本番にする
     siteUrl: (siteUrl || 'https://careeressence.jp').replace(/\/$/, ''),
     dryRun: argv.includes('--dry-run'),
@@ -165,7 +168,11 @@ async function main() {
   }
 
   const { uniqueEmails, unsubscribedCount, alreadySentCount, targets } = await loadTargets(supabase, normalizeEmail);
-  const selected = args.limit != null ? targets.slice(0, args.limit) : targets;
+  const pool = args.only ? targets.filter((t) => normalizeEmail(t.email) === normalizeEmail(args.only!)) : targets;
+  if (args.only && pool.length === 0) {
+    return fail(`${args.only} は配信対象にいません（未承認・重複のみ・配信停止済み・送信済みのいずれか）`);
+  }
+  const selected = args.limit != null ? pool.slice(0, args.limit) : pool;
 
   console.log('紹介依頼メール 配信対象');
   console.log('================================');
