@@ -2,7 +2,7 @@ import type { SchoolInstitutionType } from '@/lib/types/schools';
 
 export type RegionalSchoolTier = 'a' | 'b' | 'c';
 
-export const CITY_REGIONAL_CARD_LIMIT = 12;
+export const CITY_REGIONAL_CARD_LIMIT = 20;
 export const CITY_FINDER_STATION_LIMIT = 6;
 export const OTHER_STATION_FILTER_ID = 'station-other';
 

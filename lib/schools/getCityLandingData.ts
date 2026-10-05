@@ -288,6 +288,8 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     })),
     prefecture: config.prefecture,
     municipality: config.municipality,
+    // カードにするかは一覧の並び順で決めるため、抜粋は候補校すべてについて選んでおく
+    limit: rowsWithStations.length,
   });
   const excerptBySchool = new Map(reviewExcerpts.map((excerpt) => [excerpt.schoolId, excerpt]));
   const featuredIds = new Set(
