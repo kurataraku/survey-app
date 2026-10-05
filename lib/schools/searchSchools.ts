@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
 import { getNormalizedSchoolSearchTerms } from '@/lib/utils';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
@@ -116,15 +117,19 @@ export async function fetchSearchSchoolsWithStats(
 
   const schoolIds = schoolsList.map((s) => s.id);
 
-  const [statsResult, tendencyResult, tuitionEstimates, courseListings, admissionProfiles] =
+  const [statsRows, tendencyResult, tuitionEstimates, courseListings, admissionProfiles] =
     await Promise.all([
-    supabase
-      .from('survey_responses')
-      .select(
-        'school_id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, answers'
-      )
-      .in('school_id', schoolIds)
-      .eq('is_public', true),
+    fetchAllRows((from, to) =>
+      supabase
+        .from('survey_responses')
+        .select(
+          'school_id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, answers'
+        )
+        .in('school_id', schoolIds)
+        .eq('is_public', true)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
     supabase
       .from('school_ai_summaries')
       .select('school_id, summary_text')
@@ -177,66 +182,64 @@ export async function fetchSearchSchoolsWithStats(
     })
   );
 
-  if (statsResult.data) {
-    for (const r of statsResult.data) {
-      const s = schoolStats.get(r.school_id);
-      if (!s) continue;
-      s.count++;
-      const ov = parseRating(r.overall_satisfaction);
-      if (ov !== null) s.overall.push(ov);
+  for (const r of statsRows) {
+    const s = schoolStats.get(r.school_id);
+    if (!s) continue;
+    s.count++;
+    const ov = parseRating(r.overall_satisfaction);
+    if (ov !== null) s.overall.push(ov);
 
-      if (r.good_comment?.trim()) {
-        if (!s.latestGoodComment || r.created_at > s.latestGoodComment.ts) {
-          s.latestGoodComment = { text: r.good_comment.trim(), ts: r.created_at };
-        }
+    if (r.good_comment?.trim()) {
+      if (!s.latestGoodComment || r.created_at > s.latestGoodComment.ts) {
+        s.latestGoodComment = { text: r.good_comment.trim(), ts: r.created_at };
       }
-      if (r.bad_comment?.trim()) {
-        if (!s.latestBadComment || r.created_at > s.latestBadComment.ts) {
-          s.latestBadComment = { text: r.bad_comment.trim(), ts: r.created_at };
-        }
+    }
+    if (r.bad_comment?.trim()) {
+      if (!s.latestBadComment || r.created_at > s.latestBadComment.ts) {
+        s.latestBadComment = { text: r.bad_comment.trim(), ts: r.created_at };
       }
-      const good = r.good_comment?.trim() || null;
-      const bad = r.bad_comment?.trim() || null;
-      if (good || bad) {
-        s.latestReviewExcerpts.push({ good, bad, ts: r.created_at });
-      }
+    }
+    const good = r.good_comment?.trim() || null;
+    const bad = r.bad_comment?.trim() || null;
+    if (good || bad) {
+      s.latestReviewExcerpts.push({ good, bad, ts: r.created_at });
+    }
 
-      if (r.answers) {
-        try {
-          const ans = typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers;
-          const fr = parseRating(ans.flexibility_rating);
-          if (fr !== null) s.flexibility.push(fr);
-          const sr = parseRating(ans.staff_rating);
-          if (sr !== null) s.staff.push(sr);
-          const spr = parseRating(ans.support_rating);
-          if (spr !== null) s.support.push(spr);
-          const ar = parseRating(ans.atmosphere_fit_rating);
-          if (ar !== null) s.atmosphere.push(ar);
-          const cr = parseRating(ans.credit_rating);
-          if (cr !== null) s.credit.push(cr);
-          const ur = parseRating(ans.unique_course_rating);
-          if (ur !== null) s.uniqueCourse.push(ur);
-          const car = parseRating(ans.career_support_rating);
-          if (car !== null) s.careerSupport.push(car);
-          const clr = parseRating(ans.campus_life_rating);
-          if (clr !== null) s.campusLife.push(clr);
-          const tr = parseRating(ans.tuition_rating);
-          if (tr !== null) s.tuition.push(tr);
-          const frequency =
-            typeof ans.attendance_frequency === 'string' ? ans.attendance_frequency.trim() : '';
-          if (frequency) s.attendance[frequency] = (s.attendance[frequency] ?? 0) + 1;
+    if (r.answers) {
+      try {
+        const ans = typeof r.answers === 'string' ? JSON.parse(r.answers) : r.answers;
+        const fr = parseRating(ans.flexibility_rating);
+        if (fr !== null) s.flexibility.push(fr);
+        const sr = parseRating(ans.staff_rating);
+        if (sr !== null) s.staff.push(sr);
+        const spr = parseRating(ans.support_rating);
+        if (spr !== null) s.support.push(spr);
+        const ar = parseRating(ans.atmosphere_fit_rating);
+        if (ar !== null) s.atmosphere.push(ar);
+        const cr = parseRating(ans.credit_rating);
+        if (cr !== null) s.credit.push(cr);
+        const ur = parseRating(ans.unique_course_rating);
+        if (ur !== null) s.uniqueCourse.push(ur);
+        const car = parseRating(ans.career_support_rating);
+        if (car !== null) s.careerSupport.push(car);
+        const clr = parseRating(ans.campus_life_rating);
+        if (clr !== null) s.campusLife.push(clr);
+        const tr = parseRating(ans.tuition_rating);
+        if (tr !== null) s.tuition.push(tr);
+        const frequency =
+          typeof ans.attendance_frequency === 'string' ? ans.attendance_frequency.trim() : '';
+        if (frequency) s.attendance[frequency] = (s.attendance[frequency] ?? 0) + 1;
 
-          addRegionalReview(
-            regionalReviews,
-            r.school_id,
-            ans,
-            ov,
-            parseRating,
-            r.respondent_role
-          );
-        } catch {
-          // ignore malformed answers
-        }
+        addRegionalReview(
+          regionalReviews,
+          r.school_id,
+          ans,
+          ov,
+          parseRating,
+          r.respondent_role
+        );
+      } catch {
+        // ignore malformed answers
       }
     }
   }

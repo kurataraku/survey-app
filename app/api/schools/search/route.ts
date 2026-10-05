@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getNormalizedSchoolSearchTerms } from '@/lib/utils';
 import { DEFAULT_SCHOOL_LIST_SORT } from '@/lib/schools/school-search-constants';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export async function GET(request: NextRequest) {
   try {
@@ -168,13 +169,18 @@ export async function GET(request: NextRequest) {
     const schoolIds = schoolsList.map(s => s.id);
     
     // 口コミ数と平均評価を一括で取得
-    const { data: statsData, error: statsError } = await supabase
-      .from('survey_responses')
-      .select('school_id, overall_satisfaction')
-      .in('school_id', schoolIds)
-      .eq('is_public', true);
-
-    if (statsError) {
+    let statsData: Array<{ school_id: string; overall_satisfaction: number | null }> | null = null;
+    try {
+      statsData = await fetchAllRows((from, to) =>
+        supabase
+          .from('survey_responses')
+          .select('school_id, overall_satisfaction')
+          .in('school_id', schoolIds)
+          .eq('is_public', true)
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
+    } catch (statsError) {
       console.error('[API] /api/schools/search - 統計情報取得エラー:', statsError);
     }
 
