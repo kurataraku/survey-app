@@ -4,6 +4,7 @@ import {
   publicSurveyResponsesOrFilter,
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export async function GET(request: NextRequest) {
   try {
@@ -147,8 +148,17 @@ export async function GET(request: NextRequest) {
 
     // レビュー一覧を取得（フィルタ適用前、全件取得してアプリ側でフィルタリング）
     // 理由: JSONB配列の複雑なフィルタリング（reason_for_choosing）を確実に処理するため
-    const { data: allReviewsData, error: allReviewsError } = await reviewsQuery
-      .order(orderColumn, { ascending: orderAscending });
+    const orderedReviewsQuery = reviewsQuery
+      .order(orderColumn, { ascending: orderAscending })
+      .order('id', { ascending: true });
+    let allReviewsData: Awaited<typeof orderedReviewsQuery>['data'] = null;
+    let allReviewsError: unknown = null;
+    try {
+      // range は同じビルダーの offset/limit を上書きするため、ページごとに呼び直してよい
+      allReviewsData = await fetchAllRows((from, to) => orderedReviewsQuery.range(from, to));
+    } catch (error) {
+      allReviewsError = error;
+    }
 
     if (allReviewsError) {
       console.error('レビュー取得エラー:', allReviewsError);

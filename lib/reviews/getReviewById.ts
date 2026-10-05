@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import type { NextRequest } from 'next/server';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export interface ReviewData {
   id: string;
@@ -203,10 +204,15 @@ export const getReviewById = cache(
 
     if (review.school_name) {
       try {
-        const { data: allReviews } = await supabase
-          .from('survey_responses')
-          .select('overall_satisfaction, answers')
-          .eq('school_name', review.school_name);
+        const reviewSchoolName = review.school_name;
+        const allReviews = await fetchAllRows((from, to) =>
+          supabase
+            .from('survey_responses')
+            .select('overall_satisfaction, answers')
+            .eq('school_name', reviewSchoolName)
+            .order('id', { ascending: true })
+            .range(from, to)
+        );
 
         if (allReviews) {
           outlierCounts.overall = allReviews.filter(

@@ -4,6 +4,7 @@ import {
   publicSurveyResponsesOrFilter,
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export interface ReviewListItem {
   id: string;
@@ -28,9 +29,6 @@ export interface GetReviewsResult {
   limit: number;
   schoolName: string;
 }
-
-/** PostgREST が1リクエストで返す行数の上限。到達すると件数・ページ数が不足するため検知する */
-const SCAN_ROW_LIMIT = 1000;
 
 type ScanRow = {
   id: string;
@@ -167,19 +165,21 @@ export const getReviewsBySchoolSlug = cache(
       orderAscending = true;
     }
 
-    const listQuery = attachOptionalFilters(
-      supabase
-        .from('survey_responses')
-        .select(scanSelect)
-        .eq('is_public', true)
-        .or(publicSurveyResponsesOrFilter(schoolId, schoolName))
-    );
-
-    const { data: rawData, error: listErr } = await listQuery.order(orderColumn, {
-      ascending: orderAscending,
-    });
-
-    if (listErr) {
+    let rawRows: ScanRow[];
+    try {
+      rawRows = await fetchAllRows<ScanRow>((from, to) =>
+        attachOptionalFilters(
+          supabase
+            .from('survey_responses')
+            .select(scanSelect)
+            .eq('is_public', true)
+            .or(publicSurveyResponsesOrFilter(schoolId, schoolName))
+        )
+          .order(orderColumn, { ascending: orderAscending })
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
+    } catch (listErr) {
       console.error('レビュー取得エラー:', listErr);
       return {
         reviews: [],
@@ -190,14 +190,6 @@ export const getReviewsBySchoolSlug = cache(
         limit,
         schoolName,
       };
-    }
-
-    const rawRows = (rawData ?? []) as ScanRow[];
-
-    if (rawRows.length >= SCAN_ROW_LIMIT) {
-      console.error(
-        `[getReviewsBySchoolSlug] 走査行数が上限(${SCAN_ROW_LIMIT})に達しました。total とページ数が実際より少なくなります`
-      );
     }
 
     const hubFiltered = rawRows.filter((r) =>

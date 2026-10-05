@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 /**
  * 公開口コミのID一覧を取得（generateStaticParams用）
@@ -14,20 +15,25 @@ export const getReviewIds = cache(async (): Promise<{ id: string }[]> => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const { data, error } = await supabase
-    .from('survey_responses')
-    .select('id, school_id, schools!inner(status, is_public)')
-    .eq('is_public', true)
-    .not('school_id', 'is', null)
-    .eq('schools.status', 'active')
-    .eq('schools.is_public', true);
-
-  if (error) {
+  let data: Array<{ id: string }>;
+  try {
+    data = await fetchAllRows((from, to) =>
+      supabase
+        .from('survey_responses')
+        .select('id, school_id, schools!inner(status, is_public)')
+        .eq('is_public', true)
+        .not('school_id', 'is', null)
+        .eq('schools.status', 'active')
+        .eq('schools.is_public', true)
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
+  } catch (error) {
     console.error('[getReviewIds]', error);
     return [];
   }
 
-  return (data || [])
+  return data
     .filter((row) => !!row?.id)
     .map((row) => ({ id: row.id as string }));
 });

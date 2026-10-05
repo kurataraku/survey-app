@@ -1,4 +1,5 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
@@ -84,13 +85,19 @@ export async function getRelatedSchools({
   if (scoredSchools.length === 0) return [];
 
   const candidateIds = scoredSchools.map(({ school }) => school.id);
-  const { data: reviewsData, error: reviewsError } = await supabase
-    .from('survey_responses')
-    .select('school_id, overall_satisfaction, answers')
-    .in('school_id', candidateIds)
-    .eq('is_public', true);
-
-  if (reviewsError) {
+  let reviewsData: Array<{ school_id: string; overall_satisfaction: unknown; answers: unknown }> =
+    [];
+  try {
+    reviewsData = await fetchAllRows((from, to) =>
+      supabase
+        .from('survey_responses')
+        .select('school_id, overall_satisfaction, answers')
+        .in('school_id', candidateIds)
+        .eq('is_public', true)
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
+  } catch (reviewsError) {
     console.error('[getRelatedSchools] survey_responses:', reviewsError);
   }
 
@@ -108,7 +115,7 @@ export async function getRelatedSchools({
     stats.set(id, { count: 0, overall: [], tuition: [], support: [], flexibility: [] })
   );
 
-  for (const review of reviewsData ?? []) {
+  for (const review of reviewsData) {
     const entry = stats.get(review.school_id);
     if (!entry) continue;
     entry.count++;

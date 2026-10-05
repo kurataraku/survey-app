@@ -244,11 +244,18 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
         .is('topic', null)
         .eq('status', 'published')
         .maybeSingle(),
-      supabase
-        .from('survey_responses')
-        .select(reviewSelect)
-        .eq('is_public', true)
-        .or(publicSurveyResponsesOrFilter(school.id, school.name)),
+      fetchAllRows((from, to) =>
+        supabase
+          .from('survey_responses')
+          .select(reviewSelect)
+          .eq('is_public', true)
+          .or(publicSurveyResponsesOrFilter(school.id, school.name))
+          .order('id', { ascending: true })
+          .range(from, to)
+      ).then(
+        (data) => ({ data, error: null }),
+        (error: unknown) => ({ data: null, error })
+      ),
       getCachedGlobalAverages(),
       fetchPublicTuitionEstimates(supabase, [school.id]),
       fetchPublicCourseListings(supabase, [school.id]),

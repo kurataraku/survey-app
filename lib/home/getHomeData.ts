@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { getSearchSchoolsByIds } from '@/lib/schools/searchSchools';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 
 /** トップの「総合満足度が高い学校」に載せる最低口コミ件数 */
@@ -139,15 +140,22 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
 
     const schoolIds = allSchools.map((s) => s.id);
 
-    const [reviewsStatsResult, reviewsDataResult] = await Promise.all([
+    const [allReviewsStats, reviewsDataResult] = await Promise.all([
       schoolIds.length > 0
-        ? supabase
-            .from('survey_responses')
-            .select('school_id, overall_satisfaction')
-            .in('school_id', schoolIds)
-            .eq('is_public', true)
-            .not('school_id', 'is', null)
-        : Promise.resolve({ data: [] as unknown[], error: null }),
+        ? fetchAllRows<{ school_id?: string; overall_satisfaction?: number }>((from, to) =>
+            supabase
+              .from('survey_responses')
+              .select('school_id, overall_satisfaction')
+              .in('school_id', schoolIds)
+              .eq('is_public', true)
+              .not('school_id', 'is', null)
+              .order('id', { ascending: true })
+              .range(from, to)
+          ).catch((error) => {
+            console.error('[getHomeData] survey_responses:', error);
+            return [];
+          })
+        : Promise.resolve([]),
       supabase
         .from('survey_responses')
         .select(
@@ -158,10 +166,6 @@ export const getHomeData = cache(async (): Promise<HomeData> => {
         .limit(20),
     ]);
 
-    const allReviewsStats = (reviewsStatsResult.data || []) as Array<{
-      school_id?: string;
-      overall_satisfaction?: number;
-    }>;
     const allReviewsData = (reviewsDataResult.data || []) as Array<Record<string, unknown>>;
 
     const statsMap = new Map<

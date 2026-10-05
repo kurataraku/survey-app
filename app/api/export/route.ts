@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getExportCsvFormatGuideRowLine } from '@/lib/csv-import';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,15 +22,23 @@ export async function GET(request: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // データを取得
-    const { data, error } = await supabase
-      .from('survey_responses')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    const fetchPage = (from: number, to: number) =>
+      supabase
+        .from('survey_responses')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to);
+    let data: NonNullable<Awaited<ReturnType<typeof fetchPage>>['data']>;
+    try {
+      data = await fetchAllRows(fetchPage);
+    } catch (error) {
       console.error('Supabase取得エラー:', error);
       return NextResponse.json(
-        { error: 'データの取得に失敗しました', details: error.message },
+        {
+          error: 'データの取得に失敗しました',
+          details: error instanceof Error ? error.message : (error as { message?: string })?.message,
+        },
         { status: 500 }
       );
     }

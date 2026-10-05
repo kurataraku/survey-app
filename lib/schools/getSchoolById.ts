@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 
 export interface SchoolById {
@@ -93,20 +94,23 @@ export const getSchoolById = cache(async (id: string): Promise<SchoolById | null
     return null;
   }
 
-  const { data: byId } = await supabase
-    .from('survey_responses')
-    .select('id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers')
-    .eq('school_id', id)
-    .eq('is_public', true);
+  const fetchPublicReviews = (column: 'school_id' | 'school_name', value: string) =>
+    fetchAllRows((from, to) =>
+      supabase
+        .from('survey_responses')
+        .select('id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers')
+        .eq(column, value)
+        .eq('is_public', true)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ).catch((error) => {
+      console.error('[getSchoolById] survey_responses:', error);
+      return [];
+    });
 
-  let reviews = byId ?? [];
+  let reviews = await fetchPublicReviews('school_id', id);
   if (reviews.length === 0 && school.name) {
-    const { data: byName } = await supabase
-      .from('survey_responses')
-      .select('id, overall_satisfaction, good_comment, bad_comment, created_at, respondent_role, status, graduation_path, answers')
-      .eq('school_name', school.name)
-      .eq('is_public', true);
-    reviews = byName ?? [];
+    reviews = await fetchPublicReviews('school_name', school.name);
   }
 
   const reviewList = reviews;

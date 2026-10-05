@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { getReviewReasonsForGroup } from '@/lib/reviews/reason-groups';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export interface ReviewListItem {
   id: string;
@@ -38,9 +39,6 @@ export interface GetReviewsListResult {
   totalPages: number;
   limit: number;
 }
-
-/** PostgREST が1リクエストで返す行数の上限。到達すると件数・ページ数が不足するため検知する */
-const SCAN_ROW_LIMIT = 1000;
 
 type ScanRow = {
   id: string;
@@ -86,34 +84,36 @@ export const getReviewsList = cache(async (
   // answers は絞り込みにしか使わないため、絞り込み指定がなければ取得しない
   const needsAnswers = Boolean(prefecture) || reasonFilters.length > 0;
 
-  let queryBuilder = supabase
-    .from('survey_responses')
-    .select(`id, schools(status)${needsAnswers ? ', answers' : ''}`)
-    .eq('is_public', true)
-    .not('school_id', 'is', null)
-    .order(orderColumn, { ascending: orderAscending });
+  const buildScanQuery = (from: number, to: number) => {
+    let queryBuilder = supabase
+      .from('survey_responses')
+      .select(`id, schools(status)${needsAnswers ? ', answers' : ''}`)
+      .eq('is_public', true)
+      .not('school_id', 'is', null);
 
-  if (attendanceFrequency) queryBuilder = queryBuilder.eq('attendance_frequency', attendanceFrequency);
-  if (overallRating)    queryBuilder = queryBuilder.eq('overall_satisfaction', overallRating);
-  if (staffRating)      queryBuilder = queryBuilder.eq('staff_rating', staffRating);
-  if (atmosphereRating) queryBuilder = queryBuilder.eq('atmosphere_fit_rating', atmosphereRating);
-  if (creditRating)     queryBuilder = queryBuilder.eq('credit_rating', creditRating);
-  if (tuitionRating)    queryBuilder = queryBuilder.eq('tuition_rating', tuitionRating);
+    if (attendanceFrequency) queryBuilder = queryBuilder.eq('attendance_frequency', attendanceFrequency);
+    if (overallRating)    queryBuilder = queryBuilder.eq('overall_satisfaction', overallRating);
+    if (staffRating)      queryBuilder = queryBuilder.eq('staff_rating', staffRating);
+    if (atmosphereRating) queryBuilder = queryBuilder.eq('atmosphere_fit_rating', atmosphereRating);
+    if (creditRating)     queryBuilder = queryBuilder.eq('credit_rating', creditRating);
+    if (tuitionRating)    queryBuilder = queryBuilder.eq('tuition_rating', tuitionRating);
 
-  const { data: allReviewsData, error } = await queryBuilder.returns<ScanRow[]>();
+    return queryBuilder
+      .order(orderColumn, { ascending: orderAscending })
+      .order('id', { ascending: true })
+      .range(from, to)
+      .returns<ScanRow[]>();
+  };
 
-  if (error) {
+  let allReviewsData: ScanRow[];
+  try {
+    allReviewsData = await fetchAllRows(buildScanQuery);
+  } catch (error) {
     console.error('[getReviewsList]', error);
     return { reviews: [], total: 0, page, totalPages: 0, limit };
   }
 
-  if ((allReviewsData?.length ?? 0) >= SCAN_ROW_LIMIT) {
-    console.error(
-      `[getReviewsList] 走査行数が上限(${SCAN_ROW_LIMIT})に達しました。total とページ数が実際より少なくなります`
-    );
-  }
-
-  const filtered = (allReviewsData || []).filter((r) => {
+  const filtered = allReviewsData.filter((r) => {
     const school = Array.isArray(r.schools) ? r.schools[0] : r.schools;
     if (!school || school.status !== 'active') return false;
 

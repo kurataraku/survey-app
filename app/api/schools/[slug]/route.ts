@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 
 export async function GET(
   request: NextRequest,
@@ -113,11 +114,26 @@ export async function GET(
       .select('*', { count: 'exact', head: true })
       .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
 
-    // 評価の平均値を計算（school_idでフィルタリング、pending状態の学校の口コミを除外）
-    const { data: reviews } = await supabase
-      .from('survey_responses')
-      .select('overall_satisfaction, answers')
-      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
+    // school_idでフィルタリング（pending状態の学校の口コミを除外）
+    const fetchSchoolReviews = <T,>(columns: string) =>
+      fetchAllRows<T>((from, to) =>
+        supabase
+          .from('survey_responses')
+          .select(columns)
+          .eq('school_id', school.id)
+          .order('id', { ascending: true })
+          .range(from, to)
+          .returns<T[]>()
+      ).catch((error) => {
+        console.error('[API] /api/schools/[slug] survey_responses:', error);
+        return [] as T[];
+      });
+
+    // 評価の平均値を計算
+    const reviews = await fetchSchoolReviews<{
+      overall_satisfaction: number | null;
+      answers: Record<string, unknown> | null;
+    }>('overall_satisfaction, answers');
 
     // overall_satisfactionの平均と外れ値件数を計算
     const overallValues = reviews?.map(r => r.overall_satisfaction) || [];
@@ -197,10 +213,12 @@ export async function GET(
     const globalAverages = await getCachedGlobalAverages();
 
     // 統計情報を取得するために全口コミを取得（この学校のみ、school_idでフィルタリング）
-    const { data: allReviewsForStats } = await supabase
-      .from('survey_responses')
-      .select('respondent_role, status, graduation_path, answers')
-      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
+    const allReviewsForStats = await fetchSchoolReviews<{
+      respondent_role: string | null;
+      status: string | null;
+      graduation_path: string | null;
+      answers: Record<string, unknown> | null;
+    }>('respondent_role, status, graduation_path, answers');
 
     // 基本情報の統計
     const respondentRoleStats = {
@@ -236,7 +254,7 @@ export async function GET(
     const enrollmentTypeStats: Record<string, number> = {};
     allReviewsForStats?.forEach(r => {
       const enrollmentType = r.answers?.enrollment_type;
-      if (enrollmentType) {
+      if (typeof enrollmentType === 'string' && enrollmentType) {
         enrollmentTypeStats[enrollmentType] = (enrollmentTypeStats[enrollmentType] || 0) + 1;
       }
     });
@@ -245,7 +263,7 @@ export async function GET(
     const attendanceFrequencyStats: Record<string, number> = {};
     allReviewsForStats?.forEach(r => {
       const frequency = r.answers?.attendance_frequency;
-      if (frequency) {
+      if (typeof frequency === 'string' && frequency) {
         attendanceFrequencyStats[frequency] = (attendanceFrequencyStats[frequency] || 0) + 1;
       }
     });
@@ -334,10 +352,13 @@ export async function GET(
       : null;
 
     // すべての口コミを取得して、いいね数でソート（school_idでフィルタリング）
-    const { data: allReviews } = await supabase
-      .from('survey_responses')
-      .select('id, overall_satisfaction, good_comment, bad_comment, created_at')
-      .eq('school_id', school.id); // school_idでフィルタリング（pending状態の学校の口コミを除外）
+    const allReviews = await fetchSchoolReviews<{
+      id: string;
+      overall_satisfaction: number | null;
+      good_comment: string | null;
+      bad_comment: string | null;
+      created_at: string;
+    }>('id, overall_satisfaction, good_comment, bad_comment, created_at');
 
     // 各口コミのいいね数を取得
     const reviewsWithLikes = await Promise.all(
