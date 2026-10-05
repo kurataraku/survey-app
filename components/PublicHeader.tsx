@@ -22,8 +22,11 @@ export default function PublicHeader() {
             <span className="sr-only">通信制高校リアルレビュー</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`${BASE_PATH}/logo-service.png`}
+              src={`${BASE_PATH}/logo-service-header.webp`}
               alt="通信制高校リアルレビュー"
+              width={384}
+              height={256}
+              fetchPriority="high"
               className="block h-24 w-auto md:h-28 lg:h-32"
             />
           </Link>

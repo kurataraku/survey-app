@@ -7,6 +7,7 @@ import { getCachedGlobalAverages } from '@/lib/schools/getSchoolWithStats';
 import { getArticleSlugs } from '@/lib/articles/getArticleSlugs';
 import { appPath } from '@/lib/base-path';
 import StructuredData from '@/components/StructuredData';
+import ArticleImage from '@/components/ArticleImage';
 import SurveyCtaLink from '@/components/SurveyCtaLink';
 import ThemeHubNav from '@/components/ThemeHubNav';
 import { getThemeHubsPagePath } from '@/lib/theme-hubs';
@@ -121,9 +122,13 @@ export default async function ArticleDetailPage({ params }: PageProps) {
           )}
           {article.featured_image_url && (
             <div className="mb-6">
-              <img
+              <ArticleImage
                 src={article.featured_image_url}
                 alt={article.title}
+                width={1200}
+                height={675}
+                sizes="(min-width: 896px) 848px, 100vw"
+                priority
                 className="w-full h-auto rounded-lg"
               />
             </div>

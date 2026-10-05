@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import { LEGACY_SCHOOL_SLUG_REDIRECTS } from "./lib/seo/gsc-priority-schools";
+import { ARTICLE_IMAGE_PATH_PREFIX, getArticleImageHost } from "./lib/images/articleImages";
+
+const articleImageHost = getArticleImageHost();
 
 // ベースパスなしの旧URLは、middleware での再リダイレクトを挟まないよう直接ベースパス付きへ送る
 const legacySchoolRedirects = Object.entries(LEGACY_SCHOOL_SLUG_REDIRECTS).flatMap(
@@ -21,6 +24,14 @@ const nextConfig: NextConfig = {
   // 一覧系の初期HTMLにカード本文を含めるため、PPRによるストリーミング分割を無効化
   experimental: {
     ppr: false,
+  },
+  images: {
+    remotePatterns: articleImageHost
+      ? [{ protocol: "https", hostname: articleImageHost, pathname: `${ARTICLE_IMAGE_PATH_PREFIX}**` }]
+      : [],
+    // 記事画像はアップロードごとに一意のファイル名になるため、変換結果を長期キャッシュして再変換を抑える
+    minimumCacheTTL: 60 * 60 * 24 * 31,
+    formats: ["image/avif", "image/webp"],
   },
   async redirects() {
     return [

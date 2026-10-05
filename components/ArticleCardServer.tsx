@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { appPath } from '@/lib/base-path';
+import ArticleImage from '@/components/ArticleImage';
 
 interface ArticleCardServerProps {
   id: string;
@@ -50,10 +51,12 @@ export default function ArticleCardServer({
       className="block bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-blue-300 hover:shadow-md transition-all"
     >
       {featured_image_url && (
-        <div className="aspect-video w-full bg-gray-200 overflow-hidden">
-          <img
+        <div className="relative aspect-video w-full bg-gray-200 overflow-hidden">
+          <ArticleImage
             src={featured_image_url}
             alt={title}
+            fill
+            sizes="(min-width: 768px) 50vw, 100vw"
             className="w-full h-full object-cover"
           />
         </div>
