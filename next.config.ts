@@ -37,6 +37,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async headers() {
+    // 口コミ一覧は searchParams で絞り込むため毎回サーバー描画になる。利用者ごとに変わる内容はないので、
+    // Next.js が上書きしない Vercel 専用ヘッダーで CDN に短時間キャッシュさせる（クエリ文字列ごとに別キャッシュ）
+    const reviewsListCache = [
+      {
+        key: "Vercel-CDN-Cache-Control",
+        value: "max-age=300, stale-while-revalidate=3600",
+      },
+    ];
+    return [
+      { source: "/tsushin-kuchikomi/reviews", headers: reviewsListCache },
+      { source: "/reviews", headers: reviewsListCache },
+    ];
+  },
   async rewrites() {
     return {
       beforeFiles: [
