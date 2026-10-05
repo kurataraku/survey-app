@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import NationalAverageDiff from '@/components/NationalAverageDiff';
-import SchoolHighlightList from '@/components/SchoolHighlightList';
 import { appPath } from '@/lib/base-path';
 import {
   formatRegionalLocation,
@@ -75,7 +74,11 @@ export default function RegionalSchoolListRow({
               </span>
             )}
           </div>
-          <SchoolHighlightList highlights={school.highlights} />
+          {school.highlights.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-blue-900" aria-label="学校の特徴">
+              {school.highlights.join(' ／ ')}
+            </p>
+          )}
           {school.excerpt && (
             <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-600">
               「{school.excerpt}」
@@ -83,16 +86,16 @@ export default function RegionalSchoolListRow({
           )}
         </div>
 
-        <dl className="space-y-1 text-sm">
-          <div className="flex gap-2 md:block">
-            <dt className="shrink-0 text-gray-500">通える場所</dt>
-            <dd className="font-medium text-gray-800">{location}</dd>
-          </div>
-          <div className="flex gap-2 md:block">
-            <dt className="shrink-0 text-gray-500">初年度納入金</dt>
-            <dd className="font-medium text-gray-800">{school.tuition?.value ?? '—'}</dd>
-          </div>
-        </dl>
+        <div className="space-y-1 text-sm">
+          <p className="font-medium text-gray-800">
+            <span className="mr-2 font-normal text-gray-500">通える場所</span>
+            {location}
+          </p>
+          <p className="font-medium text-gray-800">
+            <span className="mr-2 font-normal text-gray-500">初年度納入金</span>
+            {school.tuition?.value ?? '—'}
+          </p>
+        </div>
 
         <div className="text-sm">
           {school.totalReviewCount > 0 ? (

@@ -4,10 +4,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { M_PLUS_2 } from 'next/font/google';
 import { prefectures } from '@/lib/prefectures';
 import { normalizeSearchQuery } from '@/lib/utils';
 import { appPath, BASE_PATH, apiPath } from '@/lib/base-path';
 import { trackEvent } from '@/lib/analytics/track';
+
+const mPlus2 = M_PLUS_2({
+  subsets: ['latin'],
+  weight: ['500', '600'],
+  display: 'swap',
+});
 
 interface SchoolSuggestion {
   id: string;
@@ -163,8 +170,7 @@ export default function HomeHero({
             </span>
           </h1>
           <p
-            className="text-[0.8125rem] sm:text-sm md:text-[0.95rem] text-slate-700 font-medium leading-[1.75] tracking-[0.02em] mb-3 sm:mb-4 max-w-xl text-balance"
-            style={{ fontFamily: "var(--font-mplus-2), var(--font-sans)" }}
+            className={`${mPlus2.className} text-[0.8125rem] sm:text-sm md:text-[0.95rem] text-slate-700 font-medium leading-[1.75] tracking-[0.02em] mb-3 sm:mb-4 max-w-xl text-balance`}
           >
             <span className="block">
               パンフレットや学校HPは「学校が伝えたい情報」。

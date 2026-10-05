@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, M_PLUS_2 } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
@@ -7,22 +6,6 @@ import { GoogleAnalyticsInit } from "@/components/GoogleAnalyticsInit";
 import { AnalyticsEngagement } from "@/components/AnalyticsEngagement";
 import { getAppBaseUrl } from "@/lib/env-check";
 import "./globals.css";
-
-// どちらも会社ページ・トップのヒーローなど一部でしか使わないため、全ページでの先読み（preload）はしない
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-  preload: false,
-});
-
-/** ヒーローなど短いコピー用（幾何学的で読みやすい日本語サンセリフ） */
-const mPlus2 = M_PLUS_2({
-  variable: "--font-mplus-2",
-  subsets: ["latin"],
-  weight: ["500", "600"],
-  display: "swap",
-  preload: false,
-});
 
 const appBaseUrl = getAppBaseUrl();
 
@@ -41,9 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body
-        className={`${geistSans.variable} ${mPlus2.variable} antialiased flex flex-col min-h-screen`}
-      >
+      <body className="antialiased flex flex-col min-h-screen">
         <GoogleAnalyticsInit />
         <GoogleAnalytics />
         <AnalyticsEngagement />

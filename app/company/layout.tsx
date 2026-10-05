@@ -1,5 +1,11 @@
 import Link from 'next/link';
+import { Geist } from 'next/font/google';
 import { COMPANY, ADDRESS } from '@/lib/company-content';
+
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+});
 
 const navItems = [
   { href: '#services', label: '事業内容' },
@@ -14,7 +20,10 @@ export default function CompanyLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col" style={{ backgroundColor: 'var(--company-bg)' }}>
+    <div
+      className={`${geistSans.variable} flex min-h-screen flex-col`}
+      style={{ backgroundColor: 'var(--company-bg)' }}
+    >
       <header
         className="sticky top-0 z-50 border-b backdrop-blur-md"
         style={{
