@@ -92,14 +92,14 @@ export default function RegionalSchoolCard({
       {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 520px' }}
     >
-      <article className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-[0_8px_30px_rgba(22,101,52,0.06)]">
-        <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-emerald-300 to-amber-200" />
+      <article className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_8px_30px_rgba(30,64,175,0.06)]">
+        <div className="h-1.5 bg-gradient-to-r from-blue-500 via-sky-400 to-sky-200" />
         <div className="p-5 sm:p-6 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:gap-8">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-xl font-bold leading-snug text-gray-950">{school.name}</h3>
               {school.institutionType && (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
                   {institutionTypeLabels[school.institutionType]}
                 </span>
               )}
@@ -115,7 +115,7 @@ export default function RegionalSchoolCard({
 
             <AdmissionBadgeList badges={school.admissionBadges} />
 
-            <dl className="mt-5 space-y-2 border-t border-emerald-100 pt-4 text-sm">
+            <dl className="mt-5 space-y-2 border-t border-blue-100 pt-4 text-sm">
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-gray-600">総合満足度</dt>
                 <dd className="text-right font-bold text-gray-950">
@@ -148,17 +148,17 @@ export default function RegionalSchoolCard({
             </dl>
           </div>
 
-          <div className="mt-6 border-t border-emerald-100 pt-5 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-            <p className="text-xs font-bold tracking-wide text-emerald-800">
+          <div className="mt-6 border-t border-blue-100 pt-5 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+            <p className="text-xs font-bold tracking-wide text-blue-800">
               {excerpt.isCityCampus && municipality
                 ? `${municipality}のキャンパスに通った人の声`
                 : `${prefecture}内のキャンパスに通った人の声`}
             </p>
             {excerpt.good && (
-              <blockquote className="relative mt-3 rounded-r-xl border-l-4 border-emerald-300 bg-emerald-50/70 py-4 pl-5 pr-4">
+              <blockquote className="relative mt-3 rounded-r-xl border-l-4 border-blue-300 bg-blue-50/70 py-4 pl-5 pr-4">
                 <span
                   aria-hidden
-                  className="absolute left-1.5 top-0 text-3xl leading-none text-emerald-300"
+                  className="absolute left-1.5 top-0 text-3xl leading-none text-blue-300"
                 >
                   “
                 </span>
@@ -188,7 +188,7 @@ export default function RegionalSchoolCard({
                 href={reviewsHref}
                 prefetch={false}
                 data-school-link="featured_reviews"
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
               >
                 この学校の口コミを読む（{school.totalReviewCount}件）
               </Link>

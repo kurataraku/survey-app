@@ -117,7 +117,7 @@ export default function RegionalSchoolListRow({
               <Link
                 href={appPath('/submit')}
                 prefetch={false}
-                className="mt-2 inline-flex min-h-11 items-center font-semibold text-emerald-700 underline decoration-emerald-200 underline-offset-4 hover:text-emerald-900"
+                className="mt-2 inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
               >
                 口コミを書く
               </Link>

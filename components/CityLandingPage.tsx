@@ -92,7 +92,7 @@ function ThemeReviewLinks({ prefecture }: { prefecture: string }) {
   ];
   return (
     <section
-      className="mb-12 border-t border-emerald-100 pt-9"
+      className="mb-12 border-t border-blue-100 pt-9"
       aria-labelledby="city-theme-reviews-heading"
     >
       <h2 id="city-theme-reviews-heading" className="text-2xl font-bold text-gray-950">
@@ -122,7 +122,7 @@ function AreaGuide({ data }: { data: CityLandingData }) {
   if (data.wards.length === 0 && data.topStations.length === 0) return null;
   return (
     <section
-      className="mb-12 border-t border-emerald-100 pt-9"
+      className="mb-12 border-t border-blue-100 pt-9"
       aria-labelledby="city-area-heading"
     >
       <h2 id="city-area-heading" className="text-2xl font-bold text-gray-950">
@@ -202,7 +202,7 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
   const faqItems = buildCityFaqItems(data);
 
   return (
-    <div className="min-h-screen bg-[var(--ce-bg)] py-8">
+    <div className="min-h-screen bg-gradient-to-b from-blue-50/60 via-white to-white py-8">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <nav className="mb-5 text-sm text-gray-500" aria-label="パンくず">
           <ol className="flex flex-wrap items-center gap-1">
@@ -229,7 +229,7 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
         </nav>
 
         <header className="mb-9 max-w-4xl">
-          <p className="mb-2 text-sm font-bold text-emerald-700">場所と実際の口コミから比べる</p>
+          <p className="mb-2 text-sm font-bold text-blue-700">場所と実際の口コミから比べる</p>
           <h1 className="text-3xl font-bold leading-tight text-gray-950 sm:text-4xl">
             {getCityLandingHeading(municipality)}
           </h1>
@@ -290,7 +290,7 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
 
         <AreaGuide data={data} />
 
-        <section className="mb-12 border-t border-emerald-100 pt-9" aria-labelledby="city-intro-heading">
+        <section className="mb-12 border-t border-blue-100 pt-9" aria-labelledby="city-intro-heading">
           <h2 id="city-intro-heading" className="text-2xl font-bold text-gray-950">
             {municipality}で学校を選ぶときに確認したいこと
           </h2>
@@ -304,9 +304,9 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
           <div className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
             {faqItems.map((item) => (
               <details key={item.question} className="group py-1">
-                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-3 font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700">
                   {item.question}
-                  <span aria-hidden className="text-emerald-700 transition-transform group-open:rotate-45">
+                  <span aria-hidden className="text-blue-700 transition-transform group-open:rotate-45">
                     ＋
                   </span>
                 </summary>

@@ -121,16 +121,16 @@ export default function RegionalSchoolFinder({
   const buttonClass = (active: boolean, disabled: boolean) =>
     [
       'min-h-11 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2',
       active
-        ? 'border-emerald-600 bg-emerald-600 text-white'
-        : 'border-emerald-200 bg-white text-gray-700 hover:border-emerald-500 hover:text-emerald-800',
-      disabled ? 'cursor-not-allowed opacity-40 hover:border-emerald-200 hover:text-gray-700' : '',
+        ? 'border-blue-700 bg-blue-700 text-white'
+        : 'border-blue-200 bg-white text-gray-700 hover:border-blue-500 hover:text-blue-800',
+      disabled ? 'cursor-not-allowed opacity-40 hover:border-blue-200 hover:text-gray-700' : '',
     ].join(' ');
 
   return (
     <section
-      className="mb-8 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-5 sm:px-6"
+      className="mb-8 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-5 sm:px-6"
       aria-labelledby={`${targetId}-finder-heading`}
     >
       <div className="mb-5">
@@ -195,7 +195,7 @@ export default function RegionalSchoolFinder({
         </p>
       </fieldset>
 
-      <div className="mt-5 flex flex-col gap-3 border-t border-emerald-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-5 flex flex-col gap-3 border-t border-blue-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <p className="text-sm font-semibold text-gray-800" aria-live="polite">
             {hasFilter ? `${matchingCount}校を表示しています` : `全${totalSchools}校を表示しています`}
@@ -204,7 +204,7 @@ export default function RegionalSchoolFinder({
             <button
               type="button"
               onClick={clear}
-              className="min-h-11 text-sm font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-950"
+              className="min-h-11 text-sm font-semibold text-blue-800 underline decoration-blue-300 underline-offset-4 hover:text-blue-950"
             >
               条件を解除
             </button>
@@ -215,7 +215,7 @@ export default function RegionalSchoolFinder({
           <select
             value={sort}
             onChange={(event) => setSort(event.target.value as RegionalSortKey)}
-            className="min-h-11 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-gray-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            className="min-h-11 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-normal text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-700"
           >
             {REGIONAL_SORT_OPTIONS.map((option) => (
               <option key={option.key} value={option.key}>
