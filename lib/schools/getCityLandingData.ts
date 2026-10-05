@@ -28,6 +28,11 @@ import {
   SCHOOL_TYPE_FILTERS,
   type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
+import {
+  buildRegionalThemeLists,
+  type RegionalThemeList,
+} from '@/lib/schools/regionalThemeLists';
+import { selectRegionalHighlights } from '@/lib/schools/schoolHighlights';
 import type { CityLandingConfig } from '@/lib/regions/city-landing';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 
@@ -50,6 +55,14 @@ export type CitySchoolRow = {
   prefectureReviewCount: number;
   reviewCount: number;
   overallAvg: number | null;
+  /** 学校全体のサポート満足度・学費満足度と回答件数（テーマ別リスト用） */
+  supportAvg: number | null;
+  supportRatingCount: number;
+  tuitionAvg: number | null;
+  tuitionRatingCount: number;
+  attendanceFrequencies: Record<string, number>;
+  /** 管理画面の特徴・推しポイント（場所に関する項目を除いて最大3件） */
+  highlights: string[];
   regionalOverallAvg: number | null;
   staffAvg: number | null;
   atmosphereAvg: number | null;
@@ -98,6 +111,8 @@ export type CityLandingData = {
     label: string;
     schoolCount: number;
   }>;
+  /** 学校全体の口コミから作るテーマ別リスト（該当校が少ないテーマは含まない） */
+  themeLists: RegionalThemeList[];
   /** 県内キャンパスに通った人の口コミ抜粋（市内とは限らない） */
   reviewExcerpts: RegionalReviewExcerpt[];
   cityReviewCount: number;
@@ -149,6 +164,12 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
     prefectureReviewCount: regional?.reviewCount ?? 0,
     reviewCount: school.review_count,
     overallAvg: school.overall_avg,
+    supportAvg: school.support_avg,
+    supportRatingCount: school.support_rating_count,
+    tuitionAvg: school.tuition_avg,
+    tuitionRatingCount: school.tuition_rating_count,
+    attendanceFrequencies: school.attendance_frequencies,
+    highlights: selectRegionalHighlights(school.highlights),
     regionalOverallAvg: regional?.overallAvg ?? null,
     staffAvg:
       (regional?.reviewCount ?? 0) >= 3 ? regional?.staffAvg ?? null : school.staff_avg,
@@ -321,6 +342,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     topStations: insights.topStations,
     finderStations,
     schoolTypeOptions,
+    themeLists: buildRegionalThemeLists(rows),
     reviewExcerpts,
     cityReviewCount: rows.reduce((sum, row) => sum + row.cityReviewCount, 0),
     prefectureReviewCount: rows.reduce((sum, row) => sum + row.prefectureReviewCount, 0),

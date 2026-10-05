@@ -35,7 +35,9 @@ function toCardData(row: CitySchoolRow): RegionalSchoolCardData | null {
     tier: row.tier,
     institutionType: row.institutionType,
     headquartersPrefecture: row.headquartersPrefecture,
+    wards: row.wards,
     stations: row.stations,
+    highlights: row.highlights,
     regionalReviewCount: row.prefectureReviewCount,
     totalReviewCount: row.reviewCount,
     rating: row.overallAvg,
@@ -57,7 +59,9 @@ function toListData(row: CitySchoolRow): RegionalSchoolListRowData {
     slug: row.slug,
     tier: row.tier,
     institutionType: row.institutionType,
+    wards: row.wards,
     stations: row.stations,
+    highlights: row.highlights,
     regionalReviewCount: row.prefectureReviewCount,
     totalReviewCount: row.reviewCount,
     rating: row.overallAvg,
@@ -114,6 +118,68 @@ function ThemeReviewLinks({ prefecture }: { prefecture: string }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function ThemeSchoolLists({ data }: { data: CityLandingData }) {
+  if (data.themeLists.length === 0) return null;
+  return (
+    <section
+      className="mb-12 border-t border-blue-100 pt-9"
+      aria-labelledby="city-theme-schools-heading"
+    >
+      <h2 id="city-theme-schools-heading" className="text-2xl font-bold text-gray-950">
+        {data.municipality}の通信制高校をテーマ別に見る
+      </h2>
+      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
+        {data.municipality}
+        内に通えるキャンパスがある学校を、学校全体の口コミで比べています。通学頻度は口コミの回答者が実際に通った頻度で、学校のコースや制度を示すものではありません。
+      </p>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {data.themeLists.map((list) => (
+          <div
+            key={list.key}
+            className="rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_8px_30px_rgba(30,64,175,0.05)]"
+          >
+            <h3 className="text-base font-bold leading-snug text-gray-950">{list.title}</h3>
+            <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{list.description}</p>
+            <p className="mt-3 text-right text-[11px] text-gray-500">{list.scoreLabel}（回答件数）</p>
+            <ol className="divide-y divide-blue-50">
+              {list.schools.map((school, index) => (
+                <li
+                  key={school.id}
+                  className="flex items-baseline justify-between gap-3 py-2.5 text-sm"
+                >
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span aria-hidden className="w-4 shrink-0 text-xs font-bold text-blue-700">
+                      {index + 1}
+                    </span>
+                    {school.slug ? (
+                      <Link
+                        href={appPath(`/schools/${school.slug}`)}
+                        prefetch={false}
+                        data-school-link={`theme_${list.key}`}
+                        className="font-semibold text-blue-800 underline decoration-blue-200 underline-offset-4 hover:text-blue-950"
+                      >
+                        {school.name}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-gray-900">{school.name}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-right font-semibold text-gray-900">
+                    ★ {school.score.toFixed(1)}
+                    <span className="ml-1 text-[11px] font-normal text-gray-500">
+                      （{school.answerCount}件）
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -182,6 +248,9 @@ function AboutNote({ data }: { data: CityLandingData }) {
         <li>
           口コミは当サイトのアンケートに回答した在校生・卒業生・保護者の声です。
           {prefecture}内の口コミを{municipality}内の口コミとは数えず、回答された地域を表示しています。
+        </li>
+        <li>
+          学校の特徴は、学校の公開情報をもとに当サイトがまとめたものです。「テーマ別に見る」の満足度と通学頻度は、学校全体の口コミ（{prefecture}外のキャンパスに通った人の口コミを含む）で集計しています。
         </li>
         {counts.admissionVerifiedCount > 0 && (
           <li>
@@ -285,6 +354,8 @@ export default function CityLandingPage({ data, intro }: CityLandingPageProps) {
           </p>
           <TuitionDisclaimer className="mt-2" />
         </div>
+
+        <ThemeSchoolLists data={data} />
 
         {data.prefectureReviewCount > 0 && <ThemeReviewLinks prefecture={prefecture} />}
 

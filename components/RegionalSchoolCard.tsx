@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import AdmissionBadgeList from '@/components/AdmissionBadgeList';
+import SchoolHighlightList from '@/components/SchoolHighlightList';
 import { appPath } from '@/lib/base-path';
 import { getReviewReasonGroup, type ReviewReasonGroupKey } from '@/lib/reviews/reason-groups';
 import type { RegionalReviewExcerpt } from '@/lib/schools/regionalReviewExcerpts';
 import {
+  formatRegionalLocation,
   regionalSchoolDataAttributes,
   type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
@@ -24,7 +26,9 @@ export type RegionalSchoolCardData = {
   tier: RegionalSchoolTier;
   institutionType: SchoolInstitutionType | null;
   headquartersPrefecture: string;
+  wards: string[];
   stations: string[];
+  highlights: string[];
   regionalReviewCount: number;
   totalReviewCount: number;
   /** 学校全体の総合満足度 */
@@ -77,12 +81,11 @@ export default function RegionalSchoolCard({
   ]
     .filter((tag): tag is string => Boolean(tag))
     .slice(0, 4);
-  const locationLabel =
-    school.stations.length > 0
-      ? school.stations.join('・')
-      : municipality
-        ? `${municipality}内`
-        : `${prefecture}内`;
+  const locationLabel = formatRegionalLocation(
+    school.wards,
+    school.stations,
+    municipality ? `${municipality}内` : `${prefecture}内`
+  );
   const reviewsHref = school.slug
     ? appPath(`/schools/${school.slug}/reviews`)
     : appPath(`/reviews/${excerpt.id}`);
@@ -90,7 +93,7 @@ export default function RegionalSchoolCard({
   return (
     <li
       {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 520px' }}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 550px' }}
     >
       <article className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_8px_30px_rgba(30,64,175,0.06)]">
         <div className="h-1.5 bg-gradient-to-r from-blue-500 via-sky-400 to-sky-200" />
@@ -104,6 +107,8 @@ export default function RegionalSchoolCard({
                 </span>
               )}
             </div>
+
+            <SchoolHighlightList highlights={school.highlights} className="mt-3" />
 
             <p className="mt-3 text-sm leading-relaxed text-gray-700">
               <span className="font-semibold text-gray-900">通える場所:</span> {locationLabel}

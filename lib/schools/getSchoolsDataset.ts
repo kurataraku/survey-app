@@ -55,7 +55,7 @@ export async function fetchSchoolsDatasetUncached(): Promise<SearchSchool[]> {
 
 export const getSchoolsDataset = unstable_cache(
   fetchSchoolsDatasetUncached,
-  ['schools-dataset-v1'],
+  ['schools-dataset-v2'],
   {
     revalidate: 3600,
   }

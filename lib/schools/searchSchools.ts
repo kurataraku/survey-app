@@ -45,6 +45,11 @@ export interface SearchSchool {
   career_support_avg: number | null;
   campus_life_avg: number | null;
   tuition_avg: number | null;
+  /** support_avg / tuition_avg の算出に使った回答件数（項目は任意回答のため review_count と一致しない） */
+  support_rating_count: number;
+  tuition_rating_count: number;
+  /** 学校全体の通学頻度の回答分布。「週5」「週1〜2」「ほぼオンライン/自宅」など */
+  attendance_frequencies: Record<string, number>;
   review_tendency: { good: string[]; improvement: string[] } | null;
   /** 公開済みの学費目安（参考目安）。未公開なら null */
   tuition_estimate: PublicTuitionEstimate | null;
@@ -143,6 +148,7 @@ export async function fetchSearchSchoolsWithStats(
     careerSupport: number[];
     campusLife: number[];
     tuition: number[];
+    attendance: Record<string, number>;
     latestGoodComment: { text: string; ts: string } | null;
     latestBadComment: { text: string; ts: string } | null;
     latestReviewExcerpts: Array<{ good: string | null; bad: string | null; ts: string }>;
@@ -163,6 +169,7 @@ export async function fetchSearchSchoolsWithStats(
       careerSupport: [],
       campusLife: [],
       tuition: [],
+      attendance: {},
       latestGoodComment: null,
       latestBadComment: null,
       latestReviewExcerpts: [],
@@ -214,6 +221,9 @@ export async function fetchSearchSchoolsWithStats(
           if (clr !== null) s.campusLife.push(clr);
           const tr = parseRating(ans.tuition_rating);
           if (tr !== null) s.tuition.push(tr);
+          const frequency =
+            typeof ans.attendance_frequency === 'string' ? ans.attendance_frequency.trim() : '';
+          if (frequency) s.attendance[frequency] = (s.attendance[frequency] ?? 0) + 1;
 
           addRegionalReview(
             regionalReviews,
@@ -267,6 +277,7 @@ export async function fetchSearchSchoolsWithStats(
         careerSupport: [] as number[],
         campusLife: [] as number[],
         tuition: [] as number[],
+        attendance: {} as Record<string, number>,
         latestGoodComment: null as { text: string; ts: string } | null,
         latestBadComment: null as { text: string; ts: string } | null,
         latestReviewExcerpts: [] as Array<{ good: string | null; bad: string | null; ts: string }>,
@@ -299,6 +310,9 @@ export async function fetchSearchSchoolsWithStats(
       career_support_avg: avg(s.careerSupport),
       campus_life_avg: avg(s.campusLife),
       tuition_avg: avg(s.tuition),
+      support_rating_count: s.support.length,
+      tuition_rating_count: s.tuition.length,
+      attendance_frequencies: s.attendance,
       review_tendency: tendencyMap.get(school.id) ?? null,
       tuition_estimate: tuitionEstimates.get(school.id) ?? null,
       course_listing: courseListings.get(school.id) ?? null,

@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import SchoolHighlightList from '@/components/SchoolHighlightList';
 import { appPath } from '@/lib/base-path';
 import {
+  formatRegionalLocation,
   regionalSchoolDataAttributes,
   type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
@@ -13,7 +15,9 @@ export type RegionalSchoolListRowData = {
   slug: string | null;
   tier: RegionalSchoolTier;
   institutionType: SchoolInstitutionType | null;
+  wards: string[];
   stations: string[];
+  highlights: string[];
   regionalReviewCount: number;
   totalReviewCount: number;
   /** 学校全体の総合満足度 */
@@ -40,13 +44,13 @@ export default function RegionalSchoolListRow({
   municipality: string;
 }) {
   const schoolHref = school.slug ? appPath(`/schools/${school.slug}`) : null;
-  const location = school.stations.length > 0 ? school.stations.join('・') : `${municipality}内`;
+  const location = formatRegionalLocation(school.wards, school.stations, `${municipality}内`);
 
   return (
     <li
       {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
       className="border-b border-gray-200 px-1 pb-5"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 150px' }}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 180px' }}
     >
       <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.8fr)_minmax(9rem,0.8fr)] md:items-start md:gap-6">
         <div>
@@ -69,6 +73,7 @@ export default function RegionalSchoolListRow({
               </span>
             )}
           </div>
+          <SchoolHighlightList highlights={school.highlights} />
           {school.excerpt && (
             <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-600">
               「{school.excerpt}」
@@ -78,7 +83,7 @@ export default function RegionalSchoolListRow({
 
         <dl className="space-y-1 text-sm">
           <div className="flex gap-2 md:block">
-            <dt className="shrink-0 text-gray-500">最寄り</dt>
+            <dt className="shrink-0 text-gray-500">通える場所</dt>
             <dd className="font-medium text-gray-800">{location}</dd>
           </div>
           <div className="flex gap-2 md:block">

@@ -81,6 +81,21 @@ export function matchesRegionalSchoolFilters(
   return stationMatches && typeMatches;
 }
 
+const LOCATION_WARD_LIMIT = 2;
+
+/** 「中村区・中区（名古屋駅・栄駅）」の形の通える場所。区も駅も不明なら fallback を返す */
+export function formatRegionalLocation(
+  wards: string[],
+  stations: string[],
+  fallback: string
+): string {
+  const wardLabel =
+    wards.slice(0, LOCATION_WARD_LIMIT).join('・') + (wards.length > LOCATION_WARD_LIMIT ? 'ほか' : '');
+  const stationLabel = stations.join('・');
+  if (wardLabel && stationLabel) return `${wardLabel}（${stationLabel}）`;
+  return wardLabel || stationLabel || fallback;
+}
+
 /** Finder が絞り込み・並び替えに使う属性。行データを Client Component へ渡さずに済ませる */
 export function regionalSchoolDataAttributes(
   school: RegionalSortableSchool & {
