@@ -5,6 +5,9 @@ import { sendApprovedEmail } from '@/lib/email/sender';
 import { publicReviewUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
 import { resolveSchoolIdFromSchoolName } from '@/lib/reviews/schoolReviewLinkage';
 import { syncRagForReviewIds, syncRagForSchoolIds } from '@/lib/rag/sync';
+import { createGrantsOnApproval, type ReferrerGrantResult } from '@/lib/referral/grants';
+import { getReferralShareInfo } from '@/lib/referral/server';
+import type { ReferralShareInfo } from '@/lib/referral/shared';
 
 function getSupabase() {
   return createClient(
@@ -54,7 +57,7 @@ export async function POST(
     .from('survey_responses')
     .update(updatePayload)
     .eq('id', id)
-    .select('id, email, school_name, is_duplicate_email')
+    .select('id, email, school_name, is_duplicate_email, referral_code_id, ip_hash')
     .single();
 
   if (error || !review) {
@@ -63,10 +66,12 @@ export async function POST(
 
   console.log('[approve] email:', review.email, 'is_duplicate:', review.is_duplicate_email);
 
+  let referrerGrant: ReferrerGrantResult | null = null;
+
   if (review.email && !review.is_duplicate_email) {
     const { data: campaign } = await supabase
       .from('campaigns')
-      .select('id, reward_amount')
+      .select('id, reward_amount, referral_enabled, referral_reward_amount, referral_max_per_referrer')
       .eq('is_active', true)
       .lte('starts_at', new Date().toISOString())
       .gte('ends_at', new Date().toISOString())
@@ -77,15 +82,17 @@ export async function POST(
 
     if (campaign) {
       // gift_url が渡された場合は即 sent、なければ pending（未配布タブに残す）
-      await supabase.from('campaign_grants').insert({
-        campaign_id: campaign.id,
-        survey_response_id: id,
-        email: review.email,
-        gift_code: giftUrl ?? null,
-        sent_at: giftUrl ? new Date().toISOString() : null,
-        status: giftUrl ? 'sent' : 'pending',
-        error_message: null,
-      });
+      const result = await createGrantsOnApproval({ supabase, review, campaign, giftUrl });
+      referrerGrant = result.referrer;
+    }
+
+    let referral: ReferralShareInfo | null = null;
+    if (campaign?.referral_enabled) {
+      try {
+        referral = await getReferralShareInfo(supabase, review.email, id, { forEmail: true });
+      } catch (e) {
+        console.error('[approve] 紹介URL取得エラー:', e);
+      }
     }
 
     await sendApprovedEmail({
@@ -93,6 +100,7 @@ export async function POST(
       schoolName: review.school_name,
       surveyResponseId: id,
       giftUrl,
+      referral,
       supabase,
     });
   }
@@ -110,5 +118,5 @@ export async function POST(
     }
   });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, referrer_grant: referrerGrant });
 }

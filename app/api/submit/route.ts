@@ -3,6 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import { surveySchema, SurveyFormData } from '@/lib/schema';
 import { normalizeAnswers } from '@/lib/normalizeAnswers';
 import { generateSlug } from '@/lib/utils';
+import { normalizeReferralCode, type ReferralShareInfo } from '@/lib/referral/shared';
+import {
+  findReferralCode,
+  getClientIp,
+  getReferralShareInfo,
+  hashIp,
+  normalizeEmail,
+} from '@/lib/referral/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -189,9 +197,25 @@ export async function POST(request: NextRequest) {
     const tuitionRating = data.tuition_rating ? parseInt(data.tuition_rating) : null;
 
     // ============================================================================
+    // 紹介コード（紹介URL経由の回答）。不正・自己紹介のコードは紐づけない
+    // ============================================================================
+    let referralCodeId: string | null = null;
+    const incomingReferralCode = normalizeReferralCode(body?.referral_code);
+    if (incomingReferralCode) {
+      const referralCode = await findReferralCode(supabase, incomingReferralCode);
+      if (
+        referralCode?.is_active &&
+        referralCode.referrer_email !== normalizeEmail(data.email)
+      ) {
+        referralCodeId = referralCode.id;
+      }
+    }
+    const ipHash = hashIp(getClientIp(request));
+
+    // ============================================================================
     // Supabaseに挿入（検索用カラムも含める）
     // ============================================================================
-    const { error } = await supabase.from('survey_responses').insert({
+    const { data: savedResponse, error } = await supabase.from('survey_responses').insert({
       // 既存のフィールド（後方互換性のため維持）
       school_name: schoolNameToSave, // 選択された学校名を使用
       respondent_role: data.respondent_role,
@@ -216,7 +240,9 @@ export async function POST(request: NextRequest) {
       tuition_rating: tuitionRating,
       is_public: false,
       moderation_status: 'pending',
-    });
+      referral_code_id: referralCodeId,
+      ip_hash: ipHash,
+    }).select('id').single();
 
     if (error) {
       console.error('Supabase挿入エラー:', error);
@@ -226,16 +252,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 保存したレコードのIDを取得してモデレーションを非同期起動
-    const { data: savedResponse } = await supabase
-      .from('survey_responses')
-      .select('id')
-      .eq('school_name', schoolNameToSave)
-      .eq('email', data.email)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    // 回答者自身の紹介URL（紹介制度が有効なキャンペーン中のみ）
+    let referral: ReferralShareInfo | null = null;
+    try {
+      referral = await getReferralShareInfo(supabase, data.email, savedResponse?.id ?? null);
+    } catch (e) {
+      console.error('[submit] 紹介URL発行エラー:', e);
+    }
 
+    // モデレーションを非同期起動
     if (savedResponse?.id) {
       const moderationUrl = `${process.env.AGENT_BASE_URL ?? ''}/api/admin/reviews/${savedResponse.id}/moderate`;
       const moderationId = savedResponse.id;
@@ -254,7 +279,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true, referral }, { status: 200 });
   } catch (error) {
     console.error('APIエラー:', error);
     return NextResponse.json(

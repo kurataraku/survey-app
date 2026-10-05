@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
       starts_at: body.starts_at,
       ends_at: body.ends_at,
       is_active: body.is_active ?? false,
+      referral_enabled: body.referral_enabled ?? false,
+      referral_reward_amount: body.referral_reward_amount ?? null,
     })
     .select()
     .single();

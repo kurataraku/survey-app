@@ -28,13 +28,22 @@ export async function GET(request: NextRequest) {
       gift_code,
       created_at,
       sent_at,
+      error_message,
+      grant_type,
+      reward_amount,
+      flag_reason,
       survey_responses (
         id,
-        school_name
+        school_name,
+        email
       ),
       campaigns (
         title,
         reward_amount
+      ),
+      referral_codes!campaign_grants_referral_code_id_fkey (
+        code,
+        referrer_email
       )
     `)
     .gte('created_at', CAMPAIGN_ADMIN_VISIBLE_FROM_UTC)

@@ -11,6 +11,8 @@ interface Campaign {
   starts_at: string;
   ends_at: string;
   is_active: boolean;
+  referral_enabled: boolean;
+  referral_reward_amount: number | null;
   created_at: string;
   campaign_grants: { count: number }[];
 }
@@ -18,10 +20,12 @@ interface Campaign {
 const emptyForm = {
   title: '',
   description: '',
-  reward_amount: 500,
+  reward_amount: 200,
   starts_at: '',
   ends_at: '',
   is_active: false,
+  referral_enabled: false,
+  referral_reward_amount: 200,
 };
 
 export default function CampaignsPage() {
@@ -50,6 +54,34 @@ export default function CampaignsPage() {
     load();
   };
 
+  const updateReferral = async (campaign: Campaign) => {
+    const amountInput = prompt(
+      '紹介者への謝礼（円・紹介1人につき）。紹介された人は通常の謝礼金額のみです',
+      String(campaign.referral_reward_amount ?? campaign.reward_amount)
+    );
+    if (amountInput === null) return;
+    const amount = Number(amountInput);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      alert('金額は1以上の整数で入力してください');
+      return;
+    }
+    await fetch(apiPath(`/api/admin/campaigns/${campaign.id}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ referral_reward_amount: amount }),
+    });
+    load();
+  };
+
+  const toggleReferral = async (campaign: Campaign) => {
+    await fetch(apiPath(`/api/admin/campaigns/${campaign.id}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ referral_enabled: !campaign.referral_enabled }),
+    });
+    load();
+  };
+
   const save = async () => {
     setSaving(true);
     await fetch(apiPath('/api/admin/campaigns'), {
@@ -58,6 +90,7 @@ export default function CampaignsPage() {
       body: JSON.stringify({
         ...form,
         reward_amount: Number(form.reward_amount),
+        referral_reward_amount: Number(form.referral_reward_amount),
       }),
     });
     setSaving(false);
@@ -149,6 +182,40 @@ export default function CampaignsPage() {
                 />
                 <label htmlFor="is_active" className="text-sm text-gray-700">作成後すぐに有効化する</label>
               </div>
+              <div className="border-t border-gray-100 pt-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="referral_enabled"
+                    checked={form.referral_enabled}
+                    onChange={(e) => setForm({ ...form, referral_enabled: e.target.checked })}
+                  />
+                  <label htmlFor="referral_enabled" className="text-sm text-gray-700">
+                    紹介制度を有効にする（回答完了画面・承認メールに紹介URLと依頼文を表示）
+                  </label>
+                </div>
+                {form.referral_enabled && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        紹介者への謝礼（円・紹介1人につき）
+                      </label>
+                      <input
+                        type="number"
+                        className="w-32 border border-gray-300 rounded px-3 py-1.5 text-sm"
+                        value={form.referral_reward_amount}
+                        onChange={(e) => setForm({ ...form, referral_reward_amount: Number(e.target.value) })}
+                        min={100}
+                        step={100}
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-gray-500">
+                      紹介者1人あたりの紹介人数に上限はありません。
+                      紹介された人の謝礼は上の「謝礼金額」のみです（紹介経由でも上乗せはしません）。
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="mt-4 flex gap-2">
               <button
@@ -195,9 +262,30 @@ export default function CampaignsPage() {
                       QUOカードPay {c.reward_amount.toLocaleString()}円 ／
                       {new Date(c.starts_at).toLocaleDateString('ja-JP')} 〜 {new Date(c.ends_at).toLocaleDateString('ja-JP')}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">送付済み {grantCount} 件</p>
+                    <p className="text-xs text-gray-400 mt-0.5">配布記録 {grantCount} 件</p>
+                    <p className="text-xs mt-1">
+                      {c.referral_enabled ? (
+                        <span className="text-violet-700">
+                          紹介制度: 有効 ／ 紹介者へ1人につき {(c.referral_reward_amount ?? c.reward_amount).toLocaleString()}円（上限なし）／ 紹介された人は通常謝礼 {c.reward_amount.toLocaleString()}円のみ
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">紹介制度: 無効</span>
+                      )}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => toggleReferral(c)}
+                      className={`px-3 py-1 text-xs rounded border ${c.referral_enabled ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-violet-300 text-violet-600 hover:bg-violet-50'}`}
+                    >
+                      {c.referral_enabled ? '紹介を無効化' : '紹介を有効化'}
+                    </button>
+                    <button
+                      onClick={() => updateReferral(c)}
+                      className="px-3 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                    >
+                      紹介設定
+                    </button>
                     <button
                       onClick={() => toggleActive(c)}
                       className={`px-3 py-1 text-xs rounded border ${c.is_active ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-blue-300 text-blue-600 hover:bg-blue-50'}`}

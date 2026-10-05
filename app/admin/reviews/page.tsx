@@ -54,20 +54,35 @@ interface PendingReview {
   moderation_status: string;
   rejection_reason?: string | null;
   created_at: string;
+  referral_code_id?: string | null;
+  referral_codes?: { code: string; referrer_email: string } | null;
   review_moderation_results: ModerationResult[];
 }
+
+type GrantType = 'review' | 'referee' | 'referrer';
 
 interface PendingGrant {
   id: string;
   campaign_id: string;
   email: string;
-  status: 'pending' | 'sent';
+  status: 'pending' | 'sent' | 'failed' | 'cancelled';
   gift_code: string | null;
   created_at: string;
   sent_at: string | null;
-  survey_responses: { id: string; school_name: string } | null;
+  error_message: string | null;
+  grant_type: GrantType | null;
+  reward_amount: number | null;
+  flag_reason: string | null;
+  survey_responses: { id: string; school_name: string; email: string | null } | null;
   campaigns: { title: string; reward_amount: number } | null;
+  referral_codes: { code: string; referrer_email: string } | null;
 }
+
+const GRANT_TYPE_LABELS: Record<GrantType, { label: string; className: string }> = {
+  review: { label: '通常', className: 'bg-gray-100 text-gray-700' },
+  referee: { label: '紹介経由の回答者', className: 'bg-sky-100 text-sky-700' },
+  referrer: { label: '紹介者', className: 'bg-violet-100 text-violet-700' },
+};
 
 const FLAG_LABELS: Record<string, string> = {
   personal_info: '個人特定',
@@ -226,6 +241,8 @@ export default function ReviewModerationPage() {
   const [grants, setGrants] = useState<PendingGrant[]>([]);
   const [loadingGrants, setLoadingGrants] = useState(true);
   const [marking, setMarking] = useState<string | null>(null);
+  const [grantGiftUrls, setGrantGiftUrls] = useState<Record<string, string>>({});
+  const [grantTypeFilter, setGrantTypeFilter] = useState<'all' | GrantType>('all');
 
   const loadReviews = useCallback(async (showLoading = true) => {
     if (showLoading) setLoadingReviews(true);
@@ -306,16 +323,46 @@ export default function ReviewModerationPage() {
     loadReviews();
   };
 
-  const markSent = async (grant: PendingGrant) => {
+  const updateGrant = async (grant: PendingGrant, body: Record<string, unknown>) => {
     setMarking(grant.id);
-    await fetch(apiPath(`/api/admin/campaigns/${grant.campaign_id}/grants/${grant.id}`), {
+    const res = await fetch(apiPath(`/api/admin/campaigns/${grant.campaign_id}/grants/${grant.id}`), {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
-    await loadGrants();
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(json.error ?? '更新に失敗しました');
+    }
+    await loadGrants(false);
     setMarking(null);
   };
 
-  const pendingGrantCount = grants.filter(g => g.status === 'pending').length;
+  const markSent = (grant: PendingGrant) => {
+    if (!confirm('メールは送信せず「送付済み」にします。QUOカードPayは別途お送り済みですか？')) return;
+    updateGrant(grant, {});
+  };
+
+  const giftUrlFor = (grant: PendingGrant) => grantGiftUrls[grant.id] ?? grant.gift_code ?? '';
+
+  const sendGrantEmail = (grant: PendingGrant) => {
+    const url = giftUrlFor(grant).trim();
+    if (!url) return;
+    const warning = grant.flag_reason ? `\n\n要確認: ${grant.flag_reason}` : '';
+    if (!confirm(`${grant.email} にQUOカードPayのURLをメール送信します。${warning}`)) return;
+    updateGrant(grant, { action: 'send_email', gift_url: url });
+  };
+
+  const cancelGrant = (grant: PendingGrant) => {
+    if (!confirm('この謝礼を対象外にしますか？（メールは送信されません）')) return;
+    updateGrant(grant, { action: 'cancel' });
+  };
+
+  const isOpenGrant = (g: PendingGrant) => g.status === 'pending' || g.status === 'failed';
+  const pendingGrantCount = grants.filter(isOpenGrant).length;
+  const visibleGrants = grants.filter(
+    (g) => grantTypeFilter === 'all' || (g.grant_type ?? 'review') === grantTypeFilter
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -403,11 +450,25 @@ export default function ReviewModerationPage() {
                           {review.is_duplicate_email && (
                             <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded">メール重複</span>
                           )}
+                          {review.referral_codes && (
+                            <span
+                              className="text-xs bg-violet-50 text-violet-700 border border-violet-200 px-1.5 py-0.5 rounded"
+                              title={`紹介者: ${review.referral_codes.referrer_email}`}
+                            >
+                              紹介経由（{review.referral_codes.code}）
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs text-gray-400">{new Date(review.created_at).toLocaleString('ja-JP')}</span>
                       </div>
 
                       <div className="px-5 py-4 space-y-4">
+                        {review.referral_codes && (
+                          <p className="text-xs text-violet-700 bg-violet-50 rounded px-3 py-2">
+                            紹介者: {review.referral_codes.referrer_email}
+                            {' '}／ 紹介制度が有効なキャンペーン中に承認すると、この回答者の謝礼（通常額・1件のみ）と紹介者の紹介謝礼が「QUO配布管理」に作られます。
+                          </p>
+                        )}
                         {/* AI審査結果 */}
                         {mod ? (
                           <div className="bg-gray-50 rounded p-3 space-y-1.5">
@@ -467,6 +528,11 @@ export default function ReviewModerationPage() {
                                 QUOカードPay URL
                                 <span className="ml-1 font-normal text-blue-500">（キャンペーン期間中は貼り付けてください）</span>
                               </label>
+                              {review.referral_codes && (
+                                <p className="text-xs text-violet-700 mb-1">
+                                  ここに貼るのはこの回答者（紹介経由）の分です。紹介者の分は承認後に「QUO配布管理」から送信してください。
+                                </p>
+                              )}
                               <input
                                 type="url"
                                 className="w-full text-sm border border-blue-200 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -621,12 +687,27 @@ export default function ReviewModerationPage() {
         {/* QUO配布管理タブ */}
         {tab === 'quocard' && (
           <>
-            <p className="text-sm text-gray-500 mb-4">
-              QUOカードPayの配布記録です。未送付の方に送付後「送付済みにする」を押してください。
-            </p>
+            <div className="mb-4 space-y-2">
+              <p className="text-sm text-gray-500">
+                QUOカードPayの配布記録です。未送付の行にギフトURLを貼り付けて「URLをメール送信」を押すと、種別に合ったお礼メールが届き、送付済みになります。
+                別の方法で送った場合は「送付済みにする（メールなし）」を押してください。
+              </p>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-gray-500">種別:</span>
+                {(['all', 'review', 'referee', 'referrer'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setGrantTypeFilter(t)}
+                    className={`px-2 py-1 rounded border ${grantTypeFilter === t ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    {t === 'all' ? 'すべて' : GRANT_TYPE_LABELS[t].label}
+                  </button>
+                ))}
+              </div>
+            </div>
             {loadingGrants ? (
               <p className="text-gray-500 text-center py-12">読み込み中...</p>
-            ) : grants.length === 0 ? (
+            ) : visibleGrants.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
                 <p className="text-gray-500">QUO配布対象者はいません</p>
               </div>
@@ -635,64 +716,130 @@ export default function ReviewModerationPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">学校名</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">メールアドレス</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">キャンペーン</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600">種別</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600">送付先・学校</th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600">金額・キャンペーン</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">承認日時</th>
-                      <th className="text-left px-4 py-3 font-medium text-gray-600">QUOカードPay URL</th>
                       <th className="text-left px-4 py-3 font-medium text-gray-600">ステータス</th>
-                      <th className="px-4 py-3"></th>
+                      <th className="text-left px-4 py-3 font-medium text-gray-600">QUOカードPay URL</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {grants.map((grant) => (
-                      <tr key={grant.id} className={grant.status === 'sent' ? 'bg-gray-50' : ''}>
-                        <td className="px-4 py-3 text-gray-900">{grant.survey_responses?.school_name ?? '—'}</td>
-                        <td className="px-4 py-3 text-gray-700 font-mono text-xs">{grant.email}</td>
-                        <td className="px-4 py-3 text-gray-500 text-xs">
-                          {grant.campaigns
-                            ? `${grant.campaigns.title}（${grant.campaigns.reward_amount.toLocaleString()}円）`
-                            : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500 text-xs">
-                          {new Date(grant.created_at).toLocaleString('ja-JP')}
-                        </td>
-                        <td className="px-4 py-3 text-xs max-w-xs">
-                          {grant.gift_code ? (
-                            <a href={grant.gift_code} target="_blank" rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline break-all"
-                            >
-                              {grant.gift_code}
-                            </a>
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {grant.status === 'sent' ? (
-                            <div>
-                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">送付済み</span>
-                              {grant.sent_at && (
-                                <p className="text-xs text-gray-400 mt-0.5">{new Date(grant.sent_at).toLocaleString('ja-JP')}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-medium">未送付</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {grant.status === 'pending' && (
-                            <button
-                              onClick={() => markSent(grant)}
-                              disabled={marking === grant.id}
-                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              {marking === grant.id ? '更新中...' : '送付済みにする'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleGrants.map((grant) => {
+                      const type = grant.grant_type ?? 'review';
+                      const typeLabel = GRANT_TYPE_LABELS[type];
+                      const amount = grant.reward_amount ?? grant.campaigns?.reward_amount ?? null;
+                      const isOpen = isOpenGrant(grant);
+                      const isSending = grant.error_message === '__sending__';
+                      return (
+                        <tr key={grant.id} className={isOpen ? '' : 'bg-gray-50'}>
+                          <td className="px-4 py-3 align-top">
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap ${typeLabel.className}`}>
+                              {typeLabel.label}
+                            </span>
+                            {grant.referral_codes && (
+                              <p className="text-[11px] text-gray-400 mt-1 font-mono">{grant.referral_codes.code}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <p className="text-gray-700 font-mono text-xs break-all">{grant.email}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {type === 'referrer' ? '紹介した回答: ' : ''}
+                              {grant.survey_responses?.school_name ?? '—'}
+                            </p>
+                            {type === 'referrer' && grant.survey_responses?.email && (
+                              <p className="text-[11px] text-gray-400 mt-0.5 break-all">
+                                紹介された人: {grant.survey_responses.email}
+                              </p>
+                            )}
+                            {type === 'referee' && grant.referral_codes && (
+                              <p className="text-[11px] text-gray-400 mt-0.5 break-all">
+                                紹介者: {grant.referral_codes.referrer_email}
+                              </p>
+                            )}
+                            {grant.flag_reason && (
+                              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1">
+                                要確認: {grant.flag_reason}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs align-top">
+                            <p className="text-gray-800 font-medium">{amount ? `${amount.toLocaleString()}円` : '—'}</p>
+                            <p className="mt-0.5">{grant.campaigns?.title ?? '—'}</p>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 text-xs align-top whitespace-nowrap">
+                            {new Date(grant.created_at).toLocaleString('ja-JP')}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            {grant.status === 'sent' ? (
+                              <div>
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">送付済み</span>
+                                {grant.sent_at && (
+                                  <p className="text-xs text-gray-400 mt-0.5">{new Date(grant.sent_at).toLocaleString('ja-JP')}</p>
+                                )}
+                              </div>
+                            ) : grant.status === 'cancelled' ? (
+                              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-medium">対象外</span>
+                            ) : grant.status === 'failed' ? (
+                              <div>
+                                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">送信失敗</span>
+                                {grant.error_message && !isSending && (
+                                  <p className="text-xs text-red-500 mt-0.5">{grant.error_message}</p>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded font-medium">
+                                {isSending ? '送信処理中' : '未送付'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs align-top min-w-[16rem]">
+                            {isOpen ? (
+                              <div className="space-y-1.5">
+                                <input
+                                  type="url"
+                                  placeholder="https://..."
+                                  value={giftUrlFor(grant)}
+                                  onChange={(e) => setGrantGiftUrls({ ...grantGiftUrls, [grant.id]: e.target.value })}
+                                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+                                />
+                                <div className="flex flex-wrap gap-1">
+                                  <button
+                                    onClick={() => sendGrantEmail(grant)}
+                                    disabled={marking === grant.id || isSending || !giftUrlFor(grant).trim()}
+                                    className="px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
+                                  >
+                                    {marking === grant.id ? '処理中...' : 'URLをメール送信'}
+                                  </button>
+                                  <button
+                                    onClick={() => markSent(grant)}
+                                    disabled={marking === grant.id}
+                                    className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50 disabled:opacity-50"
+                                  >
+                                    送付済みにする（メールなし）
+                                  </button>
+                                  <button
+                                    onClick={() => cancelGrant(grant)}
+                                    disabled={marking === grant.id || grant.status !== 'pending'}
+                                    className="px-2 py-1 text-xs border border-red-200 text-red-500 rounded hover:bg-red-50 disabled:opacity-50"
+                                  >
+                                    対象外
+                                  </button>
+                                </div>
+                              </div>
+                            ) : grant.gift_code ? (
+                              <a href={grant.gift_code} target="_blank" rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline break-all"
+                              >
+                                {grant.gift_code}
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

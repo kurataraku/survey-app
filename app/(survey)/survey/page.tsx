@@ -10,12 +10,51 @@ import Stepper from '@/components/Stepper';
 import QuestionRenderer from '@/components/QuestionRenderer';
 import Button from '@/components/ui/Button';
 import CampaignBanner from '@/components/CampaignBanner';
+import ReferralShareBlock from '@/components/ReferralShareBlock';
+import {
+  normalizeReferralCode,
+  REFERRAL_QUERY_PARAM,
+  REFERRAL_STORAGE_KEY,
+  REFERRAL_STORAGE_TTL_MS,
+  type ReferralShareInfo,
+} from '@/lib/referral/shared';
+
+/** URLの ?ref= を優先し、なければ30日以内に保存した紹介コードを使う */
+function readIncomingReferralCode(): string | null {
+  try {
+    const fromUrl = normalizeReferralCode(
+      new URLSearchParams(window.location.search).get(REFERRAL_QUERY_PARAM)
+    );
+    if (fromUrl) {
+      localStorage.setItem(
+        REFERRAL_STORAGE_KEY,
+        JSON.stringify({ code: fromUrl, savedAt: Date.now() })
+      );
+      return fromUrl;
+    }
+    const stored = localStorage.getItem(REFERRAL_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as { code?: string; savedAt?: number };
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > REFERRAL_STORAGE_TTL_MS) {
+      localStorage.removeItem(REFERRAL_STORAGE_KEY);
+      return null;
+    }
+    return normalizeReferralCode(parsed.code);
+  } catch {
+    return null;
+  }
+}
 
 export default function SurveyPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [incomingReferralCode, setIncomingReferralCode] = useState<string | null>(null);
+  const [referral, setReferral] = useState<ReferralShareInfo | null>(null);
   const submittedMessageRef = useRef<HTMLDivElement>(null);
+
+  // localStorage はクライアントでしか読めないためマウント後に反映する
+  useEffect(() => { setIncomingReferralCode(readIncomingReferralCode()); }, []);
 
   const {
     control,
@@ -172,7 +211,7 @@ export default function SurveyPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, referral_code: incomingReferralCode ?? undefined }),
       });
 
       const contentType = response.headers.get('content-type');
@@ -188,6 +227,12 @@ export default function SurveyPage() {
         throw new Error(responseData.error || responseData.message || '送信に失敗しました');
       }
 
+      try {
+        localStorage.removeItem(REFERRAL_STORAGE_KEY);
+      } catch {
+        // localStorage が使えない環境では無視
+      }
+      setReferral(responseData.referral ?? null);
       setIsSubmitted(true);
     } catch (error) {
       console.error('送信エラー:', error);
@@ -247,6 +292,7 @@ export default function SurveyPage() {
             <br />
             貴重なご協力、本当にありがとうございました！
           </p>
+          {referral && <ReferralShareBlock referral={referral} />}
         </div>
       </div>
     );
@@ -264,6 +310,17 @@ export default function SurveyPage() {
               ※個人が特定される内容は書かないでください
             </p>
           </div>
+
+          {incomingReferralCode && (
+            <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-center">
+              <p className="text-sm text-blue-900">
+                <span className="font-semibold">お知り合いからのご紹介リンク</span>で回答いただいています。
+              </p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                紹介キャンペーン期間中に口コミが掲載されると、あなたとご紹介者の両方に特典をお贈りします。
+              </p>
+            </div>
+          )}
 
           <CampaignBanner />
 

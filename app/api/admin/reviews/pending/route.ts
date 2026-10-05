@@ -33,6 +33,11 @@ export async function GET(request: NextRequest) {
       is_duplicate_email,
       moderation_status,
       created_at,
+      referral_code_id,
+      referral_codes!survey_responses_referral_code_id_fkey (
+        code,
+        referrer_email
+      ),
       review_moderation_results (
         danger_score,
         flags,

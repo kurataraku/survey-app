@@ -71,6 +71,12 @@ export default function AdminHeader() {
                 キャンペーン
               </Link>
               <Link
+                href={appPath('/admin/referrals')}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                紹介
+              </Link>
+              <Link
                 href={appPath('/admin/schools')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >

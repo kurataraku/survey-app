@@ -44,6 +44,7 @@
     "populate:campus-stations": "tsx scripts/populate-campus-nearest-stations.ts",
     "audit:campus-locations": "tsx scripts/audit-campus-location-coverage.ts",
     "agent:tuition": "tsx scripts/agent-tuition.ts",
+    "referral:send-requests": "tsx scripts/send-referral-requests.ts",
     "agent:school-info": "tsx scripts/agent-school-info.ts"
   },
   "dependencies": {
