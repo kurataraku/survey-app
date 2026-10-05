@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
 import { unstable_cache } from 'next/cache';
 import {
   publicSurveyResponsesOrFilter,
@@ -103,7 +104,7 @@ const EMPTY_GLOBAL_AVERAGES = {
   tuition_rating_avg: null as number | null,
 };
 
-/** サイト全体の評価平均（1時間キャッシュ） */
+/** サイト全体の公開口コミの評価平均（1時間キャッシュ） */
 async function getGlobalAverages() {
   // ビルド時 SSG で env 未設定のプロジェクトが prerender 失敗しないようにする
   if (
@@ -114,9 +115,23 @@ async function getGlobalAverages() {
   }
 
   const supabase = createAdminSupabaseClient();
-  const { data: allGlobalReviews } = await supabase
-    .from('survey_responses')
-    .select('overall_satisfaction, answers');
+  let allGlobalReviews: Array<{
+    overall_satisfaction: unknown;
+    answers: Record<string, unknown> | null;
+  }>;
+  try {
+    allGlobalReviews = await fetchAllRows((from, to) =>
+      supabase
+        .from('survey_responses')
+        .select('overall_satisfaction, answers')
+        .eq('is_public', true)
+        .order('id', { ascending: true })
+        .range(from, to)
+    );
+  } catch (error) {
+    console.error('[getGlobalAverages] survey_responses:', error);
+    return EMPTY_GLOBAL_AVERAGES;
+  }
 
   const toValidRatings = (rows: any[] | null | undefined, key: string) =>
     rows && rows.length > 0
@@ -165,7 +180,7 @@ async function getGlobalAverages() {
 
 export const getCachedGlobalAverages = unstable_cache(
   getGlobalAverages,
-  ['global-averages-v2'],
+  ['global-averages-v3'],
   { revalidate: 3600 }
 );
 
