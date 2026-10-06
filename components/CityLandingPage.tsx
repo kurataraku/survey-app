@@ -346,7 +346,7 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-gray-600">
               {prefecture}内のキャンパスに通った人の口コミがある学校は、その声を大きく紹介しています。口コミがまだない学校も含め、
-              {municipality}内に通えるキャンパスがある学校をすべて掲載しています。
+              {municipality}内に通えるキャンパスがある学校を掲載しています。
               満足度は学校全体の口コミの平均で、全国平均（当サイトに寄せられた全国の口コミの平均）との差も表示しています。
             </p>
           </div>
@@ -427,7 +427,7 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
                 href={prefecturePath}
                 className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
               >
-                {prefecture}の通信制高校をすべて見る
+                {prefecture}の通信制高校一覧を見る
               </Link>
             </li>
             <li>
