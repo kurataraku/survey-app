@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { assembleModeration } from '@/lib/moderation/assemble';
+import { loadSchoolModerationContext } from '@/lib/moderation/load-school';
+import { fetchOfficialPageExcerpt } from '@/lib/moderation/official-page';
+import { buildModerationUserPrompt, MODERATION_SYSTEM_PROMPT } from '@/lib/moderation/prompt';
+import { buildRuleFindings } from '@/lib/moderation/rules';
+import { parseAiModeration } from '@/lib/moderation/sanitize';
+import type { ReviewModerationInput } from '@/lib/moderation/types';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function getSupabase() {
   return createClient(
@@ -8,35 +18,6 @@ function getSupabase() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
-
-const MODERATION_PROMPT = `あなたは通信制高校の口コミサイトのモデレーターです。
-以下の口コミを審査し、JSON形式で結果を返してください。
-
-審査項目:
-1. personal_info: 教師名・生徒名など個人を特定できる記述が含まれているか
-2. fake_review: 在校経験がなさそうな虚偽・作り話の可能性があるか
-3. advertisement: 広告・宣伝・営業目的の投稿か
-4. hate_speech: 差別・ヘイト・誹謗中傷表現が含まれているか
-5. fake_school: 学校名が実在しない、または架空の可能性があるか
-6. duplicate_email: （外部チェック済みの値をそのまま引き継ぐ）
-
-danger_scoreは0〜100で、問題があるほど高くしてください。
-- 0〜30: 問題なし（通常承認）
-- 31〜60: 注意が必要（管理者要確認）
-- 61〜100: 高リスク（要注意）
-
-必ず以下のJSON形式のみで返答してください（説明文不要）:
-{
-  "danger_score": <0-100の整数>,
-  "flags": {
-    "personal_info": <true/false>,
-    "fake_review": <true/false>,
-    "advertisement": <true/false>,
-    "hate_speech": <true/false>,
-    "fake_school": <true/false>
-  },
-  "reason": "<日本語で150字以内の判定理由>"
-}`;
 
 export async function POST(
   request: NextRequest,
@@ -50,10 +31,9 @@ export async function POST(
   const { id } = await params;
   const supabase = getSupabase();
 
-  // 口コミデータ取得
   const { data: review, error: fetchError } = await supabase
     .from('survey_responses')
-    .select('id, school_name, respondent_role, status, good_comment, bad_comment, overall_satisfaction, email, answers')
+    .select('id, school_id, school_name, respondent_role, status, overall_satisfaction, good_comment, bad_comment, email, answers, created_at')
     .eq('id', id)
     .single();
 
@@ -61,7 +41,6 @@ export async function POST(
     return NextResponse.json({ error: '口コミが見つかりません' }, { status: 404 });
   }
 
-  // 重複メールチェック
   const { count: duplicateCount } = await supabase
     .from('survey_responses')
     .select('id', { count: 'exact', head: true })
@@ -70,78 +49,72 @@ export async function POST(
     .neq('id', id);
 
   const isDuplicateEmail = (duplicateCount ?? 0) > 0;
+  const similarIds = await findSimilarIds(supabase, {
+    id,
+    schoolName: review.school_name,
+    goodComment: review.good_comment,
+  });
 
-  // 類似投稿チェック（同じ学校への同内容）
-  const { data: similarReviews } = await supabase
-    .from('survey_responses')
-    .select('id, good_comment, bad_comment')
-    .eq('school_name', review.school_name)
-    .neq('id', id)
-    .limit(20);
-
-  const similarIds: string[] = [];
-  if (similarReviews && review.good_comment) {
-    for (const r of similarReviews) {
-      if (!r.good_comment) continue;
-      const similarity = cosineSimilaritySimple(review.good_comment, r.good_comment);
-      if (similarity > 0.8) similarIds.push(r.id);
-    }
-  }
-
-  // LLM審査
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-  const reviewText = `
-学校名: ${review.school_name}
-投稿者の立場: ${review.respondent_role}
-現在の状況: ${review.status}
-総合満足度: ${review.overall_satisfaction}/5
-良かった点: ${review.good_comment}
-改善してほしい点: ${review.bad_comment}
-  `.trim();
-
-  let moderationResult = {
-    danger_score: 0,
-    flags: {
-      personal_info: false,
-      fake_review: false,
-      advertisement: false,
-      hate_speech: false,
-      fake_school: false,
-    },
-    reason: '審査完了',
+  const answers = asRecord(review.answers);
+  const school = await loadSchoolModerationContext(supabase, {
+    schoolId: typeof review.school_id === 'string' ? review.school_id : null,
+    schoolName: review.school_name ?? '',
+  });
+  const officialPage = await fetchOfficialPageExcerpt(school.officialUrl);
+  const postedAt = review.created_at ? new Date(review.created_at) : new Date();
+  const reviewInput: ReviewModerationInput = {
+    schoolName: review.school_name ?? '',
+    respondentRole: textOrNull(review.respondent_role),
+    status: textOrNull(review.status),
+    overallSatisfaction: typeof review.overall_satisfaction === 'number' ? review.overall_satisfaction : null,
+    goodComment: textOrNull(review.good_comment),
+    badComment: textOrNull(review.bad_comment),
+    answers,
   };
 
+  const ruleFindings = buildRuleFindings({
+    reviewSchoolName: reviewInput.schoolName,
+    school,
+    campusPrefecture: textOrNull(answers.campus_prefecture),
+    campusCity: textOrNull(answers.campus_city),
+    enrollmentYear: textOrNull(answers.enrollment_year),
+    postedAt,
+    email: textOrNull(review.email),
+    duplicateEmail: isDuplicateEmail,
+    officialPage,
+  });
+
+  const model = process.env.OPENAI_MODEL ?? 'gpt-4.1';
+  let ai: ReturnType<typeof parseAiModeration> = null;
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? 'gpt-4.1',
-      messages: [
-        { role: 'system', content: MODERATION_PROMPT },
-        { role: 'user', content: reviewText },
-      ],
+      model,
       temperature: 0,
       response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: MODERATION_SYSTEM_PROMPT },
+        { role: 'user', content: buildModerationUserPrompt(reviewInput, school, officialPage) },
+      ],
     });
-
-    const raw = completion.choices[0]?.message?.content ?? '{}';
-    const parsed = JSON.parse(raw);
-
-    moderationResult = {
-      danger_score: Math.min(100, Math.max(0, parseInt(parsed.danger_score ?? 0))),
-      flags: {
-        personal_info: !!parsed.flags?.personal_info,
-        fake_review: !!parsed.flags?.fake_review,
-        advertisement: !!parsed.flags?.advertisement,
-        hate_speech: !!parsed.flags?.hate_speech,
-        fake_school: !!parsed.flags?.fake_school,
-      },
-      reason: parsed.reason ?? '審査完了',
-    };
-  } catch (e) {
-    console.error('[moderate] LLM審査エラー:', e);
+    const raw = completion.choices[0]?.message?.content ?? '';
+    ai = parseAiModeration(JSON.parse(raw));
+    if (!ai) console.error('[moderate] AI審査のJSONが不正です');
+  } catch (error) {
+    console.error('[moderate] LLM審査エラー:', error);
   }
 
-  // 重複フラグをDBに保存
+  const moderation = assembleModeration({
+    ruleFindings,
+    aiFindings: ai?.findings ?? [],
+    personalInfo: ai?.personalInfo ?? false,
+    hateSpeech: ai?.hateSpeech ?? false,
+    advertisement: ai?.advertisement ?? false,
+    fakeSchool: school.lookup === 'missing',
+    duplicateEmail: isDuplicateEmail,
+    aiFailed: ai == null,
+  });
+
   if (isDuplicateEmail) {
     await supabase
       .from('survey_responses')
@@ -149,41 +122,81 @@ export async function POST(
       .eq('id', id);
   }
 
-  // 審査結果を保存
-  const flagsWithDuplicate = {
-    ...moderationResult.flags,
-    duplicate_email: isDuplicateEmail,
-  };
-
   const { error: insertError } = await supabase
     .from('review_moderation_results')
     .insert({
       survey_response_id: id,
-      danger_score: moderationResult.danger_score,
-      flags: flagsWithDuplicate,
-      reason: moderationResult.reason,
+      danger_score: moderation.dangerScore,
+      flags: moderation.flags,
+      reason: moderation.reason,
       similar_response_ids: similarIds,
-      model_used: process.env.OPENAI_MODEL ?? 'gpt-4.1',
+      model_used: model,
     });
 
   if (insertError) {
     console.error('[moderate] 審査結果保存エラー:', insertError);
+    return NextResponse.json({ error: '審査結果の保存に失敗しました' }, { status: 500 });
   }
 
   return NextResponse.json({
     success: true,
-    danger_score: moderationResult.danger_score,
-    flags: flagsWithDuplicate,
-    reason: moderationResult.reason,
+    danger_score: moderation.dangerScore,
+    flags: moderation.flags,
+    reason: moderation.reason,
     similar_count: similarIds.length,
   });
 }
 
-// 簡易類似度チェック（共通単語の割合）
-function cosineSimilaritySimple(a: string, b: string): number {
-  const tokensA = new Set(a.split(/\s+|。|、/));
-  const tokensB = new Set(b.split(/\s+|。|、/));
-  const intersection = [...tokensA].filter((t) => tokensB.has(t)).length;
+async function findSimilarIds(
+  supabase: ReturnType<typeof getSupabase>,
+  review: { id: string; schoolName: string | null; goodComment: string | null }
+): Promise<string[]> {
+  if (!review.schoolName || !review.goodComment) return [];
+
+  const { data: similarReviews } = await supabase
+    .from('survey_responses')
+    .select('id, good_comment')
+    .eq('school_name', review.schoolName)
+    .neq('id', review.id)
+    .limit(20);
+
+  const similarIds: string[] = [];
+  for (const candidate of similarReviews ?? []) {
+    if (!candidate.good_comment) continue;
+    if (tokenOverlap(review.goodComment, candidate.good_comment) > 0.8) {
+      similarIds.push(candidate.id);
+    }
+  }
+  return similarIds;
+}
+
+function tokenOverlap(left: string, right: string): number {
+  const tokensA = new Set(left.split(/\s+|。|、/));
+  const tokensB = new Set(right.split(/\s+|。|、/));
+  const intersection = [...tokensA].filter((token) => tokensB.has(token)).length;
   const union = new Set([...tokensA, ...tokensB]).size;
   return union === 0 ? 0 : intersection / union;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+    return {};
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  return {};
+}
+
+function textOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
 }

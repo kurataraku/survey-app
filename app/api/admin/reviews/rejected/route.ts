@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
         danger_score,
         flags,
         reason,
-        similar_response_ids
+        similar_response_ids,
+        created_at
       )
     `, { count: 'exact' })
     .eq('moderation_status', 'rejected')

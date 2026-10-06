@@ -2,19 +2,36 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiPath } from '@/lib/base-path';
+import {
+  COMMENT_HEADINGS,
+  EMPTY_SUPPORT,
+  EMPTY_UNKNOWN,
+  EMPTY_WEAK,
+  latestByCreatedAt,
+  moderationSections,
+  readFindings,
+  summaryLines,
+} from '@/lib/moderation/comment';
+import type { ModerationFinding } from '@/lib/moderation/types';
+
+interface ModerationFlags {
+  personal_info?: boolean;
+  fake_review?: boolean;
+  advertisement?: boolean;
+  hate_speech?: boolean;
+  fake_school?: boolean;
+  duplicate_email?: boolean;
+  fact_conflict?: boolean;
+  internal_conflict?: boolean;
+  findings?: ModerationFinding[];
+}
 
 interface ModerationResult {
   danger_score: number;
-  flags: {
-    personal_info: boolean;
-    fake_review: boolean;
-    advertisement: boolean;
-    hate_speech: boolean;
-    fake_school: boolean;
-    duplicate_email: boolean;
-  };
+  flags: ModerationFlags;
   reason: string;
   similar_response_ids: string[];
+  created_at?: string;
 }
 
 interface Answers {
@@ -91,7 +108,20 @@ const FLAG_LABELS: Record<string, string> = {
   hate_speech: 'ヘイト',
   fake_school: '架空の学校',
   duplicate_email: 'メール重複',
+  fact_conflict: '公開情報と矛盾',
+  internal_conflict: '回答の食い違い',
 };
+
+const FLAG_ORDER = [
+  'personal_info',
+  'hate_speech',
+  'advertisement',
+  'fake_school',
+  'duplicate_email',
+  'fact_conflict',
+  'internal_conflict',
+  'fake_review',
+] as const;
 
 const RATING_LABELS: Record<string, string> = {
   flexibility_rating: '柔軟性',
@@ -127,15 +157,94 @@ function DangerBadge({ score }: { score: number | undefined }) {
 
 function FlagBadges({ flags }: { flags: ModerationResult['flags'] | undefined }) {
   if (!flags) return null;
-  const active = Object.entries(flags).filter(([, v]) => v);
-  if (active.length === 0) return <span className="text-xs text-gray-400">問題なし</span>;
+  const active = FLAG_ORDER.filter((key) => flags[key] === true)
+    .filter((key) => !(key === 'fake_review' && flags.fact_conflict === true));
+  if (active.length === 0) {
+    if (Array.isArray(flags.findings) && flags.findings.length > 0) return null;
+    return <span className="text-xs text-gray-400">問題なし</span>;
+  }
   return (
     <div className="flex flex-wrap gap-1">
-      {active.map(([key]) => (
+      {active.map((key) => (
         <span key={key} className="text-xs bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded">
           {FLAG_LABELS[key] ?? key}
         </span>
       ))}
+    </div>
+  );
+}
+
+function ModerationReport({
+  mod,
+  onRerun,
+  rerunning,
+}: {
+  mod: ModerationResult;
+  onRerun?: () => void;
+  rerunning?: boolean;
+}) {
+  const findings = readFindings(mod.flags);
+  return (
+    <div className="bg-gray-50 rounded p-3 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-gray-600">AI審査:</span>
+        <FlagBadges flags={mod.flags} />
+        {onRerun && (
+          <button
+            onClick={onRerun}
+            disabled={rerunning}
+            className="text-xs text-purple-700 underline disabled:opacity-50"
+          >
+            {rerunning ? '審査中...' : '再審査'}
+          </button>
+        )}
+      </div>
+      {findings.length === 0 ? (
+        mod.reason ? <p className="text-xs text-gray-600 whitespace-pre-wrap">{mod.reason}</p> : null
+      ) : (
+        <ModerationFindings reason={mod.reason} findings={findings} />
+      )}
+      {mod.similar_response_ids?.length > 0 && (
+        <p className="text-xs text-orange-600">類似投稿 {mod.similar_response_ids.length} 件検出</p>
+      )}
+    </div>
+  );
+}
+
+function ModerationFindings({ reason, findings }: { reason: string; findings: ModerationFinding[] }) {
+  const sections = moderationSections(findings);
+  return (
+    <div className="space-y-3">
+      {summaryLines(reason).map((line, index) => (
+        <p key={`${index}-${line}`} className="text-xs text-gray-800">{line}</p>
+      ))}
+      <FindingList title={COMMENT_HEADINGS.support} items={sections.support} empty={EMPTY_SUPPORT} className="text-green-900" />
+      <FindingList title={COMMENT_HEADINGS.weak} items={sections.weak} empty={EMPTY_WEAK} className="text-amber-950" />
+      <FindingList title={COMMENT_HEADINGS.unknown} items={sections.unknown} empty={EMPTY_UNKNOWN} className="text-gray-600" />
+    </div>
+  );
+}
+
+function FindingList({
+  title,
+  items,
+  empty,
+  className,
+}: {
+  title: string;
+  items: string[];
+  empty: string;
+  className: string;
+}) {
+  const lines = items.length > 0 ? items : [empty];
+  return (
+    <div>
+      <p className="text-xs font-medium text-gray-700 mb-1">{title}</p>
+      <ul className={`space-y-1 text-xs leading-relaxed ${className}`}>
+        {lines.map((line, index) => (
+          <li key={`${title}-${index}`}>{line}</li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -438,7 +547,7 @@ export default function ReviewModerationPage() {
             ) : (
               <div className="space-y-4">
                 {reviews.map((review) => {
-                  const mod = review.review_moderation_results?.[0];
+                  const mod = latestByCreatedAt(review.review_moderation_results);
                   return (
                     <div key={review.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       {/* ヘッダー */}
@@ -471,16 +580,11 @@ export default function ReviewModerationPage() {
                         )}
                         {/* AI審査結果 */}
                         {mod ? (
-                          <div className="bg-gray-50 rounded p-3 space-y-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-600">AI審査:</span>
-                              <FlagBadges flags={mod.flags} />
-                            </div>
-                            <p className="text-xs text-gray-600">{mod.reason}</p>
-                            {mod.similar_response_ids?.length > 0 && (
-                              <p className="text-xs text-orange-600">類似投稿 {mod.similar_response_ids.length} 件検出</p>
-                            )}
-                          </div>
+                          <ModerationReport
+                            mod={mod}
+                            onRerun={() => runModerate(review.id)}
+                            rerunning={moderating === review.id}
+                          />
                         ) : (
                           <div className="bg-gray-50 rounded p-3 flex items-center justify-between">
                             <span className="text-xs text-gray-400">AI審査未実施</span>
@@ -621,7 +725,7 @@ export default function ReviewModerationPage() {
             ) : (
               <div className="space-y-4">
                 {rejectedReviews.map((review) => {
-                  const mod = review.review_moderation_results?.[0];
+                  const mod = latestByCreatedAt(review.review_moderation_results);
                   return (
                     <div key={review.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
@@ -645,18 +749,7 @@ export default function ReviewModerationPage() {
                           </p>
                         </div>
 
-                        {mod && (
-                          <div className="bg-gray-50 rounded p-3 space-y-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-600">AI審査:</span>
-                              <FlagBadges flags={mod.flags} />
-                            </div>
-                            <p className="text-xs text-gray-600">{mod.reason}</p>
-                            {mod.similar_response_ids?.length > 0 && (
-                              <p className="text-xs text-orange-600">類似投稿 {mod.similar_response_ids.length} 件検出</p>
-                            )}
-                          </div>
-                        )}
+                        {mod && <ModerationReport mod={mod} />}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div className="min-w-0">
