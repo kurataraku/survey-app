@@ -7,10 +7,13 @@
  *   npm run referral:send-requests -- --limit=50 --sleep-ms=600     # 先行配信
  *   npm run referral:send-requests -- --sleep-ms=600                # 残り全件
  *   npm run referral:send-requests -- --only=someone@example.com    # 対象者のうち1人にだけ本番どおり送る
+ *   npm run referral:send-requests -- --limit=75 --first=a@x.com,b@y.com  # 指定した人を先頭に並べて送る
  *   --site-url=https://...  メール内のURLのドメイン（既定: https://careeressence.jp）
  *
  * 対象: moderation_status='approved'、メールあり、is_duplicate_email=false の回答者（メールで重複排除）
- * 除外: 配信停止した人（email_unsubscribes）、送信済みの人（email_logs の referral_request / sent）
+ * 除外: 配信停止した人（email_unsubscribes）、送信済みの人（email_logs の referral_request / sent）、
+ *       インポート時の仮・ダミー・社内アドレス（EXCLUDED_DOMAINS）、
+ *       紹介コードを持っている人（完了画面や承認メールで紹介の案内を受け取り済み）
  * 前提: 紹介制度が有効なキャンペーンが実施中であること
  * 環境: .env.local に NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, EMAIL_API_KEY,
  *       EMAIL_SENDER_ORG, EMAIL_SENDER_ADDRESS（特定電子メール法の表示義務）
@@ -36,6 +39,15 @@ type Target = {
 
 const PAGE_SIZE = 1000;
 
+// 存在しないアドレスへの送信は不達率を上げ、Resend の送信停止につながる
+const EXCLUDED_DOMAINS = ['example.com', 'careeressence.co.jp'];
+const EXCLUDED_DOMAIN_SUFFIXES = ['.placeholder'];
+
+function isExcludedDomain(email: string): boolean {
+  const domain = email.split('@')[1] ?? '';
+  return EXCLUDED_DOMAINS.includes(domain) || EXCLUDED_DOMAIN_SUFFIXES.some((s) => domain.endsWith(s));
+}
+
 function parseArgs() {
   const argv = process.argv.slice(2);
   const numberArg = (name: string): number | null => {
@@ -47,8 +59,13 @@ function parseArgs() {
   const testTo = argv.find((x) => x.startsWith('--test-to='))?.split('=')[1]?.trim() || null;
   const siteUrl = argv.find((x) => x.startsWith('--site-url='))?.slice('--site-url='.length).trim();
   const only = argv.find((x) => x.startsWith('--only='))?.slice('--only='.length).trim() || null;
+  const first = (argv.find((x) => x.startsWith('--first='))?.slice('--first='.length) ?? '')
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean);
   return {
     only,
+    first,
     // .env.local の NEXT_PUBLIC_SITE_URL は開発用（localhost）のことが多いため、メール内のURLは既定で本番にする
     siteUrl: (siteUrl || 'https://careeressence.jp').replace(/\/$/, ''),
     dryRun: argv.includes('--dry-run'),
@@ -116,6 +133,25 @@ async function loadTargets(supabase: SupabaseClient, normalizeEmail: (e: string)
     )).map((r) => normalizeEmail(r.to_email))
   );
 
+  // このCLIで送信に失敗した人は、紹介コードだけ発行済みでも再送の対象に残す
+  const failedRequest = new Set(
+    (await fetchAll<{ to_email: string }>((from, to) =>
+      supabase
+        .from('email_logs')
+        .select('to_email')
+        .eq('email_type', 'referral_request')
+        .eq('status', 'failed')
+        .range(from, to)
+    )).map((r) => normalizeEmail(r.to_email))
+  );
+  const hasReferralCode = new Set(
+    (await fetchAll<{ referrer_email: string }>((from, to) =>
+      supabase.from('referral_codes').select('referrer_email').range(from, to)
+    ))
+      .map((r) => normalizeEmail(r.referrer_email))
+      .filter((email) => !failedRequest.has(email))
+  );
+
   // 新しい順に並んでいるので、最初に出てきた回答がその人の最新の承認済み回答
   const latestByEmail = new Map<string, Target>();
   for (const r of responses) {
@@ -125,14 +161,19 @@ async function loadTargets(supabase: SupabaseClient, normalizeEmail: (e: string)
   }
 
   const all = [...latestByEmail.entries()];
-  const targets = all
-    .filter(([key]) => !unsubscribed.has(key) && !alreadySent.has(key))
+  const reachable = all.filter(([key]) => !isExcludedDomain(key));
+  const targets = reachable
+    .filter(([key]) => !unsubscribed.has(key) && !alreadySent.has(key) && !hasReferralCode.has(key))
     .map(([, t]) => t);
 
   return {
     uniqueEmails: all.length,
-    unsubscribedCount: all.filter(([key]) => unsubscribed.has(key)).length,
-    alreadySentCount: all.filter(([key]) => alreadySent.has(key)).length,
+    excludedDomainCount: all.length - reachable.length,
+    unsubscribedCount: reachable.filter(([key]) => unsubscribed.has(key)).length,
+    alreadySentCount: reachable.filter(([key]) => alreadySent.has(key)).length,
+    hasReferralCodeCount: reachable.filter(
+      ([key]) => hasReferralCode.has(key) && !unsubscribed.has(key) && !alreadySent.has(key)
+    ).length,
     targets,
   };
 }
@@ -167,18 +208,32 @@ async function main() {
     }
   }
 
-  const { uniqueEmails, unsubscribedCount, alreadySentCount, targets } = await loadTargets(supabase, normalizeEmail);
-  const pool = args.only ? targets.filter((t) => normalizeEmail(t.email) === normalizeEmail(args.only!)) : targets;
+  const { uniqueEmails, excludedDomainCount, unsubscribedCount, alreadySentCount, hasReferralCodeCount, targets } =
+    await loadTargets(supabase, normalizeEmail);
+
+  const firstKeys = args.first.map(normalizeEmail);
+  const missingFirst = args.first.filter((e) => !targets.some((t) => normalizeEmail(t.email) === normalizeEmail(e)));
+  if (missingFirst.length > 0) {
+    return fail(`--first の次のアドレスは配信対象にいません: ${missingFirst.join(', ')}`);
+  }
+  const ordered = [
+    ...firstKeys.map((k) => targets.find((t) => normalizeEmail(t.email) === k)!),
+    ...targets.filter((t) => !firstKeys.includes(normalizeEmail(t.email))),
+  ];
+
+  const pool = args.only ? ordered.filter((t) => normalizeEmail(t.email) === normalizeEmail(args.only!)) : ordered;
   if (args.only && pool.length === 0) {
-    return fail(`${args.only} は配信対象にいません（未承認・重複のみ・配信停止済み・送信済みのいずれか）`);
+    return fail(`${args.only} は配信対象にいません（未承認・重複のみ・除外ドメイン・配信停止済み・送信済み・紹介コードありのいずれか）`);
   }
   const selected = args.limit != null ? pool.slice(0, args.limit) : pool;
 
   console.log('紹介依頼メール 配信対象');
   console.log('================================');
   console.log(`承認済み回答者（メール重複排除後）: ${uniqueEmails} 人`);
+  console.log(`  - 仮・ダミー・社内アドレス: ${excludedDomainCount} 人`);
   console.log(`  - 配信停止済み: ${unsubscribedCount} 人`);
   console.log(`  - 送信済み:     ${alreadySentCount} 人`);
+  console.log(`  - 紹介コードあり（案内済み）: ${hasReferralCodeCount} 人`);
   console.log(`未送信の対象:   ${targets.length} 人`);
   console.log(`今回の送信予定: ${selected.length} 人${args.limit != null ? `（--limit=${args.limit}）` : ''}`);
   console.log(`メール内のURL:  ${args.siteUrl}`);
