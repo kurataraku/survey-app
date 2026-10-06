@@ -156,8 +156,7 @@ function ThemeSchoolLists({ data }: { data: CityLandingData }) {
         {data.municipality}の通信制高校をテーマ別に見る
       </h2>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
-        {data.municipality}
-        内に通えるキャンパスがある学校を、学校全体の口コミで比べています。通学頻度は口コミの回答者が実際に通った頻度で、学校のコースや制度を示すものではありません。
+        口コミの評価や、口コミに多い通い方をもとに、テーマ別に学校を紹介しています。
       </p>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {data.themeLists.map((list) => (
