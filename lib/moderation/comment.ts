@@ -38,18 +38,20 @@ export function buildModerationComment(input: {
   advertisement: boolean;
   fakeSchool: boolean;
   duplicateEmail: boolean;
+  fillerPadding: boolean;
   aiFailed: boolean;
 }): string {
   const groups = groupFindings(input.findings);
-  const factConflicts = input.findings.filter((finding) => finding.aspect === 'fact' && finding.verdict === 'contradict').length;
+  const factConflicts = input.findings.filter((finding) => finding.aspect === 'fact' && finding.verdict === 'contradict' && finding.kind !== 'filler_padding').length;
   const internalConflicts = input.findings.filter((finding) => finding.aspect === 'internal' && finding.verdict === 'contradict').length;
   const unexplained = groups.weak.filter((finding) => finding.verdict === 'unexplained').length;
-  const safety = input.personalInfo || input.hateSpeech || input.advertisement || input.fakeSchool || input.duplicateEmail;
+  const safety = input.personalInfo || input.hateSpeech || input.advertisement || input.fakeSchool || input.duplicateEmail || input.fillerPadding;
 
   const summary = [
     safety ? '安全上の問題があります。' : '安全上の問題はなし。',
     factConflicts > 0 ? `公開情報との矛盾は${factConflicts}件。` : '公開情報との矛盾はなし。',
     internalConflicts > 0 ? `回答の食い違いは${internalConflicts}件。` : '回答の食い違いはなし。',
+    input.fillerPadding ? '句読点や空白で文章を埋めています。' : '',
     unexplained > 0 ? `理由が書かれていない点数は${unexplained}件。` : '',
   ].filter(Boolean).join('');
 

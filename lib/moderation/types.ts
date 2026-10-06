@@ -11,6 +11,7 @@ export type ModerationFinding = {
   comparedWith: string;
   meaning: string;
   flag?: SafetyFlagName;
+  kind?: 'filler_padding';
 };
 
 export type StoredModerationFlags = {
@@ -22,6 +23,7 @@ export type StoredModerationFlags = {
   duplicate_email: boolean;
   fact_conflict: boolean;
   internal_conflict: boolean;
+  filler_padding: boolean;
   findings: ModerationFinding[];
 };
 

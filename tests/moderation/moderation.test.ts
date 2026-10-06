@@ -8,6 +8,7 @@ import {
 } from '../../lib/moderation/comment';
 import { htmlToText, isSafeOfficialUrl } from '../../lib/moderation/official-page';
 import { buildRuleFindings } from '../../lib/moderation/rules';
+import { fillerFindings } from '../../lib/moderation/filler';
 import { sanitizeFindings } from '../../lib/moderation/sanitize';
 import { scoreModeration } from '../../lib/moderation/score';
 import type { ModerationFinding, SchoolModerationContext } from '../../lib/moderation/types';
@@ -36,6 +37,7 @@ describe('scoreModeration', () => {
     duplicateEmail: false,
     factConflict: false,
     internalConflict: false,
+    fillerPadding: false,
   };
 
   it('一致や未記載だけでは点を足さない', () => {
@@ -46,6 +48,7 @@ describe('scoreModeration', () => {
     expect(scoreModeration({ ...none, personalInfo: true, factConflict: true })).toBe(75);
     expect(scoreModeration({ ...none, internalConflict: true })).toBe(25);
     expect(scoreModeration({ ...none, duplicateEmail: true })).toBe(15);
+    expect(scoreModeration({ ...none, fillerPadding: true })).toBe(80);
     expect(scoreModeration({
       personalInfo: true,
       hateSpeech: true,
@@ -54,7 +57,55 @@ describe('scoreModeration', () => {
       duplicateEmail: true,
       factConflict: true,
       internalConflict: true,
+      fillerPadding: true,
     })).toBe(100);
+  });
+});
+
+describe('fillerFindings', () => {
+  it('句読点や記号で長くした良かった点と、読点の連打を検知する', () => {
+    const findings = buildRuleFindings({
+      reviewSchoolName: 'S高等学校',
+      school: { ...asukaSchool, campusLocations: [] },
+      campusPrefecture: null,
+      campusCity: null,
+      enrollmentYear: '2025',
+      postedAt: new Date('2026-10-06T08:28:24Z'),
+      email: null,
+      duplicateEmail: false,
+      officialPage: { status: 'fetched', text: '本文', note: '' },
+      goodComment: '自分の行きたい進路に行けた。 ●○。●○。●○。●○。●○。●○。●○！！！',
+      badComment: 'レポートの授業動画をもっと面白くしてほしい,,,,,,,',
+    });
+    const fillers = findings.filter((finding) => finding.kind === 'filler_padding');
+
+    expect(fillers).toHaveLength(2);
+    expect(fillers[0]?.comparedWith).toBe('良かった点');
+    expect(fillers[1]?.comparedWith).toBe('改善してほしい点');
+
+    const result = assembleModeration({
+      ruleFindings: findings,
+      aiFindings: [],
+      personalInfo: false,
+      hateSpeech: false,
+      advertisement: false,
+      fakeSchool: false,
+      duplicateEmail: false,
+      aiFailed: false,
+    });
+    expect(result.dangerScore).toBe(80);
+    expect(result.flags.filler_padding).toBe(true);
+    expect(result.flags.internal_conflict).toBe(false);
+    expect(result.reason).toContain('句読点や空白で文章を埋めています。');
+    expect(result.reason).toContain('埋め込みと判断した');
+  });
+
+  it('普通の文末の句点では検知しない', () => {
+    const findings = fillerFindings(
+      '自分の行きたい進路に行けた。先生も話を聞いてくれた。',
+      'レポートの授業動画をもっと面白くしてほしい。'
+    );
+    expect(findings).toEqual([]);
   });
 });
 

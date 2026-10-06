@@ -1,3 +1,4 @@
+import { fillerFindings } from './filler';
 import type {
   CampusLocation,
   ModerationFinding,
@@ -15,6 +16,8 @@ export type RuleCheckInput = {
   email: string | null;
   duplicateEmail: boolean;
   officialPage: OfficialPageResult;
+  goodComment?: string | null;
+  badComment?: string | null;
 };
 
 export function buildRuleFindings(input: RuleCheckInput): ModerationFinding[] {
@@ -46,6 +49,7 @@ export function buildRuleFindings(input: RuleCheckInput): ModerationFinding[] {
     });
   }
 
+  findings.push(...fillerFindings(input.goodComment ?? null, input.badComment ?? null));
   findings.push(...campusFindings(input));
   const futureYear = futureEnrollmentFinding(input);
   if (futureYear) findings.push(futureYear);

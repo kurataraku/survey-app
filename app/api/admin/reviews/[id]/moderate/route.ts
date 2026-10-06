@@ -82,6 +82,8 @@ export async function POST(
     email: textOrNull(review.email),
     duplicateEmail: isDuplicateEmail,
     officialPage,
+    goodComment: reviewInput.goodComment,
+    badComment: reviewInput.badComment,
   });
 
   const model = process.env.OPENAI_MODEL ?? 'gpt-4.1';

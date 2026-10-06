@@ -23,6 +23,7 @@ interface ModerationFlags {
   duplicate_email?: boolean;
   fact_conflict?: boolean;
   internal_conflict?: boolean;
+  filler_padding?: boolean;
   findings?: ModerationFinding[];
 }
 
@@ -110,6 +111,7 @@ const FLAG_LABELS: Record<string, string> = {
   duplicate_email: 'メール重複',
   fact_conflict: '公開情報と矛盾',
   internal_conflict: '回答の食い違い',
+  filler_padding: '文章の埋め込み',
 };
 
 const FLAG_ORDER = [
@@ -120,6 +122,7 @@ const FLAG_ORDER = [
   'duplicate_email',
   'fact_conflict',
   'internal_conflict',
+  'filler_padding',
   'fake_review',
 ] as const;
 

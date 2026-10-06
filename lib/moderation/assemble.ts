@@ -36,6 +36,8 @@ export function assembleModeration(input: AssembleInput): AssembledModeration {
   const factConflict = findings.some((finding) => finding.aspect === 'fact' && finding.verdict === 'contradict');
   const internalConflict = findings.some((finding) => finding.aspect === 'internal' && finding.verdict === 'contradict');
 
+  const fillerPadding = findings.some((finding) => finding.kind === 'filler_padding');
+
   const dangerScore = scoreModeration({
     personalInfo,
     hateSpeech,
@@ -44,6 +46,7 @@ export function assembleModeration(input: AssembleInput): AssembledModeration {
     duplicateEmail: input.duplicateEmail,
     factConflict,
     internalConflict,
+    fillerPadding,
   });
 
   const flags: StoredModerationFlags = {
@@ -55,6 +58,7 @@ export function assembleModeration(input: AssembleInput): AssembledModeration {
     duplicate_email: input.duplicateEmail,
     fact_conflict: factConflict,
     internal_conflict: internalConflict,
+    filler_padding: fillerPadding,
     findings,
   };
 
@@ -68,6 +72,7 @@ export function assembleModeration(input: AssembleInput): AssembledModeration {
       advertisement,
       fakeSchool: input.fakeSchool,
       duplicateEmail: input.duplicateEmail,
+      fillerPadding,
       aiFailed: input.aiFailed,
     }),
   };

@@ -6,6 +6,7 @@ export type ScoreInput = {
   duplicateEmail: boolean;
   factConflict: boolean;
   internalConflict: boolean;
+  fillerPadding: boolean;
 };
 
 const SCORE_CAP = 100;
@@ -19,5 +20,6 @@ export function scoreModeration(input: ScoreInput): number {
   if (input.factConflict) score += 35;
   if (input.internalConflict) score += 25;
   if (input.duplicateEmail) score += 15;
+  if (input.fillerPadding) score += 80;
   return Math.min(SCORE_CAP, score);
 }
