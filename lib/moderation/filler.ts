@@ -1,7 +1,7 @@
 import type { ModerationFinding } from './types';
 
-const REPEATED_FILLER = /([。、，,\.．！!？?・●○◎◯※＊*★☆\s　])\1{5,}/u;
-const MIXED_FILLER = /[。、，,\.．！!？?・●○◎◯※＊*★☆〜~＾^\s　]{12,}/u;
+const REPEATED_FILLER = /([。、，,\.．！!？?・●○◎◯※＊*★☆\s　])\1{3,}/u;
+const MIXED_FILLER = /[。、，,\.．！!？?・●○◎◯※＊*★☆〜~＾^\s　]{4,}/u;
 
 export function fillerFindings(
   goodComment: string | null,

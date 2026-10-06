@@ -107,6 +107,13 @@ describe('fillerFindings', () => {
     );
     expect(findings).toEqual([]);
   });
+
+  it('同じ句読点4文字、記号や空白4文字から検知し、3文字では検知しない', () => {
+    expect(fillerFindings('面白くしてほしい,,,,', null)).toHaveLength(1);
+    expect(fillerFindings('進路に行けた。 ●○', null)).toHaveLength(1);
+    expect(fillerFindings('面白くしてほしい,,,', null)).toEqual([]);
+    expect(fillerFindings('進路に行けた。●○', null)).toEqual([]);
+  });
 });
 
 describe('buildRuleFindings', () => {
