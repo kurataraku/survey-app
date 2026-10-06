@@ -123,7 +123,7 @@ function ThemeReviewLinks({ prefecture }: { prefecture: string }) {
       aria-labelledby="city-theme-reviews-heading"
     >
       <h2 id="city-theme-reviews-heading" className="text-2xl font-bold text-gray-950">
-        テーマ別に口コミを読む
+        {prefecture}の通信制高校の口コミをテーマ別に読む
       </h2>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
         {prefecture}内のキャンパスに通った人の口コミを、通い方や通信制を選んだきっかけ別にまとめて読めます。
