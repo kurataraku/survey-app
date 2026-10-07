@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { apiPath } from '@/lib/base-path';
+import { isSameGiftUrl } from '@/lib/campaign/giftUrl';
 import {
   COMMENT_HEADINGS,
   EMPTY_SUPPORT,
@@ -460,6 +461,11 @@ export default function ReviewModerationPage() {
   const sendGrantEmail = (grant: PendingGrant) => {
     const url = giftUrlFor(grant).trim();
     if (!url) return;
+    const duplicate = grants.find((g) => g.id !== grant.id && isSameGiftUrl(g.gift_code, url));
+    if (duplicate) {
+      alert(`NG: このURLは既に ${duplicate.email} の配布記録で使われています。\n新しいQUOカードPayのURLを発行して入力してください。`);
+      return;
+    }
     const warning = grant.flag_reason ? `\n\n要確認: ${grant.flag_reason}` : '';
     if (!confirm(`${grant.email} にQUOカードPayのURLをメール送信します。${warning}`)) return;
     updateGrant(grant, { action: 'send_email', gift_url: url });

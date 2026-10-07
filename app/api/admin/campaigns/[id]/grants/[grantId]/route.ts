@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth/admin';
 import { sendGrantGiftEmail, type GrantType } from '@/lib/email/sender';
 import { getReferralShareInfo } from '@/lib/referral/server';
 import type { ReferralShareInfo } from '@/lib/referral/shared';
+import { giftUrlToken, isSameGiftUrl } from '@/lib/campaign/giftUrl';
 
 function getSupabase() {
   return createClient(
@@ -21,6 +22,27 @@ function isHttpsUrl(value: unknown): value is string {
   } catch {
     return false;
   }
+}
+
+/** ギフトURLは1人にしか使えないため、他の配布記録（キャンペーン・状態を問わず）に同じURLがないか調べる */
+async function findGrantWithSameGiftUrl(
+  supabase: ReturnType<typeof getSupabase>,
+  giftUrl: string,
+  excludeGrantId: string
+): Promise<{ grant: { id: string; email: string } | null; error?: string }> {
+  const token = giftUrlToken(giftUrl);
+  if (!token) return { grant: null };
+  const pattern = `%${token.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+  const { data, error } = await supabase
+    .from('campaign_grants')
+    .select('id, email, gift_code')
+    .neq('id', excludeGrantId)
+    .like('gift_code', pattern);
+  if (error) return { grant: null, error: error.message };
+
+  const hit = (data ?? []).find((row) => isSameGiftUrl(row.gift_code, giftUrl));
+  return { grant: hit ? { id: hit.id, email: hit.email } : null };
 }
 
 /**
@@ -71,6 +93,20 @@ export async function PATCH(
     }
     if (grant.status !== 'pending' && grant.status !== 'failed') {
       return NextResponse.json({ error: 'この配布記録は送付済みまたは対象外です' }, { status: 409 });
+    }
+
+    const duplicate = await findGrantWithSameGiftUrl(supabase, giftUrl, grantId);
+    if (duplicate.error) {
+      return NextResponse.json({ error: duplicate.error }, { status: 500 });
+    }
+    if (duplicate.grant) {
+      return NextResponse.json(
+        {
+          error: `このURLは既に別の配布記録（${duplicate.grant.email}）で使われています。新しいQUOカードPayのURLを発行して入力してください。`,
+          duplicate_grant_id: duplicate.grant.id,
+        },
+        { status: 409 }
+      );
     }
 
     // 二重クリックや多重リクエストでギフトURLを二度送らないよう、送信権を行単位で確保する
