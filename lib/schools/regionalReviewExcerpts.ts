@@ -1,7 +1,7 @@
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
-import { normalizeAreaName } from '@/lib/regions/area-normalize';
+import { normalizeAreaName, type NormalizedArea } from '@/lib/regions/area-normalize';
 import type { ReviewReasonGroupKey } from '@/lib/reviews/reason-groups';
-import { resolveReviewCampusArea } from '@/lib/schools/campusLocations';
+import { resolveReviewCampusArea, resolveReviewCampusPlace } from '@/lib/schools/campusLocations';
 import {
   matchReviewReasonGroupKeys,
   type RegionalRespondentRole,
@@ -21,6 +21,8 @@ export type RegionalReviewExcerpt = {
   attendance: string | null;
   /** municipality 指定時、回答者が市区町村まで申告しそれが一致した場合のみ true */
   isCityCampus: boolean;
+  /** 回答された市区町村の正規化値（例: 「大阪市北区」）。公開できない回答は null */
+  campusArea: NormalizedArea | null;
   good: string | null;
   bad: string | null;
 };
@@ -132,6 +134,9 @@ function rankExcerpt(
       overall: toOverall(review.overall_satisfaction),
       attendance: optionalText(answers.attendance_frequency),
       isCityCampus: Boolean(municipality) && campusCity?.municipality === municipality,
+      campusArea:
+        resolveReviewCampusPlace(answers.campus_prefecture, answers.campus_city, school.campusLocations)
+          ?.area ?? null,
       good: truncate(fullGood, GOOD_LENGTH),
       bad: truncate(fullBad, BAD_LENGTH),
     },

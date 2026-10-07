@@ -10,6 +10,7 @@ interface Review {
   bad_comment: string;
   created_at: string;
   like_count?: number;
+  campus_location_label?: string | null;
 }
 
 interface SchoolFeaturedReviewsServerProps {
@@ -50,13 +51,16 @@ export default function SchoolFeaturedReviewsServer({
             className="p-6 border border-gray-200 rounded-xl shadow-sm bg-white"
           >
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="p-2 bg-blue-50 rounded-full">
                   <User className="w-4 h-4 text-blue-600" aria-hidden />
                 </div>
                 <span className="text-xs font-medium text-gray-600">総合満足度</span>
                 <StarRatingDisplay value={review.overall_satisfaction} size="sm" />
                 <span className="text-sm text-gray-500">{formatDate(review.created_at)}</span>
+                {review.campus_location_label && (
+                  <span className="text-xs text-gray-500">{review.campus_location_label}</span>
+                )}
               </div>
               {review.like_count !== undefined && review.like_count > 0 && (
                 <div className="flex items-center gap-1 text-sm text-gray-600">

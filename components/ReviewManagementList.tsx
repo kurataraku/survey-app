@@ -100,7 +100,23 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
       reason_for_choosing: Array.isArray(answers.reason_for_choosing) ? answers.reason_for_choosing : [],
       attendance_frequency: answers.attendance_frequency || '',
       campus_prefecture: campusPrefectureArray,
+      campus_city: typeof answers.campus_city === 'string' ? answers.campus_city : '',
     });
+  };
+
+  // 地域集計は都道府県を文字列で読むため、1件だけなら回答フォームと同じ文字列で保存する
+  const toCampusPrefectureAnswer = (selected: string[]) =>
+    selected.length === 1 ? selected[0] : selected;
+
+  const formatCampusAnswer = (answers: any): string | null => {
+    const prefecture = Array.isArray(answers?.campus_prefecture)
+      ? answers.campus_prefecture.join('・')
+      : typeof answers?.campus_prefecture === 'string'
+        ? answers.campus_prefecture.trim()
+        : '';
+    const city = typeof answers?.campus_city === 'string' ? answers.campus_city.trim() : '';
+    const parts = [prefecture, city].filter(Boolean);
+    return parts.length > 0 ? parts.join(' / ') : null;
   };
 
   const handleEditSubmit = async () => {
@@ -119,7 +135,8 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
           answers: {
             reason_for_choosing: editFormData.reason_for_choosing,
             attendance_frequency: editFormData.attendance_frequency,
-            campus_prefecture: editFormData.campus_prefecture,
+            campus_prefecture: toCampusPrefectureAnswer(editFormData.campus_prefecture || []),
+            campus_city: String(editFormData.campus_city ?? '').trim().slice(0, 40),
           },
         }),
       });
@@ -206,6 +223,11 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                       <span className="text-sm text-gray-500">
                         {formatDate(review.created_at)}
                       </span>
+                      {formatCampusAnswer(review.answers) && (
+                        <span className="text-sm text-gray-500 break-all">
+                          {formatCampusAnswer(review.answers)}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg font-semibold text-gray-900">
@@ -428,6 +450,25 @@ export default function ReviewManagementList({ schoolId }: ReviewManagementListP
                 <p className="mt-1 text-sm text-gray-500">
                   選択された都道府県: {editFormData.campus_prefecture?.length || 0}件
                 </p>
+              </div>
+
+              <div>
+                <label htmlFor="edit-campus-city" className="block text-sm font-medium text-gray-700 mb-1">
+                  キャンパスの市区町村（任意）
+                </label>
+                <input
+                  id="edit-campus-city"
+                  name="edit-campus-city"
+                  type="text"
+                  maxLength={40}
+                  value={editFormData.campus_city ?? ''}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, campus_city: e.target.value })
+                  }
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="例: 名古屋市中村区、横浜市、さいたま市大宮区"
+                />
               </div>
             </div>
 

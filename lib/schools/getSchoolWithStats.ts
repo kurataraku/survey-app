@@ -6,7 +6,7 @@ import {
   publicSurveyResponsesOrFilter,
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
-import { normalizeCampusLocations } from '@/lib/schools/campusLocations';
+import { formatReviewCampusLabel, normalizeCampusLocations } from '@/lib/schools/campusLocations';
 import type { SchoolCampusLocation, SchoolInstitutionType } from '@/lib/types/schools';
 import type { PublicTuitionEstimate } from '@/lib/types/tuition';
 import { fetchPublicTuitionEstimates } from '@/lib/tuition/getTuitionEstimates';
@@ -71,6 +71,8 @@ export interface SchoolWithStats {
     bad_comment: string;
     created_at: string;
     like_count?: number;
+    /** 「大阪府 大阪市北区」のような公開用のキャンパス所在地 */
+    campus_location_label?: string | null;
   }>;
   ai_summary?: {
     summary_text: string;
@@ -370,6 +372,11 @@ export const getSchoolWithStats = cache(async (slug: string): Promise<SchoolWith
       bad_comment: r.bad_comment,
       created_at: r.created_at,
       like_count: r.like_count || 0,
+      campus_location_label: formatReviewCampusLabel(
+        r.answers?.campus_prefecture,
+        r.answers?.campus_city,
+        campusLocations
+      ),
     }));
 
   // 統計情報（reviewsから集計）

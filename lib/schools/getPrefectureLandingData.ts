@@ -278,8 +278,9 @@ export const getPrefectureLandingData = cache(
         .map((row, index) => [row.id, index])
     );
 
+    const campusLocationsBySchool = new Map(schools.map((school) => [school.id, school.campus_locations]));
     const excerpts = await fetchRegionalReviewExcerpts({
-      schools: baseRows,
+      schools: baseRows.map((row) => ({ ...row, campusLocations: campusLocationsBySchool.get(row.id) })),
       prefecture,
       // カードにするかは一覧の並び順で決めるため、抜粋は候補校すべてについて選んでおく
       limit: baseRows.length,

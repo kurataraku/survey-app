@@ -5,6 +5,7 @@ import {
   shouldIncludeSurveyOnSchoolHubPage,
 } from '@/lib/reviews/schoolReviewLinkage';
 import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
+import { formatReviewCampusLabel, normalizeCampusLocations } from '@/lib/schools/campusLocations';
 
 export interface ReviewListItem {
   id: string;
@@ -16,6 +17,8 @@ export interface ReviewListItem {
   bad_comment: string;
   enrollment_year: number | null;
   attendance_frequency: string | null;
+  /** 「大阪府 大阪市北区」のような公開用のキャンパス所在地 */
+  campus_location_label: string | null;
   like_count: number;
   created_at: string;
 }
@@ -50,6 +53,8 @@ type DetailRow = {
   created_at: string | null;
   enrollment_year: number | null;
   attendance_frequency: string | null;
+  campus_prefecture: unknown;
+  campus_city: string | null;
   schools: { slug?: string | null } | { slug?: string | null }[] | null;
 };
 
@@ -107,7 +112,7 @@ export const getReviewsBySchoolSlug = cache(
     // 学校ID・名前・slugを取得（status='active'のみ）
     const { data: school } = await supabase
       .from('schools')
-      .select('id, name, slug')
+      .select('id, name, slug, campus_locations')
       .eq('slug', decodedSlug)
       .eq('is_public', true)
       .eq('status', 'active')
@@ -128,6 +133,7 @@ export const getReviewsBySchoolSlug = cache(
     const schoolId = school.id;
     const schoolName = school.name;
     const schoolPageSlug = school.slug;
+    const campusLocations = normalizeCampusLocations(school.campus_locations);
 
     // answers は絞り込みにしか使わないため、絞り込み指定がなければ取得しない
     // （enrollment_type / attendance_frequency は PostgREST 側で絞り込むため不要）
@@ -261,6 +267,8 @@ export const getReviewsBySchoolSlug = cache(
         created_at,
         enrollment_year,
         attendance_frequency,
+        campus_prefecture:answers->campus_prefecture,
+        campus_city:answers->>campus_city,
         schools(slug)
       `)
       .in('id', reviewIds)
@@ -309,6 +317,11 @@ export const getReviewsBySchoolSlug = cache(
         bad_comment: review.bad_comment,
         enrollment_year: review.enrollment_year,
         attendance_frequency: review.attendance_frequency,
+        campus_location_label: formatReviewCampusLabel(
+          review.campus_prefecture,
+          review.campus_city,
+          campusLocations
+        ),
         created_at: review.created_at,
         like_count: likeCounts.get(review.id) || 0,
       } as ReviewListItem];

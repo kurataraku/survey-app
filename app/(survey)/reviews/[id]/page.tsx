@@ -153,7 +153,7 @@ export default async function ReviewDetailPage({ params }: PageProps) {
           </div>
 
           {(review.attendance_frequency ||
-            review.campus_prefecture ||
+            review.campus_location_label ||
             review.teaching_style.length > 0 ||
             review.student_atmosphere.length > 0) && (
             <div className="mb-8 pb-8 border-b border-gray-200">
@@ -164,8 +164,8 @@ export default async function ReviewDetailPage({ params }: PageProps) {
                     {getQuestionLabel('attendance_frequency', review.attendance_frequency)}
                   </Chip>
                 )}
-                {review.campus_prefecture && (
-                  <Chip variant="outline">{review.campus_prefecture}</Chip>
+                {review.campus_location_label && (
+                  <Chip variant="outline">{review.campus_location_label}</Chip>
                 )}
               </div>
               {review.teaching_style.length > 0 && (

@@ -56,6 +56,8 @@ interface ReviewCardServerProps {
   reasonForChoosing?: string[];
   attendanceFrequencyProp?: string | null;
   campusPrefecture?: string | null;
+  /** 入学年・通学頻度の行に並べるキャンパス所在地（例: 「大阪府 大阪市北区」） */
+  campusLocationLabel?: string | null;
 }
 
 /**
@@ -76,7 +78,13 @@ export default function ReviewCardServer({
   reasonForChoosing,
   attendanceFrequencyProp,
   campusPrefecture,
+  campusLocationLabel,
 }: ReviewCardServerProps) {
+  const attributes = [
+    enrollmentYear ? `${enrollmentYear}年入学` : null,
+    attendanceFrequency,
+    campusLocationLabel,
+  ].filter((value): value is string => Boolean(value));
   return (
     <Link
       href={appPath(`/reviews/${id}`)}
@@ -113,11 +121,14 @@ export default function ReviewCardServer({
             <StarRating value={overallSatisfaction} size="sm" />
             <span className="text-sm text-gray-500">{formatDate(createdAt)}</span>
           </div>
-          {(enrollmentYear || attendanceFrequency) && (
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-              {enrollmentYear && <span>{enrollmentYear}年入学</span>}
-              {enrollmentYear && attendanceFrequency && <span>•</span>}
-              {attendanceFrequency && <span>{attendanceFrequency}</span>}
+          {attributes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
+              {attributes.map((attribute, index) => (
+                <span key={index} className="contents">
+                  {index > 0 && <span>•</span>}
+                  <span>{attribute}</span>
+                </span>
+              ))}
             </div>
           )}
         </div>

@@ -10,6 +10,8 @@ interface SchoolReviewCardProps {
   badComment?: string;
   enrollmentYear: number | null;
   attendanceFrequency: string | null;
+  /** 「大阪府 大阪市北区」のようなキャンパス所在地 */
+  campusLocationLabel?: string | null;
   likeCount: number;
   createdAt: string;
   /** 1ページ目の先頭数件など、本文をクランプせず全文表示する */
@@ -57,10 +59,16 @@ export default function SchoolReviewCard({
   badComment,
   enrollmentYear,
   attendanceFrequency,
+  campusLocationLabel,
   likeCount,
   createdAt,
   bodyExpanded = false,
 }: SchoolReviewCardProps) {
+  const attributes = [
+    enrollmentYear ? `${enrollmentYear}年入学` : null,
+    attendanceFrequency,
+    campusLocationLabel,
+  ].filter((value): value is string => Boolean(value));
   const bodyClass = bodyExpanded
     ? 'text-gray-700 text-sm leading-relaxed whitespace-pre-wrap'
     : 'text-gray-700 line-clamp-4 text-sm leading-relaxed';
@@ -80,11 +88,14 @@ export default function SchoolReviewCard({
             <StarRating value={overallSatisfaction} size="sm" />
             <span className="text-sm text-gray-500">{formatDate(createdAt)}</span>
           </div>
-          {(enrollmentYear || attendanceFrequency) && (
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-              {enrollmentYear && <span>{enrollmentYear}年入学</span>}
-              {enrollmentYear && attendanceFrequency && <span>•</span>}
-              {attendanceFrequency && <span>{attendanceFrequency}</span>}
+          {attributes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-2">
+              {attributes.map((attribute, index) => (
+                <span key={index} className="contents">
+                  {index > 0 && <span>•</span>}
+                  <span>{attribute}</span>
+                </span>
+              ))}
             </div>
           )}
         </div>

@@ -61,6 +61,7 @@ export default function ReviewsListServer({
             badComment={review.bad_comment}
             enrollmentYear={review.enrollment_year}
             attendanceFrequency={review.attendance_frequency}
+            campusLocationLabel={review.campus_location_label}
             likeCount={review.like_count}
             createdAt={review.created_at}
           />

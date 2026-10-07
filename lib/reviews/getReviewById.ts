@@ -2,6 +2,8 @@ import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import type { NextRequest } from 'next/server';
 import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
+import { formatReviewCampusLabel, normalizeCampusLocations } from '@/lib/schools/campusLocations';
+import type { SchoolCampusLocation } from '@/lib/types/schools';
 
 export interface ReviewData {
   id: string;
@@ -21,6 +23,8 @@ export interface ReviewData {
   enrollment_year?: string | null;
   attendance_frequency?: string | null;
   campus_prefecture?: string | null;
+  /** 「大阪府 大阪市北区」のような公開用のキャンパス所在地。市区町村が出せなければ都道府県のみ */
+  campus_location_label: string | null;
   teaching_style: string[];
   student_atmosphere: string[];
   atmosphere_other?: string | null;
@@ -120,11 +124,12 @@ export const getReviewById = cache(
 
     let schoolSlug: string | null = null;
     let schoolName = review.school_name;
+    let campusLocations: SchoolCampusLocation[] | null = null;
     if (review.school_id) {
       try {
         const { data: school } = await supabase
           .from('schools')
-          .select('slug, name, status, is_public')
+          .select('slug, name, status, is_public, campus_locations')
           .eq('id', review.school_id)
           .single();
         if (school) {
@@ -133,6 +138,7 @@ export const getReviewById = cache(
           }
           schoolSlug = school.slug || null;
           schoolName = school.name;
+          campusLocations = normalizeCampusLocations(school.campus_locations);
         }
       } catch {
         // ignore
@@ -141,7 +147,7 @@ export const getReviewById = cache(
       try {
         const { data: school } = await supabase
           .from('schools')
-          .select('slug, name, status, is_public')
+          .select('slug, name, status, is_public, campus_locations')
           .eq('name', review.school_name)
           .single();
         if (school) {
@@ -150,6 +156,7 @@ export const getReviewById = cache(
           }
           schoolSlug = school.slug || null;
           schoolName = school.name;
+          campusLocations = normalizeCampusLocations(school.campus_locations);
         }
       } catch {
         // ignore
@@ -264,6 +271,11 @@ export const getReviewById = cache(
       enrollment_year: (answers.enrollment_year as string) || null,
       attendance_frequency: (answers.attendance_frequency as string) || null,
       campus_prefecture: (answers.campus_prefecture as string) || null,
+      campus_location_label: formatReviewCampusLabel(
+        answers.campus_prefecture,
+        answers.campus_city,
+        campusLocations
+      ),
       teaching_style: Array.isArray(answers.teaching_style)
         ? answers.teaching_style
         : [],

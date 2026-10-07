@@ -1129,7 +1129,7 @@ export default function SchoolDetailClient({
                       key={review.id}
                       className="p-6 bg-white border border-gray-200 rounded-xl shadow-md"
                     >
-                      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-100">
+                      <div className="flex flex-wrap items-center gap-3 mb-5 pb-4 border-b border-gray-100">
                         <div className="p-2 bg-blue-50 rounded-full">
                           <User className="w-4 h-4 text-blue-600" />
                         </div>
@@ -1137,6 +1137,9 @@ export default function SchoolDetailClient({
                         <span className="text-sm text-gray-500">
                           {formatDate(review.created_at)}
                         </span>
+                        {review.campus_location_label && (
+                          <span className="text-xs text-gray-500">{review.campus_location_label}</span>
+                        )}
                       </div>
 
                       <div className="space-y-4 mb-5">

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getStandingCampusLocationsInPrefecture,
+  formatReviewCampusLabel,
   isStandingCampus,
   normalizeCampusLocations,
   resolveReviewCampusArea,
@@ -188,5 +189,32 @@ describe('resolveReviewCampusArea', () => {
     });
     expect(resolveReviewCampusArea('', '大阪府', campuses)).toBeNull();
     expect(resolveReviewCampusArea(undefined, '大阪府', campuses)).toBeNull();
+  });
+});
+
+describe('formatReviewCampusLabel', () => {
+  const campuses: SchoolCampusLocation[] = [
+    { prefecture: '大阪府', city: '大阪市北区' },
+    { prefecture: '愛知県', city: '名古屋市西区' },
+  ];
+
+  it('正規化した市区町村を都道府県と並べ、番地は出さない', () => {
+    expect(formatReviewCampusLabel('愛知県', '愛知県名古屋市西区名駅2丁目20-18', campuses)).toBe(
+      '愛知県 名古屋市西区'
+    );
+    expect(formatReviewCampusLabel('大阪府', '北区', campuses)).toBe('大阪府 大阪市北区');
+    expect(formatReviewCampusLabel('東京都', '北区', campuses)).toBe('東京都 北区');
+  });
+
+  it('市を特定できない区名や市区町村として読めない回答は都道府県だけにする', () => {
+    expect(formatReviewCampusLabel('大阪府', '北区', [])).toBe('大阪府');
+    expect(formatReviewCampusLabel('大阪府', 'わからない', campuses)).toBe('大阪府');
+    expect(formatReviewCampusLabel('大阪府', '', campuses)).toBe('大阪府');
+  });
+
+  it('1件だけの配列の都道府県回答も扱い、都道府県がなければ出さない', () => {
+    expect(formatReviewCampusLabel(['大阪府'], '大阪市北区', campuses)).toBe('大阪府 大阪市北区');
+    expect(formatReviewCampusLabel(['大阪府', '兵庫県'], '大阪市北区', campuses)).toBeNull();
+    expect(formatReviewCampusLabel(null, '大阪市北区', campuses)).toBeNull();
   });
 });

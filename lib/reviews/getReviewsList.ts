@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { getReviewReasonsForGroup } from '@/lib/reviews/reason-groups';
 import { fetchAllRows } from '@/lib/supabase/fetchAllRows';
+import { formatReviewCampusLabel, normalizeCampusLocations } from '@/lib/schools/campusLocations';
 
 export interface ReviewListItem {
   id: string;
@@ -14,6 +15,8 @@ export interface ReviewListItem {
   bad_comment: string;
   enrollment_year: number | null;
   attendance_frequency: string | null;
+  /** 「大阪府 大阪市北区」のような公開用のキャンパス所在地（school_prefecture は学校本部の都道府県） */
+  campus_location_label: string | null;
   like_count: number;
   created_at: string;
 }
@@ -56,7 +59,15 @@ type DetailRow = {
   enrollment_year: number | null;
   attendance_frequency: string | null;
   created_at: string | null;
-  schools: { slug?: string | null; prefecture?: string | null } | { slug?: string | null; prefecture?: string | null }[] | null;
+  campus_prefecture: unknown;
+  campus_city: string | null;
+  schools: DetailSchool | DetailSchool[] | null;
+};
+
+type DetailSchool = {
+  slug?: string | null;
+  prefecture?: string | null;
+  campus_locations?: unknown;
 };
 
 export const getReviewsList = cache(async (
@@ -158,7 +169,9 @@ export const getReviewsList = cache(async (
     .select(`
       id, school_id, school_name, overall_satisfaction, good_comment, bad_comment,
       created_at, enrollment_year, attendance_frequency,
-      schools(slug, prefecture)
+      campus_prefecture:answers->campus_prefecture,
+      campus_city:answers->>campus_city,
+      schools(slug, prefecture, campus_locations)
     `)
     .in('id', reviewIds)
     .returns<DetailRow[]>();
@@ -198,6 +211,11 @@ export const getReviewsList = cache(async (
       bad_comment: r.bad_comment || '',
       enrollment_year: r.enrollment_year,
       attendance_frequency: r.attendance_frequency,
+      campus_location_label: formatReviewCampusLabel(
+        r.campus_prefecture,
+        r.campus_city,
+        normalizeCampusLocations(school?.campus_locations)
+      ),
       like_count: likeCounts.get(r.id) || 0,
       created_at: r.created_at || '',
     }];

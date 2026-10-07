@@ -79,7 +79,16 @@ export default function RegionalSchoolCard({
 }) {
   const NameHeading = nameHeadingLevel;
   const { excerpt } = school;
+  const campusArea = excerpt.campusArea;
+  const campusTag = !campusArea
+    ? null
+    : municipality && excerpt.isCityCampus
+      ? campusArea.ward
+        ? `${campusArea.ward}のキャンパス`
+        : null
+      : `${campusArea.city}のキャンパス`;
   const situationTags = [
+    campusTag,
     excerpt.respondentRole,
     shortEnrollment(excerpt.enrollmentType),
     excerpt.attendance,

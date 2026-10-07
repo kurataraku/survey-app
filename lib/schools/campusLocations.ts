@@ -73,6 +73,46 @@ export function resolveReviewCampusArea(
   return { city: `${municipality}${area.city}`, municipality, ward: area.city };
 }
 
+const DISPLAYABLE_AREA = /(市|区|町|村|郡)$/;
+
+export type ReviewCampusPlace = {
+  prefecture: string;
+  /** 公開画面に出せる市区町村。未回答・特定できない回答は null */
+  area: NormalizedArea | null;
+};
+
+/**
+ * 公開画面に出す口コミのキャンパス所在地。番地などの原文は出さず、正規化した市区町村だけを使う。
+ * 東京都の特別区以外で区名だけの回答が市を特定できない場合や、市区町村として読めない回答は都道府県だけにする。
+ * 管理画面の編集で配列になった1件だけの都道府県回答も受け付ける。
+ */
+export function resolveReviewCampusPlace(
+  campusPrefecture: unknown,
+  campusCity: unknown,
+  locations: SchoolCampusLocation[] | null | undefined
+): ReviewCampusPlace | null {
+  const rawPrefecture =
+    Array.isArray(campusPrefecture) && campusPrefecture.length === 1 ? campusPrefecture[0] : campusPrefecture;
+  const prefecture = typeof rawPrefecture === 'string' ? rawPrefecture.trim() : '';
+  if (!prefecture) return null;
+
+  const area = resolveReviewCampusArea(campusCity, prefecture, locations);
+  if (!area || !DISPLAYABLE_AREA.test(area.city)) return { prefecture, area: null };
+  const unresolvedWard = !area.ward && area.city.endsWith('区') && prefecture !== '東京都';
+  return { prefecture, area: unresolvedWard ? null : area };
+}
+
+/** 口コミ一覧・詳細に出すキャンパス所在地（例: 「大阪府 大阪市北区」） */
+export function formatReviewCampusLabel(
+  campusPrefecture: unknown,
+  campusCity: unknown,
+  locations: SchoolCampusLocation[] | null | undefined
+): string | null {
+  const place = resolveReviewCampusPlace(campusPrefecture, campusCity, locations);
+  if (!place) return null;
+  return place.area ? `${place.prefecture} ${place.area.city}` : place.prefecture;
+}
+
 function parseNearestStations(record: Record<string, unknown>): string[] {
   if (Array.isArray(record.nearest_stations)) {
     const stations = record.nearest_stations
