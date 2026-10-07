@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/track';
@@ -7,17 +8,11 @@ import {
   compareRegionalSchools,
   RATING_SORT_MIN_REVIEWS,
   REGIONAL_SORT_OPTIONS,
+  type FinderAreaOption,
   type RegionalSortableSchool,
   type RegionalSortKey,
 } from '@/lib/schools/regionalLanding';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
-
-type FinderStation = {
-  id: string;
-  label: string;
-  schoolCount: number;
-  typeCounts: Partial<Record<SchoolInstitutionType, number>>;
-};
 
 type FinderSchoolType = {
   key: SchoolInstitutionType;
@@ -29,8 +24,19 @@ interface RegionalSchoolFinderProps {
   targetId: string;
   prefecture: string;
   totalSchools: number;
-  stations: FinderStation[];
+  areas: FinderAreaOption[];
   schoolTypes: FinderSchoolType[];
+  heading?: string;
+  headingLevel?: 'h2' | 'h3';
+  areaLegend?: string;
+  /** 1校を複数の地域に数える場合などの注記 */
+  areaNote?: string;
+  /** 地域ごとの詳しいページ（都市LPなど） */
+  areaLinks?: Array<{ href: string; label: string }>;
+  /** スマホで地域のボタンを折り返さず、横スクロールの1列にする */
+  scrollAreasOnMobile?: boolean;
+  /** 一覧が複数のまとまりに分かれ、まとまりごとに並べ替える場合の注記 */
+  groupedSortNote?: string;
 }
 
 function readSortable(row: HTMLElement): RegionalSortableSchool {
@@ -57,20 +63,30 @@ export default function RegionalSchoolFinder({
   targetId,
   prefecture,
   totalSchools,
-  stations,
+  areas,
   schoolTypes,
+  heading = '通う場所と学校の種類で絞る',
+  headingLevel = 'h2',
+  areaLegend = '最寄り駅',
+  areaNote,
+  areaLinks = [],
+  scrollAreasOnMobile = false,
+  groupedSortNote,
 }: RegionalSchoolFinderProps) {
-  const [stationId, setStationId] = useState('');
+  const [areaId, setAreaId] = useState('');
   const [schoolType, setSchoolType] = useState<SchoolInstitutionType | ''>('');
   const [sort, setSort] = useState<RegionalSortKey>('default');
   const reordered = useRef(false);
-  const hasFilter = Boolean(stationId || schoolType);
-  const selectedStation = stations.find((station) => station.id === stationId);
+  const hasFilter = Boolean(areaId || schoolType);
+  const selectedArea = areas.find((area) => area.id === areaId);
   const selectedType = schoolTypes.find((option) => option.key === schoolType);
+  const Heading = headingLevel;
+  const showAreas = areas.length >= 2;
+  const showTypes = schoolTypes.length >= 2;
 
   let matchingCount = totalSchools;
-  if (selectedStation && schoolType) matchingCount = selectedStation.typeCounts[schoolType] ?? 0;
-  else if (selectedStation) matchingCount = selectedStation.schoolCount;
+  if (selectedArea && schoolType) matchingCount = selectedArea.typeCounts[schoolType] ?? 0;
+  else if (selectedArea) matchingCount = selectedArea.schoolCount;
   else if (selectedType) matchingCount = selectedType.schoolCount;
 
   useEffect(() => {
@@ -78,22 +94,26 @@ export default function RegionalSchoolFinder({
     if (!root) return;
     if (!hasFilter && !root.querySelector('[data-regional-school][hidden]')) return;
     for (const row of root.querySelectorAll<HTMLElement>('[data-regional-school]')) {
-      const stationMatches =
-        !stationId || (row.dataset.stationFilters ?? '').split(' ').includes(stationId);
+      const areaMatches =
+        !areaId || (row.dataset.areaFilters ?? '').split(' ').includes(areaId);
       const typeMatches = !schoolType || row.dataset.schoolType === schoolType;
-      row.hidden = !(stationMatches && typeMatches);
+      row.hidden = !(areaMatches && typeMatches);
     }
-  }, [hasFilter, schoolType, stationId, targetId]);
+    for (const group of root.querySelectorAll<HTMLElement>('[data-regional-group]')) {
+      group.hidden = !group.querySelector('[data-regional-school]:not([hidden])');
+    }
+  }, [hasFilter, schoolType, areaId, targetId]);
 
   useEffect(() => {
     if (sort === 'default' && !reordered.current) return;
-    const list = document.getElementById(targetId)?.querySelector<HTMLElement>('[data-regional-list]');
-    if (!list) return;
-    const rows = [...list.querySelectorAll<HTMLElement>(':scope > [data-regional-school]')];
-    rows
-      .map((row) => ({ row, school: readSortable(row) }))
-      .sort((a, b) => compareRegionalSchools(a.school, b.school, sort))
-      .forEach(({ row }) => list.appendChild(row));
+    const lists = document.getElementById(targetId)?.querySelectorAll<HTMLElement>('[data-regional-list]');
+    for (const list of lists ?? []) {
+      const rows = [...list.querySelectorAll<HTMLElement>(':scope > [data-regional-school]')];
+      rows
+        .map((row) => ({ row, school: readSortable(row) }))
+        .sort((a, b) => compareRegionalSchools(a.school, b.school, sort))
+        .forEach(({ row }) => list.appendChild(row));
+    }
     reordered.current = sort !== 'default';
   }, [sort, targetId]);
 
@@ -114,7 +134,7 @@ export default function RegionalSchoolFinder({
   }, [prefecture, targetId]);
 
   const clear = () => {
-    setStationId('');
+    setAreaId('');
     setSchoolType('');
   };
 
@@ -134,66 +154,97 @@ export default function RegionalSchoolFinder({
       aria-labelledby={`${targetId}-finder-heading`}
     >
       <div className="mb-5">
-        <h2 id={`${targetId}-finder-heading`} className="text-xl font-bold text-gray-900">
-          通う場所と学校の種類で絞る
-        </h2>
+        <Heading id={`${targetId}-finder-heading`} className="text-xl font-bold text-gray-900">
+          {heading}
+        </Heading>
         <p className="mt-1 text-sm leading-relaxed text-gray-600">
-          どちらも選ばなければ、全{totalSchools}校を表示します。
+          {showAreas || showTypes ? 'どちらも選ばなければ、' : ''}全{totalSchools}校を表示します。
         </p>
       </div>
 
-      {stations.length > 0 && (
-        <fieldset className="mb-5">
-          <legend className="mb-2 text-sm font-bold text-gray-800">最寄り駅</legend>
-          <div className="flex flex-wrap gap-2">
-            {stations.map((station) => {
-              const count = schoolType ? station.typeCounts[schoolType] ?? 0 : station.schoolCount;
-              const active = stationId === station.id;
+      {showAreas && (
+        <fieldset className="mb-5 min-w-0">
+          <legend className="mb-2 flex w-full items-baseline justify-between text-sm font-bold text-gray-800">
+            {areaLegend}
+            {scrollAreasOnMobile && (
+              <span aria-hidden className="text-xs font-normal text-gray-500 sm:hidden">
+                横にスクロールできます →
+              </span>
+            )}
+          </legend>
+          <div
+            className={
+              scrollAreasOnMobile
+                ? '-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
+                : 'flex flex-wrap gap-2'
+            }
+          >
+            {areas.map((area) => {
+              const count = schoolType ? area.typeCounts[schoolType] ?? 0 : area.schoolCount;
+              const active = areaId === area.id;
               const disabled = count === 0 && !active;
               return (
                 <button
-                  key={station.id}
+                  key={area.id}
                   type="button"
                   aria-pressed={active}
                   disabled={disabled}
-                  className={buttonClass(active, disabled)}
-                  onClick={() => setStationId(active ? '' : station.id)}
+                  className={`${buttonClass(active, disabled)}${scrollAreasOnMobile ? ' shrink-0 whitespace-nowrap' : ''}`}
+                  onClick={() => setAreaId(active ? '' : area.id)}
                 >
-                  {station.label} <span className="font-normal">{count}校</span>
+                  {area.label} <span className="font-normal">{count}校</span>
                 </button>
               );
             })}
           </div>
+          {areaNote && <p className="mt-2 text-xs leading-relaxed text-gray-500">{areaNote}</p>}
+          {areaLinks.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              {areaLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    prefetch={false}
+                    className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+                  >
+                    {link.label} →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </fieldset>
       )}
 
-      <fieldset>
-        <legend className="mb-2 text-sm font-bold text-gray-800">学校の種類</legend>
-        <div className="flex flex-wrap gap-2">
-          {schoolTypes.map((option) => {
-            const count = selectedStation
-              ? selectedStation.typeCounts[option.key] ?? 0
-              : option.schoolCount;
-            const active = schoolType === option.key;
-            const disabled = count === 0 && !active;
-            return (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={active}
-                disabled={disabled}
-                className={buttonClass(active, disabled)}
-                onClick={() => setSchoolType(active ? '' : option.key)}
-              >
-                {option.label} <span className="font-normal">{count}校</span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-xs leading-relaxed text-gray-500">
-          サポート校は、通信制高校に在籍しながら学習や生活の支援を受けるために通う学校です。多くの場合、通信制高校の学費も別にかかります。
-        </p>
-      </fieldset>
+      {showTypes && (
+        <fieldset>
+          <legend className="mb-2 text-sm font-bold text-gray-800">学校の種類</legend>
+          <div className="flex flex-wrap gap-2">
+            {schoolTypes.map((option) => {
+              const count = selectedArea
+                ? selectedArea.typeCounts[option.key] ?? 0
+                : option.schoolCount;
+              const active = schoolType === option.key;
+              const disabled = count === 0 && !active;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={disabled}
+                  className={buttonClass(active, disabled)}
+                  onClick={() => setSchoolType(active ? '' : option.key)}
+                >
+                  {option.label} <span className="font-normal">{count}校</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">
+            サポート校は、通信制高校に在籍しながら学習や生活の支援を受けるために通う学校です。多くの場合、通信制高校の学費も別にかかります。
+          </p>
+        </fieldset>
+      )}
 
       <div className="mt-5 flex flex-col gap-3 border-t border-blue-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -225,7 +276,10 @@ export default function RegionalSchoolFinder({
           </select>
         </label>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-gray-500">{sortNote(sort, prefecture)}</p>
+      <p className="mt-2 text-xs leading-relaxed text-gray-500">
+        {sortNote(sort, prefecture)}
+        {groupedSortNote ? ` ${groupedSortNote}` : ''}
+      </p>
     </section>
   );
 }

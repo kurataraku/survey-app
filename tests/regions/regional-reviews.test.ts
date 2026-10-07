@@ -184,4 +184,42 @@ describe('representative regional review excerpts', () => {
     expect(result[0].good?.endsWith('…')).toBe(true);
     expect(new Set(result.map((review) => review.schoolId)).size).toBe(result.length);
   });
+
+  it('除外IDの口コミは、同じ学校にほかの候補がある場合だけ避ける', () => {
+    const detailed = '先生がこまめに声をかけてくれて、レポートの進め方も相談しやすかったです。'.repeat(2);
+    const reviews = [
+      {
+        id: 'used-on-city-page',
+        school_id: 'school-1',
+        good_comment: detailed,
+        bad_comment: detailed,
+        created_at: '2026-03-01T00:00:00Z',
+      },
+      {
+        id: 'other-review',
+        school_id: 'school-1',
+        good_comment: '短い口コミです。',
+        bad_comment: null,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'only-review',
+        school_id: 'school-2',
+        good_comment: detailed,
+        bad_comment: null,
+        created_at: '2026-02-01T00:00:00Z',
+      },
+    ];
+
+    const result = selectRepresentativeRegionalReviewExcerpts({
+      schools: [
+        { id: 'school-1', name: '学校1', slug: 'school-1', localReviewCount: 2 },
+        { id: 'school-2', name: '学校2', slug: 'school-2', localReviewCount: 1 },
+      ],
+      reviews,
+      excludeReviewIds: ['used-on-city-page', 'only-review'],
+    });
+
+    expect(result.map((review) => review.id)).toEqual(['other-review', 'only-review']);
+  });
 });

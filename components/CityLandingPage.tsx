@@ -63,7 +63,7 @@ function toCardData(
     tuition: row.tuition,
     admissionBadges: row.admissionBadges,
     excerpt: row.excerpt,
-    stationFilterIds: row.stationFilterIds,
+    areaFilterIds: row.areaFilterIds,
   };
 }
 
@@ -91,7 +91,7 @@ function toListData(
     defaultOrder: row.defaultOrder,
     tuition: row.tuition,
     excerpt: row.listExcerpt,
-    stationFilterIds: row.stationFilterIds,
+    areaFilterIds: row.areaFilterIds,
   };
 }
 
@@ -334,7 +334,7 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
           targetId={RESULTS_ID}
           prefecture={prefecture}
           totalSchools={data.counts.totalSchools}
-          stations={data.finderStations}
+          areas={data.finderStations}
           schoolTypes={data.schoolTypeOptions}
         />
 

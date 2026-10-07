@@ -33,8 +33,19 @@ import type { PrefectureLandingCopyStats } from '@/lib/prefectures/prefecture-la
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissionProfiles';
 import { getCityLandingPath, getCityLandingsForPrefecture } from '@/lib/regions/city-landing';
+import { getCityLandingData } from '@/lib/schools/getCityLandingData';
+import {
+  assignAreaFilterIds,
+  buildFinderAreaOptions,
+  OTHER_AREA_FILTER_ID,
+  PREFECTURE_FINDER_AREA_LIMIT,
+  PREFECTURE_REGIONAL_CARD_LIMIT,
+  SCHOOL_TYPE_FILTERS,
+  type FinderAreaOption,
+} from '@/lib/schools/regionalLanding';
+import { selectRegionalHighlights } from '@/lib/schools/schoolHighlights';
 
-/** 比較表1行分。表示に必要な値だけを持たせ、口コミ本文や学校紹介は学校詳細へ集約する */
+/** 一覧の1校分。口コミ本文はカードに載せる学校（featured）だけが持つ */
 export type PrefectureSchoolRow = {
   id: string;
   name: string;
@@ -61,6 +72,18 @@ export type PrefectureSchoolRow = {
   tuition: ReturnType<typeof buildTuitionTableCell>;
   /** 公式情報で確認済み（12か月以内）の募集区域・スクーリング会場。未確認なら空配列 */
   admissionBadges: AdmissionBadge[];
+  /** 管理画面の特徴・推しポイント（場所に関する項目を除いて最大3件） */
+  highlights: string[];
+  /** 学校全体の先生・職員の対応の満足度と回答件数 */
+  staffAvg: number | null;
+  staffRatingCount: number;
+  /** 県内キャンパスの市区町村（政令指定都市は親市単位）。絞り込みに使う */
+  localMunicipalities: string[];
+  /** 一覧の標準の並び順（県内の口コミが多い順、次に学校全体の口コミが多い順） */
+  defaultOrder: number;
+  areaFilterIds: string[];
+  /** カードに載せる県内キャンパスの代表口コミ。カードに載せない学校は null */
+  excerpt: RegionalReviewExcerpt | null;
 };
 
 export type PrefectureRegionalCounts = {
@@ -101,8 +124,12 @@ export type PrefectureLandingData = {
   regionalReviewSummary: RegionalReviewSummary;
   /** 初年度納入金の目安を公開している掲載校（口コミ件数順） */
   tuitionRows: PrefectureSchoolRow[];
-  /** 県内キャンパスに通った人の口コミ抜粋 */
-  reviewExcerpts: RegionalReviewExcerpt[];
+  /** 県内キャンパスの代表口コミをカードで紹介する学校（標準の並び順、最大12校） */
+  featuredRows: PrefectureSchoolRow[];
+  /** カード以外の掲載校（標準の並び順） */
+  otherRows: PrefectureSchoolRow[];
+  finderAreas: FinderAreaOption[];
+  schoolTypeOptions: Array<{ key: SchoolInstitutionType; label: string; schoolCount: number }>;
   averageOverallSatisfaction: number | null;
   averageTuitionSatisfaction: number | null;
   topByLocalReviewCount: PrefectureRankingEntry[];
@@ -133,13 +160,11 @@ function isRelatedToPrefecture(school: SearchSchool, prefecture: string): boolea
 
 function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
   const localLocations = getStandingCampusLocationsInPrefecture(school.campus_locations, prefecture);
-  const localCities = [
-    ...new Set(
-      localLocations
-        .map((location) => normalizeAreaName(location.city)?.city)
-        .filter((city): city is string => Boolean(city))
-    ),
-  ];
+  const localAreas = localLocations
+    .map((location) => normalizeAreaName(location.city))
+    .filter((area): area is NonNullable<typeof area> => area !== null);
+  const localCities = [...new Set(localAreas.map((area) => area.city))];
+  const localMunicipalities = [...new Set(localAreas.map((area) => area.municipality))];
   const localStations = [
     ...new Set(
       localLocations
@@ -168,7 +193,30 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     tuitionAvg: school.tuition_avg,
     tuition: buildTuitionTableCell(school.tuition_estimate),
     admissionBadges: buildAdmissionBadges(school.admission_profile, prefecture),
+    highlights: selectRegionalHighlights(school.highlights),
+    staffAvg: school.staff_avg,
+    staffRatingCount: school.staff_rating_count,
+    localMunicipalities,
+    defaultOrder: 0,
+    areaFilterIds: [],
+    excerpt: null,
   };
+}
+
+/** 都市LPのカードで使っている口コミ。県LPでは同じ学校に別の口コミがあればそちらを選ぶ */
+async function getCityLandingCardReviewIds(prefecture: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (const config of getCityLandingsForPrefecture(prefecture)) {
+    try {
+      const city = await getCityLandingData(config);
+      for (const row of city.rows) {
+        if (row.tier === 'a' && row.excerpt) ids.add(row.excerpt.id);
+      }
+    } catch (error) {
+      console.error('[getPrefectureLandingData] 都市LPの口コミ取得エラー:', error);
+    }
+  }
+  return ids;
 }
 
 function computeWeightedAverage(
@@ -213,7 +261,46 @@ export const getPrefectureLandingData = cache(
       .filter((school) => isRelatedToPrefecture(school, prefecture))
       .sort((a, b) => b.review_count - a.review_count || a.name.localeCompare(b.name, 'ja'));
 
-    const rows = schools.map((school) => toRow(school, prefecture));
+    const baseRows = schools.map((school) => toRow(school, prefecture));
+    const locationInsights = computePrefectureLocationInsights(schools, prefecture);
+
+    const areaDefinitions = locationInsights.topCities
+      .slice(0, PREFECTURE_FINDER_AREA_LIMIT)
+      .map((city, index) => ({ id: `area-${index + 1}`, label: city.city }));
+    const orderById = new Map(
+      [...baseRows]
+        .sort(
+          (a, b) =>
+            b.localReviewCount - a.localReviewCount ||
+            b.reviewCount - a.reviewCount ||
+            a.name.localeCompare(b.name, 'ja')
+        )
+        .map((row, index) => [row.id, index])
+    );
+
+    const excerpts = await fetchRegionalReviewExcerpts({
+      schools: baseRows,
+      prefecture,
+      // カードにするかは一覧の並び順で決めるため、抜粋は候補校すべてについて選んでおく
+      limit: baseRows.length,
+      excludeReviewIds: await getCityLandingCardReviewIds(prefecture),
+    });
+    const excerptBySchool = new Map(excerpts.map((excerpt) => [excerpt.schoolId, excerpt]));
+    const featuredIds = new Set(
+      [...baseRows]
+        .filter((row) => row.localReviewCount > 0 && excerptBySchool.has(row.id))
+        .sort((a, b) => (orderById.get(a.id) ?? 0) - (orderById.get(b.id) ?? 0))
+        .slice(0, PREFECTURE_REGIONAL_CARD_LIMIT)
+        .map((row) => row.id)
+    );
+
+    const rows = baseRows.map((row) => ({
+      ...row,
+      defaultOrder: orderById.get(row.id) ?? 0,
+      areaFilterIds: assignAreaFilterIds(row.localMunicipalities, areaDefinitions),
+      excerpt: featuredIds.has(row.id) ? excerptBySchool.get(row.id) ?? null : null,
+    }));
+    const listRows = [...rows].sort((a, b) => a.defaultOrder - b.defaultOrder);
 
     const localCampusLocationCount = rows.reduce((sum, row) => sum + row.localCampusCount, 0);
 
@@ -242,7 +329,6 @@ export const getPrefectureLandingData = cache(
       .slice(0, PREFECTURE_LANDING_HIGHLIGHT_LIMIT)
       .map((row) => ({ row, metricLabel: `口コミ${row.reviewCount}件` }));
 
-    const locationInsights = computePrefectureLocationInsights(schools, prefecture);
     const totalReviewCount = rows.reduce((sum, row) => sum + row.reviewCount, 0);
     const localReviewCount = rows.reduce((sum, row) => sum + row.localReviewCount, 0);
 
@@ -258,7 +344,6 @@ export const getPrefectureLandingData = cache(
       .map((row) => ({ row, metricLabel: `${prefecture}内の口コミ${row.localReviewCount}件` }));
 
     const tuitionRows = rows.filter((row) => row.tuition !== null);
-    const reviewExcerpts = await fetchRegionalReviewExcerpts({ schools: rows, prefecture });
 
     const copyStats: PrefectureLandingCopyStats = {
       totalSchools: counts.totalSchools,
@@ -283,7 +368,16 @@ export const getPrefectureLandingData = cache(
       localReviewSchoolCount: regionalReviewSummary.schoolCount,
       regionalReviewSummary,
       tuitionRows,
-      reviewExcerpts,
+      featuredRows: listRows.filter((row) => row.excerpt !== null),
+      otherRows: listRows.filter((row) => row.excerpt === null),
+      finderAreas: buildFinderAreaOptions(rows, [
+        ...areaDefinitions,
+        { id: OTHER_AREA_FILTER_ID, label: 'その他の地域' },
+      ]),
+      schoolTypeOptions: SCHOOL_TYPE_FILTERS.map((filter) => ({
+        ...filter,
+        schoolCount: rows.filter((row) => row.institutionType === filter.key).length,
+      })).filter((option) => option.schoolCount > 0),
       averageOverallSatisfaction: computeWeightedAverage(schools, 'overall_avg'),
       averageTuitionSatisfaction: computeWeightedAverage(schools, 'tuition_avg'),
       topByLocalReviewCount,

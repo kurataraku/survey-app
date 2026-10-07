@@ -6,6 +6,62 @@ export const CITY_REGIONAL_CARD_LIMIT = 20;
 export const CITY_FINDER_STATION_LIMIT = 6;
 export const OTHER_STATION_FILTER_ID = 'station-other';
 
+export const PREFECTURE_REGIONAL_CARD_LIMIT = 12;
+export const PREFECTURE_FINDER_AREA_LIMIT = 8;
+export const OTHER_AREA_FILTER_ID = 'area-other';
+/** この校数以下の県では、絞り込んでも候補がほとんど変わらないため絞り込み欄を出さない */
+export const PREFECTURE_FINDER_MAX_HIDDEN_SCHOOLS = 5;
+/** この校数を超える県では、一覧を読み飛ばすページ内リンクを置く */
+export const PREFECTURE_LIST_SKIP_LINK_MIN_SCHOOLS = 15;
+
+export type FinderAreaOption = {
+  id: string;
+  label: string;
+  schoolCount: number;
+  typeCounts: Partial<Record<SchoolInstitutionType, number>>;
+};
+
+export function shouldShowPrefectureFinder(totalSchools: number): boolean {
+  return totalSchools > PREFECTURE_FINDER_MAX_HIDDEN_SCHOOLS;
+}
+
+/**
+ * 都道府県LPの市区町村の絞り込みID。上位の市区町村に当たればそのID、
+ * 上位以外の市区町村にもキャンパスがあれば「その他の地域」も付ける。県内にキャンパスがなければ空配列。
+ */
+export function assignAreaFilterIds(
+  municipalities: string[],
+  areas: ReadonlyArray<{ id: string; label: string }>,
+  otherId: string = OTHER_AREA_FILTER_ID
+): string[] {
+  const ids = areas.filter((area) => municipalities.includes(area.label)).map((area) => area.id);
+  const labels = new Set(areas.map((area) => area.label));
+  if (municipalities.some((municipality) => !labels.has(municipality))) ids.push(otherId);
+  return ids;
+}
+
+/** 絞り込みボタンの件数。1校が複数の地域に当たる場合はそれぞれに数え、0校の選択肢は出さない */
+export function buildFinderAreaOptions(
+  rows: ReadonlyArray<{ areaFilterIds: string[]; institutionType: SchoolInstitutionType | null }>,
+  areas: ReadonlyArray<{ id: string; label: string }>
+): FinderAreaOption[] {
+  return areas
+    .map((area) => {
+      const areaRows = rows.filter((row) => row.areaFilterIds.includes(area.id));
+      return {
+        ...area,
+        schoolCount: areaRows.length,
+        typeCounts: Object.fromEntries(
+          SCHOOL_TYPE_FILTERS.map((filter) => [
+            filter.key,
+            areaRows.filter((row) => row.institutionType === filter.key).length,
+          ])
+        ) as Partial<Record<SchoolInstitutionType, number>>,
+      };
+    })
+    .filter((area) => area.schoolCount > 0);
+}
+
 export const SCHOOL_TYPE_FILTERS: ReadonlyArray<{
   key: SchoolInstitutionType;
   label: string;
@@ -72,13 +128,13 @@ export function compareRegionalSchools(
 }
 
 export function matchesRegionalSchoolFilters(
-  school: { stationFilterIds: string[]; institutionType: SchoolInstitutionType | null },
-  stationId: string,
+  school: { areaFilterIds: string[]; institutionType: SchoolInstitutionType | null },
+  areaId: string,
   schoolType: SchoolInstitutionType | ''
 ): boolean {
-  const stationMatches = !stationId || school.stationFilterIds.includes(stationId);
+  const areaMatches = !areaId || school.areaFilterIds.includes(areaId);
   const typeMatches = !schoolType || school.institutionType === schoolType;
-  return stationMatches && typeMatches;
+  return areaMatches && typeMatches;
 }
 
 const LOCATION_WARD_LIMIT = 2;
@@ -94,6 +150,22 @@ export function formatRegionalLocation(
   const stationLabel = stations.join('・');
   if (wardLabel && stationLabel) return `${wardLabel}（${stationLabel}）`;
   return wardLabel || stationLabel || fallback;
+}
+
+/**
+ * 都道府県LPの一覧の「通える場所」。県内キャンパスの登録がない学校は、
+ * 県内に通える場所がないと断定せず「キャンパス情報なし」とだけ書く。
+ */
+export function formatPrefectureLocation(
+  school: { localCities: string[]; localStations: string[]; localCampusCount: number },
+  prefecture: string
+): string {
+  if (school.localCampusCount === 0) return 'キャンパス情報なし';
+  return formatRegionalLocation(
+    school.localCities,
+    school.localStations,
+    `${prefecture}内のキャンパス${school.localCampusCount}か所`
+  );
 }
 
 export const NATIONAL_DIFF_MIN_ANSWERS = 3;
@@ -118,13 +190,13 @@ export function nationalAverageDiff(
 /** Finder が絞り込み・並び替えに使う属性。行データを Client Component へ渡さずに済ませる */
 export function regionalSchoolDataAttributes(
   school: RegionalSortableSchool & {
-    stationFilterIds: string[];
+    areaFilterIds: string[];
     institutionType: SchoolInstitutionType | null;
   }
 ): Record<`data-${string}`, string | boolean> {
   return {
     'data-regional-school': true,
-    'data-station-filters': school.stationFilterIds.join(' '),
+    'data-area-filters': school.areaFilterIds.join(' '),
     'data-school-type': school.institutionType ?? '',
     'data-default-order': String(school.defaultOrder),
     'data-rating': school.rating == null ? '' : String(school.rating),

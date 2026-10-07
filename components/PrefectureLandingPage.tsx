@@ -9,7 +9,15 @@ import type {
   PrefectureRankingEntry,
   PrefectureSchoolRow,
 } from '@/lib/schools/getPrefectureLandingData';
-import RegionalReviewExcerptList from '@/components/RegionalReviewExcerptList';
+import PrefectureSchoolListRow from '@/components/PrefectureSchoolListRow';
+import RegionalSchoolCard, { type RegionalSchoolCardData } from '@/components/RegionalSchoolCard';
+import RegionalSchoolFinder from '@/components/RegionalSchoolFinder';
+import {
+  nationalAverageDiff,
+  PREFECTURE_LIST_SKIP_LINK_MIN_SCHOOLS,
+  PREFECTURE_REGIONAL_CARD_LIMIT,
+  shouldShowPrefectureFinder,
+} from '@/lib/schools/regionalLanding';
 import type { PrefectureLocationInsights } from '@/lib/schools/getPrefectureLocationInsights';
 import type { SchoolCardGlobalAverages } from '@/lib/home/getHomeData';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
@@ -27,7 +35,6 @@ import RequestNotificationCta from '@/components/RequestNotificationCta';
 import TuitionDisclaimer from '@/components/TuitionDisclaimer';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { PREFECTURE_LANDING_MIN_REVIEWS_FOR_RATING } from '@/lib/schools/prefecture-landing-constants';
-import AdmissionBadgeList from '@/components/AdmissionBadgeList';
 
 interface PrefectureLandingPageProps {
   data: PrefectureLandingData;
@@ -35,12 +42,6 @@ interface PrefectureLandingPageProps {
   globalAverages: SchoolCardGlobalAverages | null;
   hasSchools: boolean;
 }
-
-const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
-  public: '公立',
-  private: '私立',
-  support: 'サポート校',
-};
 
 function TuitionCell({ tuition }: { tuition: PrefectureSchoolRow['tuition'] }) {
   if (!tuition) return <span className="text-gray-400">—</span>;
@@ -50,11 +51,6 @@ function TuitionCell({ tuition }: { tuition: PrefectureSchoolRow['tuition'] }) {
       {tuition.basisLabel && <span className="block text-[11px] text-gray-500">{tuition.basisLabel}</span>}
     </>
   );
-}
-
-/** 本校所在地が未登録の学校では「本校: 不明」を出さない */
-function hasKnownHeadquarters(row: PrefectureSchoolRow): boolean {
-  return Boolean(row.headquartersPrefecture) && row.headquartersPrefecture !== '不明';
 }
 
 function schoolHref(row: PrefectureSchoolRow): string | null {
@@ -71,20 +67,6 @@ function SchoolNameCell({ row }: { row: PrefectureSchoolRow }) {
       {row.name}
     </Link>
   );
-}
-
-function formatLocalBase(row: PrefectureSchoolRow): string {
-  const parts: string[] = [];
-  if (row.hasLocalHeadquarters) parts.push('本校');
-  if (row.localCampusCount > 0) {
-    parts.push(
-      row.localCities.length > 0
-        ? `${row.localCities.slice(0, 2).join('・')}${row.localCampusCount > 2 ? 'ほか' : ''}`
-        : `キャンパス${row.localCampusCount}か所`
-    );
-  }
-  if (parts.length === 0) return '—';
-  return parts.join(' / ');
 }
 
 /** 掲載母集団の内訳。合算した「掲載校数」だけを主指標にしない */
@@ -191,95 +173,171 @@ function MethodologyNote({ data }: { data: PrefectureLandingData }) {
   );
 }
 
-/** 全掲載校のコンパクト比較表。大型カードの繰り返しをやめ、初期HTMLを軽くする */
-function ComparisonTable({ data }: { data: PrefectureLandingData }) {
-  const { prefecture, rows } = data;
+const RESULTS_ID = 'pref-school-results';
+
+function toCardData(
+  row: PrefectureSchoolRow,
+  globalAverages: SchoolCardGlobalAverages | null
+): RegionalSchoolCardData | null {
+  if (!row.excerpt) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    tier: 'a',
+    institutionType: row.institutionType,
+    headquartersPrefecture: row.headquartersPrefecture,
+    wards: row.localCities,
+    stations: row.localStations,
+    highlights: row.highlights,
+    regionalReviewCount: row.localReviewCount,
+    cityReviewCount: 0,
+    totalReviewCount: row.reviewCount,
+    rating: row.overallAvg,
+    ratingDiff: nationalAverageDiff(
+      row.overallAvg,
+      globalAverages?.overall_satisfaction_avg ?? null,
+      row.reviewCount
+    ),
+    staffAvg: row.staffAvg,
+    staffDiff: nationalAverageDiff(
+      row.staffAvg,
+      globalAverages?.staff_rating_avg ?? null,
+      row.staffRatingCount
+    ),
+    defaultOrder: row.defaultOrder,
+    tuition: row.tuition,
+    admissionBadges: row.admissionBadges,
+    excerpt: row.excerpt,
+    areaFilterIds: row.areaFilterIds,
+  };
+}
+
+function SkipListLink({ href, label }: { href: string; label: string }) {
   return (
-    <section className="mb-8" aria-labelledby="pref-comparison-heading">
+    <a
+      href={href}
+      className="inline-flex min-h-11 items-center text-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+    >
+      {label}
+    </a>
+  );
+}
+
+/**
+ * 全掲載校の一覧。県内の口コミがある学校はカードで声を紹介し、残りは軽い1行で並べる。
+ * 全校をHTMLに出し、絞り込みは表示の切り替えだけにする（URLは変えない）。
+ */
+function SchoolList({
+  data,
+  globalAverages,
+}: {
+  data: PrefectureLandingData;
+  globalAverages: SchoolCardGlobalAverages | null;
+}) {
+  const { prefecture, featuredRows, otherRows, counts, locationInsights } = data;
+  const hasLocationSection =
+    locationInsights.topCities.length > 0 || locationInsights.topStations.length > 0;
+  const skipLink =
+    counts.totalSchools > PREFECTURE_LIST_SKIP_LINK_MIN_SCHOOLS
+      ? hasLocationSection
+        ? { href: '#pref-location-insights-heading', label: '一覧を飛ばしてエリア・ランキングへ ↓' }
+        : { href: '#pref-regional-voice-heading', label: '一覧を飛ばして口コミ・ランキングへ ↓' }
+      : null;
+  const nationalOverall = globalAverages?.overall_satisfaction_avg ?? null;
+
+  return (
+    <section id={RESULTS_ID} className="mb-8" aria-labelledby="pref-comparison-heading">
       <span id="pref-school-list" className="block scroll-mt-40" aria-hidden />
       <h2 id="pref-comparison-heading" className="text-xl font-bold text-gray-900 mb-2">
         {prefecture}の通信制高校・サポート校を一覧で比較
       </h2>
-      <p className="text-sm text-gray-600 mb-4">
-        {prefecture}内のキャンパス、最寄り駅、初年度納入金の目安、口コミ件数、総合満足度を並べています。
-        「{prefecture}内の口コミ」は{prefecture}内のキャンパスに通った人の口コミ、「全体」は他県のキャンパスも含めた学校全体の口コミです。
-        学校名から詳細ページへ移ると、口コミ本文と項目別評価を確認できます。
+      <p className="text-sm text-gray-600 leading-relaxed max-w-4xl">
+        {prefecture}内のキャンパス、最寄り駅、初年度納入金の目安、口コミ件数、総合満足度を学校ごとにまとめています。
+        「{prefecture}内」の口コミは{prefecture}内のキャンパスに通った人の口コミ、「学校全体」は他県のキャンパスも含めた口コミです。
+        満足度は学校全体の口コミの平均で、全国平均（当サイトに寄せられた全国の口コミの平均）との差も表示しています。
       </p>
-      <PrefectureSchoolCardTracker prefecture={prefecture} block="list">
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-[48rem] w-full text-sm">
-            <caption className="sr-only">
-              {prefecture}の通信制高校・サポート校の比較一覧
-            </caption>
-            <thead className="bg-gray-50 text-xs text-gray-600">
-              <tr>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  学校名
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  種別
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  {prefecture}内のキャンパス
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  最寄り駅
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-left font-semibold">
-                  初年度納入金の目安
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-right font-semibold">
-                  {prefecture}内の口コミ
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-right font-semibold">
-                  口コミ（全体）
-                </th>
-                <th scope="col" className="px-3 py-2.5 text-right font-semibold">
-                  総合
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
-                <tr key={row.id} className="align-top hover:bg-blue-50/40">
-                  <th scope="row" className="px-3 py-2.5 text-left font-normal">
-                    <SchoolNameCell row={row} />
-                    {!row.hasLocalHeadquarters && hasKnownHeadquarters(row) && (
-                      <span className="block text-[11px] text-gray-500">
-                        本校: {row.headquartersPrefecture}
-                      </span>
-                    )}
-                    <AdmissionBadgeList badges={row.admissionBadges} />
-                  </th>
-                  <td className="px-3 py-2.5 whitespace-nowrap text-gray-700">
-                    {row.institutionType ? institutionTypeLabels[row.institutionType] : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-gray-700">{formatLocalBase(row)}</td>
-                  <td className="px-3 py-2.5 text-gray-700">
-                    {row.localStations.length > 0 ? row.localStations.join('・') : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-gray-700">
-                    <TuitionCell tuition={row.tuition} />
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                    {row.localReviewCount > 0 ? (
-                      <span className="font-semibold text-gray-900">{row.localReviewCount}件</span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-500">
-                    {row.reviewCount > 0 ? `${row.reviewCount}件` : '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap text-gray-700">
-                    {row.overallAvg != null ? row.overallAvg.toFixed(1) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {skipLink && (
+        <p className="mb-2">
+          <SkipListLink {...skipLink} />
+        </p>
+      )}
+      <div className="mt-3">
+        {shouldShowPrefectureFinder(counts.totalSchools) && (
+          <RegionalSchoolFinder
+            targetId={RESULTS_ID}
+            prefecture={prefecture}
+            totalSchools={counts.totalSchools}
+            areas={data.finderAreas}
+            schoolTypes={data.schoolTypeOptions}
+            heading="市区町村と学校の種類で絞る"
+            headingLevel="h3"
+            areaLegend="市区町村"
+            areaNote="複数の市区町村にキャンパスがある学校は、それぞれに数えています。"
+            areaLinks={data.cityLandings.map((city) => ({
+              href: appPath(city.path),
+              label: `${city.municipality}の通信制高校ページを見る`,
+            }))}
+            scrollAreasOnMobile
+            groupedSortNote={
+              featuredRows.length > 0 && otherRows.length > 0
+                ? '口コミを紹介している学校と、そのほかの掲載校は、それぞれの中で並べ替えます。'
+                : undefined
+            }
+          />
+        )}
+      </div>
+
+      {featuredRows.length > 0 && (
+        <div data-regional-group="featured" className="mb-10">
+          <h3 id="pref-featured-heading" className="text-lg font-bold text-gray-900">
+            {prefecture}のキャンパスに通った人の口コミがある学校
+          </h3>
+          <p className="mt-1 mb-4 text-sm text-gray-600 leading-relaxed">
+            {prefecture}内の口コミが多い順に、最大{PREFECTURE_REGIONAL_CARD_LIMIT}校の声を紹介しています。
+            {data.localReviewSchoolCount > featuredRows.length &&
+              `ほかの学校の${prefecture}内の口コミ件数は、下の一覧に載せています。`}
+          </p>
+          <ul className="space-y-5" data-regional-list>
+            {featuredRows.map((row) => {
+              const card = toCardData(row, globalAverages);
+              return card ? (
+                <RegionalSchoolCard
+                  key={row.id}
+                  school={card}
+                  prefecture={prefecture}
+                  showFullReviewLink
+                  nameHeadingLevel="h4"
+                />
+              ) : null;
+            })}
+          </ul>
         </div>
-      </PrefectureSchoolCardTracker>
+      )}
+
+      {otherRows.length > 0 && (
+        <div data-regional-group="others">
+          {featuredRows.length > 0 && (
+            <h3 className="mb-2 text-lg font-bold text-gray-900">そのほかの掲載校</h3>
+          )}
+          <ul className="border-t border-gray-200" data-regional-list>
+            {otherRows.map((row) => (
+              <PrefectureSchoolListRow
+                key={row.id}
+                school={row}
+                prefecture={prefecture}
+                ratingDiff={nationalAverageDiff(row.overallAvg, nationalOverall, row.reviewCount)}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {skipLink && (
+        <p className="mt-2">
+          <SkipListLink {...skipLink} />
+        </p>
+      )}
       <p className="mt-2 text-xs text-gray-500">
         「—」の学費は、学校が金額を公開していないか、コースや通学頻度によって大きく変わる学校です。資料請求や個別相談で確認できます。
       </p>
@@ -443,7 +501,7 @@ function RegionalVoiceSection({ data }: { data: PrefectureLandingData }) {
         </h2>
         <p className="text-sm text-gray-600 leading-relaxed">
           {prefecture}のキャンパスを回答した口コミはまだありません。掲載校の学校全体の口コミは
-          {data.totalReviewCount}件あり、比較表の「学校全体の口コミ」列と学校詳細で確認できます。
+          {data.totalReviewCount}件あり、上の一覧の口コミ件数と学校詳細で確認できます。
         </p>
       </section>
     );
@@ -452,7 +510,7 @@ function RegionalVoiceSection({ data }: { data: PrefectureLandingData }) {
   const distributions: Array<{ heading: string; note: string; items: Array<{ label: string; count: number }> }> = [
     {
       heading: '通学頻度の回答内訳',
-      note: '同じ学校でもコースによって通学頻度は変わります。比較表と学校詳細で条件を確認してください。',
+      note: '同じ学校でもコースによって通学頻度は変わります。一覧と学校詳細で条件を確認してください。',
       items: summary.attendanceFrequencies,
     },
     {
@@ -476,13 +534,16 @@ function RegionalVoiceSection({ data }: { data: PrefectureLandingData }) {
         {summary.overallAvg != null && `この口コミだけで見た総合満足度は${summary.overallAvg.toFixed(1)}（5点満点）です。`}
         他県のキャンパスに通った人の口コミは含みません。
       </p>
-      {data.reviewExcerpts.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-bold text-gray-900 mb-3">
-            {prefecture}のキャンパスに通った人の口コミ（抜粋）
-          </h3>
-          <RegionalReviewExcerptList reviews={data.reviewExcerpts} prefecture={prefecture} />
-        </div>
+      {data.featuredRows.length > 0 && (
+        <p className="mb-5 text-sm text-gray-700">
+          学校ごとの口コミは、上の一覧で{data.featuredRows.length}校分を紹介しています。
+          <a
+            href="#pref-featured-heading"
+            className="ml-1 font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+          >
+            上の学校別の声を見る
+          </a>
+        </p>
       )}
       <div className="grid gap-4 md:grid-cols-2">
         {distributions.map(({ heading, note, items }) =>
@@ -604,7 +665,7 @@ function InstitutionTypeGuide({
         {prefecture}で比べる前に知っておきたい学校種別の違い
       </h2>
       <p className="text-sm text-gray-600 leading-relaxed mb-4 max-w-4xl">
-        公立・私立・サポート校は、費用の考え方も卒業資格の仕組みも異なります。比較表の「種別」列とあわせて確認してください。
+        公立・私立・サポート校は、費用の考え方も卒業資格の仕組みも異なります。一覧の学校名の横にある種別とあわせて確認してください。
       </p>
       <ul className="grid gap-4 md:grid-cols-3">
         {items.map(({ type, count }) => (
@@ -758,7 +819,7 @@ export default function PrefectureLandingPage({
                     href="#pref-comparison-heading"
                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                   >
-                    全掲載校の比較表を見る
+                    学校の一覧を見る
                   </Link>
                 </li>
                 <li>
@@ -781,7 +842,11 @@ export default function PrefectureLandingPage({
                 ))}
                 <li>
                   <Link
-                    href="#pref-regional-voice-heading"
+                    href={
+                      data.featuredRows.length > 0
+                        ? '#pref-featured-heading'
+                        : '#pref-regional-voice-heading'
+                    }
                     className="text-blue-600 hover:text-blue-800 hover:underline"
                   >
                     {prefecture}のキャンパスに通った人の口コミを読む
@@ -824,7 +889,7 @@ export default function PrefectureLandingPage({
               </ul>
             </nav>
 
-            <ComparisonTable data={data} />
+            <SchoolList data={data} globalAverages={globalAverages} />
 
             <LocationInsightsSection
               prefecture={prefecture}

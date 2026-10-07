@@ -42,7 +42,7 @@ export type RegionalSchoolCardData = {
   tuition: ReturnType<typeof buildTuitionTableCell>;
   admissionBadges: AdmissionBadge[];
   excerpt: CardExcerpt;
-  stationFilterIds: string[];
+  areaFilterIds: string[];
 };
 
 const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
@@ -67,11 +67,17 @@ export default function RegionalSchoolCard({
   school,
   prefecture,
   municipality,
+  showFullReviewLink = false,
+  nameHeadingLevel = 'h3',
 }: {
   school: RegionalSchoolCardData;
   prefecture: string;
+  /** 未指定なら都道府県LPのカードとして、県内の本校も表示する */
   municipality?: string;
+  showFullReviewLink?: boolean;
+  nameHeadingLevel?: 'h3' | 'h4';
 }) {
+  const NameHeading = nameHeadingLevel;
   const { excerpt } = school;
   const situationTags = [
     excerpt.respondentRole,
@@ -102,7 +108,9 @@ export default function RegionalSchoolCard({
         <div className="p-5 sm:p-6 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:gap-8">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-xl font-bold leading-snug text-gray-950">{school.name}</h3>
+              <NameHeading className="text-xl font-bold leading-snug text-gray-950">
+                {school.name}
+              </NameHeading>
               {school.institutionType && (
                 <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
                   {institutionTypeLabels[school.institutionType]}
@@ -115,8 +123,9 @@ export default function RegionalSchoolCard({
             <p className="mt-3 text-sm leading-relaxed text-gray-700">
               <span className="font-semibold text-gray-900">通える場所:</span> {locationLabel}
             </p>
-            {school.headquartersPrefecture !== prefecture &&
-              school.headquartersPrefecture !== '不明' && (
+            {school.headquartersPrefecture &&
+              school.headquartersPrefecture !== '不明' &&
+              (school.headquartersPrefecture !== prefecture || !municipality) && (
                 <p className="mt-1 text-xs text-gray-500">本校: {school.headquartersPrefecture}</p>
               )}
 
@@ -184,6 +193,15 @@ export default function RegionalSchoolCard({
               <p className="mt-3 text-sm leading-relaxed text-gray-700">
                 <span className="font-semibold text-gray-900">気になった点:</span> {excerpt.bad}
               </p>
+            )}
+            {showFullReviewLink && (
+              <Link
+                href={appPath(`/reviews/${excerpt.id}`)}
+                prefetch={false}
+                className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+              >
+                この口コミを全文で読む
+              </Link>
             )}
 
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">

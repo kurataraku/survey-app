@@ -80,10 +80,23 @@ function toOverall(value: unknown): number | null {
 
 type RankedExcerpt = {
   excerpt: RegionalReviewExcerpt;
+  /** 都市LPなど同じ地域の別ページで使っている口コミ。ほかに候補がない学校でだけ選ぶ */
+  excluded: boolean;
   completeness: number;
   specificity: number;
   createdAt: string;
 };
+
+function isBetterExcerpt(candidate: RankedExcerpt, current: RankedExcerpt): boolean {
+  if (candidate.excluded !== current.excluded) return !candidate.excluded;
+  if (candidate.completeness !== current.completeness) {
+    return candidate.completeness > current.completeness;
+  }
+  if (candidate.specificity !== current.specificity) {
+    return candidate.specificity > current.specificity;
+  }
+  return candidate.createdAt > current.createdAt;
+}
 
 function rankExcerpt(
   review: RegionalReviewExcerptSource,
@@ -122,6 +135,7 @@ function rankExcerpt(
       good: truncate(fullGood, GOOD_LENGTH),
       bad: truncate(fullBad, BAD_LENGTH),
     },
+    excluded: false,
     completeness,
     // 原文の情報量を具体性の再現可能な代理指標にする。長文だけが過度に有利にならないよう上限を設ける。
     specificity: Math.min(combinedLength, 400),
@@ -132,13 +146,16 @@ function rankExcerpt(
 /**
  * 地域口コミから学校ごとの代表1件を選ぶ純粋関数。
  * 完全性、具体性、新しさの順で比較し、回答者属性・理由・入学区分・評価の値は順位に使わない。
+ * excludeReviewIds の口コミは、同じ学校にほかの候補がない場合にだけ選ぶ。
  */
 export function selectRepresentativeRegionalReviewExcerpts(input: {
   schools: ExcerptSourceSchool[];
   reviews: RegionalReviewExcerptSource[];
   municipality?: string;
   limit?: number;
+  excludeReviewIds?: Iterable<string>;
 }): RegionalReviewExcerpt[] {
+  const excludeReviewIds = new Set(input.excludeReviewIds ?? []);
   const requestedLimit = input.limit ?? LIMIT;
   const limit = Number.isFinite(requestedLimit)
     ? Math.max(0, Math.floor(requestedLimit))
@@ -159,16 +176,9 @@ export function selectRepresentativeRegionalReviewExcerpts(input: {
     if (!school) continue;
     const candidate = rankExcerpt(review, school, municipality);
     if (!candidate) continue;
+    candidate.excluded = excludeReviewIds.has(review.id);
     const current = bestBySchool.get(school.id);
-    if (
-      !current ||
-      candidate.completeness > current.completeness ||
-      (candidate.completeness === current.completeness &&
-        candidate.specificity > current.specificity) ||
-      (candidate.completeness === current.completeness &&
-        candidate.specificity === current.specificity &&
-        candidate.createdAt > current.createdAt)
-    ) {
+    if (!current || isBetterExcerpt(candidate, current)) {
       bestBySchool.set(school.id, candidate);
     }
   }
@@ -192,6 +202,7 @@ export async function fetchRegionalReviewExcerpts(input: {
   prefecture: string;
   municipality?: string;
   limit?: number;
+  excludeReviewIds?: Iterable<string>;
 }): Promise<RegionalReviewExcerpt[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -222,5 +233,6 @@ export async function fetchRegionalReviewExcerpts(input: {
     reviews: (data ?? []) as RegionalReviewExcerptSource[],
     municipality: input.municipality,
     limit: input.limit,
+    excludeReviewIds: input.excludeReviewIds,
   });
 }

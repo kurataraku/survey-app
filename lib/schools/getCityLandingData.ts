@@ -22,10 +22,12 @@ import {
   type RegionalReviewExcerpt,
 } from '@/lib/schools/regionalReviewExcerpts';
 import {
+  buildFinderAreaOptions,
   CITY_FINDER_STATION_LIMIT,
   CITY_REGIONAL_CARD_LIMIT,
   OTHER_STATION_FILTER_ID,
   SCHOOL_TYPE_FILTERS,
+  type FinderAreaOption,
   type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
 import {
@@ -74,7 +76,7 @@ export type CitySchoolRow = {
   tier: RegionalSchoolTier;
   /** 標準の並び順（県内の口コミが多い順） */
   defaultOrder: number;
-  stationFilterIds: string[];
+  areaFilterIds: string[];
   excerpt: RegionalReviewExcerpt | null;
   listExcerpt: string | null;
 };
@@ -100,12 +102,7 @@ export type CityLandingData = {
   };
   wards: CityWardInsight[];
   topStations: PrefectureStationInsight[];
-  finderStations: Array<{
-    id: string;
-    label: string;
-    schoolCount: number;
-    typeCounts: Partial<Record<SchoolInstitutionType, number>>;
-  }>;
+  finderStations: FinderAreaOption[];
   schoolTypeOptions: Array<{
     key: SchoolInstitutionType;
     label: string;
@@ -177,7 +174,7 @@ function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
     admissionBadges: buildAdmissionBadges(school.admission_profile, config.prefecture),
     tier: school.review_count > 0 ? 'b' : 'c',
     defaultOrder: 0,
-    stationFilterIds: [],
+    areaFilterIds: [],
     excerpt: null,
     listExcerpt: school.latest_good_comment,
   };
@@ -257,7 +254,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     }));
   const rowsWithStations = baseRows.map((row, index) => {
     // 駅の集計（computePrefectureLocationInsights）と同じく、事業者名付きの駅は接頭辞なしの駅にまとめる
-    const stationFilterIds = stationDefinitions
+    const areaFilterIds = stationDefinitions
       .filter((station) =>
         row.allStations.some(
           (name) => name === station.label || stripRailOperatorPrefix(name) === station.label
@@ -267,7 +264,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     return {
       ...row,
       defaultOrder: index,
-      stationFilterIds: stationFilterIds.length > 0 ? stationFilterIds : [OTHER_STATION_FILTER_ID],
+      areaFilterIds: areaFilterIds.length > 0 ? areaFilterIds : [OTHER_STATION_FILTER_ID],
     };
   });
 
@@ -298,24 +295,10 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     excerpt: excerptBySchool.get(row.id) ?? null,
   }));
 
-  const finderStations = [
+  const finderStations = buildFinderAreaOptions(rows, [
     ...stationDefinitions,
     { id: OTHER_STATION_FILTER_ID, label: 'その他の駅' },
-  ]
-    .map((station) => {
-      const stationRows = rows.filter((row) => row.stationFilterIds.includes(station.id));
-      return {
-        ...station,
-        schoolCount: stationRows.length,
-        typeCounts: Object.fromEntries(
-          SCHOOL_TYPE_FILTERS.map((filter) => [
-            filter.key,
-            stationRows.filter((row) => row.institutionType === filter.key).length,
-          ])
-        ) as Partial<Record<SchoolInstitutionType, number>>,
-      };
-    })
-    .filter((station) => station.schoolCount > 0);
+  ]);
   const schoolTypeOptions = SCHOOL_TYPE_FILTERS.map((filter) => ({
     ...filter,
     schoolCount: rows.filter((row) => row.institutionType === filter.key).length,

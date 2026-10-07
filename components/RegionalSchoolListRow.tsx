@@ -26,7 +26,7 @@ export type RegionalSchoolListRowData = {
   defaultOrder: number;
   tuition: ReturnType<typeof buildTuitionTableCell>;
   excerpt: string | null;
-  stationFilterIds: string[];
+  areaFilterIds: string[];
 };
 
 const institutionTypeLabels: Record<SchoolInstitutionType, string> = {
