@@ -162,6 +162,9 @@ export async function fetchSearchSchoolsWithStats(
 
   const schoolStats = new Map<string, StatsEntry>();
   const regionalReviews = createRegionalReviewIndex();
+  const campusLocationsBySchool = new Map(
+    schoolsList.map((school) => [school.id, school.campus_locations])
+  );
   schoolIds.forEach((id) =>
     schoolStats.set(id, {
       count: 0,
@@ -236,7 +239,8 @@ export async function fetchSearchSchoolsWithStats(
           ans,
           ov,
           parseRating,
-          r.respondent_role
+          r.respondent_role,
+          campusLocationsBySchool.get(r.school_id)
         );
       } catch {
         // ignore malformed answers

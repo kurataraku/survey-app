@@ -271,12 +271,14 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     };
   });
 
+  const campusLocationsBySchool = new Map(schools.map((school) => [school.id, school.campus_locations]));
   const reviewExcerpts = await fetchRegionalReviewExcerpts({
     schools: rowsWithStations.map((row) => ({
       id: row.id,
       name: row.name,
       slug: row.slug,
       localReviewCount: row.prefectureReviewCount,
+      campusLocations: campusLocationsBySchool.get(row.id),
     })),
     prefecture: config.prefecture,
     municipality: config.municipality,

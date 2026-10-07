@@ -8,11 +8,12 @@
  * 「その県の口コミ」に見えてしまう。地域別に数え直すことで、実際に県内で通った回答だけを
  * 地域の根拠として提示できるようにする。
  */
-import { normalizeAreaName } from '@/lib/regions/area-normalize';
+import { resolveReviewCampusArea } from '@/lib/schools/campusLocations';
 import {
   REVIEW_REASON_GROUPS,
   type ReviewReasonGroupKey,
 } from '@/lib/reviews/reason-groups';
+import type { SchoolCampusLocation } from '@/lib/types/schools';
 
 export type RegionalRespondentRole = '本人' | '保護者';
 export type RegionalReasonGroupCounts = Record<ReviewReasonGroupKey, number>;
@@ -118,6 +119,7 @@ export function matchReviewReasonGroupKeys(value: unknown): ReviewReasonGroupKey
  * 1件の公開口コミを、回答されたキャンパス都道府県の集計へ加える。
  * campus_prefecture が空の回答は地域の根拠にしないため、どの都道府県にも加算しない。
  * respondent_role は answers ではなく survey_responses のトップレベル列から渡す。
+ * campusLocations は区名だけの市区町村回答を親市へ帰属させる判断に使う（resolveReviewCampusArea）。
  */
 export function addRegionalReview(
   index: RegionalReviewIndex,
@@ -125,7 +127,8 @@ export function addRegionalReview(
   answers: Record<string, unknown>,
   overallSatisfaction: number | null,
   parseRating: (value: unknown) => number | null,
-  respondentRole?: unknown
+  respondentRole?: unknown,
+  campusLocations?: SchoolCampusLocation[] | null
 ): void {
   const campusPrefecture =
     typeof answers.campus_prefecture === 'string' ? answers.campus_prefecture.trim() : '';
@@ -157,8 +160,11 @@ export function addRegionalReview(
     entry.respondentRoles[respondentRole] += 1;
   }
 
-  const municipality =
-    typeof answers.campus_city === 'string' ? normalizeAreaName(answers.campus_city)?.municipality : null;
+  const municipality = resolveReviewCampusArea(
+    answers.campus_city,
+    campusPrefecture,
+    campusLocations
+  )?.municipality;
   if (municipality) {
     const cityEntry = entry.municipalities.get(municipality) ?? { reviewCount: 0, overall: [] };
     cityEntry.reviewCount += 1;

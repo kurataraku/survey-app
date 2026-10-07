@@ -1,10 +1,12 @@
 import { createSupabaseClientWithLargeHeaders } from '@/lib/supabase/large-headers';
 import { normalizeAreaName } from '@/lib/regions/area-normalize';
 import type { ReviewReasonGroupKey } from '@/lib/reviews/reason-groups';
+import { resolveReviewCampusArea } from '@/lib/schools/campusLocations';
 import {
   matchReviewReasonGroupKeys,
   type RegionalRespondentRole,
 } from '@/lib/schools/regionalReviews';
+import type { SchoolCampusLocation } from '@/lib/types/schools';
 
 /** 地域LPに載せる口コミ抜粋。回答者が申告したキャンパス所在地で絞り込んだもの */
 export type RegionalReviewExcerpt = {
@@ -29,6 +31,8 @@ type ExcerptSourceSchool = {
   slug: string | null;
   /** 県内キャンパスの口コミ件数。0件の学校は取得対象から外す */
   localReviewCount: number;
+  /** 区名だけの市区町村回答を親市へ帰属させる判断に使う */
+  campusLocations?: SchoolCampusLocation[] | null;
 };
 
 const LIMIT = 12;
@@ -95,10 +99,9 @@ function rankExcerpt(
   const hasBoth = Boolean(fullGood && fullBad);
   // 両面が書かれ、十分な情報量がある口コミを優先する。評価値や回答者属性の値は順位に使わない。
   const completeness = hasBoth ? (combinedLength >= 120 ? 3 : 2) : combinedLength >= 80 ? 1 : 0;
-  const campusCity =
-    municipality && typeof answers.campus_city === 'string'
-      ? normalizeAreaName(answers.campus_city)
-      : null;
+  const campusCity = municipality
+    ? resolveReviewCampusArea(answers.campus_city, answers.campus_prefecture, school.campusLocations)
+    : null;
   const respondentRole =
     review.respondent_role === '本人' || review.respondent_role === '保護者'
       ? review.respondent_role

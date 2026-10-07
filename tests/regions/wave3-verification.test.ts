@@ -3,8 +3,10 @@ import {
   getStandingCampusLocationsInPrefecture,
   isStandingCampus,
   normalizeCampusLocations,
+  resolveReviewCampusArea,
   sanitizeCampusLocationsInput,
 } from '@/lib/schools/campusLocations';
+import type { SchoolCampusLocation } from '@/lib/types/schools';
 import {
   buildAdmissionBadges,
   canPublishAdmissionProfile,
@@ -128,5 +130,63 @@ describe('regional reviews by municipality', () => {
     const [aichi] = finalizeRegionalReviews(index, 's1')!;
     expect(aichi.reviewCount).toBe(3);
     expect(aichi.municipalities).toEqual({ 名古屋市: { reviewCount: 2, overallAvg: 3 } });
+  });
+
+  it('区名だけの回答は、県内拠点で一意に決まるときだけ親市へ帰属させる', () => {
+    const index = createRegionalReviewIndex();
+    const osakaCampuses: SchoolCampusLocation[] = [
+      { prefecture: '大阪府', city: '大阪市阿倍野区' },
+      { prefecture: '大阪府', city: '大阪市北区' },
+      { prefecture: '大阪府', city: '堺市' },
+    ];
+    addRegionalReview(index, 's1', { campus_prefecture: '大阪府', campus_city: '北区' }, 4, parseRating, '本人', osakaCampuses);
+    addRegionalReview(index, 's1', { campus_prefecture: '大阪府', campus_city: '大阪市北区' }, 2, parseRating, '本人', osakaCampuses);
+    const [osaka] = finalizeRegionalReviews(index, 's1')!;
+    expect(osaka.municipalities).toEqual({ 大阪市: { reviewCount: 2, overallAvg: 3 } });
+  });
+});
+
+describe('resolveReviewCampusArea', () => {
+  const campuses: SchoolCampusLocation[] = [
+    { prefecture: '大阪府', city: '大阪市北区' },
+    { prefecture: '大阪府', city: '堺市北区' },
+    { prefecture: '大阪府', city: '大阪市中央区' },
+    { prefecture: '大阪府', city: '大阪市阿倍野区', location_type: 'exam_venue' },
+    { prefecture: '東京都', city: '北区' },
+    { prefecture: '愛知県', city: '名古屋市西区', address: '名古屋市西区名駅2丁目20-18' },
+  ];
+
+  it('同名の行政区が1つの市にしかなければ、その市の区として扱う', () => {
+    expect(resolveReviewCampusArea('中央区', '大阪府', campuses)).toEqual({
+      city: '大阪市中央区',
+      municipality: '大阪市',
+      ward: '中央区',
+    });
+  });
+
+  it('同名の行政区が複数の市にあれば推測しない', () => {
+    expect(resolveReviewCampusArea('北区', '大阪府', campuses)).toEqual({
+      city: '北区',
+      municipality: '北区',
+      ward: null,
+    });
+  });
+
+  it('試験会場など常設でない拠点は帰属の根拠にしない', () => {
+    expect(resolveReviewCampusArea('阿倍野区', '大阪府', campuses)?.municipality).toBe('阿倍野区');
+  });
+
+  it('東京都の特別区はそのまま扱う', () => {
+    expect(resolveReviewCampusArea('北区', '東京都', campuses)?.municipality).toBe('北区');
+  });
+
+  it('市名から書かれた回答や住所まるごとの回答は従来どおり正規化する', () => {
+    expect(resolveReviewCampusArea('愛知県名古屋市西区名駅2丁目20-18', '愛知県', campuses)).toEqual({
+      city: '名古屋市西区',
+      municipality: '名古屋市',
+      ward: '西区',
+    });
+    expect(resolveReviewCampusArea('', '大阪府', campuses)).toBeNull();
+    expect(resolveReviewCampusArea(undefined, '大阪府', campuses)).toBeNull();
   });
 });

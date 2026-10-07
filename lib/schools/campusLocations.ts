@@ -1,3 +1,4 @@
+import { normalizeAreaName, type NormalizedArea } from '@/lib/regions/area-normalize';
 import type { CampusLocationType, SchoolCampusLocation } from '@/lib/types/schools';
 
 const MAX_NEAREST_STATIONS_PER_CAMPUS = 2;
@@ -38,6 +39,38 @@ export function getStandingCampusLocationsInPrefecture(
   return (locations ?? []).filter(
     (location) => location.prefecture === prefecture && isStandingCampus(location)
   );
+}
+
+/**
+ * 口コミの「主に通っていたキャンパスの市区町村」を市区町村レベルに正規化する。
+ *
+ * 「北区」のように政令指定都市の区名だけが書かれた回答は、回答した都道府県内の
+ * その学校の常設拠点で、同名の行政区を持つ市がちょうど1つのときだけその市の区として扱う。
+ * 候補がない・複数の市にまたがる場合は推測せず、書かれた値のまま返す
+ * （東京都の特別区は行政区ではないため、拠点側に候補が生じず書かれた値のままになる）。
+ */
+export function resolveReviewCampusArea(
+  campusCity: unknown,
+  campusPrefecture: unknown,
+  locations: SchoolCampusLocation[] | null | undefined
+): NormalizedArea | null {
+  if (typeof campusCity !== 'string') return null;
+  const area = normalizeAreaName(campusCity);
+  if (!area || area.ward || !area.city.endsWith('区')) return area;
+
+  const prefecture = typeof campusPrefecture === 'string' ? campusPrefecture.trim() : '';
+  if (!prefecture) return area;
+
+  const parentCities = new Set(
+    getStandingCampusLocationsInPrefecture(locations, prefecture)
+      .map((location) => normalizeAreaName(location.city))
+      .filter((candidate): candidate is NormalizedArea => candidate?.ward === area.city)
+      .map((candidate) => candidate.municipality)
+  );
+  if (parentCities.size !== 1) return area;
+
+  const [municipality] = parentCities;
+  return { city: `${municipality}${area.city}`, municipality, ward: area.city };
 }
 
 function parseNearestStations(record: Record<string, unknown>): string[] {
