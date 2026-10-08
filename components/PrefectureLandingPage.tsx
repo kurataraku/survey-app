@@ -303,7 +303,7 @@ function SchoolList({
               const card = toCardData(row, globalAverages);
               return card ? (
                 <RegionalSchoolCard
-                  key={row.id}
+                  key={row.defaultOrder}
                   school={card}
                   prefecture={prefecture}
                   showFullReviewLink
@@ -323,7 +323,7 @@ function SchoolList({
           <ul className="border-t border-gray-200" data-regional-list>
             {otherRows.map((row) => (
               <PrefectureSchoolListRow
-                key={row.id}
+                key={row.defaultOrder}
                 school={row}
                 prefecture={prefecture}
                 ratingDiff={nationalAverageDiff(row.overallAvg, nationalOverall, row.reviewCount)}
@@ -365,7 +365,7 @@ function RankingList({
     <PrefectureSchoolCardTracker prefecture={prefecture} block={block}>
       <ol className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
         {entries.map((entry, index) => (
-          <li key={entry.row.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+          <li key={index} className="flex items-center gap-3 px-4 py-2.5 text-sm">
             <span className="w-5 shrink-0 text-xs font-bold text-gray-400">{index + 1}</span>
             <span className="min-w-0 flex-1">
               <SchoolNameCell row={entry.row} />
@@ -607,7 +607,7 @@ function TuitionSection({ data }: { data: PrefectureLandingData }) {
       {tuitionRows.length > 0 && (
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {tuitionRows.map((row) => (
-            <li key={row.id} className="rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2.5 text-sm">
+            <li key={row.defaultOrder} className="rounded-lg border border-gray-100 bg-gray-50/70 px-3 py-2.5 text-sm">
               <SchoolNameCell row={row} />
               <span className="mt-0.5 block text-gray-800">
                 <TuitionCell tuition={row.tuition} />

@@ -36,6 +36,15 @@ export default function PrefectureSchoolListRow({
       ? school.headquartersPrefecture
       : null;
   const highlights = school.highlights.slice(0, ROW_HIGHLIGHT_LIMIT);
+  const tuitionText = `${school.tuition?.value ?? '—'}${
+    school.tuition?.basisLabel ? `（${school.tuition.basisLabel}）` : ''
+  }`;
+  const reviewCountText = `${
+    school.overallAvg != null ? `★ ${school.overallAvg.toFixed(1)}　` : ''
+  }口コミ${school.reviewCount}件`;
+  const reviewScopeText = `学校全体${
+    school.localReviewCount > 0 ? `（うち${prefecture}内${school.localReviewCount}件）` : ''
+  }`;
 
   return (
     <li
@@ -44,55 +53,38 @@ export default function PrefectureSchoolListRow({
         rating: school.overallAvg,
         reviewCount: school.reviewCount,
       })}
-      className="grid gap-2 border-b border-gray-200 px-1 py-4 text-sm md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.9fr)_minmax(9rem,0.8fr)] md:gap-6"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 150px' }}
+      className="pref-row"
     >
       <div>
         {schoolHref ? (
-          <Link
-            href={schoolHref}
-            prefetch={false}
-            data-school-link="list"
-            className="text-base font-bold text-gray-950 hover:text-blue-800 hover:underline"
-          >
+          <Link href={schoolHref} prefetch={false} data-school-link="list" className="pref-row-name">
             {school.name}
           </Link>
         ) : (
           <span className="text-base font-bold text-gray-950">{school.name}</span>
         )}
         {school.institutionType && (
-          <span className="ml-2 text-xs text-gray-500">
-            {institutionTypeLabels[school.institutionType]}
-          </span>
+          <span className="pref-row-type">{institutionTypeLabels[school.institutionType]}</span>
         )}
-        {highlights.length > 0 && (
-          <p className="mt-1 text-xs leading-relaxed text-blue-900">{highlights.join(' ／ ')}</p>
-        )}
+        {highlights.length > 0 && <p className="pref-row-tags">{highlights.join(' ／ ')}</p>}
         <AdmissionBadgeList badges={school.admissionBadges} />
       </div>
 
-      <p className="leading-relaxed text-gray-800">
-        <span className="mr-2 text-gray-500">通える場所</span>
+      <p className="pref-row-place">
+        <span className="pref-row-label">通える場所</span>
         {formatPrefectureLocation(school, prefecture)}
-        {headquarters && (
-          <span className="block text-xs text-gray-500">本校: {headquarters}</span>
-        )}
+        {headquarters && <span className="pref-row-sub">{`本校: ${headquarters}`}</span>}
         <span className="block">
-          <span className="mr-2 text-gray-500">初年度納入金</span>
-          {school.tuition?.value ?? '—'}
-          {school.tuition?.basisLabel ? `（${school.tuition.basisLabel}）` : ''}
+          <span className="pref-row-label">初年度納入金</span>
+          {tuitionText}
         </span>
       </p>
 
       {school.reviewCount > 0 ? (
         <p className="text-gray-900">
-          <span className="font-semibold">
-            {school.overallAvg != null ? `★ ${school.overallAvg.toFixed(1)}　` : ''}
-            口コミ{school.reviewCount}件
-          </span>
-          <span className="block text-xs text-gray-500">
-            学校全体
-            {school.localReviewCount > 0 ? `（うち${prefecture}内${school.localReviewCount}件）` : ''}
+          <span className="font-semibold">{reviewCountText}</span>
+          <span className="pref-row-sub">
+            {reviewScopeText}
             <NationalAverageDiff diff={ratingDiff} className="ml-2" />
           </span>
           {school.slug && (
@@ -100,7 +92,7 @@ export default function PrefectureSchoolListRow({
               href={appPath(`/schools/${school.slug}/reviews`)}
               prefetch={false}
               data-school-link="list_reviews"
-              className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+              className="pref-row-link"
             >
               口コミを読む
             </Link>
@@ -109,11 +101,7 @@ export default function PrefectureSchoolListRow({
       ) : (
         <p className="text-gray-600">
           口コミ募集中
-          <Link
-            href={appPath('/submit')}
-            prefetch={false}
-            className="flex min-h-11 w-fit items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
-          >
+          <Link href={appPath('/submit')} prefetch={false} className="pref-row-write">
             口コミを書く
           </Link>
         </p>

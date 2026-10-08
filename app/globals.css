@@ -27,6 +27,39 @@ body {
   --color-error: #ef4444;
 }
 
+/* 都道府県LPの一覧行（東京は130校超）。クラス列はHTMLとRSCデータに行数分重複して転送量に響くため、ここにまとめる */
+@layer components {
+  .pref-row {
+    @apply grid gap-2 border-b border-gray-200 px-1 py-4 text-sm md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.9fr)_minmax(9rem,0.8fr)] md:gap-6;
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 150px;
+  }
+  .pref-row-name {
+    @apply text-base font-bold text-gray-950 hover:text-blue-800 hover:underline;
+  }
+  .pref-row-type {
+    @apply ml-2 text-xs text-gray-500;
+  }
+  .pref-row-tags {
+    @apply mt-1 text-xs leading-relaxed text-blue-900;
+  }
+  .pref-row-place {
+    @apply leading-relaxed text-gray-800;
+  }
+  .pref-row-label {
+    @apply mr-2 text-gray-500;
+  }
+  .pref-row-sub {
+    @apply block text-xs text-gray-500;
+  }
+  .pref-row-link {
+    @apply inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900;
+  }
+  .pref-row-write {
+    @apply flex min-h-11 w-fit items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900;
+  }
+}
+
 /* リッチテキストエディタのコンテンツ表示用スタイル */
 .article-content h1 {
   font-size: 2em;
