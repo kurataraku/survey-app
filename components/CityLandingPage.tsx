@@ -334,8 +334,12 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
           targetId={RESULTS_ID}
           prefecture={prefecture}
           totalSchools={data.counts.totalSchools}
-          areas={data.finderStations}
+          areas={data.finderAreas}
           schoolTypes={data.schoolTypeOptions}
+          areaLegend="区・最寄り駅"
+          areaDialogButtonLabel="すべての区・駅から選ぶ"
+          areaDialogTitle="区・最寄り駅を選ぶ"
+          areaNote="複数の区・駅にキャンパスがある学校は、それぞれに数えています。"
         />
 
         <section id={RESULTS_ID} className="mb-10" aria-labelledby="city-comparison-heading">

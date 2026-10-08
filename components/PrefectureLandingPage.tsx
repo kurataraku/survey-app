@@ -273,12 +273,13 @@ function SchoolList({
             heading="市区町村と学校の種類で絞る"
             headingLevel="h3"
             areaLegend="市区町村"
+            areaDialogButtonLabel="すべての市区町村から選ぶ"
+            areaDialogTitle="市区町村を選ぶ"
             areaNote="複数の市区町村にキャンパスがある学校は、それぞれに数えています。"
             areaLinks={data.cityLandings.map((city) => ({
               href: appPath(city.path),
               label: `${city.municipality}の通信制高校ページを見る`,
             }))}
-            scrollAreasOnMobile
             groupedSortNote={
               featuredRows.length > 0 && otherRows.length > 0
                 ? '口コミを紹介している学校と、そのほかの掲載校は、それぞれの中で並べ替えます。'

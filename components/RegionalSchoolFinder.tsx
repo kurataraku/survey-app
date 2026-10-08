@@ -1,14 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import RegionalAreaDialog from '@/components/RegionalAreaDialog';
 import { GA_EVENTS } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/track';
 import {
   compareRegionalSchools,
+  FINDER_MOBILE_AREA_LIMIT,
   RATING_SORT_MIN_REVIEWS,
   REGIONAL_SORT_OPTIONS,
   type FinderAreaOption,
+  type FinderAreas,
   type RegionalSortableSchool,
   type RegionalSortKey,
 } from '@/lib/schools/regionalLanding';
@@ -24,17 +27,18 @@ interface RegionalSchoolFinderProps {
   targetId: string;
   prefecture: string;
   totalSchools: number;
-  areas: FinderAreaOption[];
+  areas: FinderAreas;
   schoolTypes: FinderSchoolType[];
   heading?: string;
   headingLevel?: 'h2' | 'h3';
   areaLegend?: string;
+  /** すべての地域から選ぶダイアログを開くボタンと、ダイアログの見出し */
+  areaDialogButtonLabel?: string;
+  areaDialogTitle?: string;
   /** 1校を複数の地域に数える場合などの注記 */
   areaNote?: string;
   /** 地域ごとの詳しいページ（都市LPなど） */
   areaLinks?: Array<{ href: string; label: string }>;
-  /** スマホで地域のボタンを折り返さず、横スクロールの1列にする */
-  scrollAreasOnMobile?: boolean;
   /** 一覧が複数のまとまりに分かれ、まとまりごとに並べ替える場合の注記 */
   groupedSortNote?: string;
 }
@@ -68,21 +72,47 @@ export default function RegionalSchoolFinder({
   heading = '通う場所と学校の種類で絞る',
   headingLevel = 'h2',
   areaLegend = '最寄り駅',
+  areaDialogButtonLabel = 'すべての地域から選ぶ',
+  areaDialogTitle = '地域を選ぶ',
   areaNote,
   areaLinks = [],
-  scrollAreasOnMobile = false,
   groupedSortNote,
 }: RegionalSchoolFinderProps) {
   const [areaId, setAreaId] = useState('');
   const [schoolType, setSchoolType] = useState<SchoolInstitutionType | ''>('');
   const [sort, setSort] = useState<RegionalSortKey>('default');
+  const [dialogOpen, setDialogOpen] = useState(false);
   const reordered = useRef(false);
+  const allAreas = useMemo(() => areas.groups.flatMap((group) => group.options), [areas]);
+  const featuredAreas = useMemo(
+    () =>
+      areas.featuredIds
+        .map((id) => allAreas.find((area) => area.id === id))
+        .filter((area): area is FinderAreaOption => Boolean(area)),
+    [allAreas, areas.featuredIds]
+  );
   const hasFilter = Boolean(areaId || schoolType);
-  const selectedArea = areas.find((area) => area.id === areaId);
+  const selectedArea = allAreas.find((area) => area.id === areaId);
+  const selectedFeaturedIndex = featuredAreas.findIndex((area) => area.id === areaId);
   const selectedType = schoolTypes.find((option) => option.key === schoolType);
   const Heading = headingLevel;
-  const showAreas = areas.length >= 2;
+  const showAreas = allAreas.length >= 2;
   const showTypes = schoolTypes.length >= 2;
+  const dialogNeeded = allAreas.length > featuredAreas.length;
+  const dialogNeededOnMobile = featuredAreas.length > FINDER_MOBILE_AREA_LIMIT;
+  const areaCount = (area: FinderAreaOption) =>
+    schoolType ? area.typeCounts[schoolType] ?? 0 : area.schoolCount;
+  const selectArea = (area: FinderAreaOption, source: 'button' | 'dialog') => {
+    const next = areaId === area.id ? '' : area.id;
+    setAreaId(next);
+    if (next) {
+      trackEvent(GA_EVENTS.regionAreaFilter, {
+        prefecture,
+        area_label: area.fullLabel ?? area.label,
+        area_source: source,
+      });
+    }
+  };
 
   let matchingCount = totalSchools;
   if (selectedArea && schoolType) matchingCount = selectedArea.typeCounts[schoolType] ?? 0;
@@ -164,23 +194,23 @@ export default function RegionalSchoolFinder({
 
       {showAreas && (
         <fieldset className="mb-5 min-w-0">
-          <legend className="mb-2 flex w-full items-baseline justify-between text-sm font-bold text-gray-800">
-            {areaLegend}
-            {scrollAreasOnMobile && (
-              <span aria-hidden className="text-xs font-normal text-gray-500 sm:hidden">
-                横にスクロールできます →
-              </span>
-            )}
-          </legend>
-          <div
-            className={
-              scrollAreasOnMobile
-                ? '-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0'
-                : 'flex flex-wrap gap-2'
-            }
-          >
-            {areas.map((area) => {
-              const count = schoolType ? area.typeCounts[schoolType] ?? 0 : area.schoolCount;
+          <legend className="mb-2 text-sm font-bold text-gray-800">{areaLegend}</legend>
+          <div className="flex flex-wrap gap-2">
+            {selectedArea &&
+              (selectedFeaturedIndex === -1 || selectedFeaturedIndex >= FINDER_MOBILE_AREA_LIMIT) && (
+                <button
+                  type="button"
+                  aria-pressed
+                  className={`${buttonClass(true, false)}${selectedFeaturedIndex === -1 ? '' : ' sm:hidden'}`}
+                  onClick={() => setAreaId('')}
+                >
+                  {selectedArea.fullLabel ?? selectedArea.label}{' '}
+                  <span className="font-normal">{areaCount(selectedArea)}校</span>
+                  <span aria-hidden className="ml-1.5">×</span>
+                </button>
+              )}
+            {featuredAreas.map((area, index) => {
+              const count = areaCount(area);
               const active = areaId === area.id;
               const disabled = count === 0 && !active;
               return (
@@ -189,15 +219,41 @@ export default function RegionalSchoolFinder({
                   type="button"
                   aria-pressed={active}
                   disabled={disabled}
-                  className={`${buttonClass(active, disabled)}${scrollAreasOnMobile ? ' shrink-0 whitespace-nowrap' : ''}`}
-                  onClick={() => setAreaId(active ? '' : area.id)}
+                  className={`${buttonClass(active, disabled)}${index >= FINDER_MOBILE_AREA_LIMIT ? ' max-sm:hidden' : ''}`}
+                  onClick={() => selectArea(area, 'button')}
                 >
-                  {area.label} <span className="font-normal">{count}校</span>
+                  {area.fullLabel ?? area.label} <span className="font-normal">{count}校</span>
                 </button>
               );
             })}
+            {(dialogNeeded || dialogNeededOnMobile) && (
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                aria-controls={`${targetId}-area-dialog`}
+                className={`min-h-11 rounded-xl border border-blue-700 bg-white px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2${dialogNeeded ? '' : ' sm:hidden'}`}
+                onClick={() => setDialogOpen(true)}
+              >
+                {areaDialogButtonLabel}
+                <span aria-hidden className="ml-1">›</span>
+              </button>
+            )}
           </div>
           {areaNote && <p className="mt-2 text-xs leading-relaxed text-gray-500">{areaNote}</p>}
+          <RegionalAreaDialog
+            id={`${targetId}-area-dialog`}
+            open={dialogOpen}
+            title={areaDialogTitle}
+            note={areaNote}
+            groups={areas.groups}
+            selectedId={areaId}
+            countFor={areaCount}
+            onSelect={(area) => {
+              selectArea(area, 'dialog');
+              setDialogOpen(false);
+            }}
+            onClose={() => setDialogOpen(false)}
+          />
           {areaLinks.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
               {areaLinks.map((link) => (

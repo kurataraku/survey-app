@@ -12,6 +12,7 @@ import {
 } from '@/lib/regions/area-normalize';
 import {
   computePrefectureLocationInsights,
+  TOP_STATION_LIMIT,
   type PrefectureStationInsight,
 } from '@/lib/schools/getPrefectureLocationInsights';
 import { findRegionalReviewStat } from '@/lib/schools/regionalReviews';
@@ -22,12 +23,10 @@ import {
   type RegionalReviewExcerpt,
 } from '@/lib/schools/regionalReviewExcerpts';
 import {
-  buildFinderAreaOptions,
-  CITY_FINDER_STATION_LIMIT,
+  buildCityFinderAreas,
   CITY_REGIONAL_CARD_LIMIT,
-  OTHER_STATION_FILTER_ID,
   SCHOOL_TYPE_FILTERS,
-  type FinderAreaOption,
+  type FinderAreas,
   type RegionalSchoolTier,
 } from '@/lib/schools/regionalLanding';
 import {
@@ -102,7 +101,7 @@ export type CityLandingData = {
   };
   wards: CityWardInsight[];
   topStations: PrefectureStationInsight[];
-  finderStations: FinderAreaOption[];
+  finderAreas: FinderAreas;
   schoolTypeOptions: Array<{
     key: SchoolInstitutionType;
     label: string;
@@ -244,29 +243,25 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
 
   const insights = computePrefectureLocationInsights(schools, config.prefecture, {
     municipality: config.municipality,
+    stationLimit: Number.POSITIVE_INFINITY,
   });
 
-  const stationDefinitions = insights.topStations
-    .slice(0, CITY_FINDER_STATION_LIMIT)
-    .map((station, index) => ({
-      id: `station-${index + 1}`,
-      label: station.name,
-    }));
-  const rowsWithStations = baseRows.map((row, index) => {
-    // 駅の集計（computePrefectureLocationInsights）と同じく、事業者名付きの駅は接頭辞なしの駅にまとめる
-    const areaFilterIds = stationDefinitions
-      .filter((station) =>
-        row.allStations.some(
-          (name) => name === station.label || stripRailOperatorPrefix(name) === station.label
-        )
-      )
-      .map((station) => station.id);
-    return {
-      ...row,
-      defaultOrder: index,
-      areaFilterIds: areaFilterIds.length > 0 ? areaFilterIds : [OTHER_STATION_FILTER_ID],
-    };
-  });
+  const stationNamesInCity = insights.topStations.map((station) => station.name);
+  const finder = buildCityFinderAreas(
+    baseRows.map((row) => ({
+      institutionType: row.institutionType,
+      wards: row.wards,
+      // 駅の集計（computePrefectureLocationInsights）と同じく、事業者名付きの駅は接頭辞なしの駅にまとめる
+      stations: stationNamesInCity.filter((station) =>
+        row.allStations.some((name) => name === station || stripRailOperatorPrefix(name) === station)
+      ),
+    }))
+  );
+  const rowsWithStations = baseRows.map((row, index) => ({
+    ...row,
+    defaultOrder: index,
+    areaFilterIds: finder.areaFilterIds[index],
+  }));
 
   const campusLocationsBySchool = new Map(schools.map((school) => [school.id, school.campus_locations]));
   const reviewExcerpts = await fetchRegionalReviewExcerpts({
@@ -295,10 +290,6 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     excerpt: excerptBySchool.get(row.id) ?? null,
   }));
 
-  const finderStations = buildFinderAreaOptions(rows, [
-    ...stationDefinitions,
-    { id: OTHER_STATION_FILTER_ID, label: 'その他の駅' },
-  ]);
   const schoolTypeOptions = SCHOOL_TYPE_FILTERS.map((filter) => ({
     ...filter,
     schoolCount: rows.filter((row) => row.institutionType === filter.key).length,
@@ -318,8 +309,8 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
       admissionVerifiedCount: rows.filter((row) => row.admissionBadges.length > 0).length,
     },
     wards: buildWards(schools, config),
-    topStations: insights.topStations,
-    finderStations,
+    topStations: insights.topStations.slice(0, TOP_STATION_LIMIT),
+    finderAreas: finder.areas,
     schoolTypeOptions,
     themeLists: buildRegionalThemeLists(rows),
     reviewExcerpts,

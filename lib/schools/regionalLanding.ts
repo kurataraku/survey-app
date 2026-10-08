@@ -4,11 +4,11 @@ export type RegionalSchoolTier = 'a' | 'b' | 'c';
 
 export const CITY_REGIONAL_CARD_LIMIT = 20;
 export const CITY_FINDER_STATION_LIMIT = 6;
-export const OTHER_STATION_FILTER_ID = 'station-other';
 
 export const PREFECTURE_REGIONAL_CARD_LIMIT = 12;
 export const PREFECTURE_FINDER_AREA_LIMIT = 8;
-export const OTHER_AREA_FILTER_ID = 'area-other';
+/** スマホでボタンとして並べる地域の上限。残りは一覧（ダイアログ）から選ぶ */
+export const FINDER_MOBILE_AREA_LIMIT = 4;
 /** この校数以下の県では、絞り込んでも候補がほとんど変わらないため絞り込み欄を出さない */
 export const PREFECTURE_FINDER_MAX_HIDDEN_SCHOOLS = 5;
 /** この校数を超える県では、一覧を読み飛ばすページ内リンクを置く */
@@ -17,49 +17,177 @@ export const PREFECTURE_LIST_SKIP_LINK_MIN_SCHOOLS = 15;
 export type FinderAreaOption = {
   id: string;
   label: string;
+  /**
+   * 一覧の外（ボタン・選択中の表示）で使う名前。区は親の市を含めた「大阪市北区」、
+   * 政令指定都市の市全体は「大阪市」（一覧の中では label の「大阪市全体」）。label で足りる場合は省略
+   */
+  fullLabel?: string;
   schoolCount: number;
+  /** 0校の種類は持たない */
   typeCounts: Partial<Record<SchoolInstitutionType, number>>;
+};
+
+export type FinderAreaGroup = {
+  /** 見出し。まとまりが1つだけなら null */
+  label: string | null;
+  options: FinderAreaOption[];
+};
+
+export type FinderAreas = {
+  /** 一覧（ダイアログ）に並べるすべての地域 */
+  groups: FinderAreaGroup[];
+  /** ボタンとして並べる地域（校数の多い順） */
+  featuredIds: string[];
+};
+
+export type FinderAreasResult = {
+  areas: FinderAreas;
+  /** 入力の行と同じ順の、各校の絞り込みID */
+  areaFilterIds: string[][];
 };
 
 export function shouldShowPrefectureFinder(totalSchools: number): boolean {
   return totalSchools > PREFECTURE_FINDER_MAX_HIDDEN_SCHOOLS;
 }
 
-/**
- * 都道府県LPの市区町村の絞り込みID。上位の市区町村に当たればそのID、
- * 上位以外の市区町村にもキャンパスがあれば「その他の地域」も付ける。県内にキャンパスがなければ空配列。
- */
-export function assignAreaFilterIds(
-  municipalities: string[],
-  areas: ReadonlyArray<{ id: string; label: string }>,
-  otherId: string = OTHER_AREA_FILTER_ID
-): string[] {
-  const ids = areas.filter((area) => municipalities.includes(area.label)).map((area) => area.id);
-  const labels = new Set(areas.map((area) => area.label));
-  if (municipalities.some((municipality) => !labels.has(municipality))) ids.push(otherId);
-  return ids;
+type FinderRow = { institutionType: SchoolInstitutionType | null };
+
+function addIndex(map: Map<string, Set<number>>, key: string, index: number) {
+  const indexes = map.get(key) ?? new Set<number>();
+  indexes.add(index);
+  map.set(key, indexes);
 }
 
-/** 絞り込みボタンの件数。1校が複数の地域に当たる場合はそれぞれに数え、0校の選択肢は出さない */
-export function buildFinderAreaOptions(
-  rows: ReadonlyArray<{ areaFilterIds: string[]; institutionType: SchoolInstitutionType | null }>,
-  areas: ReadonlyArray<{ id: string; label: string }>
-): FinderAreaOption[] {
-  return areas
-    .map((area) => {
-      const areaRows = rows.filter((row) => row.areaFilterIds.includes(area.id));
-      return {
-        ...area,
-        schoolCount: areaRows.length,
-        typeCounts: Object.fromEntries(
-          SCHOOL_TYPE_FILTERS.map((filter) => [
-            filter.key,
-            areaRows.filter((row) => row.institutionType === filter.key).length,
-          ])
-        ) as Partial<Record<SchoolInstitutionType, number>>,
-      };
-    })
-    .filter((area) => area.schoolCount > 0);
+function sortByCount(map: Map<string, Set<number>>): Array<[string, Set<number>]> {
+  return [...map.entries()].sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0], 'ja'));
+}
+
+function toOption(
+  id: string,
+  label: string,
+  indexes: Set<number>,
+  rows: ReadonlyArray<FinderRow>,
+  fullLabel?: string
+): FinderAreaOption {
+  const typeCounts: Partial<Record<SchoolInstitutionType, number>> = {};
+  for (const index of indexes) {
+    const type = rows[index].institutionType;
+    if (type) typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+  }
+  return { id, label, ...(fullLabel ? { fullLabel } : {}), schoolCount: indexes.size, typeCounts };
+}
+
+function assignIds(entries: Array<[string, Set<number>]>, options: FinderAreaOption[], filterIds: string[][]) {
+  entries.forEach(([, indexes], position) => {
+    for (const index of indexes) filterIds[index].push(options[position].id);
+  });
+}
+
+/**
+ * 都道府県LPの市区町村の絞り込み。県内にキャンパスがある市区町村をすべて選べるようにし、
+ * 政令指定都市は市全体に加えて区でも選べるようにする。1校が複数の地域に当たる場合はそれぞれに数える。
+ */
+export function buildPrefectureFinderAreas(
+  prefecture: string,
+  rows: ReadonlyArray<
+    FinderRow & {
+      localMunicipalities: string[];
+      localWards: Array<{ municipality: string; ward: string }>;
+    }
+  >,
+  featuredLimit: number = PREFECTURE_FINDER_AREA_LIMIT
+): FinderAreasResult {
+  const byMunicipality = new Map<string, Set<number>>();
+  const byWard = new Map<string, Map<string, Set<number>>>();
+  rows.forEach((row, index) => {
+    for (const municipality of row.localMunicipalities) addIndex(byMunicipality, municipality, index);
+    for (const { municipality, ward } of row.localWards) {
+      const wards = byWard.get(municipality) ?? new Map<string, Set<number>>();
+      addIndex(wards, ward, index);
+      byWard.set(municipality, wards);
+    }
+  });
+
+  const filterIds = rows.map(() => [] as string[]);
+  const municipalities = sortByCount(byMunicipality);
+  const municipalityOptions = municipalities.map(([name, indexes], position) =>
+    toOption(`a${position + 1}`, name, indexes, rows)
+  );
+  assignIds(municipalities, municipalityOptions, filterIds);
+
+  const designatedGroups: FinderAreaGroup[] = [];
+  const kindOptions = { ward: [] as FinderAreaOption[], city: [] as FinderAreaOption[], town: [] as FinderAreaOption[] };
+  municipalities.forEach(([name], position) => {
+    const option = municipalityOptions[position];
+    const wards = byWard.get(name);
+    if (wards) {
+      const wardEntries = sortByCount(wards);
+      const wardOptions = wardEntries.map(([ward, indexes], wardPosition) =>
+        toOption(`${option.id}-${wardPosition + 1}`, ward, indexes, rows, `${name}${ward}`)
+      );
+      assignIds(wardEntries, wardOptions, filterIds);
+      const wholeCity = { ...option, label: `${name}全体`, fullLabel: name };
+      municipalityOptions[position] = wholeCity;
+      designatedGroups.push({ label: name, options: [wholeCity, ...wardOptions] });
+    } else if (name.endsWith('区')) {
+      kindOptions.ward.push(option);
+    } else if (name.endsWith('市')) {
+      kindOptions.city.push(option);
+    } else {
+      kindOptions.town.push(option);
+    }
+  });
+
+  const groups = [
+    ...designatedGroups,
+    { label: prefecture === '東京都' ? '23区' : '区', options: kindOptions.ward },
+    { label: designatedGroups.length > 0 ? 'そのほかの市' : '市', options: kindOptions.city },
+    { label: '町・村', options: kindOptions.town },
+  ].filter((group) => group.options.length > 0);
+
+  return {
+    areas: {
+      groups: groups.length === 1 ? [{ ...groups[0], label: null }] : groups,
+      featuredIds: municipalityOptions.slice(0, featuredLimit).map((option) => option.id),
+    },
+    areaFilterIds: filterIds,
+  };
+}
+
+/** 都市LPの区・最寄り駅の絞り込み。ボタンは校数の多い駅、一覧ではすべての区と駅から選べる */
+export function buildCityFinderAreas(
+  rows: ReadonlyArray<FinderRow & { wards: string[]; stations: string[] }>,
+  featuredLimit: number = CITY_FINDER_STATION_LIMIT
+): FinderAreasResult {
+  const byWard = new Map<string, Set<number>>();
+  const byStation = new Map<string, Set<number>>();
+  rows.forEach((row, index) => {
+    for (const ward of row.wards) addIndex(byWard, ward, index);
+    for (const station of row.stations) addIndex(byStation, station, index);
+  });
+
+  const filterIds = rows.map(() => [] as string[]);
+  const wards = sortByCount(byWard);
+  const wardOptions = wards.map(([name, indexes], position) => toOption(`w${position + 1}`, name, indexes, rows));
+  assignIds(wards, wardOptions, filterIds);
+  const stations = sortByCount(byStation);
+  const stationOptions = stations.map(([name, indexes], position) =>
+    toOption(`s${position + 1}`, name, indexes, rows)
+  );
+  assignIds(stations, stationOptions, filterIds);
+
+  return {
+    areas: {
+      groups: [
+        { label: '区', options: wardOptions },
+        { label: '最寄り駅', options: stationOptions },
+      ].filter((group) => group.options.length > 0),
+      featuredIds: (stationOptions.length >= 2 ? stationOptions : wardOptions)
+        .slice(0, featuredLimit)
+        .map((option) => option.id),
+    },
+    areaFilterIds: filterIds,
+  };
 }
 
 export const SCHOOL_TYPE_FILTERS: ReadonlyArray<{

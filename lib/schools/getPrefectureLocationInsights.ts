@@ -40,7 +40,7 @@ export type PrefectureLocationInsights = {
 };
 
 const TOP_CITY_LIMIT = 12;
-const TOP_STATION_LIMIT = 12;
+export const TOP_STATION_LIMIT = 12;
 
 type CityEntry = {
   schoolIds: Set<string>;
@@ -116,6 +116,7 @@ export function computePrefectureLocationInsights(
     /** 指定時はこの市区町村（政令指定都市は親市単位）の拠点だけを集計する */
     municipality?: string;
     wardLimit?: number;
+    stationLimit?: number;
   } = {}
 ): PrefectureLocationInsights {
   const cityMap = new Map<string, CityEntry>();
@@ -212,6 +213,6 @@ export function computePrefectureLocationInsights(
     cityCount: cityMap.size,
     stationCount: stationMap.size,
     topCities: topCities.slice(0, TOP_CITY_LIMIT),
-    topStations: topStations.slice(0, TOP_STATION_LIMIT),
+    topStations: topStations.slice(0, options.stationLimit ?? TOP_STATION_LIMIT),
   };
 }

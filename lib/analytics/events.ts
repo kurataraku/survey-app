@@ -1,6 +1,7 @@
 /** GA4 カスタムイベント名（計画書と統一） */
 export const GA_EVENTS = {
   regionSchoolClick: 'region_school_click',
+  regionAreaFilter: 'region_area_filter',
   schoolDetailView: 'school_detail_view',
   diagnosisStartClick: 'diagnosis_start_click',
   reviewPostClick: 'review_post_click',

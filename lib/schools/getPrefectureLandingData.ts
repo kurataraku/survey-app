@@ -35,13 +35,10 @@ import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissi
 import { getCityLandingPath, getCityLandingsForPrefecture } from '@/lib/regions/city-landing';
 import { getCityLandingData } from '@/lib/schools/getCityLandingData';
 import {
-  assignAreaFilterIds,
-  buildFinderAreaOptions,
-  OTHER_AREA_FILTER_ID,
-  PREFECTURE_FINDER_AREA_LIMIT,
+  buildPrefectureFinderAreas,
   PREFECTURE_REGIONAL_CARD_LIMIT,
   SCHOOL_TYPE_FILTERS,
-  type FinderAreaOption,
+  type FinderAreas,
 } from '@/lib/schools/regionalLanding';
 import { selectRegionalHighlights } from '@/lib/schools/schoolHighlights';
 
@@ -79,6 +76,8 @@ export type PrefectureSchoolRow = {
   staffRatingCount: number;
   /** 県内キャンパスの市区町村（政令指定都市は親市単位）。絞り込みに使う */
   localMunicipalities: string[];
+  /** 県内キャンパスのうち、政令指定都市の区まで分かるもの。絞り込みに使う */
+  localWards: Array<{ municipality: string; ward: string }>;
   /** 一覧の標準の並び順（県内の口コミが多い順、次に学校全体の口コミが多い順） */
   defaultOrder: number;
   areaFilterIds: string[];
@@ -128,7 +127,7 @@ export type PrefectureLandingData = {
   featuredRows: PrefectureSchoolRow[];
   /** カード以外の掲載校（標準の並び順） */
   otherRows: PrefectureSchoolRow[];
-  finderAreas: FinderAreaOption[];
+  finderAreas: FinderAreas;
   schoolTypeOptions: Array<{ key: SchoolInstitutionType; label: string; schoolCount: number }>;
   averageOverallSatisfaction: number | null;
   averageTuitionSatisfaction: number | null;
@@ -165,6 +164,13 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     .filter((area): area is NonNullable<typeof area> => area !== null);
   const localCities = [...new Set(localAreas.map((area) => area.city))];
   const localMunicipalities = [...new Set(localAreas.map((area) => area.municipality))];
+  const localWards = [
+    ...new Map(
+      localAreas
+        .filter((area) => area.ward)
+        .map((area) => [area.city, { municipality: area.municipality, ward: area.ward as string }])
+    ).values(),
+  ];
   const localStations = [
     ...new Set(
       localLocations
@@ -197,6 +203,7 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
     staffAvg: school.staff_avg,
     staffRatingCount: school.staff_rating_count,
     localMunicipalities,
+    localWards,
     defaultOrder: 0,
     areaFilterIds: [],
     excerpt: null,
@@ -264,9 +271,7 @@ export const getPrefectureLandingData = cache(
     const baseRows = schools.map((school) => toRow(school, prefecture));
     const locationInsights = computePrefectureLocationInsights(schools, prefecture);
 
-    const areaDefinitions = locationInsights.topCities
-      .slice(0, PREFECTURE_FINDER_AREA_LIMIT)
-      .map((city, index) => ({ id: `area-${index + 1}`, label: city.city }));
+    const finder = buildPrefectureFinderAreas(prefecture, baseRows);
     const orderById = new Map(
       [...baseRows]
         .sort(
@@ -295,10 +300,10 @@ export const getPrefectureLandingData = cache(
         .map((row) => row.id)
     );
 
-    const rows = baseRows.map((row) => ({
+    const rows = baseRows.map((row, index) => ({
       ...row,
       defaultOrder: orderById.get(row.id) ?? 0,
-      areaFilterIds: assignAreaFilterIds(row.localMunicipalities, areaDefinitions),
+      areaFilterIds: finder.areaFilterIds[index],
       excerpt: featuredIds.has(row.id) ? excerptBySchool.get(row.id) ?? null : null,
     }));
     const listRows = [...rows].sort((a, b) => a.defaultOrder - b.defaultOrder);
@@ -371,10 +376,7 @@ export const getPrefectureLandingData = cache(
       tuitionRows,
       featuredRows: listRows.filter((row) => row.excerpt !== null),
       otherRows: listRows.filter((row) => row.excerpt === null),
-      finderAreas: buildFinderAreaOptions(rows, [
-        ...areaDefinitions,
-        { id: OTHER_AREA_FILTER_ID, label: 'その他の地域' },
-      ]),
+      finderAreas: finder.areas,
       schoolTypeOptions: SCHOOL_TYPE_FILTERS.map((filter) => ({
         ...filter,
         schoolCount: rows.filter((row) => row.institutionType === filter.key).length,
