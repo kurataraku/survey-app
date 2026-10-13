@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireAdmin } from '@/lib/auth/admin';
+import { duplicateGiftUrlMessage, findGrantWithSameGiftUrl } from '@/lib/campaign/giftUrlDuplicate';
 import { sendApprovedEmail } from '@/lib/email/sender';
 import { publicReviewUrl, submitIndexNowUrls } from '@/lib/indexnow/submitIndexNow';
 import { resolveSchoolIdFromSchoolName } from '@/lib/reviews/schoolReviewLinkage';
@@ -25,9 +26,25 @@ export async function POST(
 
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  const giftUrl: string | undefined = body.gift_url || undefined;
+  const giftUrl: string | undefined = typeof body.gift_url === 'string' && body.gift_url.trim()
+    ? body.gift_url.trim()
+    : undefined;
 
   const supabase = getSupabase();
+
+  // 承認・メール送信の後では取り消せないため、同じギフトURLの使い回しは承認前に止める
+  if (giftUrl) {
+    const duplicate = await findGrantWithSameGiftUrl(supabase, giftUrl);
+    if (duplicate.error) {
+      return NextResponse.json({ error: duplicate.error }, { status: 500 });
+    }
+    if (duplicate.grant) {
+      return NextResponse.json(
+        { error: duplicateGiftUrlMessage(duplicate.grant.email), duplicate_grant_id: duplicate.grant.id },
+        { status: 409 }
+      );
+    }
+  }
 
   const { data: before, error: beforeErr } = await supabase
     .from('survey_responses')

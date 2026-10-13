@@ -388,16 +388,30 @@ export default function ReviewModerationPage() {
   // Initial/tab-triggered admin data fetches intentionally hydrate client state.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadReviews(false); }, [loadReviews]);
+  // 承認フォームのURL重複チェックにも使うため、QUO配布管理タブを開く前から読み込んでおく
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadGrants(false); }, [loadGrants]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (tab === 'quocard') loadGrants(false); }, [tab, loadGrants]);
 
   const approve = async (id: string, url: string) => {
+    const duplicate = findDuplicateGiftUrl(null, url);
+    if (duplicate) {
+      alert(`NG: このURLは既に ${duplicate.email} の配布記録で使われています。\n新しいQUOカードPayのURLを発行して入力してください。`);
+      return;
+    }
     setProcessing(id);
-    await fetch(apiPath(`/api/admin/reviews/${id}/approve`), {
+    const res = await fetch(apiPath(`/api/admin/reviews/${id}/approve`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ gift_url: url.trim() || undefined }),
     });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      alert(json.error ?? '承認に失敗しました');
+      setProcessing(null);
+      return;
+    }
     setProcessing(null);
     setApprovingId(null);
     setGiftUrl('');
@@ -460,10 +474,23 @@ export default function ReviewModerationPage() {
 
   const giftUrlFor = (grant: PendingGrant) => grantGiftUrls[grant.id] ?? grant.gift_code ?? '';
 
+  // 送信済みの記録に加え、他の未送付行に入力中のURLとも突き合わせる（同じURLを2行に貼った場合も検知する）
+  const findDuplicateGiftUrl = (excludeGrantId: string | null, url: string) => {
+    const target = url.trim();
+    if (!target) return null;
+    return (
+      grants.find(
+        (g) =>
+          g.id !== excludeGrantId &&
+          (isSameGiftUrl(g.gift_code, target) || isSameGiftUrl(grantGiftUrls[g.id], target))
+      ) ?? null
+    );
+  };
+
   const sendGrantEmail = (grant: PendingGrant) => {
     const url = giftUrlFor(grant).trim();
     if (!url) return;
-    const duplicate = grants.find((g) => g.id !== grant.id && isSameGiftUrl(g.gift_code, url));
+    const duplicate = findDuplicateGiftUrl(grant.id, url);
     if (duplicate) {
       alert(`NG: このURLは既に ${duplicate.email} の配布記録で使われています。\n新しいQUOカードPayのURLを発行して入力してください。`);
       return;
@@ -477,6 +504,8 @@ export default function ReviewModerationPage() {
     if (!confirm('この謝礼を対象外にしますか？（メールは送信されません）')) return;
     updateGrant(grant, { action: 'cancel' });
   };
+
+  const approveDuplicateGrant = findDuplicateGiftUrl(null, giftUrl);
 
   const isOpenGrant = (g: PendingGrant) => g.status === 'pending' || g.status === 'failed';
   const pendingGrantCount = grants.filter(isOpenGrant).length;
@@ -650,17 +679,33 @@ export default function ReviewModerationPage() {
                               )}
                               <input
                                 type="url"
-                                className="w-full text-sm border border-blue-200 rounded px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                className={`w-full text-sm border rounded px-3 py-1.5 focus:outline-none focus:ring-2 ${
+                                  approveDuplicateGrant
+                                    ? 'border-red-500 bg-red-50 focus:ring-red-300'
+                                    : 'border-blue-200 bg-white focus:ring-blue-300'
+                                }`}
                                 placeholder="https://..."
                                 value={giftUrl}
                                 onChange={(e) => setGiftUrl(e.target.value)}
+                                aria-invalid={approveDuplicateGrant ? true : undefined}
                                 autoFocus
                               />
+                              {approveDuplicateGrant && (
+                                <p className="mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-1">
+                                  このURLは {approveDuplicateGrant.email}（
+                                  {approveDuplicateGrant.status === 'sent'
+                                    ? '送付済み'
+                                    : approveDuplicateGrant.status === 'failed'
+                                      ? '送信失敗'
+                                      : '入力中'}
+                                  ）と同じです。新しいQUOカードPayのURLを入力してください。
+                                </p>
+                              )}
                             </div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => approve(review.id, giftUrl)}
-                                disabled={processing === review.id}
+                                disabled={processing === review.id || !!approveDuplicateGrant}
                                 className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                               >
                                 {processing === review.id ? '処理中...' : '承認してメール送信'}
@@ -835,6 +880,7 @@ export default function ReviewModerationPage() {
                       const amount = grant.reward_amount ?? grant.campaigns?.reward_amount ?? null;
                       const isOpen = isOpenGrant(grant);
                       const isSending = grant.error_message === '__sending__';
+                      const duplicateGrant = isOpen ? findDuplicateGiftUrl(grant.id, giftUrlFor(grant)) : null;
                       return (
                         <tr key={grant.id} className={isOpen ? '' : 'bg-gray-50'}>
                           <td className="px-4 py-3 align-top">
@@ -905,12 +951,26 @@ export default function ReviewModerationPage() {
                                   placeholder="https://..."
                                   value={giftUrlFor(grant)}
                                   onChange={(e) => setGrantGiftUrls({ ...grantGiftUrls, [grant.id]: e.target.value })}
-                                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs"
+                                  aria-invalid={duplicateGrant ? true : undefined}
+                                  className={`w-full border rounded px-2 py-1 text-xs ${
+                                    duplicateGrant ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                  }`}
                                 />
+                                {duplicateGrant && (
+                                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-1">
+                                    このURLは {duplicateGrant.email}（
+                                    {duplicateGrant.status === 'sent'
+                                      ? '送付済み'
+                                      : duplicateGrant.status === 'failed'
+                                        ? '送信失敗'
+                                        : '入力中'}
+                                    ）と同じです。新しいQUOカードPayのURLを入力してください。
+                                  </p>
+                                )}
                                 <div className="flex flex-wrap gap-1">
                                   <button
                                     onClick={() => sendGrantEmail(grant)}
-                                    disabled={marking === grant.id || isSending || !giftUrlFor(grant).trim()}
+                                    disabled={marking === grant.id || isSending || !giftUrlFor(grant).trim() || !!duplicateGrant}
                                     className="px-2 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
                                   >
                                     {marking === grant.id ? '処理中...' : 'URLをメール送信'}
