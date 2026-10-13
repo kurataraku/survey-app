@@ -362,6 +362,7 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
                   school={card}
                   prefecture={prefecture}
                   municipality={municipality}
+                  showFullReviewLink
                 />
               ) : (
                 <RegionalSchoolListRow
