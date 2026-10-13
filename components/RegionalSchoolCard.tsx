@@ -59,8 +59,14 @@ function shortEnrollment(value: string | null | undefined): string | null {
   return value;
 }
 
-function formatRating(value: number | null): string {
-  return value == null ? '—' : `★ ${value.toFixed(1)}`;
+function Rating({ value }: { value: number | null }) {
+  if (value == null) return <>—</>;
+  return (
+    <>
+      <span className="rating-star">★</span>
+      {` ${value.toFixed(1)}`}
+    </>
+  );
 }
 
 export default function RegionalSchoolCard({
@@ -112,16 +118,16 @@ export default function RegionalSchoolCard({
       {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
       style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 550px' }}
     >
-      <article className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_8px_30px_rgba(30,64,175,0.06)]">
+      <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
         <div className="h-1.5 bg-gradient-to-r from-blue-500 via-sky-400 to-sky-200" />
         <div className="p-5 sm:p-6 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:gap-8">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <NameHeading className="text-xl font-bold leading-snug text-gray-950">
+              <NameHeading className="text-xl font-bold leading-snug text-slate-900">
                 {school.name}
               </NameHeading>
               {school.institutionType && (
-                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-800">
+                <span className={`school-type school-type-${school.institutionType}`}>
                   {institutionTypeLabels[school.institutionType]}
                 </span>
               )}
@@ -140,24 +146,24 @@ export default function RegionalSchoolCard({
 
             <AdmissionBadgeList badges={school.admissionBadges} />
 
-            <dl className="mt-5 space-y-2 border-t border-blue-100 pt-4 text-sm">
+            <dl className="mt-5 space-y-2 rounded-xl bg-slate-50 px-4 py-3.5 text-sm">
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-gray-600">総合満足度</dt>
-                <dd className="text-right font-bold text-gray-950">
-                  {formatRating(school.rating)}
+                <dt className="text-slate-600">総合満足度</dt>
+                <dd className="text-right font-bold text-slate-900">
+                  <Rating value={school.rating} />
                   <NationalAverageDiff diff={school.ratingDiff} className="ml-2" />
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-gray-600">先生・職員の対応</dt>
-                <dd className="text-right font-semibold text-gray-900">
-                  {formatRating(school.staffAvg)}
+                <dt className="text-slate-600">先生・職員の対応</dt>
+                <dd className="text-right font-semibold text-slate-900">
+                  <Rating value={school.staffAvg} />
                   <NationalAverageDiff diff={school.staffDiff} className="ml-2" />
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-gray-600">初年度納入金の目安</dt>
-                <dd className="text-right font-semibold text-gray-900">
+                <dt className="text-slate-600">初年度納入金の目安</dt>
+                <dd className="text-right font-semibold text-slate-900">
                   {school.tuition?.value ?? '—'}
                   {school.tuition?.basisLabel && (
                     <span className="block text-[11px] font-normal text-gray-500">
@@ -169,17 +175,17 @@ export default function RegionalSchoolCard({
             </dl>
           </div>
 
-          <div className="mt-6 border-t border-blue-100 pt-5 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-            <p className="text-xs font-bold tracking-wide text-blue-800">
+          <div className="mt-6 border-t border-slate-100 pt-5 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+            <p className="text-xs font-bold tracking-wide text-amber-800">
               {excerpt.isCityCampus && municipality
                 ? `${municipality}のキャンパスに通った人の声（${school.cityReviewCount}件）`
                 : `${prefecture}内のキャンパスに通った人の声（${school.regionalReviewCount}件）`}
             </p>
             {excerpt.good && (
-              <blockquote className="relative mt-3 rounded-r-xl border-l-4 border-blue-300 bg-blue-50/70 py-4 pl-5 pr-4">
+              <blockquote className="relative mt-3 rounded-r-xl border-l-4 border-amber-300 bg-amber-50/70 py-4 pl-5 pr-4">
                 <span
                   aria-hidden
-                  className="absolute left-1.5 top-0 text-3xl leading-none text-blue-300"
+                  className="absolute left-1.5 top-0 text-3xl leading-none text-amber-400"
                 >
                   “
                 </span>
@@ -191,7 +197,7 @@ export default function RegionalSchoolCard({
                 {situationTags.map((tag) => (
                   <li
                     key={tag}
-                    className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] text-gray-600"
+                    className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
                   >
                     {tag}
                   </li>
@@ -200,7 +206,7 @@ export default function RegionalSchoolCard({
             )}
             {excerpt.bad && (
               <p className="mt-3 text-sm leading-relaxed text-gray-700">
-                <span className="font-semibold text-gray-900">気になった点:</span> {excerpt.bad}
+                <span className="font-semibold text-slate-900">気になった点:</span> {excerpt.bad}
               </p>
             )}
             {showFullReviewLink && (

@@ -319,9 +319,9 @@ function SchoolList({
       {otherRows.length > 0 && (
         <div data-regional-group="others">
           {featuredRows.length > 0 && (
-            <h3 className="mb-2 text-lg font-bold text-gray-900">そのほかの掲載校</h3>
+            <h3 className="mb-3 text-lg font-bold text-gray-900">そのほかの掲載校</h3>
           )}
-          <ul className="border-t border-gray-200" data-regional-list>
+          <ul className="space-y-3" data-regional-list>
             {otherRows.map((row) => (
               <PrefectureSchoolListRow
                 key={row.defaultOrder}

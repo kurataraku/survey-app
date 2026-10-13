@@ -40,7 +40,7 @@ export default function PrefectureSchoolListRow({
     school.tuition?.basisLabel ? `（${school.tuition.basisLabel}）` : ''
   }`;
   const reviewCountText = `${
-    school.overallAvg != null ? `★ ${school.overallAvg.toFixed(1)}　` : ''
+    school.overallAvg != null ? ` ${school.overallAvg.toFixed(1)}　` : ''
   }口コミ${school.reviewCount}件`;
   const reviewScopeText = `学校全体${
     school.localReviewCount > 0 ? `（うち${prefecture}内${school.localReviewCount}件）` : ''
@@ -61,28 +61,33 @@ export default function PrefectureSchoolListRow({
             {school.name}
           </Link>
         ) : (
-          <span className="text-base font-bold text-gray-950">{school.name}</span>
+          <span className="text-base font-bold leading-snug text-slate-900">{school.name}</span>
         )}
         {school.institutionType && (
-          <span className="pref-row-type">{institutionTypeLabels[school.institutionType]}</span>
+          <span className={`pref-row-type school-type-${school.institutionType}`}>
+            {institutionTypeLabels[school.institutionType]}
+          </span>
         )}
         {highlights.length > 0 && <p className="pref-row-tags">{highlights.join(' ／ ')}</p>}
         <AdmissionBadgeList badges={school.admissionBadges} />
       </div>
 
       <p className="pref-row-place">
-        <span className="pref-row-label">通える場所</span>
+        <span className="pref-row-key-place">通える場所</span>
         {formatPrefectureLocation(school, prefecture)}
         {headquarters && <span className="pref-row-sub">{`本校: ${headquarters}`}</span>}
-        <span className="block">
-          <span className="pref-row-label">初年度納入金</span>
+        <span className="mt-1.5 block">
+          <span className="pref-row-key-fee">初年度納入金</span>
           {tuitionText}
         </span>
       </p>
 
       {school.reviewCount > 0 ? (
-        <p className="text-gray-900">
-          <span className="font-semibold">{reviewCountText}</span>
+        <p className="pref-row-score">
+          <span className="pref-row-count">
+            {school.overallAvg != null && <span className="rating-star">★</span>}
+            {reviewCountText}
+          </span>
           <span className="pref-row-sub">
             {reviewScopeText}
             <NationalAverageDiff diff={ratingDiff} className="ml-2" />
@@ -99,7 +104,7 @@ export default function PrefectureSchoolListRow({
           )}
         </p>
       ) : (
-        <p className="text-gray-600">
+        <p className="pref-row-empty">
           口コミ募集中
           <Link href={appPath('/submit')} prefetch={false} className="pref-row-write">
             口コミを書く

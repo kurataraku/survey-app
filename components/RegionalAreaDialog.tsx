@@ -95,7 +95,7 @@ export default function RegionalAreaDialog({
                           className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 ${
                             active
                               ? 'border-blue-700 bg-blue-700 text-white'
-                              : 'border-blue-200 bg-white text-gray-800 hover:border-blue-500'
+                              : 'border-slate-200 bg-white text-slate-800 hover:border-blue-400'
                           } ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
                         >
                           <span>{option.label}</span>

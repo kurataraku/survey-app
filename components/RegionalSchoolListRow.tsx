@@ -50,10 +50,10 @@ export default function RegionalSchoolListRow({
   return (
     <li
       {...regionalSchoolDataAttributes({ ...school, reviewCount: school.totalReviewCount })}
-      className="border-b border-gray-200 px-1 pb-5"
-      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 180px' }}
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow] hover:border-blue-200 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)] md:p-5"
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '1px 190px' }}
     >
-      <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.8fr)_minmax(9rem,0.8fr)] md:items-start md:gap-6">
+      <div className="grid gap-3 md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.8fr)_minmax(9rem,0.8fr)] md:items-start md:gap-5">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             {schoolHref ? (
@@ -61,50 +61,51 @@ export default function RegionalSchoolListRow({
                 href={schoolHref}
                 prefetch={false}
                 data-school-link="other_detail"
-                className="text-base font-bold text-gray-950 hover:text-blue-800 hover:underline"
+                className="pref-row-name"
               >
                 {school.name}
               </Link>
             ) : (
-              <span className="text-base font-bold text-gray-950">{school.name}</span>
+              <span className="text-base font-bold leading-snug text-slate-900">{school.name}</span>
             )}
             {school.institutionType && (
-              <span className="text-xs text-gray-500">
+              <span className={`school-type school-type-${school.institutionType}`}>
                 {institutionTypeLabels[school.institutionType]}
               </span>
             )}
           </div>
           {school.highlights.length > 0 && (
-            <p className="mt-2 text-xs leading-relaxed text-blue-900" aria-label="学校の特徴">
+            <p className="pref-row-tags" aria-label="学校の特徴">
               {school.highlights.join(' ／ ')}
             </p>
           )}
           {school.excerpt && (
-            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-600">
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-slate-600">
               「{school.excerpt}」
             </p>
           )}
         </div>
 
-        <div className="space-y-1 text-sm">
-          <p className="font-medium text-gray-800">
-            <span className="mr-2 font-normal text-gray-500">通える場所</span>
+        <div className="space-y-1.5 text-sm md:border-l md:border-slate-100 md:pl-5">
+          <p className="font-medium text-slate-800">
+            <span className="pref-row-key-place">通える場所</span>
             {location}
           </p>
-          <p className="font-medium text-gray-800">
-            <span className="mr-2 font-normal text-gray-500">初年度納入金</span>
+          <p className="font-medium text-slate-800">
+            <span className="pref-row-key-fee">初年度納入金</span>
             {school.tuition?.value ?? '—'}
           </p>
         </div>
 
         <div className="text-sm">
           {school.totalReviewCount > 0 ? (
-            <>
-              <p className="font-semibold text-gray-900">
-                {school.rating != null ? `★ ${school.rating.toFixed(1)}　` : ''}
+            <div className="pref-row-score">
+              <p className="font-bold">
+                {school.rating != null && <span className="rating-star">★</span>}
+                {school.rating != null ? ` ${school.rating.toFixed(1)}　` : ''}
                 口コミ{school.totalReviewCount}件
               </p>
-              <p className="mt-0.5 text-xs text-gray-500">
+              <p className="mt-0.5 text-xs text-slate-500">
                 学校全体
                 {school.regionalReviewCount > 0
                   ? `（うち${prefecture}内${school.regionalReviewCount}件）`
@@ -116,23 +117,19 @@ export default function RegionalSchoolListRow({
                   href={appPath(`/schools/${school.slug}/reviews`)}
                   prefetch={false}
                   data-school-link="other_reviews"
-                  className="mt-2 inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
+                  className="pref-row-link"
                 >
                   口コミを読む
                 </Link>
               )}
-            </>
+            </div>
           ) : (
-            <>
-              <p className="text-gray-600">口コミ募集中</p>
-              <Link
-                href={appPath('/submit')}
-                prefetch={false}
-                className="mt-2 inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900"
-              >
+            <div className="pref-row-empty">
+              <p>口コミ募集中</p>
+              <Link href={appPath('/submit')} prefetch={false} className="pref-row-write">
                 口コミを書く
               </Link>
-            </>
+            </div>
           )}
         </div>
       </div>

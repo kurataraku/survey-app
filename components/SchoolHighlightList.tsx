@@ -12,7 +12,7 @@ export default function SchoolHighlightList({
       {highlights.map((highlight) => (
         <li
           key={highlight}
-          className="rounded-full bg-blue-50 px-2.5 py-1 text-xs leading-tight text-blue-900 ring-1 ring-blue-100"
+          className="rounded-full bg-slate-50 px-2.5 py-1 text-xs leading-tight text-slate-700 ring-1 ring-inset ring-slate-200"
         >
           {highlight}
         </li>

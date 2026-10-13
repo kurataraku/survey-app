@@ -27,36 +27,87 @@ body {
   --color-error: #ef4444;
 }
 
-/* 都道府県LPの一覧行（東京は130校超）。クラス列はHTMLとRSCデータに行数分重複して転送量に響くため、ここにまとめる */
+/* 地域LP（都道府県・都市）の一覧行（東京は130校超）。クラス列はHTMLとRSCデータに行数分重複して転送量に響くため、ここにまとめる */
 @layer components {
+  /* 学校の種類のバッジ（地域LPのカード・一覧行で共通） */
+  .school-type,
+  .pref-row-type {
+    @apply inline-block rounded-full px-2 py-0.5 align-[1px] text-[11px] leading-4 font-semibold ring-1 ring-inset;
+  }
+  .school-type-public {
+    @apply bg-emerald-50 text-emerald-800 ring-emerald-200;
+  }
+  .school-type-private {
+    @apply bg-sky-50 text-sky-800 ring-sky-200;
+  }
+  .school-type-support {
+    @apply bg-violet-50 text-violet-800 ring-violet-200;
+  }
+  .rating-star {
+    @apply text-amber-500;
+  }
+
   .pref-row {
-    @apply grid gap-2 border-b border-gray-200 px-1 py-4 text-sm md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.9fr)_minmax(9rem,0.8fr)] md:gap-6;
+    @apply grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-[border-color,box-shadow] hover:border-blue-200 hover:shadow-[0_6px_20px_rgba(15,23,42,0.08)] md:grid-cols-[minmax(12rem,1.25fr)_minmax(8rem,0.9fr)_minmax(9rem,0.8fr)] md:items-start md:gap-5 md:p-5;
     content-visibility: auto;
-    contain-intrinsic-size: 1px 150px;
+    contain-intrinsic-size: 1px 170px;
   }
   .pref-row-name {
-    @apply text-base font-bold text-gray-950 hover:text-blue-800 hover:underline;
+    @apply text-base font-bold leading-snug text-slate-900 hover:text-blue-700 hover:underline;
   }
   .pref-row-type {
-    @apply ml-2 text-xs text-gray-500;
+    @apply ml-2;
   }
   .pref-row-tags {
-    @apply mt-1 text-xs leading-relaxed text-blue-900;
+    @apply mt-2 w-fit rounded-lg bg-slate-50 px-2.5 py-1 text-xs leading-relaxed text-slate-700 ring-1 ring-inset ring-slate-200;
   }
   .pref-row-place {
-    @apply leading-relaxed text-gray-800;
+    @apply leading-relaxed text-slate-800 md:border-l md:border-slate-100 md:pl-5;
   }
-  .pref-row-label {
-    @apply mr-2 text-gray-500;
+  .pref-row-key-place,
+  .pref-row-key-fee {
+    @apply mr-1.5 inline-flex items-center gap-1 align-[-1px] text-xs font-medium text-slate-500;
+  }
+  .pref-row-key-place::before,
+  .pref-row-key-fee::before {
+    content: "";
+    @apply size-3.5 shrink-0 bg-current;
+    mask: var(--pref-row-icon) center / contain no-repeat;
+  }
+  .pref-row-key-place::before {
+    --pref-row-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1.5a6.5 6.5 0 0 0-6.5 6.5c0 4.6 6.5 10.5 6.5 10.5s6.5-5.9 6.5-10.5A6.5 6.5 0 0 0 10 1.5Zm0 9a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z'/%3E%3C/svg%3E");
+  }
+  .pref-row-key-fee::before {
+    --pref-row-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 3 5 7 5-7M10 10v7M6 11.5h8M6 14.5h8'/%3E%3C/svg%3E");
   }
   .pref-row-sub {
-    @apply block text-xs text-gray-500;
+    @apply mt-0.5 block text-xs text-slate-500;
+  }
+  .pref-row-score {
+    @apply rounded-xl bg-slate-50 px-3.5 py-3 text-slate-900 max-md:grid max-md:grid-cols-[1fr_auto] max-md:items-center max-md:gap-x-3 max-md:py-2.5;
+  }
+  .pref-row-score > .pref-row-link {
+    @apply max-md:col-start-2 max-md:row-span-2 max-md:row-start-1 max-md:mt-0;
+  }
+  .pref-row-count {
+    @apply font-bold;
   }
   .pref-row-link {
-    @apply inline-flex min-h-11 items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900;
+    @apply mt-2.5 inline-flex min-h-11 items-center gap-1 rounded-full border border-blue-200 bg-white px-4 font-semibold text-blue-700 transition-colors hover:border-blue-400 hover:bg-blue-50;
+  }
+  .pref-row-link::after,
+  .pref-row-write::after {
+    content: "›";
+    @apply text-base leading-none;
+  }
+  .pref-row-empty {
+    @apply rounded-xl border border-dashed border-slate-300 px-3.5 py-3 text-slate-500 max-md:flex max-md:items-center max-md:justify-between max-md:gap-3 max-md:py-2;
+  }
+  .pref-row-empty > .pref-row-write {
+    @apply max-md:mt-0;
   }
   .pref-row-write {
-    @apply flex min-h-11 w-fit items-center font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900;
+    @apply mt-2 flex min-h-11 w-fit items-center gap-1 rounded-full bg-rose-50 px-4 font-semibold text-rose-700 ring-1 ring-inset ring-rose-200 transition-colors hover:bg-rose-100;
   }
 }
 
