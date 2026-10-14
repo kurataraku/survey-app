@@ -486,6 +486,36 @@ function LocationInsightsSection({
   );
 }
 
+function PrefecturePageCitySection({ data }: { data: PrefectureLandingData }) {
+  const city = data.copyStats.prefecturePageCity;
+  if (!city) return null;
+  const stationText = city.nearestStations.length > 0 ? city.nearestStations.join('・') : null;
+
+  return (
+    <section
+      className="mb-8 rounded-xl border border-blue-100 bg-white p-5 md:p-6"
+      aria-labelledby="pref-primary-city-heading"
+    >
+      <h2 id="pref-primary-city-heading" className="text-xl font-bold text-gray-900 mb-2">
+        {city.municipality}の通信制高校もこのページで比較できます
+      </h2>
+      <p className="text-sm text-gray-600 leading-relaxed max-w-4xl">
+        {data.prefecture}の掲載校のうち、{city.municipality}
+        内に通えるキャンパス・学習センターがある学校は{city.schoolCount}校（
+        {city.campusCount}キャンパス）です。
+        {stationText ? `${stationText}などの最寄り駅から、上の一覧で絞り込めます。` : '上の一覧で市区町村から絞り込めます。'}
+        学校の一覧を重複して載せず、この県ページで所在地・学費・口コミをまとめて確認できます。
+      </p>
+      {city.wards.length > 0 && (
+        <p className="mt-3 text-xs leading-relaxed text-gray-500">
+          主な区の内訳:{' '}
+          {city.wards.map((ward) => `${ward.name}${ward.schoolCount}校`).join(' / ')}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** その都道府県のキャンパスに通った回答だけを使う。競合が持てない一次データを地域の根拠にする */
 function RegionalVoiceSection({ data }: { data: PrefectureLandingData }) {
   const { prefecture, regionalReviewSummary: summary } = data;
@@ -761,6 +791,14 @@ export default function PrefectureLandingPage({
     localReviewCount: data.localReviewCount,
     localReviewSchoolCount: data.localReviewSchoolCount,
     averageOverallSatisfaction: data.averageOverallSatisfaction,
+    prefecturePageCity: data.copyStats.prefecturePageCity
+      ? {
+          municipality: data.copyStats.prefecturePageCity.municipality,
+          schoolCount: data.copyStats.prefecturePageCity.schoolCount,
+          campusCount: data.copyStats.prefecturePageCity.campusCount,
+          nearestStations: data.copyStats.prefecturePageCity.nearestStations,
+        }
+      : null,
   };
 
   const prefParam = encodeURIComponent(prefecture);
@@ -837,7 +875,8 @@ export default function PrefectureLandingPage({
                       href={appPath(city.path)}
                       className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                     >
-                      {city.municipality}の通信制高校を区・駅から比較する
+                      {city.municipality}の通信制高校を
+                      {city.areaMode === 'ward_station' ? '区・駅' : '駅'}から比較する
                     </Link>
                   </li>
                 ))}
@@ -897,6 +936,8 @@ export default function PrefectureLandingPage({
               insights={data.locationInsights}
               cityLandings={data.cityLandings}
             />
+
+            <PrefecturePageCitySection data={data} />
 
             <RegionalVoiceSection data={data} />
 

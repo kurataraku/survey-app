@@ -122,6 +122,14 @@ export default async function PrefectureSchoolsPage({ params }: PageProps) {
           localReviewCount: data.localReviewCount,
           localReviewSchoolCount: data.localReviewSchoolCount,
           averageOverallSatisfaction: data.averageOverallSatisfaction,
+          prefecturePageCity: data.copyStats.prefecturePageCity
+            ? {
+                municipality: data.copyStats.prefecturePageCity.municipality,
+                schoolCount: data.copyStats.prefecturePageCity.schoolCount,
+                campusCount: data.copyStats.prefecturePageCity.campusCount,
+                nearestStations: data.copyStats.prefecturePageCity.nearestStations,
+              }
+            : null,
         },
       })
     : null;

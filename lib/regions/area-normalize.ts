@@ -22,6 +22,13 @@ const COUNTY_TOWN = /^(.+?郡)(.+?[町村])/;
 const SPECIAL_WARD = /^(.+?区)/;
 const MUNICIPALITY = /^(.+?[市町村])/;
 const COUNTY_ONLY = /^(.+?郡)/;
+const MUNICIPALITY_ALIASES: Record<string, string> = {
+  四日市: '四日市市',
+};
+
+function normalizeMunicipalityAlias(name: string): string {
+  return MUNICIPALITY_ALIASES[name] ?? name;
+}
 
 function stripPrefecturePrefix(value: string): string {
   for (const prefecture of prefectures) {
@@ -62,14 +69,14 @@ export function normalizeAreaName(raw: string | null | undefined): NormalizedAre
 
   const countyTown = COUNTY_TOWN.exec(rest);
   if (countyTown) {
-    const name = extendMunicipalitySuffix(rest, `${countyTown[1]}${countyTown[2]}`);
+    const name = normalizeMunicipalityAlias(extendMunicipalitySuffix(rest, `${countyTown[1]}${countyTown[2]}`));
     return { city: name, municipality: name, ward: null };
   }
 
   for (const pattern of [SPECIAL_WARD, MUNICIPALITY, COUNTY_ONLY]) {
     const matched = pattern.exec(rest);
     if (matched) {
-      const name = extendMunicipalitySuffix(rest, matched[1]);
+      const name = normalizeMunicipalityAlias(extendMunicipalitySuffix(rest, matched[1]));
       return { city: name, municipality: name, ward: null };
     }
   }

@@ -157,12 +157,16 @@ export function buildPrefectureFinderAreas(
 /** 都市LPの区・最寄り駅の絞り込み。ボタンは校数の多い駅、一覧ではすべての区と駅から選べる */
 export function buildCityFinderAreas(
   rows: ReadonlyArray<FinderRow & { wards: string[]; stations: string[] }>,
-  featuredLimit: number = CITY_FINDER_STATION_LIMIT
+  featuredLimit: number = CITY_FINDER_STATION_LIMIT,
+  options: { includeWards?: boolean; hideSingleStationArea?: boolean } = {}
 ): FinderAreasResult {
+  const includeWards = options.includeWards ?? true;
   const byWard = new Map<string, Set<number>>();
   const byStation = new Map<string, Set<number>>();
   rows.forEach((row, index) => {
-    for (const ward of row.wards) addIndex(byWard, ward, index);
+    if (includeWards) {
+      for (const ward of row.wards) addIndex(byWard, ward, index);
+    }
     for (const station of row.stations) addIndex(byStation, station, index);
   });
 
@@ -175,16 +179,20 @@ export function buildCityFinderAreas(
     toOption(`s${position + 1}`, name, indexes, rows)
   );
   assignIds(stations, stationOptions, filterIds);
+  const visibleStationOptions =
+    options.hideSingleStationArea && stationOptions.length <= 1 ? [] : stationOptions;
+  const visibleWardOptions =
+    options.hideSingleStationArea && stationOptions.length <= 1 ? [] : wardOptions;
+  const groups = [
+    { label: includeWards ? '区' : null, options: visibleWardOptions },
+    { label: includeWards ? '最寄り駅' : null, options: visibleStationOptions },
+  ].filter((group) => group.options.length > 0);
+  const featuredSource = visibleStationOptions.length >= 2 ? visibleStationOptions : visibleWardOptions;
 
   return {
     areas: {
-      groups: [
-        { label: '区', options: wardOptions },
-        { label: '最寄り駅', options: stationOptions },
-      ].filter((group) => group.options.length > 0),
-      featuredIds: (stationOptions.length >= 2 ? stationOptions : wardOptions)
-        .slice(0, featuredLimit)
-        .map((option) => option.id),
+      groups: groups.length === 1 ? [{ ...groups[0], label: null }] : groups,
+      featuredIds: featuredSource.slice(0, featuredLimit).map((option) => option.id),
     },
     areaFilterIds: filterIds,
   };

@@ -291,6 +291,8 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
   const { municipality, prefecture } = data;
   const prefecturePath = appPath(getPrefecturePath(prefecture));
   const faqItems = buildCityFaqItems(data);
+  const hasWardFilter = data.config.areaMode === 'ward_station' && data.wards.length > 0;
+  const areaLabel = hasWardFilter ? '区・最寄り駅' : '最寄り駅';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50/60 via-white to-white py-8">
@@ -336,10 +338,14 @@ export default function CityLandingPage({ data, intro, globalAverages }: CityLan
           totalSchools={data.counts.totalSchools}
           areas={data.finderAreas}
           schoolTypes={data.schoolTypeOptions}
-          areaLegend="区・最寄り駅"
-          areaDialogButtonLabel="すべての区・駅から選ぶ"
-          areaDialogTitle="区・最寄り駅を選ぶ"
-          areaNote="複数の区・駅にキャンパスがある学校は、それぞれに数えています。"
+          areaLegend={areaLabel}
+          areaDialogButtonLabel={hasWardFilter ? 'すべての区・駅から選ぶ' : 'すべての駅から選ぶ'}
+          areaDialogTitle={hasWardFilter ? '区・最寄り駅を選ぶ' : '最寄り駅を選ぶ'}
+          areaNote={
+            hasWardFilter
+              ? '複数の区・駅にキャンパスがある学校は、それぞれに数えています。'
+              : '複数の駅にキャンパスがある学校は、それぞれに数えています。'
+          }
         />
 
         <section id={RESULTS_ID} className="mb-10" aria-labelledby="city-comparison-heading">

@@ -51,6 +51,7 @@ describe('normalizeAreaName', () => {
     expect(normalizeAreaName('市川市')?.city).toBe('市川市');
     expect(normalizeAreaName('町田市')?.city).toBe('町田市');
     expect(normalizeAreaName('廿日市市')?.city).toBe('廿日市市');
+    expect(normalizeAreaName('四日市')?.municipality).toBe('四日市市');
     expect(normalizeAreaName('四日市市')?.city).toBe('四日市市');
     expect(normalizeAreaName('大町市')?.city).toBe('大町市');
     expect(normalizeAreaName('村山市')?.city).toBe('村山市');

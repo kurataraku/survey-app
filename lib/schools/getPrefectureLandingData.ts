@@ -33,6 +33,7 @@ import type { PrefectureLandingCopyStats } from '@/lib/prefectures/prefecture-la
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissionProfiles';
 import { getCityLandingPath, getCityLandingsForPrefecture } from '@/lib/regions/city-landing';
+import { getPrefecturePageCityTarget } from '@/lib/regions/city-landing-candidates';
 import { getCityLandingData } from '@/lib/schools/getCityLandingData';
 import {
   buildPrefectureFinderAreas,
@@ -144,7 +145,7 @@ export type PrefectureLandingData = {
   /** JSON-LD の ItemList 用 */
   itemListSchools: { id: string; name: string; slug: string | null }[];
   /** この都道府県で公開中の都市LP（appPath 前のパス） */
-  cityLandings: { municipality: string; path: string }[];
+  cityLandings: { municipality: string; path: string; areaMode: string }[];
 };
 
 function hasLocalCampus(school: SearchSchool, prefecture: string): boolean {
@@ -213,7 +214,9 @@ function toRow(school: SearchSchool, prefecture: string): PrefectureSchoolRow {
 /** 都市LPのカードで使っている口コミ。県LPでは同じ学校に別の口コミがあればそちらを選ぶ */
 async function getCityLandingCardReviewIds(prefecture: string): Promise<Set<string>> {
   const ids = new Set<string>();
-  for (const config of getCityLandingsForPrefecture(prefecture)) {
+  for (const config of getCityLandingsForPrefecture(prefecture).filter(
+    (city) => city.publishWave === 'existing'
+  )) {
     try {
       const city = await getCityLandingData(config);
       for (const row of city.rows) {
@@ -270,6 +273,10 @@ export const getPrefectureLandingData = cache(
 
     const baseRows = schools.map((school) => toRow(school, prefecture));
     const locationInsights = computePrefectureLocationInsights(schools, prefecture);
+    const prefecturePageCityTarget = getPrefecturePageCityTarget(prefecture);
+    const prefecturePageCityInsight = prefecturePageCityTarget
+      ? locationInsights.topCities.find((city) => city.city === prefecturePageCityTarget.municipality)
+      : null;
 
     const finder = buildPrefectureFinderAreas(prefecture, baseRows);
     const orderById = new Map(
@@ -362,6 +369,16 @@ export const getPrefectureLandingData = cache(
       cityCount: locationInsights.cityCount,
       topCities: locationInsights.topCities.map((city) => city.city),
       topStations: locationInsights.topStations.map((station) => station.name),
+      prefecturePageCity:
+        prefecturePageCityTarget && prefecturePageCityInsight
+          ? {
+              municipality: prefecturePageCityTarget.municipality,
+              schoolCount: prefecturePageCityInsight.schoolCount,
+              campusCount: prefecturePageCityInsight.campusCount,
+              nearestStations: prefecturePageCityInsight.nearestStations,
+              wards: prefecturePageCityInsight.wards,
+            }
+          : null,
     };
 
     return {
@@ -400,6 +417,7 @@ export const getPrefectureLandingData = cache(
       cityLandings: getCityLandingsForPrefecture(prefecture).map((config) => ({
         municipality: config.municipality,
         path: getCityLandingPath(config),
+        areaMode: config.areaMode,
       })),
     };
   }

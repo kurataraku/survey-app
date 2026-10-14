@@ -19,12 +19,16 @@ import { findRegionalReviewStat } from '@/lib/schools/regionalReviews';
 import { buildAdmissionBadges, type AdmissionBadge } from '@/lib/schools/admissionProfiles';
 import { buildTuitionTableCell } from '@/lib/tuition/format';
 import {
+  collectFeaturedExcerptIds,
   fetchRegionalReviewExcerpts,
+  reservedExcerptIdsForNewCityLanding,
   type RegionalReviewExcerpt,
 } from '@/lib/schools/regionalReviewExcerpts';
 import {
   buildCityFinderAreas,
+  CITY_FINDER_STATION_LIMIT,
   CITY_REGIONAL_CARD_LIMIT,
+  PREFECTURE_REGIONAL_CARD_LIMIT,
   SCHOOL_TYPE_FILTERS,
   type FinderAreas,
   type RegionalSchoolTier,
@@ -34,7 +38,7 @@ import {
   type RegionalThemeList,
 } from '@/lib/schools/regionalThemeLists';
 import { selectRegionalHighlights } from '@/lib/schools/schoolHighlights';
-import type { CityLandingConfig } from '@/lib/regions/city-landing';
+import { getCityLandingsForPrefecture, type CityLandingConfig } from '@/lib/regions/city-landing';
 import type { SchoolInstitutionType } from '@/lib/types/schools';
 
 export type CitySchoolRow = {
@@ -120,6 +124,79 @@ export type CityLandingData = {
   itemListSchools: { id: string; name: string; slug: string | null }[];
 };
 
+function isRelatedToPrefecture(school: SearchSchool, prefecture: string): boolean {
+  if (school.prefecture === prefecture) return true;
+  if (school.prefectures?.includes(prefecture)) return true;
+  return getStandingCampusLocationsInPrefecture(school.campus_locations, prefecture).length > 0;
+}
+
+function featuredExcerptIdsFromCityRows(rows: CitySchoolRow[]): string[] {
+  return rows
+    .filter((row) => row.tier === 'a' && row.excerpt)
+    .map((row) => row.excerpt!.id);
+}
+
+const getPrefectureFeaturedExcerptIds = cache(async (prefecture: string) => {
+  const dataset = await getSchoolsDataset();
+  const existingExcerptIds = new Set<string>();
+  for (const city of getCityLandingsForPrefecture(prefecture).filter((entry) => entry.publishWave === 'existing')) {
+    const data = await getCityLandingData(city);
+    for (const id of featuredExcerptIdsFromCityRows(data.rows)) existingExcerptIds.add(id);
+  }
+
+  const prefectureSchools = dataset
+    .filter((school) => isRelatedToPrefecture(school, prefecture))
+    .map((school) => ({
+      id: school.id,
+      name: school.name,
+      slug: school.slug,
+      localReviewCount: findRegionalReviewStat(school.regional_reviews, prefecture)?.reviewCount ?? 0,
+      campusLocations: school.campus_locations,
+    }))
+    .sort((a, b) => b.localReviewCount - a.localReviewCount || a.name.localeCompare(b.name, 'ja'));
+  const prefectureExcerpts = await fetchRegionalReviewExcerpts({
+    schools: prefectureSchools,
+    prefecture,
+    limit: prefectureSchools.length,
+    excludeReviewIds: existingExcerptIds,
+  });
+  return collectFeaturedExcerptIds(prefectureExcerpts, prefectureSchools, PREFECTURE_REGIONAL_CARD_LIMIT);
+});
+
+async function getExcludeReviewIdsForNewCity(config: CityLandingConfig): Promise<string[]> {
+  if (config.publishWave === 'existing') return [];
+
+  const siblings = getCityLandingsForPrefecture(config.prefecture);
+  const siblingCards = [];
+
+  for (const city of siblings) {
+    if (city.slug === config.slug) {
+      siblingCards.push({ slug: city.slug, publishWave: city.publishWave, featuredExcerptIds: [] });
+      continue;
+    }
+    const shouldLoad =
+      city.publishWave === 'existing' ||
+      siblings.findIndex((entry) => entry.slug === city.slug) <
+        siblings.findIndex((entry) => entry.slug === config.slug);
+    if (!shouldLoad) {
+      siblingCards.push({ slug: city.slug, publishWave: city.publishWave, featuredExcerptIds: [] });
+      continue;
+    }
+    const data = await getCityLandingData(city);
+    siblingCards.push({
+      slug: city.slug,
+      publishWave: city.publishWave,
+      featuredExcerptIds: featuredExcerptIdsFromCityRows(data.rows),
+    });
+  }
+
+  return reservedExcerptIdsForNewCityLanding({
+    selfSlug: config.slug,
+    siblings: siblingCards,
+    prefectureFeaturedExcerptIds: await getPrefectureFeaturedExcerptIds(config.prefecture),
+  });
+}
+
 function localLocationsInCity(school: SearchSchool, config: CityLandingConfig) {
   return getStandingCampusLocationsInPrefecture(school.campus_locations, config.prefecture)
     .map((location) => ({ location, area: normalizeAreaName(location.city) }))
@@ -139,9 +216,10 @@ function stationNames(locations: ReturnType<typeof localLocationsInCity>): strin
 
 function toRow(school: SearchSchool, config: CityLandingConfig): CitySchoolRow {
   const locations = localLocationsInCity(school, config);
-  const wards = [
-    ...new Set(locations.map(({ area }) => area?.ward).filter((ward): ward is string => Boolean(ward))),
-  ];
+  const includeWards = config.areaMode === 'ward_station';
+  const wards = includeWards
+    ? [...new Set(locations.map(({ area }) => area?.ward).filter((ward): ward is string => Boolean(ward)))]
+    : [];
   const regional = findRegionalReviewStat(school.regional_reviews, config.prefecture);
   const city = regional?.municipalities?.[config.municipality] ?? null;
   const allStations = stationNames(locations);
@@ -255,7 +333,12 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
       stations: stationNamesInCity.filter((station) =>
         row.allStations.some((name) => name === station || stripRailOperatorPrefix(name) === station)
       ),
-    }))
+    })),
+    CITY_FINDER_STATION_LIMIT,
+    {
+      includeWards: config.areaMode === 'ward_station',
+      hideSingleStationArea: config.areaMode === 'station_only_hide_single',
+    }
   );
   const rowsWithStations = baseRows.map((row, index) => ({
     ...row,
@@ -264,6 +347,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
   }));
 
   const campusLocationsBySchool = new Map(schools.map((school) => [school.id, school.campus_locations]));
+  const excludeReviewIds = await getExcludeReviewIdsForNewCity(config);
   const reviewExcerpts = await fetchRegionalReviewExcerpts({
     schools: rowsWithStations.map((row) => ({
       id: row.id,
@@ -276,6 +360,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
     municipality: config.municipality,
     // カードにするかは一覧の並び順で決めるため、抜粋は候補校すべてについて選んでおく
     limit: rowsWithStations.length,
+    excludeReviewIds,
   });
   const excerptBySchool = new Map(reviewExcerpts.map((excerpt) => [excerpt.schoolId, excerpt]));
   const featuredIds = new Set(
@@ -308,7 +393,7 @@ export const getCityLandingData = cache(async (config: CityLandingConfig): Promi
       supportCount: rows.filter((row) => row.institutionType === 'support').length,
       admissionVerifiedCount: rows.filter((row) => row.admissionBadges.length > 0).length,
     },
-    wards: buildWards(schools, config),
+    wards: config.areaMode === 'ward_station' ? buildWards(schools, config) : [],
     topStations: insights.topStations.slice(0, TOP_STATION_LIMIT),
     finderAreas: finder.areas,
     schoolTypeOptions,

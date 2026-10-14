@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
   // 一覧系の初期HTMLにカード本文を含めるため、PPRによるストリーミング分割を無効化
   experimental: {
     ppr: false,
+    // 学校・記事の静的生成は外部APIに依存するため、一時的な接続切れではページ単位で再試行する
+    staticGenerationRetryCount: 3,
   },
   images: {
     remotePatterns: articleImageHost

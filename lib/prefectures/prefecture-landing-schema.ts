@@ -17,6 +17,12 @@ export type PrefectureFaqStats = {
   /** 地域口コミが1件以上ある掲載校数 */
   localReviewSchoolCount?: number;
   averageOverallSatisfaction?: number | null;
+  prefecturePageCity?: {
+    municipality: string;
+    schoolCount: number;
+    campusCount: number;
+    nearestStations: string[];
+  } | null;
 };
 
 /** 都道府県ごとに同じ文章が並ばないよう、確認できた実数だけを文末に足す */
@@ -41,7 +47,17 @@ export function buildPrefectureFaqItems(
   prefecture: string,
   stats?: PrefectureFaqStats
 ): { question: string; answer: string }[] {
+  const cityItem = stats?.prefecturePageCity
+    ? [
+        {
+          question: `${stats.prefecturePageCity.municipality}内にキャンパスがある通信制高校は何校ありますか？`,
+          answer: `このページの掲載校のうち、${stats.prefecturePageCity.municipality}内に通えるキャンパス・学習センターがある学校は${stats.prefecturePageCity.schoolCount}校（${stats.prefecturePageCity.campusCount}キャンパス）です${stats.prefecturePageCity.nearestStations.length > 0 ? `。主な最寄り駅は${stats.prefecturePageCity.nearestStations.join('・')}です` : ''}。口コミは${prefecture}内のキャンパスに通った人の回答として扱い、${stats.prefecturePageCity.municipality}の口コミとは分けて表示しています。`,
+        },
+      ]
+    : [];
+
   return [
+    ...cityItem,
     {
       question: `${prefecture}で通信制高校を選ぶとき、まず何を比較すればいいですか？`,
       answer: `${prefecture}の通信制高校は、キャンパスの場所、通学頻度、オンライン学習の有無、先生・職員の対応、学費、卒業までのサポート体制を比べるのがおすすめです。${buildStatsSentence(prefecture, stats)}口コミの良かった点・改善してほしい点と、項目別の満足度をあわせて確認できます。`,

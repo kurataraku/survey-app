@@ -153,6 +153,48 @@ function rankExcerpt(
  * 完全性、具体性、新しさの順で比較し、回答者属性・理由・入学区分・評価の値は順位に使わない。
  * excludeReviewIds の口コミは、同じ学校にほかの候補がない場合にだけ選ぶ。
  */
+/** 一覧の並びと件数上限から、カードに載せる口コミIDだけを取り出す */
+export function collectFeaturedExcerptIds(
+  excerpts: RegionalReviewExcerpt[],
+  schoolOrder: Array<{ id: string; localReviewCount: number }>,
+  limit: number
+): string[] {
+  const excerptBySchool = new Map(excerpts.map((excerpt) => [excerpt.schoolId, excerpt]));
+  const ids: string[] = [];
+  for (const school of schoolOrder) {
+    if (school.localReviewCount <= 0) continue;
+    const excerpt = excerptBySchool.get(school.id);
+    if (!excerpt) continue;
+    ids.push(excerpt.id);
+    if (ids.length >= limit) break;
+  }
+  return ids;
+}
+
+/**
+ * 新しい都市LPが後回しにする口コミ。県LPと既存都市LP（名古屋）は変えない。
+ * 同じ県の新しい都市LPは登録順で、先のページが使った口コミを後回しにする。
+ */
+export function reservedExcerptIdsForNewCityLanding(input: {
+  selfSlug: string;
+  siblings: Array<{
+    slug: string;
+    publishWave: 'existing' | 'phase1_station' | 'phase2_ward' | 'phase3_low_review';
+    featuredExcerptIds: string[];
+  }>;
+  prefectureFeaturedExcerptIds: string[];
+}): string[] {
+  const selfIndex = input.siblings.findIndex((city) => city.slug === input.selfSlug);
+  const reserved = new Set(input.prefectureFeaturedExcerptIds);
+  for (const [index, city] of input.siblings.entries()) {
+    if (city.slug === input.selfSlug) continue;
+    if (city.publishWave === 'existing' || (selfIndex >= 0 && index < selfIndex)) {
+      for (const id of city.featuredExcerptIds) reserved.add(id);
+    }
+  }
+  return [...reserved];
+}
+
 export function selectRepresentativeRegionalReviewExcerpts(input: {
   schools: ExcerptSourceSchool[];
   reviews: RegionalReviewExcerptSource[];
