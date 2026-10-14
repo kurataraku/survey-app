@@ -36,10 +36,12 @@ describe('city landing candidates', () => {
     });
   });
 
-  it('登録した都市は候補に含まれ、第1波の駅だけの市だけを公開する', () => {
+  it('登録した都市は候補に含まれ、第1波と第2波だけを公開する', () => {
     const published = getPublishableCityLandingCandidates();
-    expect(published).toHaveLength(21);
-    expect(published.every((candidate) => candidate.publishWave === 'phase1_station')).toBe(true);
+    expect(published).toHaveLength(34);
+    expect(published.filter((candidate) => candidate.publishWave === 'phase1_station')).toHaveLength(21);
+    expect(published.filter((candidate) => candidate.publishWave === 'phase2_ward')).toHaveLength(13);
+    expect(published.some((candidate) => candidate.publishWave === 'phase3_low_review')).toBe(false);
     expect(CITY_LANDINGS.map((city) => city.slug)).toEqual(['nagoya', ...published.map((city) => city.slug)]);
     for (const city of CITY_LANDINGS) {
       if (city.slug === 'nagoya') continue;

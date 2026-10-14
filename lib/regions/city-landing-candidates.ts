@@ -103,7 +103,10 @@ export const CITY_LANDING_CANDIDATES: readonly CityLandingCandidate[] = [
   { prefecture: '大阪府', municipality: '吹田市', slug: 'suita', population2020: 385567, source: '2020国勢調査', designatedCity: false, status: 'defer_few_campuses', areaMode: 'station_only', note: '市内常設拠点0か所。データ欠け疑い' },
 ];
 
-export const CITY_LANDING_ACTIVE_WAVES: readonly CityLandingPublishWave[] = ['phase1_station'];
+export const CITY_LANDING_ACTIVE_WAVES: readonly CityLandingPublishWave[] = [
+  'phase1_station',
+  'phase2_ward',
+];
 
 export function getPublishableCityLandingCandidates(
   waves: readonly CityLandingPublishWave[] = CITY_LANDING_ACTIVE_WAVES
