@@ -18,6 +18,11 @@ describe('normalizeAreaName', () => {
       municipality: '横浜市',
       ward: '西区',
     });
+    expect(normalizeAreaName('横浜市保土ヶ谷区岩井町')).toEqual({
+      city: '横浜市保土ケ谷区',
+      municipality: '横浜市',
+      ward: '保土ケ谷区',
+    });
   });
 
   it('町名・丁目・番地を取り除く', () => {

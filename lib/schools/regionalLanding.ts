@@ -181,8 +181,7 @@ export function buildCityFinderAreas(
   assignIds(stations, stationOptions, filterIds);
   const visibleStationOptions =
     options.hideSingleStationArea && stationOptions.length <= 1 ? [] : stationOptions;
-  const visibleWardOptions =
-    options.hideSingleStationArea && stationOptions.length <= 1 ? [] : wardOptions;
+  const visibleWardOptions = wardOptions;
   const groups = [
     { label: includeWards ? '区' : null, options: visibleWardOptions },
     { label: includeWards ? '最寄り駅' : null, options: visibleStationOptions },

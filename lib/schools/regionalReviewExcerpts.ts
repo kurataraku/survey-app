@@ -91,6 +91,11 @@ type RankedExcerpt = {
 
 function isBetterExcerpt(candidate: RankedExcerpt, current: RankedExcerpt): boolean {
   if (candidate.excluded !== current.excluded) return !candidate.excluded;
+  // 都市LPでは、その市のキャンパスだと回答した口コミを県内のほかの口コミより先に選ぶ。
+  // 県LPは isCityCampus が常に false なので、この比較は順位に影響しない。
+  if (candidate.excerpt.isCityCampus !== current.excerpt.isCityCampus) {
+    return candidate.excerpt.isCityCampus;
+  }
   if (candidate.completeness !== current.completeness) {
     return candidate.completeness > current.completeness;
   }

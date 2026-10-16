@@ -26,6 +26,10 @@ const MUNICIPALITY_ALIASES: Record<string, string> = {
   四日市: '四日市市',
 };
 
+const WARD_ALIASES: Record<string, string> = {
+  保土ヶ谷区: '保土ケ谷区',
+};
+
 function normalizeMunicipalityAlias(name: string): string {
   return MUNICIPALITY_ALIASES[name] ?? name;
 }
@@ -63,7 +67,8 @@ export function normalizeAreaName(raw: string | null | undefined): NormalizedAre
 
   const designated = DESIGNATED_CITY_WARD.exec(rest);
   if (designated) {
-    const [, city, ward] = designated;
+    const [, city, rawWard] = designated;
+    const ward = WARD_ALIASES[rawWard] ?? rawWard;
     return { city: `${city}${ward}`, municipality: city, ward };
   }
 

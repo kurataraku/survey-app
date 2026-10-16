@@ -1,5 +1,28 @@
 /** 都道府県別学校一覧（SEOハブ）の共通文言 */
+import { getCityLandingsForPrefecture } from '@/lib/regions/city-landing';
 import { getPrefecturePageCityTarget } from '@/lib/regions/city-landing-candidates';
+
+/**
+ * 市名を入れた県ページ（重複率80%以上の13県）だけ、説明文の「多い市」から
+ * 冒頭で扱う主都市と、都市ページがある市（北海道の旭川市など）を外す。ほかの県の文言は変えない。
+ */
+function citiesForPrefectureCopy(prefecture: string, topCities: string[]): string[] {
+  const primary = getPrefecturePageCityTarget(prefecture)?.prefecturePageCity;
+  if (!primary) return topCities;
+  const published = new Set(getCityLandingsForPrefecture(prefecture).map((city) => city.municipality));
+  return topCities.filter((city) => !published.has(city) && city !== primary);
+}
+
+/** 市名を入れた県ページの説明文の冒頭（例: 掲載28校のうち25校は仙台市内にキャンパスがあります） */
+function prefecturePageCityLead(stats: PrefectureLandingCopyStats): string {
+  const city = stats.prefecturePageCity;
+  if (!city) return '';
+  const stations =
+    city.nearestStations.length > 0
+      ? `（主な最寄り駅: ${city.nearestStations.slice(0, 2).join('・')}など）`
+      : '';
+  return `掲載${stats.totalSchools}校のうち${city.schoolCount}校は${city.municipality}内にキャンパスがあります${stations}。`;
+}
 
 function prefectureCityTitlePrefix(prefecture: string): string {
   const target = getPrefecturePageCityTarget(prefecture);
@@ -61,13 +84,14 @@ export function getPrefectureLandingSubtitle(
     return `${prefecture}の通信制高校を、口コミと項目別評価から比較できる一覧です。`;
   }
 
+  const copyCities = citiesForPrefectureCopy(prefecture, stats.topCities);
   const areaPart =
-    stats.topCities.length > 0
-      ? `掲載校が多いのは${stats.topCities.slice(0, 3).join('・')}で、${stats.cityCount}市区町村から絞り込めます。`
-      : '';
-  const cityPart = stats.prefecturePageCity
-    ? `${stats.prefecturePageCity.municipality}内にキャンパスがある学校は${stats.prefecturePageCity.schoolCount}校（${stats.prefecturePageCity.campusCount}キャンパス）です。`
-    : '';
+    copyCities.length > 0
+      ? `掲載校が多いのは${copyCities.slice(0, 3).join('・')}で、${stats.cityCount}市区町村から絞り込めます。`
+      : stats.cityCount > 0
+        ? `${stats.cityCount}市区町村から絞り込めます。`
+        : '';
+  const cityLead = prefecturePageCityLead(stats);
   const stationPart =
     stats.topStations.length > 0
       ? `${stats.topStations.slice(0, 2).join('・')}など最寄り駅からも確認できます。`
@@ -75,7 +99,7 @@ export function getPrefectureLandingSubtitle(
   const localPart = buildLocalReviewPhrase(prefecture, stats);
   const reviewPart = localPart ? `${localPart}をもとに、` : '';
 
-  return `${prefecture}で検討できる通信制高校・サポート校${stats.totalSchools}校（うち公立${stats.publicCount}校、サポート校${stats.supportCount}校）を、${prefecture}内${stats.localCampusLocationCount}か所のキャンパス情報とあわせて比較できます。${cityPart}${reviewPart}初年度納入金の目安、通いやすさ、項目別評価を同じ表で並べています。${areaPart}${stationPart}`;
+  return `${cityLead}${prefecture}で検討できる通信制高校・サポート校${stats.totalSchools}校（うち公立${stats.publicCount}校、サポート校${stats.supportCount}校）を、${prefecture}内${stats.localCampusLocationCount}か所のキャンパス情報とあわせて比較できます。${reviewPart}初年度納入金の目安、通いやすさ、項目別評価を同じ表で並べています。${areaPart}${stationPart}`;
 }
 
 /** generateMetadata 用の description（当該都道府県の実数のみを使う） */
@@ -89,12 +113,10 @@ export function getPrefectureLandingMetaDescription(
 
   const localPart = buildLocalReviewPhrase(prefecture, stats);
   const reviewPart = localPart ? `${localPart}・` : '';
-  const cityPart = stats.prefecturePageCity
-    ? `${stats.prefecturePageCity.municipality}内キャンパス${stats.prefecturePageCity.campusCount}か所、`
-    : '';
-  const areaPart = stats.topCities.length > 0 ? `${stats.topCities.slice(0, 3).join('・')}など` : '';
+  const copyCities = citiesForPrefectureCopy(prefecture, stats.topCities);
+  const areaPart = copyCities.length > 0 ? `${copyCities.slice(0, 3).join('・')}などの` : '';
 
-  return `${prefecture}の通信制高校・サポート校${stats.totalSchools}校を比較。${reviewPart}${prefecture}内キャンパス${stats.localCampusLocationCount}か所、${cityPart}${areaPart}のエリア別情報、公立${stats.publicCount}校の区分、初年度納入金の目安、良い点と改善点の両面を同じ条件で確認できます。`;
+  return `${prefecturePageCityLead(stats)}${prefecture}の通信制高校・サポート校${stats.totalSchools}校を比較。${reviewPart}${prefecture}内キャンパス${stats.localCampusLocationCount}か所、${areaPart}エリア別情報、公立${stats.publicCount}校の区分、初年度納入金の目安、良い点と改善点の両面を同じ条件で確認できます。`;
 }
 
 /** CollectionPage / ItemList 用 */

@@ -79,8 +79,14 @@ export function buildCityFaqItems(data: CityLandingData): { question: string; an
       answer: `学校やコース、通学頻度によって大きく変わります。比較表では、学校が公開している初年度納入金の目安を載せています。国の就学支援金が適用されると実際の負担は下がることが多いため、支援金の適用前か適用後かもあわせて確認してください。金額の記載がない学校は、学校の資料請求や個別相談で確認できます。`,
     },
     {
-      question: `${municipality}の通信制高校の口コミは、どのような人の声ですか？`,
-      answer: `当サイトのアンケートに回答した在校生・卒業生・保護者の声です。「主に通っていたキャンパス」が${prefecture}内だった口コミを掲載しており、${municipality}のキャンパスだと回答した口コミにはその旨を表示しています。`,
+      question:
+        data.cityReviewCount > 0
+          ? `${municipality}の通信制高校の口コミは、どのような人の声ですか？`
+          : `このページに掲載している口コミは、どのような人の声ですか？`,
+      answer:
+        data.cityReviewCount > 0
+          ? `当サイトのアンケートに回答した在校生・卒業生・保護者の声です。「主に通っていたキャンパス」が${prefecture}内だった口コミを掲載しており、${municipality}のキャンパスだと回答した口コミにはその旨を表示しています。`
+          : `当サイトのアンケートに回答した在校生・卒業生・保護者の声です。いま掲載しているのは「主に通っていたキャンパス」が${prefecture}内だった口コミで、${municipality}のキャンパスに通った人の口コミとしては数えていません。`,
     },
   ];
 }
@@ -114,7 +120,7 @@ export function buildCityLandingJsonLd(data: CityLandingData): Record<string, un
       },
       {
         '@type': 'CollectionPage',
-        name: getCityLandingTitle(data.municipality, data.wards.length > 0),
+        name: getCityLandingTitle(data.municipality, data.config.areaMode === 'ward_station'),
         url: pageUrl,
         description: getCityLandingMetaDescription(data),
         isPartOf: { '@type': 'WebSite', name: '通信制高校リアルレビュー', url: appBase },

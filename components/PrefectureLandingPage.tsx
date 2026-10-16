@@ -489,7 +489,12 @@ function LocationInsightsSection({
 function PrefecturePageCitySection({ data }: { data: PrefectureLandingData }) {
   const city = data.copyStats.prefecturePageCity;
   if (!city) return null;
-  const stationText = city.nearestStations.length > 0 ? city.nearestStations.join('・') : null;
+  const otherSchoolCount = Math.max(0, data.counts.totalSchools - city.schoolCount);
+  const otherCities = data.locationInsights.topCities
+    .filter((entry) => entry.city !== city.municipality)
+    .slice(0, 4)
+    .map((entry) => entry.city);
+  const stationCounts = city.nearestStations.slice(0, 4);
 
   return (
     <section
@@ -497,18 +502,31 @@ function PrefecturePageCitySection({ data }: { data: PrefectureLandingData }) {
       aria-labelledby="pref-primary-city-heading"
     >
       <h2 id="pref-primary-city-heading" className="text-xl font-bold text-gray-900 mb-2">
-        {city.municipality}の通信制高校もこのページで比較できます
+        {city.municipality}の通信制高校
       </h2>
       <p className="text-sm text-gray-600 leading-relaxed max-w-4xl">
-        {data.prefecture}の掲載校のうち、{city.municipality}
+        {data.prefecture}の掲載{data.counts.totalSchools}校のうち、{city.municipality}
         内に通えるキャンパス・学習センターがある学校は{city.schoolCount}校（
         {city.campusCount}キャンパス）です。
-        {stationText ? `${stationText}などの最寄り駅から、上の一覧で絞り込めます。` : '上の一覧で市区町村から絞り込めます。'}
-        学校の一覧を重複して載せず、この県ページで所在地・学費・口コミをまとめて確認できます。
+        {stationCounts.length > 0
+          ? `主な最寄り駅は${stationCounts.join('・')}です。`
+          : ''}
+        {otherSchoolCount > 0 && otherCities.length > 0
+          ? `残りの${otherSchoolCount}校は、${otherCities.join('・')}などにキャンパスがあります。`
+          : ''}
+        学校の一覧を重ねて載せず、
+        <a href="#pref-comparison-heading" className="font-medium text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900">
+          比較表
+        </a>
+        と
+        <a href="#pref-location-insights-heading" className="font-medium text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900">
+          エリア・最寄り駅の絞り込み
+        </a>
+        で確認できます。
       </p>
       {city.wards.length > 0 && (
         <p className="mt-3 text-xs leading-relaxed text-gray-500">
-          主な区の内訳:{' '}
+          {city.municipality}の区ごとの学校数:{' '}
           {city.wards.map((ward) => `${ward.name}${ward.schoolCount}校`).join(' / ')}
         </p>
       )}
@@ -876,7 +894,12 @@ export default function PrefectureLandingPage({
                       className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                     >
                       {city.municipality}の通信制高校を
-                      {city.areaMode === 'ward_station' ? '区・駅' : '駅'}から比較する
+                      {city.areaMode === 'ward_station'
+                        ? '区・駅から'
+                        : city.areaMode === 'station_only_hide_single'
+                          ? ''
+                          : '駅から'}
+                      比較する
                     </Link>
                   </li>
                 ))}
@@ -929,6 +952,8 @@ export default function PrefectureLandingPage({
               </ul>
             </nav>
 
+            <PrefecturePageCitySection data={data} />
+
             <SchoolList data={data} globalAverages={globalAverages} />
 
             <LocationInsightsSection
@@ -936,8 +961,6 @@ export default function PrefectureLandingPage({
               insights={data.locationInsights}
               cityLandings={data.cityLandings}
             />
-
-            <PrefecturePageCitySection data={data} />
 
             <RegionalVoiceSection data={data} />
 
