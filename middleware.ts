@@ -19,6 +19,7 @@ const APP_PAGE_PREFIXES = [
   '/privacy',
   '/contact',
   '/campaign',
+  '/my-story-award',
   '/simulator',
   '/consultation-ai',
   '/survey',

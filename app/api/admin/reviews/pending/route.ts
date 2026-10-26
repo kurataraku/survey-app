@@ -30,9 +30,23 @@ export async function GET(request: NextRequest) {
       bad_comment,
       answers,
       email,
+      entry_source,
       is_duplicate_email,
       moderation_status,
       created_at,
+      contest_entries (
+        author_type,
+        pen_name,
+        title,
+        effort_summary,
+        before_enrollment,
+        after_enrollment,
+        learning_and_change,
+        future_goal,
+        current_life,
+        wants_feedback,
+        publication_consent
+      ),
       referral_code_id,
       referral_codes!survey_responses_referral_code_id_fkey (
         code,

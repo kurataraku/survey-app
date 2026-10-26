@@ -25,6 +25,7 @@ export default function Header() {
     { href: appPath('/schools'), label: '学校検索', special: false },
     { href: appPath('/rankings'), label: 'ランキング', special: false },
     { href: appPath('/features'), label: '特集', special: false },
+    { href: appPath('/my-story-award'), label: '体験談コンテスト', special: false },
     { href: appPath('/consultation-ai'), label: 'AI相談', special: 'consultation' },
     { href: appPath('/simulator'), label: '診断ナビ', special: true },
     { href: appPath('/survey'), label: '口コミ投稿', special: false },

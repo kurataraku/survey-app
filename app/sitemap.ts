@@ -170,6 +170,12 @@ function buildStaticCore(baseUrl: string, apexUrl: string): MetadataRoute.Sitema
       priority: 0.7,
     },
     {
+      url: `${baseUrl}/my-story-award`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.75,
+    },
+    {
       url: `${baseUrl}/press-releases`,
       lastModified: new Date(ATTENDANCE_SATISFACTION_RELEASE.publishedAt),
       changeFrequency: 'monthly',

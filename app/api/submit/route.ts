@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { surveySchema, SurveyFormData } from '@/lib/schema';
+import { contestEntrySchema, surveySchema, SurveyFormData } from '@/lib/schema';
 import { normalizeAnswers } from '@/lib/normalizeAnswers';
 import { generateSlug } from '@/lib/utils';
+import { MY_STORY_AWARD_SOURCE } from '@/lib/contest/copy';
 import { normalizeReferralCode, type ReferralShareInfo } from '@/lib/referral/shared';
 import {
   findReferralCode,
@@ -43,10 +44,22 @@ export async function POST(request: NextRequest) {
     }
 
     const data: SurveyFormData = validationResult.data;
+    const contestEntryResult = body?.contest_entry
+      ? contestEntrySchema.safeParse(body.contest_entry)
+      : null;
+
+    if (contestEntryResult && !contestEntryResult.success) {
+      return NextResponse.json(
+        { error: 'コンテスト応募内容のバリデーションエラー', details: contestEntryResult.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const contestEntry = contestEntryResult?.success ? contestEntryResult.data : null;
 
     // answers（JSONB）に格納するデータを準備
     // 設問順に沿った形でフィールドを保持する（配列・補足情報など）
-    const rawAnswers: Record<string, any> = {
+    const rawAnswers: Record<string, unknown> = {
       // Step1: 基本情報
       reason_for_choosing: data.reason_for_choosing,
       course: data.course || null,
@@ -240,6 +253,7 @@ export async function POST(request: NextRequest) {
       tuition_rating: tuitionRating,
       is_public: false,
       moderation_status: 'pending',
+      entry_source: contestEntry ? MY_STORY_AWARD_SOURCE : 'survey',
       referral_code_id: referralCodeId,
       ip_hash: ipHash,
     }).select('id').single();
@@ -250,6 +264,43 @@ export async function POST(request: NextRequest) {
         { error: 'データの保存に失敗しました', details: error.message },
         { status: 500 }
       );
+    }
+
+    if (contestEntry && savedResponse?.id) {
+      const { error: contestError } = await supabase.from('contest_entries').insert({
+        survey_response_id: savedResponse.id,
+        entry_source: MY_STORY_AWARD_SOURCE,
+        author_type: contestEntry.author_type,
+        pen_name: contestEntry.pen_name,
+        title: contestEntry.title,
+        effort_summary: contestEntry.effort_summary,
+        before_enrollment: contestEntry.before_enrollment,
+        after_enrollment: contestEntry.after_enrollment,
+        learning_and_change: contestEntry.learning_and_change,
+        future_goal: contestEntry.author_type === '在校生' ? contestEntry.future_goal : null,
+        current_life: contestEntry.author_type === '卒業生' ? contestEntry.current_life : null,
+        wants_feedback: contestEntry.wants_feedback,
+        publication_consent: contestEntry.publication_consent,
+      });
+
+      if (contestError) {
+        console.error('コンテスト応募保存エラー:', contestError);
+        await supabase.from('survey_responses').delete().eq('id', savedResponse.id);
+        return NextResponse.json(
+          { error: 'コンテスト応募の保存に失敗しました', details: contestError.message },
+          { status: 500 }
+        );
+      }
+
+      if (contestEntry.draft_token) {
+        await supabase
+          .from('contest_drafts')
+          .update({
+            submitted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('token', contestEntry.draft_token);
+      }
     }
 
     // 回答者自身の紹介URL（紹介制度が有効なキャンペーン中のみ）

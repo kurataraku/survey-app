@@ -414,3 +414,46 @@ export async function sendRejectedEmail({
   const ok = await sendEmail(to, subject, html);
   await logEmail(supabase, surveyResponseId, 'rejected', to, subject, ok ? 'sent' : 'failed');
 }
+
+export async function sendContestDraftResumeEmail({
+  to,
+  resumeUrl,
+  supabase,
+}: {
+  to: string;
+  resumeUrl: string;
+  supabase: SupabaseClient;
+}): Promise<boolean> {
+  const subject = '【MY STORY AWARD】書きかけの応募の続きはこちら';
+  const html = `
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1f2937;line-height:1.8;">
+  <p>「通信制高校 MY STORY AWARD」への応募を書きかけで保存しています。</p>
+  <p>
+    別の端末で続きを書く場合は、下のボタンから応募フォームを開いてください。<br>
+    開いた端末に、ここまで入力した内容が入った状態で戻ります。
+  </p>
+  <p style="margin:28px 0;">
+    <a href="${resumeUrl}" style="display:inline-block;background:#facc15;color:#111827;padding:14px 22px;border-radius:999px;text-decoration:none;font-weight:bold;">別の端末で続きを書く</a>
+  </p>
+  <p style="font-size:13px;color:#6b7280;">
+    このリンクは2026年12月25日 23:59まで有効です。応募が完了すると、リンクから下書きは開けなくなります。<br>
+    心当たりがない場合は、このメールを破棄してください。
+  </p>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+  <p style="font-size:13px;color:#9ca3af;margin:0;">
+    通信制高校リアルレビュー<br>
+    <a href="${SITE_URL}/tsushin-kuchikomi" style="color:#3b82f6;">${SITE_URL}/tsushin-kuchikomi</a>
+  </p>
+</div>
+  `.trim();
+
+  const ok = await sendEmail(to, subject, html);
+  await supabase.from('email_logs').insert({
+    survey_response_id: null,
+    email_type: 'contest_draft_resume',
+    to_email: to,
+    subject,
+    status: ok ? 'sent' : 'failed',
+  });
+  return ok;
+}

@@ -36,6 +36,20 @@ interface ModerationResult {
   created_at?: string;
 }
 
+interface ContestEntry {
+  author_type: '在校生' | '卒業生';
+  pen_name: string;
+  title: string;
+  effort_summary: string;
+  before_enrollment: string;
+  after_enrollment: string;
+  learning_and_change: string;
+  future_goal?: string | null;
+  current_life?: string | null;
+  wants_feedback: boolean;
+  publication_consent: boolean;
+}
+
 interface Answers {
   reason_for_choosing?: string[];
   important_points?: string[];
@@ -70,6 +84,8 @@ interface PendingReview {
   bad_comment: string;
   answers: Answers;
   email: string;
+  entry_source?: string;
+  contest_entries?: ContestEntry[] | ContestEntry | null;
   is_duplicate_email: boolean;
   moderation_status: string;
   rejection_reason?: string | null;
@@ -262,6 +278,46 @@ function RatingDisplay({ value }: { value?: string }) {
     <span className="font-medium text-gray-800">
       {n}<span className="text-gray-400 text-xs">/5</span>
     </span>
+  );
+}
+
+function contestEntryFor(review: PendingReview): ContestEntry | null {
+  if (!review.contest_entries) return null;
+  return Array.isArray(review.contest_entries)
+    ? review.contest_entries[0] ?? null
+    : review.contest_entries;
+}
+
+function ContestEntryDetail({ entry }: { entry: ContestEntry }) {
+  const rows = [
+    ['作品タイトル', entry.title],
+    ['ペンネーム', `${entry.pen_name}（${entry.author_type}）`],
+    ['頑張ったこと', entry.effort_summary],
+    ['入学前', entry.before_enrollment],
+    ['入学後', entry.after_enrollment],
+    ['学び・変化', entry.learning_and_change],
+    [
+      entry.author_type === '在校生' ? 'これから挑戦したいこと' : '卒業後の現在の生活',
+      entry.author_type === '在校生' ? entry.future_goal : entry.current_life,
+    ],
+    ['フィードバック希望', entry.wants_feedback ? '希望する' : '希望しない'],
+    ['作品利用同意', entry.publication_consent ? '同意済み' : '未同意'],
+  ].filter(([, value]) => Boolean(value));
+
+  return (
+    <details className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-sky-900">
+        MY STORY AWARD 応募作品を表示
+      </summary>
+      <div className="mt-3 space-y-3">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <p className="text-xs font-semibold text-sky-700">{label}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-800">{value}</p>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -588,6 +644,7 @@ export default function ReviewModerationPage() {
               <div className="space-y-4">
                 {reviews.map((review) => {
                   const mod = latestByCreatedAt(review.review_moderation_results);
+                  const contestEntry = contestEntryFor(review);
                   return (
                     <div key={review.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       {/* ヘッダー */}
@@ -595,6 +652,11 @@ export default function ReviewModerationPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-gray-900">{review.school_name}</span>
                           <span className="text-xs text-gray-500">{review.respondent_role} / {review.status}</span>
+                          {review.entry_source === 'my_story_award' && (
+                            <span className="text-xs bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded">
+                              MY STORY AWARD（入学年条件なし）
+                            </span>
+                          )}
                           <DangerBadge score={mod?.danger_score} />
                           {review.is_duplicate_email && (
                             <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded">メール重複</span>
@@ -618,6 +680,7 @@ export default function ReviewModerationPage() {
                             {' '}／ 紹介制度が有効なキャンペーン中に承認すると、この回答者の謝礼（通常額・1件のみ）と紹介者の紹介謝礼が「QUO配布管理」に作られます。
                           </p>
                         )}
+                        {contestEntry && <ContestEntryDetail entry={contestEntry} />}
                         {/* AI審査結果 */}
                         {mod ? (
                           <ModerationReport
@@ -782,6 +845,7 @@ export default function ReviewModerationPage() {
               <div className="space-y-4">
                 {rejectedReviews.map((review) => {
                   const mod = latestByCreatedAt(review.review_moderation_results);
+                  const contestEntry = contestEntryFor(review);
                   return (
                     <div key={review.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
@@ -789,6 +853,11 @@ export default function ReviewModerationPage() {
                           <span className="font-semibold text-gray-900">{review.school_name}</span>
                           <span className="text-xs text-gray-500">{review.respondent_role} / {review.status}</span>
                           <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">却下済み</span>
+                          {review.entry_source === 'my_story_award' && (
+                            <span className="text-xs bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded">
+                              MY STORY AWARD（入学年条件なし）
+                            </span>
+                          )}
                           <DangerBadge score={mod?.danger_score} />
                           {review.is_duplicate_email && (
                             <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-1.5 py-0.5 rounded">メール重複</span>
@@ -805,6 +874,7 @@ export default function ReviewModerationPage() {
                           </p>
                         </div>
 
+                        {contestEntry && <ContestEntryDetail entry={contestEntry} />}
                         {mod && <ModerationReport mod={mod} />}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

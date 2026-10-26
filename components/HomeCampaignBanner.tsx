@@ -27,6 +27,39 @@ export default function HomeCampaignBanner() {
   const rewardLabel = (campaign?.reward_amount ?? 200).toLocaleString('ja-JP');
 
   return (
+    <>
+    <section className="mb-5" aria-label="MY STORY AWARD">
+      <Link
+        href={appPath('/my-story-award')}
+        className="group block relative overflow-hidden rounded-3xl bg-[#eefdff] p-4 shadow-lg ring-4 ring-sky-100 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl active:scale-[0.99] sm:p-7 md:p-8"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(14,165,233,0.14)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.14)_1px,transparent_1px)] bg-[size:22px_22px]" aria-hidden />
+        <div className="relative grid gap-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-center">
+          <div>
+            <div className="inline-flex rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-slate-950">
+              体験談コンテスト
+            </div>
+            <h2 className="mt-3 text-2xl font-black leading-tight text-sky-950 md:text-3xl">
+              MY STORY AWARD
+              <span className="block text-lg md:text-xl">「私らしい高校生活」を募集</span>
+            </h2>
+            <p className="mt-2 text-sm font-bold leading-relaxed text-slate-700">
+              通信制高校の在校生・卒業生へ。あなたの経験が、これから学校を選ぶ人のヒントになります。
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-3 md:flex-col">
+            <div className="rounded-2xl bg-white px-4 py-3 text-center font-black text-sky-900 shadow-sm">
+              締切 12/25
+              <span className="block text-xs text-slate-500">途中保存できます</span>
+            </div>
+            <div className="inline-flex shrink-0 rounded-2xl bg-yellow-300 px-5 py-3 text-sm font-black text-slate-950 shadow-md transition group-hover:scale-105">
+              募集ページを見る
+            </div>
+          </div>
+        </div>
+      </Link>
+    </section>
+
     <section className="mb-8" aria-label="口コミ協力キャンペーン">
       <Link
         href={appPath('/campaign')}
@@ -89,6 +122,7 @@ export default function HomeCampaignBanner() {
         </div>
       </Link>
     </section>
+    </>
   );
 }
 

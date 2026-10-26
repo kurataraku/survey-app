@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CONTEST_TEXT_LIMITS, MY_STORY_AWARD_SOURCE } from '@/lib/contest/copy';
 
 /** 総合満足度に応じた口コミ本文の最小文字数（アンケート・管理画面編集で共通） */
 export function getCommentMinLength(
@@ -136,6 +137,48 @@ export const surveySchema = baseSchema
   });
 
 export type SurveyFormData = z.infer<typeof surveySchema>;
+
+export const contestEntrySchema = z
+  .object({
+    entry_source: z.literal(MY_STORY_AWARD_SOURCE),
+    author_type: z.enum(['在校生', '卒業生']),
+    pen_name: z.string().trim().min(1, 'サイトに出すときの名前を入力してください').max(40, '40字以内で入力してください'),
+    title: z.string().trim().min(1, '作品タイトルを入力してください').max(CONTEST_TEXT_LIMITS.title.max, '作品タイトルは20字以内で入力してください'),
+    effort_summary: z.string().trim().min(CONTEST_TEXT_LIMITS.effort_summary.min, `頑張ったことは${CONTEST_TEXT_LIMITS.effort_summary.min}字以上入力してください`),
+    before_enrollment: z.string().trim().min(CONTEST_TEXT_LIMITS.before_enrollment.min, `入学前のことは${CONTEST_TEXT_LIMITS.before_enrollment.min}字以上入力してください`),
+    after_enrollment: z.string().trim().min(CONTEST_TEXT_LIMITS.after_enrollment.min, `入学後のことは${CONTEST_TEXT_LIMITS.after_enrollment.min}字以上入力してください`),
+    learning_and_change: z.string().trim().min(CONTEST_TEXT_LIMITS.learning_and_change.min, `学びや変化は${CONTEST_TEXT_LIMITS.learning_and_change.min}字以上入力してください`),
+    future_goal: z.string().trim().optional(),
+    current_life: z.string().trim().optional(),
+    wants_feedback: z.boolean().default(false),
+    publication_consent: z.boolean().refine((value) => value, {
+      message: '作品の利用について同意してください',
+    }),
+    draft_token: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.author_type === '在校生') {
+      if (!data.future_goal || data.future_goal.trim().length < CONTEST_TEXT_LIMITS.future_goal.min) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `これから挑戦したいことは${CONTEST_TEXT_LIMITS.future_goal.min}字以上入力してください`,
+          path: ['future_goal'],
+        });
+      }
+    }
+
+    if (data.author_type === '卒業生') {
+      if (!data.current_life || data.current_life.trim().length < CONTEST_TEXT_LIMITS.current_life.min) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `卒業後のことは${CONTEST_TEXT_LIMITS.current_life.min}字以上入力してください`,
+          path: ['current_life'],
+        });
+      }
+    }
+  });
+
+export type ContestEntryFormData = z.infer<typeof contestEntrySchema>;
 
 /**
  * インポート用スキーマ（CSV一括投入）
