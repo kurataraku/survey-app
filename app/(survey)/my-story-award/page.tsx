@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   },
 };
 
+const applyButtonClass =
+  'flex min-h-20 w-full items-center justify-center rounded-full bg-yellow-400 px-8 text-xl font-black text-slate-950 shadow-lg transition hover:bg-yellow-300 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-sky-500 sm:text-2xl';
+
 const writingExamples = [
   '入学前に不安だったことと、実際に入って感じたこと',
   '登校する日や、自宅で過ごす日のこと',
@@ -100,17 +103,14 @@ export default function MyStoryAwardPage() {
                   </dd>
                 </div>
               </dl>
-
-              <Link
-                href={appPath(MY_STORY_AWARD_APPLY_PATH)}
-                className="mt-8 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-yellow-300 px-8 py-4 text-lg font-black text-slate-950 shadow-md transition hover:bg-yellow-200 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-sky-500 sm:w-auto"
-              >
-                体験談を書いて応募する
-              </Link>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                指定された質問に文章で回答します。体験談と学校についての回答を、同じフォームで送信します。
-              </p>
             </div>
+
+            <Link href={appPath(MY_STORY_AWARD_APPLY_PATH)} className={`mt-8 ${applyButtonClass}`}>
+              体験談を書いて応募する
+            </Link>
+            <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+              指定された質問に文章で回答します。体験談と学校についての回答を、同じフォームで送信します。
+            </p>
           </div>
         </section>
 
@@ -295,10 +295,7 @@ export default function MyStoryAwardPage() {
             <h2 className="text-2xl font-black leading-tight text-sky-950 sm:text-3xl">
               あなたの経験を、これから学校を選ぶ人へ。
             </h2>
-            <Link
-              href={appPath(MY_STORY_AWARD_APPLY_PATH)}
-              className="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-full bg-yellow-300 px-8 py-4 text-lg font-black text-slate-950 shadow-md transition hover:bg-yellow-200 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-sky-500 sm:w-auto"
-            >
+            <Link href={appPath(MY_STORY_AWARD_APPLY_PATH)} className={`mt-8 ${applyButtonClass}`}>
               体験談を書いて応募する
             </Link>
           </section>
