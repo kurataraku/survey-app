@@ -176,10 +176,13 @@ export default function MyStoryAwardPage() {
               <h3 className="text-xl font-black text-sky-950 sm:text-2xl">口コミに協力した方へ、もれなく200円</h3>
               <p className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">QUOカードPay 200円分</p>
               <p className="mt-4 text-base leading-[1.8]">
-                体験談と一緒に、通っていた学校の口コミも書いてください。口コミに協力してくれた方には、基本的に全員へ200円分をお送りします。コンテストで賞が取れなくても届きます。
+                体験談と一緒に、通っていた学校の口コミも書いてください。口コミに協力してくれた方には、全員へ200円分をお送りします。コンテストで賞が取れなくても届きます。
               </p>
               <p className="mt-3 text-base leading-[1.8]">
                 内容を確認したあと、登録したメールアドレスへお送りします。
+              </p>
+              <p className="mt-4 text-sm leading-[1.7] text-slate-600">
+                ※口コミの内容が事実と違っていたり、いたずらと判断されたりしなければ、問題なく承認されます。
               </p>
             </div>
           </Section>
