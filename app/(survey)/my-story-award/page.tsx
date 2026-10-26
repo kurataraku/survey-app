@@ -182,7 +182,7 @@ export default function MyStoryAwardPage() {
                 内容を確認したあと、登録したメールアドレスへお送りします。
               </p>
               <p className="mt-4 text-sm leading-[1.7] text-slate-600">
-                ※口コミの内容が事実と違っていたり、いたずらと判断されたりしなければ、問題なく承認されます。
+                ※事実に基づいた口コミであれば、承認されます。いたずらや、事実と異なる内容は対象外です。
               </p>
             </div>
           </Section>
