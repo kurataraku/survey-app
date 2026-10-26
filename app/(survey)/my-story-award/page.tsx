@@ -37,47 +37,40 @@ export default function MyStoryAwardPage() {
   return (
     <div className="min-h-screen bg-[#eefdff] bg-[linear-gradient(rgba(14,165,233,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(14,165,233,0.12)_1px,transparent_1px)] bg-[size:22px_22px]">
       <main>
-        <section className="relative overflow-hidden px-4 py-10 sm:py-14">
-          <div className="mx-auto grid max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_520px]">
-            <div>
-              <p className="inline-flex rounded-full bg-yellow-300 px-4 py-2 text-sm font-black text-slate-950 shadow-sm">
-                通信制高校の体験談コンテスト
-              </p>
-              <h1 className="mt-5 text-4xl font-black leading-tight text-sky-950 sm:text-6xl">
-                あなたの
-                <br />
-                「私らしい高校生活」を
-                <br />
-                聞かせてください
-              </h1>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-relaxed text-slate-700">
-                通信制高校の在校生・卒業生が対象です。探究活動、アルバイト、趣味、資格取得、学び直し。あなたが過ごしてきた時間が、これから学校を選ぶ人のヒントになります。
-              </p>
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <span className="rounded-full bg-white px-4 py-2 text-sm font-black text-sky-900 shadow-sm">
-                  締切 {MY_STORY_AWARD_DEADLINE_LABEL}
-                </span>
-                <span className="rounded-full bg-white px-4 py-2 text-sm font-black text-sky-900 shadow-sm">
-                  途中保存できます
-                </span>
+        <section className="relative overflow-hidden px-4 pb-10 pt-6 sm:pb-14 sm:pt-8">
+          <div className="mx-auto max-w-6xl">
+            <h1 className="sr-only">通信制高校 MY STORY AWARD 私らしい高校生活</h1>
+            <div className="overflow-hidden rounded-[28px] border-4 border-white bg-white shadow-2xl sm:rounded-[36px]">
+              <Image
+                src="/my-story-award-main.jpg"
+                alt="通信制高校の体験談コンテスト MY STORY AWARD。募集テーマは私らしい高校生活。在校生・卒業生が対象。最優秀賞はAmazonギフトカード10,000円分。"
+                width={602}
+                height={295}
+                priority
+                sizes="(min-width: 1152px) 1152px, 100vw"
+                className="h-auto w-full"
+              />
+            </div>
+            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="max-w-2xl text-base font-bold leading-relaxed text-slate-700 sm:text-lg">
+                  通信制高校の在校生・卒業生が対象です。探究、アルバイト、趣味、資格、学び直し。あなたの高校生活を、これから学校を選ぶ人へ。
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-white px-4 py-2 text-sm font-black text-sky-900 shadow-sm">
+                    締切 {MY_STORY_AWARD_DEADLINE_LABEL}
+                  </span>
+                  <span className="rounded-full bg-white px-4 py-2 text-sm font-black text-sky-900 shadow-sm">
+                    途中保存できます
+                  </span>
+                </div>
               </div>
               <Link
                 href={appPath(MY_STORY_AWARD_APPLY_PATH)}
-                className="mt-8 inline-flex rounded-full bg-yellow-300 px-8 py-4 text-lg font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
+                className="inline-flex shrink-0 justify-center rounded-full bg-yellow-300 px-8 py-4 text-lg font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
               >
                 応募をはじめる
               </Link>
-            </div>
-
-            <div className="rounded-[36px] border-4 border-white bg-white p-3 shadow-2xl">
-              <Image
-                src="/my-story-award-main.jpg"
-                alt="通信制高校の体験談コンテスト MY STORY AWARD 作品募集"
-                width={602}
-                height={257}
-                priority
-                className="h-auto w-full rounded-[28px]"
-              />
             </div>
           </div>
         </section>
