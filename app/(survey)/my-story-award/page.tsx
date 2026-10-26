@@ -61,6 +61,8 @@ function Section({
 }
 
 export default function MyStoryAwardPage() {
+  const [topAward, ...otherAwards] = CONTEST_AWARDS;
+
   return (
     <div className="min-h-screen bg-white">
       <main>
@@ -155,24 +157,29 @@ export default function MyStoryAwardPage() {
 
           <Section title="賞・応募特典">
             <h3 className="text-xl font-black text-sky-950">受賞作品の賞</h3>
-            <div className="mt-5 grid gap-4 sm:grid-cols-3">
-              {CONTEST_AWARDS.map((award) => (
+            <div className="mt-5 rounded-3xl bg-yellow-300 px-6 py-8 text-center shadow-md sm:px-10 sm:py-10">
+              <p className="text-lg font-black text-slate-950 sm:text-xl">{topAward.name}</p>
+              <p className="mt-2 text-5xl font-black tracking-tight text-slate-950 sm:text-7xl">{topAward.amount}</p>
+              <p className="mt-3 text-base font-bold text-slate-800">Amazonギフトカード／{topAward.count}</p>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {otherAwards.map((award) => (
                 <div key={award.name} className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
                   <p className="font-black text-sky-950">{award.name}</p>
-                  <p className="mt-3 text-2xl font-black tracking-tight text-slate-950">{award.amount}</p>
+                  <p className="mt-3 text-3xl font-black tracking-tight text-slate-950">{award.amount}</p>
                   <p className="mt-1 text-sm font-bold text-slate-600">Amazonギフトカード／{award.count}</p>
                 </div>
               ))}
             </div>
 
             <div className="mt-9 border-l-4 border-sky-300 bg-sky-50 px-5 py-6 sm:px-7">
-              <h3 className="text-xl font-black text-sky-950">学校についての回答が承認・掲載された方への特典</h3>
-              <p className="mt-3 font-black text-slate-950">QUOカードPay 200円分／1回</p>
-              <p className="mt-3">
-                コンテスト応募と同時に送信する学校についての回答が、掲載基準を満たして承認・公開された場合に対象となります。コンテストの受賞有無とは別の特典です。重複投稿と判定された場合は対象外です。
+              <h3 className="text-xl font-black text-sky-950 sm:text-2xl">口コミに協力した方へ、もれなく200円</h3>
+              <p className="mt-4 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">QUOカードPay 200円分</p>
+              <p className="mt-4 text-base leading-[1.8]">
+                体験談と一緒に、通っていた学校の口コミも書いてください。口コミに協力してくれた方には、基本的に全員へ200円分をお送りします。コンテストで賞が取れなくても届きます。
               </p>
-              <p className="mt-3">
-                承認後、後日、登録したメールアドレス宛に受け取りの案内をお送りします。応募しただけで全員に付与される特典ではありません。
+              <p className="mt-3 text-base leading-[1.8]">
+                内容を確認したあと、登録したメールアドレスへお送りします。
               </p>
             </div>
           </Section>
