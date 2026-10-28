@@ -111,7 +111,7 @@ export default function MyStoryAwardPage() {
               体験談を書いて応募する
             </Link>
             <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-slate-600">
-              指定された質問に文章で回答します。体験談と学校についての回答を、同じフォームで送信します。
+              指定された質問に文章で回答します。体験談と口コミの回答を、同じフォームで送信します。
             </p>
           </div>
         </section>
@@ -138,13 +138,13 @@ export default function MyStoryAwardPage() {
               </li>
               <li>
                 <p className="text-sm font-black text-sky-600">STEP 2</p>
-                <h3 className="mt-2 text-lg font-black text-sky-950">学校について回答</h3>
+                <h3 className="mt-2 text-lg font-black text-sky-950">口コミについて回答</h3>
                 <p className="mt-2">学校名、通い方、評価、良かった点や気になる点に回答します。</p>
               </li>
               <li>
                 <p className="text-sm font-black text-sky-600">STEP 3</p>
                 <h3 className="mt-2 text-lg font-black text-sky-950">確認して応募</h3>
-                <p className="mt-2">作品の利用について確認・同意し、体験談と学校についての回答を一緒に送信します。</p>
+                <p className="mt-2">作品の利用について確認・同意し、体験談と口コミの回答を一緒に送信します。</p>
               </li>
             </ol>
             <div className="mt-8 border-t border-sky-200 pt-5">
@@ -196,7 +196,7 @@ export default function MyStoryAwardPage() {
                 </dd>
               </div>
               <div className="py-5">
-                <dt className="font-black text-sky-950">学校についての回答</dt>
+                <dt className="font-black text-sky-950">口コミの回答</dt>
                 <dd className="mt-1">
                   学校名とあわせて審査し、承認された回答は、学校を選ぶ人の参考になる口コミとしてサイトに公開されます。
                 </dd>
@@ -265,7 +265,7 @@ export default function MyStoryAwardPage() {
                 <div>
                   <h3 className="font-black text-sky-950">応募方法</h3>
                   <p>
-                    応募フォームから、体験談と学校についての回答を一緒に送信してください。会員登録はありません。参加費は無料です。
+                    応募フォームから、体験談と口コミの回答を一緒に送信してください。会員登録はありません。参加費は無料です。
                   </p>
                 </div>
                 <div>
@@ -281,7 +281,7 @@ export default function MyStoryAwardPage() {
                 <div>
                   <h3 className="font-black text-sky-950">応募内容の取り扱い</h3>
                   <p>
-                    学校についての回答は確認・承認後に口コミとして公開されます。応募作品は、利用への同意を確認したうえで、通信制高校の多様な学び方や生き方を伝える広報コンテンツとして活用する予定です。
+                    口コミの回答は確認・承認後に公開されます。応募作品は、利用への同意を確認したうえで、通信制高校の多様な学び方や生き方を伝える広報コンテンツとして活用する予定です。
                   </p>
                 </div>
                 <div>
