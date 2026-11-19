@@ -276,15 +276,17 @@ export default function PartnershipOperator({ initialSchool }: { initialSchool: 
       </section>
       {undelivered.length > 0 && <section className="space-y-3 rounded-xl border-2 border-red-300 bg-red-50 p-5">
         <h2 className="font-bold text-red-900">届かなかったメール {undelivered.length}件</h2>
-        <p className="text-sm text-red-900">送信はできていますが、宛先に届いていません。学校に連絡が届いていない前提で対応してください。</p>
+        <p className="text-sm text-red-900">送信はできていますが、宛先に届いていません。種類ごとの対応を確認してください。</p>
         <ul className="space-y-2">
           {undelivered.map((item) => <li className="rounded-lg bg-white p-3 text-sm" key={item.id}>
-            <p><span className="font-semibold text-red-900">{deliveryLabels[item.status as keyof typeof deliveryLabels] ?? item.status}</span>　{relatedName(item.schools)}　{item.kind === 'school_invitation' ? '学校担当者の招待' : '資料請求の新着通知'}</p>
+            <p><span className="font-semibold text-red-900">{deliveryLabels[item.status as keyof typeof deliveryLabels] ?? item.status}</span>　{relatedName(item.schools)}　{item.kind === 'school_invitation' ? '学校担当者の招待' : item.kind === 'applicant_receipt' ? '受付確認メール（応募者宛）' : '資料請求の新着通知'}</p>
             <p className="break-all text-slate-700">宛先 {item.recipient}　送信 {formatDate(item.created_at)}</p>
             {item.detail && <p className="text-slate-600">{item.detail}</p>}
             <p className="text-slate-700">{item.kind === 'school_invitation'
               ? 'アドレスの誤りを学校に確認し、正しいアドレスで招待し直してください。'
-              : '担当者のアドレスを確認し、必要なら学校へ電話等で直接連絡してください。'}</p>
+              : item.kind === 'applicant_receipt'
+                ? '入力ミスのほか、いたずらの可能性もあります。学校へ公開する前に、請求の内容を確認してください。'
+                : '担当者のアドレスを確認し、必要なら学校へ電話等で直接連絡してください。'}</p>
           </li>)}
         </ul>
       </section>}

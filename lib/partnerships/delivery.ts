@@ -2,7 +2,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { deliveryLabels, type DeliveryStatus } from './model';
 
 type Db = ReturnType<typeof createAdminSupabaseClient>;
-export type DeliveryKind = 'school_notification' | 'school_invitation';
+export type DeliveryKind = 'school_notification' | 'school_invitation' | 'applicant_receipt';
 export type { DeliveryStatus };
 
 // 結果の強さ。弱い状態から強い状態へしか進めない。
@@ -93,10 +93,13 @@ async function alertUndelivered(db: Db) {
   let alerted = 0;
   for (const row of rows ?? []) {
     const school = Array.isArray(row.schools) ? row.schools[0]?.name : (row.schools as { name?: string } | null)?.name;
-    const kind = row.kind === 'school_invitation' ? '学校担当者の招待メール' : '資料請求の新着通知';
+    const kind = row.kind === 'school_invitation' ? '学校担当者の招待メール'
+      : row.kind === 'applicant_receipt' ? '資料請求の受付確認メール（応募者宛）' : '資料請求の新着通知';
     const next = row.kind === 'school_invitation'
       ? 'アドレスの誤りがないか学校に確認し、正しいアドレスで招待し直してください。'
-      : '学校に連絡が届いていません。担当者のアドレスを確認し、運営画面の通知欄から再送してください。';
+      : row.kind === 'applicant_receipt'
+        ? '入力ミスのほか、いたずらや他人のアドレスの入力の可能性があります。学校へ公開する前に、運営画面で請求の内容（宛名・住所・メールアドレス）を確認してください。'
+        : '学校に連絡が届いていません。担当者のアドレスを確認し、運営画面の通知欄から再送してください。';
     const sent = await postSlack([
       `:warning: メールが届いていません（${deliveryLabels[row.status as DeliveryStatus]}）`,
       `対象: ${kind}`,

@@ -117,6 +117,42 @@ export function buildContentStoppedMail(input: { schoolName: string; contentKind
   };
 }
 
+export function buildApplicantReceiptMail(input: { schoolName: string; requestId: string; receivedAt: Date }) {
+  const received = input.receivedAt.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return {
+    subject: `【${mediaName}】資料請求を受け付けました（${input.schoolName}）`,
+    message: [
+      '資料請求のお申し込みありがとうございます。',
+      `${mediaName}（運営：株式会社キャリアエッセンス）です。`,
+      '以下の内容で受け付けました。',
+      '',
+      `■ 請求先の学校：${input.schoolName}`,
+      `■ 受付番号：${input.requestId.slice(0, 8)}`,
+      `■ 受付日時：${received}`,
+      '',
+      '【今後の流れ】',
+      '1. 運営が請求の内容を確認します。',
+      '2. 確認後、学校へ宛名・住所などを共有します。',
+      '3. 学校から、ご記入の住所へ資料が郵送されます。',
+      '※ 発送の時期は学校により異なります。',
+      '',
+      '【ご確認ください】',
+      `・内容の訂正や取り消しをご希望の場合は、受付番号を添えて ${contactEmail} へご連絡ください。`,
+      '・このメールに心当たりがない場合は、破棄してください。',
+      '',
+      signature,
+    ].join('\n'),
+  };
+}
+
+/** 応募者への受付確認。失敗しても請求の受付には影響させない（呼び出し側で結果を握りつぶす）。 */
+export async function sendApplicantReceipt(db: Db, input: { requestId: string; email: string; schoolId: string; schoolName: string }) {
+  const mail = buildApplicantReceiptMail({ schoolName: input.schoolName, requestId: input.requestId, receivedAt: new Date() });
+  const result = await send(input.email, mail.subject, mail.message, `applicant-receipt-${input.requestId}`);
+  if (result.ok) await recordEmailSend(db, { messageId: result.messageId, kind: 'applicant_receipt', refId: input.requestId, schoolId: input.schoolId, recipient: input.email });
+  return result.ok;
+}
+
 export async function sendSchoolInvitation(db: Db, email: string, schoolName: string, schoolId: string, memberId: string) {
   const mail = buildInvitationMail(schoolName, `${getAppBaseUrl()}/school-portal`);
   const result = await send(email, mail.subject, mail.message, `school-invite-${memberId}`);

@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
-import { NextRequest } from 'next/server';
+import { after, NextRequest } from 'next/server';
+import { sendApplicantReceipt } from '@/lib/partnerships/notifications';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { consentText, consentVersion, requestSchema } from '@/lib/partnerships/model';
 import { isSameOrigin, json } from '@/lib/partnerships/server';
@@ -34,7 +35,22 @@ export async function POST(request: NextRequest) {
     p_consent_text: consentText(data.recipient_label, data.recipient_name, Boolean(data.phone)),
     p_source_hash: sourceHash,
   });
-  if (!result.error) return json({ id: result.data.id }, result.data.created ? 201 : 200);
+  if (!result.error) {
+    // 新規受付のときだけ、応募者へ受付確認を送る（同じ請求の再送信では送らない）。
+    // 応答を待たせないよう after() で送り、失敗しても受付結果には影響させない。
+    if (result.data.created) {
+      after(async () => {
+        try {
+          const school = await db.from('schools').select('name').eq('id', data.school_id).single();
+          if (school.error || !school.data?.name) return;
+          await sendApplicantReceipt(db, { requestId: result.data.id, email: data.email, schoolId: data.school_id, schoolName: school.data.name });
+        } catch (error) {
+          console.error('[Material requests] Receipt mail failed', error instanceof Error ? error.message : 'unknown');
+        }
+      });
+    }
+    return json({ id: result.data.id }, result.data.created ? 201 : 200);
+  }
 
   switch (result.error.message) {
     case 'request_unavailable':
