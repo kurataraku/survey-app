@@ -21,10 +21,105 @@ async function send(to: string, subject: string, message: string, idempotencyKey
   return { ok: true, messageId: body?.id ?? null };
 }
 
+const mediaName = '通信制高校リアルレビュー';
+const contactEmail = process.env.PARTNERSHIP_CONTACT_EMAIL || 'info@careeressence.co.jp';
+
+const signature = [
+  '――――――――――――',
+  mediaName,
+  '運営：株式会社キャリアエッセンス',
+  `お問い合わせ：${contactEmail}`,
+  '※ 本メールは送信専用です。ご返信いただいても届きません。',
+].join('\n');
+
+const loginGuide = [
+  '【ログイン方法】',
+  'ご登録のメールアドレスを入力すると、認証コードが届きます。そのコードと、認証アプリの6桁の数字でログインできます。',
+].join('\n');
+
+const formatDeadline = (value?: string | null) => value
+  ? `${new Date(value).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric' })}まで`
+  : null;
+
+export function buildInvitationMail(schoolName: string, portalUrl: string) {
+  return {
+    subject: `【${mediaName}】学校向け管理画面のご案内（${schoolName}）`,
+    message: [
+      `${mediaName}（運営：株式会社キャリアエッセンス）です。`,
+      `${schoolName}の学校担当者として、このメールアドレスを登録しました。`,
+      '',
+      '学校向け管理画面では、貴校あての資料請求の確認と、学校紹介の写真・メッセージの掲載ができます。',
+      '',
+      '▼ 学校向け管理画面',
+      portalUrl,
+      '',
+      '上のページでこのメールアドレスを入力すると、認証コードが届きます。初回は、認証アプリの設定もご案内します。',
+      '',
+      '心当たりがない場合は、このメールを破棄してください。',
+      '',
+      signature,
+    ].join('\n'),
+  };
+}
+
+export function buildRequestSharedMail(input: { schoolName: string; requestId: string; accessUntil?: string | null; portalUrl: string }) {
+  const deadline = formatDeadline(input.accessUntil);
+  return {
+    subject: `【${mediaName}】資料請求が届きました（${input.schoolName}）`,
+    message: [
+      input.schoolName,
+      'ご担当者さま',
+      '',
+      `${mediaName}（運営：株式会社キャリアエッセンス）です。`,
+      '貴校あてに、新しい資料請求が届きました。',
+      '',
+      `■ 受付番号：${input.requestId.slice(0, 8)}`,
+      ...(deadline ? [`■ 閲覧できる期限：${deadline}`] : []),
+      '',
+      '【ご対応のお願い】',
+      '1. 下記の学校向け管理画面にログインしてください。',
+      '2. 「届いた資料請求」で、受付番号の「詳細を見る」から宛名・住所などをご確認ください。',
+      '3. 資料を郵送いただいたら、「発送済みにする」を押してください。',
+      '',
+      '▼ 学校向け管理画面',
+      input.portalUrl,
+      '',
+      loginGuide,
+      '',
+      '※ 宛名・住所などの個人情報は、安全のためメールには記載していません。',
+      '',
+      signature,
+    ].join('\n'),
+  };
+}
+
+export function buildContentStoppedMail(input: { schoolName: string; contentKind: string; reason: string; portalUrl: string }) {
+  return {
+    subject: `【${mediaName}】掲載を停止しました（${input.schoolName}）`,
+    message: [
+      input.schoolName,
+      'ご担当者さま',
+      '',
+      `${mediaName}（運営：株式会社キャリアエッセンス）です。`,
+      '貴校から提供いただいた情報の掲載を、いったん停止しました。',
+      '',
+      `■ 対象：${input.contentKind === 'photo' ? '学校提供の写真' : '学校からのメッセージ'}`,
+      `■ 理由・修正のお願い：${input.reason}`,
+      '',
+      '【ご対応のお願い】',
+      '学校向け管理画面で内容を修正のうえ、再度ご提出ください。運営が確認したあと、公開します。',
+      '',
+      '▼ 学校向け管理画面',
+      input.portalUrl,
+      '',
+      signature,
+    ].join('\n'),
+  };
+}
+
 export async function sendSchoolInvitation(db: Db, email: string, schoolName: string, schoolId: string, memberId: string) {
-  const result = await send(email, '通信制高校リアルレビュー 学校担当者のご案内',
-    `${schoolName}の学校担当者として登録しました。以下の画面でこのメールアドレスを入力し、届く認証コードでログインしてください。\n${getAppBaseUrl()}/school-portal`,
-    `school-invite-${memberId}`);
+  const mail = buildInvitationMail(schoolName, `${getAppBaseUrl()}/school-portal`);
+  const result = await send(email, mail.subject, mail.message, `school-invite-${memberId}`);
   if (result.ok) await recordEmailSend(db, { messageId: result.messageId, kind: 'school_invitation', refId: memberId, schoolId, recipient: email });
   return result.ok;
 }
@@ -40,11 +135,12 @@ export async function sendQueuedSchoolNotifications(db: Db, kind: 'request_share
   const material = kind === 'request_shared'
     ? await db.from('school_material_requests').select('status, access_until').eq('id', eventId).single() : null;
   if (content?.error || material?.error) return false;
-  const subject = kind === 'request_shared' ? '新しい資料請求が届きました' : '学校提供情報の掲載停止のお知らせ';
-  const reason = content?.data
-    ? `対象：${content.data.kind === 'photo' ? '学校提供の写真' : '学校からのメッセージ'}\n理由・修正のお願い：${content.data.stop_reason}\n\n`
-    : '学校向け画面で新しい資料請求をご確認ください。\n\n';
-  const message = `${reason}${getAppBaseUrl()}/school-portal`;
+  const school = await db.from('schools').select('name').eq('id', rows[0].school_id).single();
+  if (school.error || !school.data?.name) return false;
+  const portalUrl = `${getAppBaseUrl()}/school-portal`;
+  const { subject, message } = kind === 'request_shared'
+    ? buildRequestSharedMail({ schoolName: school.data.name, requestId: eventId, accessUntil: material?.data?.access_until, portalUrl })
+    : buildContentStoppedMail({ schoolName: school.data.name, contentKind: content?.data?.kind ?? '', reason: content?.data?.stop_reason ?? '', portalUrl });
 
   const results = await Promise.allSettled(rows.map(async (row) => {
     if (row.status === 'sending' && row.attempted_at && Date.now() - Date.parse(row.attempted_at) < 120_000) return false;
