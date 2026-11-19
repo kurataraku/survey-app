@@ -7,6 +7,8 @@ export const GA_EVENTS = {
   reviewPostClick: 'review_post_click',
   requestNotificationClick: 'request_notification_click',
   requestNotificationSubmit: 'request_notification_submit',
+  schoolOfficialSiteClick: 'school_official_site_click',
+  schoolMaterialRequestClick: 'school_material_request_click',
   ctaCampaignClick: 'cta_campaign_click',
   ctaSurvey: 'cta_survey',
   ctaSurveyFromSchool: 'cta_survey_from_school',

@@ -25,6 +25,7 @@ const APP_PAGE_PREFIXES = [
   '/survey',
   '/export',
   '/admin',
+  '/school-portal',
 ];
 
 function needsBasePathRedirect(pathname: string): boolean {

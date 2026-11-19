@@ -94,6 +94,9 @@ export default function AdminHeader() {
               >
                 記事管理
               </Link>
+              <Link href={appPath('/admin/partnerships')} className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                学校提携
+              </Link>
               <Link
                 href={appPath('/admin/seo-drafts')}
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"

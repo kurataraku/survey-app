@@ -8,6 +8,8 @@ import RatingDisplay from '@/components/RatingDisplay';
 import SchoolRadarChart from '@/components/SchoolRadarChart';
 import { getQuestionLabel } from '@/lib/questionLabels';
 import SchoolSummary from '@/components/SchoolSummary';
+import SchoolPartnershipCard from '@/components/SchoolPartnershipCard';
+import type { PublicPartnership } from '@/lib/partnerships/server';
 import Tabs from '@/components/ui/Tabs';
 import StatisticsSection from '@/components/StatisticsSection';
 import { SchoolWithStats } from '@/lib/schools/getSchoolWithStats';
@@ -145,6 +147,7 @@ function ResponseDistributionCard({
 
 interface SchoolDetailClientProps {
   school: SchoolWithStats;
+  partnership?: PublicPartnership | null;
   encodedSlug: string;
   parsedAiSummary: ParsedAiSummarySections;
   tuitionAttendStatsHint: string | null;
@@ -154,6 +157,7 @@ interface SchoolDetailClientProps {
 
 export default function SchoolDetailClient({
   school,
+  partnership,
   encodedSlug,
   parsedAiSummary,
   tuitionAttendStatsHint,
@@ -263,6 +267,8 @@ export default function SchoolDetailClient({
         tuitionAttendStatsHint={showTuitionCommuteTrend ? tuitionAttendStatsHint : null}
         globalAverages={school.global_averages}
       />
+
+      {partnership && <SchoolPartnershipCard partnership={partnership} schoolId={school.id} slug={school.slug ?? encodedSlug} />}
 
       {(school.intro ||
         (school.review_count === 0 && school.prefecture && school.prefecture !== '不明')) && (
@@ -867,13 +873,13 @@ export default function SchoolDetailClient({
         className="mb-8"
       />
 
-      <RequestNotificationCta
+      {!partnership?.requestEnabled && <RequestNotificationCta
         source="school_detail"
         schoolName={school.name}
         schoolSlug={school.slug ?? encodedSlug}
         prefecture={school.prefecture ?? undefined}
         className="mb-8"
-      />
+      />}
 
       {/* グラフブロック（詳細評価・みんなの傾向）— 全タブをDOMに出力してSSR/SEO対応 */}
       <div id="section-graph" className="bg-white rounded-2xl shadow-md p-6 md:p-8 mb-8 border border-gray-200">

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getSchoolWithStats } from '@/lib/schools/getSchoolWithStats';
 import { getSchoolSlugs } from '@/lib/schools/getSchoolSlugs';
 import SchoolDetailClient from '@/components/SchoolDetailClient';
+import { getPublicPartnership } from '@/lib/partnerships/server';
 import SchoolFeaturedReviewsServer from '@/components/SchoolFeaturedReviewsServer';
 import type { Metadata } from 'next';
 import { getAppBaseUrl } from '@/lib/env-check';
@@ -172,6 +173,7 @@ export default async function SchoolDetailPage({ params }: PageProps) {
       : null;
 
   const parsedAiSummary = parseAiSummarySections(school.ai_summary?.summary_text);
+  const partnership = await getPublicPartnership(school.id);
   const tuitionAttendStatsHint =
     school.review_count >= MIN_REVIEW_COUNT_FOR_TUITION_COMMUTE_TREND
       ? buildTuitionAttendStatsHint(school)
@@ -213,6 +215,7 @@ export default async function SchoolDetailPage({ params }: PageProps) {
 
         <SchoolDetailClient
           school={school}
+          partnership={partnership}
           encodedSlug={encodedSlug}
           parsedAiSummary={parsedAiSummary}
           tuitionAttendStatsHint={tuitionAttendStatsHint}

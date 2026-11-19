@@ -1,5 +1,7 @@
 'use client';
 
+import { isPrivateAnalyticsPath } from '@/lib/analytics/private-path';
+
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 
@@ -14,7 +16,7 @@ let lastSentTime = 0;
 
 function isAdminPath(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.pathname.includes('/admin');
+  return isPrivateAnalyticsPath(window.location.pathname);
 }
 
 function sendPageView(path: string, location: string): boolean {

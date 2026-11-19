@@ -3,6 +3,10 @@
     {
       "path": "/tsushin-kuchikomi/api/cron/seo-loop",
       "schedule": "17 * * * *"
+    },
+    {
+      "path": "/tsushin-kuchikomi/api/cron/partnership-email",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

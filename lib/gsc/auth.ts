@@ -15,7 +15,7 @@ type CachedToken = {
   expiresAt: number;
 };
 
-let cachedToken: CachedToken | null = null;
+const cachedTokens = new Map<string, CachedToken>();
 
 function base64Url(input: string | Buffer): string {
   return Buffer.from(input)
@@ -49,12 +49,12 @@ function readServiceAccountKey(): ServiceAccountKey {
   };
 }
 
-function createJwt(key: ServiceAccountKey): string {
+function createJwt(key: ServiceAccountKey, scope: string): string {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
   const claim = {
     iss: key.client_email,
-    scope: READONLY_SCOPE,
+    scope,
     aud: key.token_uri ?? TOKEN_URL,
     exp: now + 3600,
     iat: now,
@@ -66,12 +66,17 @@ function createJwt(key: ServiceAccountKey): string {
 }
 
 export async function getGscAccessToken(): Promise<string> {
+  return getGoogleReadOnlyAccessToken(READONLY_SCOPE);
+}
+
+export async function getGoogleReadOnlyAccessToken(scope: typeof READONLY_SCOPE | 'https://www.googleapis.com/auth/analytics.readonly'): Promise<string> {
+  const cachedToken = cachedTokens.get(scope);
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.accessToken;
   }
 
   const key = readServiceAccountKey();
-  const assertion = createJwt(key);
+  const assertion = createJwt(key, scope);
   const body = new URLSearchParams({
     grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
     assertion,
@@ -93,10 +98,10 @@ export async function getGscAccessToken(): Promise<string> {
     throw new Error('GSC OAuth token レスポンスに access_token がありません');
   }
 
-  cachedToken = {
+  cachedTokens.set(scope, {
     accessToken: json.access_token,
     expiresAt: Date.now() + (json.expires_in ?? 3600) * 1000,
-  };
+  });
 
-  return cachedToken.accessToken;
+  return json.access_token;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { isPrivateAnalyticsPath } from '@/lib/analytics/private-path';
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const LOAD_DELAY_MS = 8000;
@@ -13,7 +14,7 @@ const INTERACTION_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'] as
  */
 export function GoogleAnalyticsInit() {
   useEffect(() => {
-    if (!GA_ID || window.location.pathname.includes('/admin')) return;
+    if (!GA_ID || isPrivateAnalyticsPath(window.location.pathname)) return;
 
     window.dataLayer = window.dataLayer || [];
     window.gtag = window.gtag || (function gtag() {

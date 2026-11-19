@@ -298,6 +298,7 @@ export default function EditSchoolPage() {
             ← 学校一覧に戻る
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">学校編集</h1>
+          {school?.id && <Link className="text-sm text-blue-700 underline" href={appPath(`/admin/partnerships?school=${school.id}`)}>この学校の提携・資料請求を管理</Link>}
         </div>
 
         {/* タブ */}

@@ -1,5 +1,7 @@
 'use client';
 
+import { isPrivateAnalyticsPath } from '@/lib/analytics/private-path';
+
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { trackEvent } from '@/lib/analytics/track';
@@ -8,7 +10,7 @@ const DEPTHS = [25, 50, 75, 100] as const;
 
 function isAdminPath(): boolean {
   if (typeof window === 'undefined') return false;
-  return window.location.pathname.includes('/admin');
+  return isPrivateAnalyticsPath(window.location.pathname);
 }
 
 /** スクロール深度（25/50/75/100%）を1セッションにつき各1回だけ計測 */

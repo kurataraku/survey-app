@@ -35,6 +35,7 @@ export default function PrivacyPage() {
                   <li>利用者が入力する情報：口コミ投稿内容、アンケート回答、メールアドレス（任意）、その他任意入力項目</li>
                   <li>端末・ログ情報：IPアドレス、ブラウザ情報、アクセス日時、閲覧ページ、Cookie等</li>
                   <li>お問い合わせ情報：氏名（任意）、連絡先、問い合わせ内容 等</li>
+                  <li>資料請求情報：申込者の区分、宛名、郵便番号、住所、受付連絡用メールアドレス、電話番号（任意）、同意の記録</li>
                 </ul>
               </section>
 
@@ -43,6 +44,7 @@ export default function PrivacyPage() {
                 <p>当社は、取得した情報を以下の目的で利用します。</p>
                 <ul className="list-disc list-outside ml-6 space-y-2">
                   <li>本サービスの提供・運営（投稿の表示、検索、問い合わせ対応等）</li>
+                  <li>資料請求の受付、請求先の学校への取次ぎ、受付に関する連絡および対応状況の確認</li>
                   <li>投稿内容の審査、品質向上、不正利用防止</li>
                   <li>投稿・回答の集計、統計化、分析（個人が特定されない形での公表を含む）</li>
                   <li>本サービスの改善・新機能開発</li>
@@ -54,6 +56,7 @@ export default function PrivacyPage() {
               <section className="space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 mt-8 mb-4">3. 第三者提供</h2>
                 <p>当社は、法令に基づく場合等を除き、本人の同意なく個人情報を第三者に提供しません。</p>
+                <p>資料請求では、申込画面に示した請求先の学校に、同意を得たうえで、資料の郵送と請求内容の確認に必要な連絡のため、宛名、郵便番号、住所および入力された電話番号を提供します。</p>
               </section>
 
               <section className="space-y-4">
