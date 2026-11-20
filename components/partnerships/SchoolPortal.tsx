@@ -20,6 +20,7 @@ type Content = { id: string; kind: string; status: string; body: string | null; 
 type Dashboard = {
   school: { name: string; slug: string };
   settings: { content_enabled: boolean; request_enabled: boolean };
+  official_link: { enabled: boolean; url: string | null } | null;
   content: Content[];
   requests: RequestRow[];
   counts: { shared: number; acknowledged: number; shipped: number };
@@ -90,6 +91,28 @@ function ContentEditor({ content, kind, onSave }: { content?: Content; kind: 'ph
         <label className="flex gap-2 text-sm"><input type="checkbox" name="permission" required />この写真を公開するために必要な許可を確認しました。</label>
       </> : <label className="block">メッセージ（300字以内）<textarea name="body" className={input} defaultValue={content?.body ?? ''} maxLength={300} rows={5} required /></label>}
       <button disabled={busy} className={primary}>{needsReview ? '修正版を提出する' : '保存して公開する'}</button>
+    </form>
+  </section>;
+}
+
+function OfficialLinkEditor({ link, onSave }: { link: { enabled: boolean; url: string | null }; onSave: (url: string) => Promise<boolean> }) {
+  const [busy, setBusy] = useState(false);
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const url = String(new FormData(event.currentTarget).get('url') ?? '');
+    setBusy(true);
+    try { await onSave(url); } finally { setBusy(false); }
+  }
+  return <section className={panel}>
+    <h3 className="font-bold">公式サイトのボタン</h3>
+    <p className="text-sm text-slate-600">貴校の公開ページに表示される「公式サイトを見る」ボタンのリンク先です。保存するとすぐに公開ページへ反映されます。</p>
+    {!link.enabled && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">現在、このボタンは公開ページに表示されない設定です。表示を希望する場合は運営へご連絡ください。</p>}
+    <form method="post" className="space-y-3" onSubmit={submit}>
+      <label className="block">リンク先のURL（https:// で始まるもの）
+        <input key={link.url ?? ''} name="url" type="url" className={input} defaultValue={link.url ?? ''} maxLength={500} placeholder="https://example.ac.jp/" />
+      </label>
+      <p className="text-xs text-slate-600">空欄で保存すると、設定を外します（運営が登録した公式サイトのURLがあれば、そちらが使われます）。</p>
+      <button disabled={busy} className={primary}>保存して公開する</button>
     </form>
   </section>;
 }
@@ -166,6 +189,22 @@ export default function SchoolPortal() {
     } finally { setBusy(false); }
   }
 
+  async function saveLink(url: string) {
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'official_link', url }) });
+      const data = await response.json();
+      if (!response.ok) { setError(data.error); return false; }
+      setMessage(data.url ? '公式サイトのリンク先を保存しました。' : 'リンク先の設定を外しました。');
+      await load();
+      return true;
+    } catch {
+      setError('通信に失敗しました。');
+      return false;
+    }
+  }
+
   const total = dashboard ? Object.values(dashboard.counts).reduce((sum, value) => sum + value, 0) : 0;
   return <main className="mx-auto min-h-screen max-w-5xl space-y-5 px-4 py-8 sm:px-6">
     <div className="flex items-start justify-between gap-3"><h1 className="text-2xl font-bold">学校向け管理画面</h1>
@@ -201,6 +240,7 @@ export default function SchoolPortal() {
           {detail.status === 'shipped' && <p>発送済み</p>}
         </div>}
       </section>
+      {dashboard.official_link && <OfficialLinkEditor link={dashboard.official_link} onSave={saveLink} />}
       {dashboard.settings.content_enabled && <div className="grid gap-4 md:grid-cols-2">
         {(['photo', 'message'] as const).map((kind) => {
           const content = dashboard.content.find((item) => item.kind === kind);

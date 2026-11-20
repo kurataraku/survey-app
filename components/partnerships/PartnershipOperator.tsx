@@ -30,6 +30,7 @@ type Dashboard = {
   requests: RequestRow[];
   notices: Notice[];
   undelivered: Undelivered[];
+  schoolLink?: { school_link_url: string | null; school_link_updated_at: string | null } | null;
   requestCount: number;
   schoolAuthReady: boolean;
   month: string;
@@ -171,7 +172,12 @@ export default function PartnershipOperator({ initialSchool }: { initialSchool: 
           <h2 className="font-bold">{dashboard.school.name}の提携設定</h2>
           <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void action({ type: 'settings', schoolId, settings }); }}>
             <label className="flex gap-2"><input type="checkbox" checked={settings.official_link_enabled} onChange={(event) => setSettings({ ...settings, official_link_enabled: event.target.checked })} />公式サイトのボタンを表示</label>
-            <p className="break-all text-sm text-slate-600">{official ?? '学校編集画面で公式サイトURLを確認してください。'}</p>
+            <p className="break-all text-sm text-slate-600">運営が確認した公式URL: {official ?? '未確認（学校編集画面で公式サイトURLを確認してください）'}</p>
+            {dashboard.schoolLink?.school_link_url && <div className="space-y-1 rounded bg-blue-50 p-3 text-sm">
+              <p className="break-all"><span className="font-semibold">学校が設定したリンク（公開ページではこちらを優先）:</span> {dashboard.schoolLink.school_link_url}</p>
+              {dashboard.schoolLink.school_link_updated_at && <p className="text-slate-600">更新 {formatDate(dashboard.schoolLink.school_link_updated_at)}</p>}
+              <button type="button" disabled={busy} className="text-red-700 underline" onClick={() => { if (window.confirm('学校が設定したリンクを外します。公開ページは運営が確認した公式URLに戻ります。よろしいですか？')) void action({ type: 'clear_school_link', schoolId }); }}>このリンクを外す</button>
+            </div>}
             <label className="flex gap-2"><input type="checkbox" checked={settings.content_enabled} onChange={(event) => setSettings({ ...settings, content_enabled: event.target.checked })} />学校による写真・メッセージの掲載を有効にする</label>
             <label className="flex gap-2"><input type="checkbox" checked={settings.request_enabled} onChange={(event) => setSettings({ ...settings, request_enabled: event.target.checked })} />郵送の資料請求を受け付ける</label>
             <label className="block text-sm">提供先の運営法人名<input className={input} value={settings.recipient_name} onChange={(event) => setSettings({ ...settings, recipient_name: event.target.value })} required={settings.request_enabled} maxLength={150} /></label>

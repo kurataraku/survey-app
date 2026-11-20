@@ -57,6 +57,29 @@ export function verifiedOfficialLink(url: unknown, verified: unknown): string | 
   }
 }
 
+/**
+ * 学校が入力したリンク先の検証。外部リンクとして公開されるため厳しめにする。
+ * 通らなければ null（保存せず、公開時にも表示しない）。https のみ、認証情報・ローカル/社内ホスト・IP直指定は不可。
+ */
+export function normalizeSchoolLink(input: unknown): string | null {
+  if (typeof input !== 'string') return null;
+  const value = input.normalize('NFKC').trim();
+  if (!value || value.length > 500) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port) return null;
+    const host = parsed.hostname.toLowerCase();
+    if (!host.includes('.') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.localhost')) return null;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(':') || host.startsWith('[')) return null;
+    parsed.hash = '';
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+export const schoolLinkError = 'https:// で始まる、学校の公式サイトのURLを入力してください（例: https://example.ac.jp/）。';
+
 export const requestLabels: Record<string, string> = {
   received: '受付済み', held: '保留', shared: '未確認', acknowledged: '発送待ち', shipped: '発送済み', cancelled: '取消',
 };

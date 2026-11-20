@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getPartnershipTraffic } from '@/lib/partnerships/analytics';
-import { defaultSettings, email, monthRange, photoBucket, settingsSchema, uuid, verifiedOfficialLink } from '@/lib/partnerships/model';
+import { defaultSettings, email, monthRange, normalizeSchoolLink, photoBucket, settingsSchema, uuid, verifiedOfficialLink } from '@/lib/partnerships/model';
 import { sendQueuedSchoolNotifications, sendSchoolInvitation } from '@/lib/partnerships/notifications';
 import { isSameOrigin, json, privateHeaders, refreshSchool, requirePartnershipOperator, schoolAuthAdmin } from '@/lib/partnerships/server';
 
@@ -12,6 +12,7 @@ const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('request'), id: uuid, action: z.enum(['viewed', 'shared', 'held', 'cancelled']) }),
   z.object({ type: z.literal('content'), id: uuid, action: z.enum(['approve', 'stop']), reason: z.string().trim().max(600).optional() }),
   z.object({ type: z.literal('retry'), id: uuid, kind: z.enum(['request_shared', 'content_stopped']) }),
+  z.object({ type: z.literal('clear_school_link'), schoolId: uuid }),
 ]);
 
 // school_partner_content / school_partner_notifications は schools への外部キーを持たず、
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
     requests = requests.in('status', ['received', 'held']);
     content = content.in('status', ['pending', 'revision_pending']);
   }
-  const [list, posts, schools, school, settings, members, notices, undelivered] = await Promise.all([
+  const [list, posts, schools, school, settings, members, notices, undelivered, schoolLink] = await Promise.all([
     requests.order('created_at', { ascending: false }).order('id').range(offset, offset + 24),
     content.neq('status', 'superseded').order('created_at', { ascending: true }).limit(40),
     db.from('school_partnerships').select('school_id, schools(name, slug)').limit(300),
@@ -87,12 +88,15 @@ export async function GET(request: NextRequest) {
     db.from('school_partner_notifications').select('event_kind, event_id, school_id, school_partnerships(schools(name))').in('status', ['pending', 'failed', 'sending'])
       .order('created_at', { ascending: false }).limit(60),
     deliveries.in('status', ['bounced', 'complained', 'unknown']).order('created_at', { ascending: false }).limit(40),
+    schoolId ? db.from('school_partnerships').select('school_link_url, school_link_updated_at').eq('school_id', schoolId).maybeSingle() : null,
   ]);
   if ([list, posts, schools, school, settings, members, notices].some((item) => item?.error)) return json({ error: '提携情報を取得できませんでした。データベースの設定をご確認ください。' }, 503);
   // email_deliveries は未適用でも画面全体を落とさない（マイグレーション前でも従来どおり使える）
   if (schoolId && !school?.data) return json({ error: '学校が見つかりません。' }, 404);
   return json({ requests: list.data, requestCount: list.count, content: withSchoolName(posts.data), schools: schools.data, school: school?.data ?? null,
-    settings: settings?.data ?? defaultSettings, members: members?.data ?? [], notices: withSchoolName(notices.data), undelivered: undelivered.error ? [] : (undelivered.data ?? []), month: period.month, schoolAuthReady: Boolean(schoolAuthAdmin()) });
+    settings: settings?.data ?? defaultSettings, members: members?.data ?? [], notices: withSchoolName(notices.data), undelivered: undelivered.error ? [] : (undelivered.data ?? []),
+    // 学校が自校の管理画面で設定したリンク（列が未作成のときは出さない）
+    schoolLink: schoolLink?.error ? null : (schoolLink?.data ?? null), month: period.month, schoolAuthReady: Boolean(schoolAuthAdmin()) });
 }
 
 export async function POST(request: NextRequest) {
@@ -108,7 +112,11 @@ export async function POST(request: NextRequest) {
     const { data: school } = await db.from('schools').select('status, official_url, official_url_verified').eq('id', action.schoolId).maybeSingle();
     if (!school) return json({ error: '学校が見つかりません。' }, 404);
     if (action.settings.official_link_enabled && !verifiedOfficialLink(school.official_url, school.official_url_verified)) {
-      return json({ error: '学校編集画面で公式サイトURLを確認・保存してから公開してください。' }, 409);
+      // 学校が自校の管理画面でリンクを設定していれば、運営の公式URLが未確認でも表示できる
+      const own = await db.from('school_partnerships').select('school_link_url').eq('school_id', action.schoolId).maybeSingle();
+      if (!normalizeSchoolLink(own.data?.school_link_url)) {
+        return json({ error: '学校編集画面で公式サイトURLを確認・保存してから公開してください。' }, 409);
+      }
     }
     if (action.settings.request_enabled) {
       const { data: member } = await db.from('school_partner_members').select('user_id').eq('school_id', action.schoolId).eq('active', true).limit(1);
@@ -118,6 +126,15 @@ export async function POST(request: NextRequest) {
     }
     const { error } = await db.from('school_partnerships').upsert({ school_id: action.schoolId, ...action.settings, updated_at: new Date().toISOString() });
     if (error) return json({ error: '設定を保存できませんでした。' }, 503);
+    await refreshSchool(action.schoolId);
+    return json({ ok: true });
+  }
+
+  if (action.type === 'clear_school_link') {
+    // 学校が設定したリンクに問題があるとき、運営が外す（外すと運営が確認した公式URLに戻る）
+    const { data, error } = await db.from('school_partnerships').update({ school_link_url: null, school_link_updated_at: new Date().toISOString(), school_link_updated_by: actorId })
+      .eq('school_id', action.schoolId).select('school_id').maybeSingle();
+    if (error || !data) return json({ error: 'リンクを外せませんでした。' }, 503);
     await refreshSchool(action.schoolId);
     return json({ ok: true });
   }

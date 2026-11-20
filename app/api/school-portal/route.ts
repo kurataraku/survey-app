@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { z } from 'zod';
-import { monthRange, photoBucket, uuid } from '@/lib/partnerships/model';
+import { monthRange, normalizeSchoolLink, photoBucket, schoolLinkError, uuid } from '@/lib/partnerships/model';
 import { isSameOrigin, json, privateHeaders, refreshSchool, requireSchoolMember } from '@/lib/partnerships/server';
 
 const requestAction = z.object({ id: uuid, action: z.enum(['viewed', 'acknowledged', 'shipped']) });
+const linkAction = z.object({ type: z.literal('official_link'), url: z.string().max(600) });
 const messageInput = z.string().trim().min(1).max(300);
 const captionInput = z.string().trim().max(120);
 const altInput = z.string().trim().min(1).max(120);
@@ -42,7 +43,10 @@ export async function GET(request: NextRequest) {
   ]);
   if ([school, settings, content, list, shared, acknowledged, shipped].some((item) => item.error)) return json({ error: '学校の情報を取得できませんでした。' }, 503);
   const requests = (list.data ?? []).map(({ access_until, ...row }) => ({ ...row, can_view: Date.parse(access_until) > Date.now() }));
-  return json({ school: school.data, settings: settings.data, content: content.data, requests,
+  // 公式サイトボタンのリンク先。列が未作成（マイグレーション前）の場合は、この機能だけ使えない状態にする。
+  const link = await db.from('school_partnerships').select('official_link_enabled, school_link_url').eq('school_id', member.schoolId).single();
+  const officialLink = link.error ? null : { enabled: Boolean(link.data.official_link_enabled), url: normalizeSchoolLink(link.data.school_link_url) };
+  return json({ school: school.data, settings: settings.data, content: content.data, requests, official_link: officialLink,
     counts: { shared: shared.count ?? 0, acknowledged: acknowledged.count ?? 0, shipped: shipped.count ?? 0 }, month: period.month });
 }
 
@@ -52,7 +56,21 @@ export async function POST(request: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { db, member } = auth;
   if (!request.headers.get('content-type')?.startsWith('multipart/form-data')) {
-    const input = requestAction.safeParse(await request.json().catch(() => null));
+    const body = await request.json().catch(() => null);
+    const link = linkAction.safeParse(body);
+    if (link.success) {
+      // 公式サイトボタンのリンク先。空欄で送ると設定を外す（運営が確認した公式URLに戻る）。
+      const raw = link.data.url.trim();
+      const url = raw ? normalizeSchoolLink(raw) : null;
+      if (raw && !url) return json({ error: schoolLinkError }, 400);
+      const { data: updated, error } = await db.from('school_partnerships')
+        .update({ school_link_url: url, school_link_updated_at: new Date().toISOString(), school_link_updated_by: member.userId })
+        .eq('school_id', member.schoolId).select('school_id').maybeSingle();
+      if (error || !updated) return json({ error: 'リンク先を保存できませんでした。' }, 503);
+      await refreshSchool(member.schoolId);
+      return json({ url });
+    }
+    const input = requestAction.safeParse(body);
     if (!input.success) return json({ error: '操作が不正です。' }, 400);
     const { data, error } = await db.rpc('process_school_material_request', {
       p_request_id: input.data.id, p_action: input.data.action, p_actor_id: member.userId, p_scope: 'school',
