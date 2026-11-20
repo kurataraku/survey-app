@@ -86,8 +86,20 @@ function ContentEditor({ content, kind, onSave }: { content?: Content; kind: 'ph
       <input type="hidden" name="kind" value={kind} />
       {kind === 'photo' ? <>
         <label className="block">写真（JPEG・PNG・WebP、3MB以内）<input name="file" type="file" accept="image/jpeg,image/png,image/webp" className={input} required /></label>
-        <label className="block">写真の説明（読み上げ用）<input name="alt" className={input} defaultValue={content?.alt ?? ''} maxLength={120} required /></label>
-        <label className="block">キャプション（任意）<input name="caption" className={input} defaultValue={content?.caption ?? ''} maxLength={120} /></label>
+        <div>
+          <label className="block">写真の説明（目の見えない方への読み上げ・検索用）
+            <input name="alt" className={input} defaultValue={content?.alt ?? ''} maxLength={120} required aria-describedby="alt-help" placeholder="例：明るい教室で、生徒が机に向かって学習している様子" />
+          </label>
+          <p id="alt-help" className="mt-1 space-y-1 text-xs text-slate-600">
+            <span className="block">写真が見えない方のために、画面読み上げソフトがこの文章を読み上げます。画像が表示されないときの代わりの表示や、Googleなどの検索で画像の内容を伝える手がかりにも使われます。</span>
+            <span className="block">写っているものを具体的に書いてください。（画面には表示されません）</span>
+            <span className="block">例：明るい教室で、生徒が机に向かって学習している様子</span>
+          </p>
+        </div>
+        <div>
+          <label className="block">キャプション（任意）<input name="caption" className={input} defaultValue={content?.caption ?? ''} maxLength={120} aria-describedby="caption-help" placeholder="例：教室の一風景です" /></label>
+          <p id="caption-help" className="mt-1 text-xs text-slate-600">写真の下に表示される短い補足です。「（学校提供）」の表記は自動で付きます。<br />例：教室の一風景です</p>
+        </div>
         <label className="flex gap-2 text-sm"><input type="checkbox" name="permission" required />この写真を公開するために必要な許可を確認しました。</label>
       </> : <label className="block">メッセージ（300字以内）<textarea name="body" className={input} defaultValue={content?.body ?? ''} maxLength={300} rows={5} required /></label>}
       <button disabled={busy} className={primary}>{needsReview ? '修正版を提出する' : '保存して公開する'}</button>
