@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getPartnershipTraffic } from '@/lib/partnerships/analytics';
-import { defaultSettings, email, monthRange, normalizeSchoolLink, photoBucket, settingsSchema, uuid, verifiedOfficialLink } from '@/lib/partnerships/model';
+import { defaultSettings, email, monthRange, photoBucket, settingsSchema, uuid } from '@/lib/partnerships/model';
 import { sendQueuedSchoolNotifications, sendSchoolInvitation } from '@/lib/partnerships/notifications';
 import { isSameOrigin, json, privateHeaders, refreshSchool, requirePartnershipOperator, schoolAuthAdmin } from '@/lib/partnerships/server';
 
@@ -13,6 +13,7 @@ const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('content'), id: uuid, action: z.enum(['approve', 'stop']), reason: z.string().trim().max(600).optional() }),
   z.object({ type: z.literal('retry'), id: uuid, kind: z.enum(['request_shared', 'content_stopped']) }),
   z.object({ type: z.literal('clear_school_link'), schoolId: uuid }),
+  z.object({ type: z.literal('approve_school_link'), schoolId: uuid, url: z.string().max(600) }),
 ]);
 
 // school_partner_content / school_partner_notifications は schools への外部キーを持たず、
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
     requests = requests.in('status', ['received', 'held']);
     content = content.in('status', ['pending', 'revision_pending']);
   }
-  const [list, posts, schools, school, settings, members, notices, undelivered, schoolLink] = await Promise.all([
+  const [list, posts, schools, school, settings, members, notices, undelivered, schoolLink, pendingLinks] = await Promise.all([
     requests.order('created_at', { ascending: false }).order('id').range(offset, offset + 24),
     content.neq('status', 'superseded').order('created_at', { ascending: true }).limit(40),
     db.from('school_partnerships').select('school_id, schools(name, slug)').limit(300),
@@ -88,7 +89,13 @@ export async function GET(request: NextRequest) {
     db.from('school_partner_notifications').select('event_kind, event_id, school_id, school_partnerships(schools(name))').in('status', ['pending', 'failed', 'sending'])
       .order('created_at', { ascending: false }).limit(60),
     deliveries.in('status', ['bounced', 'complained', 'unknown']).order('created_at', { ascending: false }).limit(40),
-    schoolId ? db.from('school_partnerships').select('school_link_url, school_link_updated_at').eq('school_id', schoolId).maybeSingle() : null,
+    schoolId ? db.from('school_partnerships').select('school_link_url, school_link_updated_at, school_link_reviewed_at').eq('school_id', schoolId).maybeSingle() : null,
+    // 学校が設定して、運営がまだ確認していない公式サイトのリンク（承認一覧）
+    (() => {
+      const query = db.from('school_partnerships').select('school_id, school_link_url, school_link_updated_at, schools(name, slug)')
+        .not('school_link_url', 'is', null).is('school_link_reviewed_at', null).order('school_link_updated_at', { ascending: true }).limit(40);
+      return schoolId ? query.eq('school_id', schoolId) : query;
+    })(),
   ]);
   if ([list, posts, schools, school, settings, members, notices].some((item) => item?.error)) return json({ error: '提携情報を取得できませんでした。データベースの設定をご確認ください。' }, 503);
   // email_deliveries は未適用でも画面全体を落とさない（マイグレーション前でも従来どおり使える）
@@ -96,7 +103,8 @@ export async function GET(request: NextRequest) {
   return json({ requests: list.data, requestCount: list.count, content: withSchoolName(posts.data), schools: schools.data, school: school?.data ?? null,
     settings: settings?.data ?? defaultSettings, members: members?.data ?? [], notices: withSchoolName(notices.data), undelivered: undelivered.error ? [] : (undelivered.data ?? []),
     // 学校が自校の管理画面で設定したリンク（列が未作成のときは出さない）
-    schoolLink: schoolLink?.error ? null : (schoolLink?.data ?? null), month: period.month, schoolAuthReady: Boolean(schoolAuthAdmin()) });
+    schoolLink: schoolLink?.error ? null : (schoolLink?.data ?? null),
+    pendingLinks: pendingLinks.error ? [] : (pendingLinks.data ?? []), month: period.month, schoolAuthReady: Boolean(schoolAuthAdmin()) });
 }
 
 export async function POST(request: NextRequest) {
@@ -111,13 +119,6 @@ export async function POST(request: NextRequest) {
   if (action.type === 'settings') {
     const { data: school } = await db.from('schools').select('status, official_url, official_url_verified').eq('id', action.schoolId).maybeSingle();
     if (!school) return json({ error: '学校が見つかりません。' }, 404);
-    if (action.settings.official_link_enabled && !verifiedOfficialLink(school.official_url, school.official_url_verified)) {
-      // 学校が自校の管理画面でリンクを設定していれば、運営の公式URLが未確認でも表示できる
-      const own = await db.from('school_partnerships').select('school_link_url').eq('school_id', action.schoolId).maybeSingle();
-      if (!normalizeSchoolLink(own.data?.school_link_url)) {
-        return json({ error: '学校編集画面で公式サイトURLを確認・保存してから公開してください。' }, 409);
-      }
-    }
     if (action.settings.request_enabled) {
       const { data: member } = await db.from('school_partner_members').select('user_id').eq('school_id', action.schoolId).eq('active', true).limit(1);
       if (!schoolAuthAdmin() || school.status !== 'active' || !action.settings.recipient_name || !member?.length) {
@@ -136,6 +137,15 @@ export async function POST(request: NextRequest) {
       .eq('school_id', action.schoolId).select('school_id').maybeSingle();
     if (error || !data) return json({ error: 'リンクを外せませんでした。' }, 503);
     await refreshSchool(action.schoolId);
+    return json({ ok: true });
+  }
+
+  if (action.type === 'approve_school_link') {
+    // 確認したURLと保存中のURLが一致するときだけ承認する（確認後に学校が書き換えていたら承認しない）
+    const { data, error } = await db.from('school_partnerships').update({ school_link_reviewed_at: new Date().toISOString() })
+      .eq('school_id', action.schoolId).eq('school_link_url', action.url).select('school_id').maybeSingle();
+    if (error) return json({ error: '確認済みにできませんでした。' }, 503);
+    if (!data) return json({ error: '学校がリンクを更新したか、すでに外されています。画面を再読み込みして内容を確認してください。' }, 409);
     return json({ ok: true });
   }
 

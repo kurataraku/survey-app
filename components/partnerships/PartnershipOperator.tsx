@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { apiPath, appPath } from '@/lib/base-path';
-import { contentLabels, defaultSettings, deliveryLabels, requestLabels, verifiedOfficialLink } from '@/lib/partnerships/model';
+import { contentLabels, defaultSettings, deliveryLabels, requestLabels } from '@/lib/partnerships/model';
 import type { PartnershipSettings } from '@/lib/partnerships/model';
 import PartnershipMfa from './PartnershipMfa';
 
@@ -30,7 +30,8 @@ type Dashboard = {
   requests: RequestRow[];
   notices: Notice[];
   undelivered: Undelivered[];
-  schoolLink?: { school_link_url: string | null; school_link_updated_at: string | null } | null;
+  schoolLink?: { school_link_url: string | null; school_link_updated_at: string | null; school_link_reviewed_at: string | null } | null;
+  pendingLinks?: { school_id: string; school_link_url: string; school_link_updated_at: string | null; schools: SchoolRelation }[];
   requestCount: number;
   schoolAuthReady: boolean;
   month: string;
@@ -146,7 +147,6 @@ export default function PartnershipOperator({ initialSchool }: { initialSchool: 
     finally { setBusy(false); }
   }
 
-  const official = verifiedOfficialLink(dashboard?.school?.official_url, dashboard?.school?.official_url_verified);
   const notices = [...new Map((dashboard?.notices ?? []).map((item) => [`${item.event_kind}:${item.event_id}`, item])).values()];
   // 送信後に配信結果を照合して分かった不達（cronが15分おきに更新）
   const undelivered = dashboard?.undelivered ?? [];
@@ -171,12 +171,11 @@ export default function PartnershipOperator({ initialSchool }: { initialSchool: 
         <section className={panel}>
           <h2 className="font-bold">{dashboard.school.name}の提携設定</h2>
           <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void action({ type: 'settings', schoolId, settings }); }}>
-            <label className="flex gap-2"><input type="checkbox" checked={settings.official_link_enabled} onChange={(event) => setSettings({ ...settings, official_link_enabled: event.target.checked })} />公式サイトのボタンを表示</label>
-            <p className="break-all text-sm text-slate-600">運営が確認した公式URL: {official ?? '未確認（学校編集画面で公式サイトURLを確認してください）'}</p>
+            <p className="text-sm text-slate-600">公式サイトのボタンは、学校が管理画面でリンク先を設定すると、すぐに公開ページへ表示されます（運営の操作は不要）。運営は「公式サイトのリンクの確認」で事後に確認し、問題があればリンクを外してください。</p>
             {dashboard.schoolLink?.school_link_url && <div className="space-y-1 rounded bg-blue-50 p-3 text-sm">
-              <p className="break-all"><span className="font-semibold">学校が設定したリンク（公開ページではこちらを優先）:</span> {dashboard.schoolLink.school_link_url}</p>
-              {dashboard.schoolLink.school_link_updated_at && <p className="text-slate-600">更新 {formatDate(dashboard.schoolLink.school_link_updated_at)}</p>}
-              <button type="button" disabled={busy} className="text-red-700 underline" onClick={() => { if (window.confirm('学校が設定したリンクを外します。公開ページは運営が確認した公式URLに戻ります。よろしいですか？')) void action({ type: 'clear_school_link', schoolId }); }}>このリンクを外す</button>
+              <p className="break-all"><span className="font-semibold">学校が設定したリンク:</span> {dashboard.schoolLink.school_link_url}</p>
+              {dashboard.schoolLink.school_link_updated_at && <p className="text-slate-600">更新 {formatDate(dashboard.schoolLink.school_link_updated_at)}　{dashboard.schoolLink.school_link_reviewed_at ? `運営確認済み ${formatDate(dashboard.schoolLink.school_link_reviewed_at)}` : '運営未確認（下の「公式サイトのリンクの確認」で確認してください）'}</p>}
+              <button type="button" disabled={busy} className="text-red-700 underline" onClick={() => { if (window.confirm('学校が設定したリンクを外します。公開ページの公式サイトのボタンは表示されなくなります。よろしいですか？')) void action({ type: 'clear_school_link', schoolId }); }}>このリンクを外す</button>
             </div>}
             <label className="flex gap-2"><input type="checkbox" checked={settings.content_enabled} onChange={(event) => setSettings({ ...settings, content_enabled: event.target.checked })} />学校による写真・メッセージの掲載を有効にする</label>
             <label className="flex gap-2"><input type="checkbox" checked={settings.request_enabled} onChange={(event) => setSettings({ ...settings, request_enabled: event.target.checked })} />郵送の資料請求を受け付ける</label>
@@ -256,6 +255,22 @@ export default function PartnershipOperator({ initialSchool }: { initialSchool: 
         </ul>
         {dashboard.requestCount === 0 && <p className="text-sm text-slate-600">対象の資料請求はありません。</p>}
         {dashboard.requestCount > 25 && <div className="flex gap-4 text-sm"><button disabled={page === 1 || busy} onClick={() => { setDetail(null); setPage(page - 1); }}>前へ</button><span>{page}ページ</span><button disabled={page * 25 >= dashboard.requestCount || busy} onClick={() => { setDetail(null); setPage(page + 1); }}>次へ</button></div>}
+      </section>
+      <section className={panel}>
+        <h2 className="font-bold">公式サイトのリンクの確認 {(dashboard.pendingLinks ?? []).length}件</h2>
+        <p className="text-sm text-slate-600">学校が設定したリンクは保存した時点で公開されます。リンク先を開いて、学校の公式サイトであることを確認してください。</p>
+        {!(dashboard.pendingLinks ?? []).length && <p className="text-sm text-slate-600">確認待ちのリンクはありません。</p>}
+        {(dashboard.pendingLinks ?? []).map((item) => <article key={item.school_id} className="space-y-2 rounded-lg border p-4">
+          <h3 className="font-semibold">{relatedName(item.schools)}</h3>
+          <p className="break-all text-sm"><a className="text-blue-700 underline" href={item.school_link_url} target="_blank" rel="noopener noreferrer nofollow">{item.school_link_url}</a>（新しいタブで開きます）</p>
+          {item.school_link_updated_at && <p className="text-sm text-slate-600">学校が設定 {formatDate(item.school_link_updated_at)}</p>}
+          <div className="flex gap-2">
+            <button className={primary} disabled={busy} onClick={() => void action({ type: 'approve_school_link', schoolId: item.school_id, url: item.school_link_url })}>確認済みにする</button>
+            <button className={secondary} disabled={busy} onClick={() => {
+              if (window.confirm('このリンクを外します。公開ページの公式サイトのボタンは表示されなくなります。よろしいですか？')) void action({ type: 'clear_school_link', schoolId: item.school_id });
+            }}>リンクを外す</button>
+          </div>
+        </article>)}
       </section>
       <section className={panel}>
         <h2 className="font-bold">学校提供情報の確認</h2>

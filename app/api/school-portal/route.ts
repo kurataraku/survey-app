@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
   if ([school, settings, content, list, shared, acknowledged, shipped].some((item) => item.error)) return json({ error: '学校の情報を取得できませんでした。' }, 503);
   const requests = (list.data ?? []).map(({ access_until, ...row }) => ({ ...row, can_view: Date.parse(access_until) > Date.now() }));
   // 公式サイトボタンのリンク先。列が未作成（マイグレーション前）の場合は、この機能だけ使えない状態にする。
-  const link = await db.from('school_partnerships').select('official_link_enabled, school_link_url').eq('school_id', member.schoolId).single();
-  const officialLink = link.error ? null : { enabled: Boolean(link.data.official_link_enabled), url: normalizeSchoolLink(link.data.school_link_url) };
+  const link = await db.from('school_partnerships').select('school_link_url').eq('school_id', member.schoolId).single();
+  const officialLink = link.error ? null : { url: normalizeSchoolLink(link.data.school_link_url) };
   return json({ school: school.data, settings: settings.data, content: content.data, requests, official_link: officialLink,
     counts: { shared: shared.count ?? 0, acknowledged: acknowledged.count ?? 0, shipped: shipped.count ?? 0 }, month: period.month });
 }
@@ -63,10 +63,11 @@ export async function POST(request: NextRequest) {
       const raw = link.data.url.trim();
       const url = raw ? normalizeSchoolLink(raw) : null;
       if (raw && !url) return json({ error: schoolLinkError }, 400);
-      const { data: updated, error } = await db.from('school_partnerships')
-        .update({ school_link_url: url, school_link_updated_at: new Date().toISOString(), school_link_updated_by: member.userId })
-        .eq('school_id', member.schoolId).select('school_id').maybeSingle();
-      if (error || !updated) return json({ error: 'リンク先を保存できませんでした。' }, 503);
+      const changes = { school_link_url: url, school_link_updated_at: new Date().toISOString(), school_link_updated_by: member.userId };
+      // 保存のたびに「運営は未確認」に戻す（承認一覧に出る）。確認用の列が未作成の環境では、リンクの保存だけ行う。
+      let saved = await db.from('school_partnerships').update({ ...changes, school_link_reviewed_at: null }).eq('school_id', member.schoolId).select('school_id').maybeSingle();
+      if (saved.error) saved = await db.from('school_partnerships').update(changes).eq('school_id', member.schoolId).select('school_id').maybeSingle();
+      if (saved.error || !saved.data) return json({ error: 'リンク先を保存できませんでした。' }, 503);
       await refreshSchool(member.schoolId);
       return json({ url });
     }

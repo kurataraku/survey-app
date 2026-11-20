@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getAdminUser } from '@/lib/auth/admin';
 import { appPath } from '@/lib/base-path';
 import { createAdminSupabaseClient, createServerSupabaseClient } from '@/lib/supabase/server';
-import { normalizeSchoolLink, verifiedOfficialLink } from './model';
+import { normalizeSchoolLink } from './model';
 
 export const privateHeaders = { 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex' };
 
@@ -104,23 +104,24 @@ export interface PublicPartnership {
 
 export async function getPublicPartnership(schoolId: string): Promise<PublicPartnership | null> {
   const db = createAdminSupabaseClient();
-  const base = 'official_link_enabled, request_enabled, content_enabled';
+  const base = 'request_enabled, content_enabled';
   let loaded = await db.from('school_partnerships').select(`${base}, school_link_url`).eq('school_id', schoolId).maybeSingle();
   // school_link_url の列を追加するマイグレーションが未適用でも、公開ページの提携カードは従来どおり出す
   if (loaded.error) loaded = await db.from('school_partnerships').select(base).eq('school_id', schoolId).maybeSingle() as typeof loaded;
-  const settings = loaded.data as { official_link_enabled: boolean; request_enabled: boolean; content_enabled: boolean; school_link_url?: string | null } | null;
+  const settings = loaded.data as { request_enabled: boolean; content_enabled: boolean; school_link_url?: string | null } | null;
   if (!settings) return null;
 
-  // 学校が自校の管理画面で設定したリンクを優先し、無ければ運営が確認した公式URLを使う
-  const schoolLink = settings.official_link_enabled ? normalizeSchoolLink(settings.school_link_url) : null;
-  const [official, content, members] = await Promise.all([
-    settings.official_link_enabled && !schoolLink ? db.from('schools').select('official_url, official_url_verified').eq('id', schoolId).maybeSingle() : null,
+  // 公式サイトのボタンは、学校が自校の管理画面でリンク先を設定したときだけ表示する（設定がなければボタン自体を出さない）。
+  // 運営が登録した schools.official_url には切り戻さない。
+  // 運営側のオン/オフのスイッチは設けない（保存した時点で即公開し、運営は事後に確認して、問題があればリンクを外す）。
+  const schoolLink = normalizeSchoolLink(settings.school_link_url);
+  const [content, members] = await Promise.all([
     settings.content_enabled ? db.from('school_partner_content').select('id, kind, body, caption, alt').eq('school_id', schoolId).in('status', ['pending', 'approved']) : null,
     settings.request_enabled ? db.from('school_partner_members').select('user_id').eq('school_id', schoolId).eq('active', true).limit(1) : null,
   ]);
   const photo = content?.data?.find((item) => item.kind === 'photo');
   return {
-    officialUrl: schoolLink ?? verifiedOfficialLink(official?.data?.official_url, official?.data?.official_url_verified),
+    officialUrl: schoolLink,
     requestEnabled: Boolean(settings.request_enabled && members?.data?.length),
     photo: photo ? { id: photo.id, caption: photo.caption, alt: photo.alt ?? '' } : null,
     message: content?.data?.find((item) => item.kind === 'message')?.body ?? null,

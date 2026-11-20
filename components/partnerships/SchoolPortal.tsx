@@ -20,7 +20,7 @@ type Content = { id: string; kind: string; status: string; body: string | null; 
 type Dashboard = {
   school: { name: string; slug: string };
   settings: { content_enabled: boolean; request_enabled: boolean };
-  official_link: { enabled: boolean; url: string | null } | null;
+  official_link: { url: string | null } | null;
   content: Content[];
   requests: RequestRow[];
   counts: { shared: number; acknowledged: number; shipped: number };
@@ -66,7 +66,11 @@ function SchoolLogin({ onSuccess }: { onSuccess: () => void }) {
   </section>;
 }
 
-function ContentEditor({ content, kind, onSave }: { content?: Content; kind: 'photo' | 'message'; onSave: (form: FormData) => Promise<boolean> }) {
+type SaveResult = { ok: boolean; message: string };
+
+// 結果は保存ボタンのすぐ下に出す（画面上部のメッセージ欄は、この枠からは見えない位置にあるため）。
+// 保存すると掲載内容のIDが変わり、この枠は作り直されるので、結果は親が持って渡す。
+function ContentEditor({ content, kind, result, onSave }: { content?: Content; kind: 'photo' | 'message'; result?: SaveResult; onSave: (kind: 'photo' | 'message', form: FormData) => Promise<SaveResult> }) {
   const title = kind === 'photo' ? '学校提供の写真' : '学校からのメッセージ';
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -74,7 +78,10 @@ function ContentEditor({ content, kind, onSave }: { content?: Content; kind: 'ph
     const form = event.currentTarget;
     const payload = new FormData(form);
     setBusy(true);
-    try { if (await onSave(payload) && kind === 'photo') form.reset(); } finally { setBusy(false); }
+    try {
+      const outcome = await onSave(kind, payload);
+      if (outcome.ok && kind === 'photo') form.reset();
+    } finally { setBusy(false); }
   }
   const needsReview = content && ['stopped', 'revision_pending'].includes(content.status);
   return <section className={panel}>
@@ -103,28 +110,32 @@ function ContentEditor({ content, kind, onSave }: { content?: Content; kind: 'ph
         <label className="flex gap-2 text-sm"><input type="checkbox" name="permission" required />この写真を公開するために必要な許可を確認しました。</label>
       </> : <label className="block">メッセージ（300字以内）<textarea name="body" className={input} defaultValue={content?.body ?? ''} maxLength={300} rows={5} required /></label>}
       <button disabled={busy} className={primary}>{needsReview ? '修正版を提出する' : '保存して公開する'}</button>
+      {result && <p role={result.ok ? 'status' : 'alert'} className={`rounded p-3 text-sm ${result.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>{result.message}</p>}
     </form>
   </section>;
 }
 
-function OfficialLinkEditor({ link, onSave }: { link: { enabled: boolean; url: string | null }; onSave: (url: string) => Promise<boolean> }) {
+function OfficialLinkEditor({ link, onSave }: { link: { url: string | null }; onSave: (url: string) => Promise<{ ok: boolean; message: string }> }) {
   const [busy, setBusy] = useState(false);
+  // 結果は入力欄のすぐ下に出す（画面上部のメッセージ欄は、この枠からは見えない位置にあるため）
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const url = String(new FormData(event.currentTarget).get('url') ?? '');
     setBusy(true);
-    try { await onSave(url); } finally { setBusy(false); }
+    setResult(null);
+    try { setResult(await onSave(url)); } finally { setBusy(false); }
   }
   return <section className={panel}>
     <h3 className="font-bold">公式サイトのボタン</h3>
-    <p className="text-sm text-slate-600">貴校の公開ページに表示される「公式サイトを見る」ボタンのリンク先です。保存するとすぐに公開ページへ反映されます。</p>
-    {!link.enabled && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">現在、このボタンは公開ページに表示されない設定です。表示を希望する場合は運営へご連絡ください。</p>}
+    <p className="text-sm text-slate-600">貴校の公開ページに表示される「公式サイトを見る」ボタンのリンク先です。保存するとすぐに公開ページへ反映されます。リンク先を設定しないと、ボタンは表示されません。</p>
     <form method="post" className="space-y-3" onSubmit={submit}>
       <label className="block">リンク先のURL（https:// で始まるもの）
         <input key={link.url ?? ''} name="url" type="url" className={input} defaultValue={link.url ?? ''} maxLength={500} placeholder="https://example.ac.jp/" />
       </label>
-      <p className="text-xs text-slate-600">空欄で保存すると、設定を外します（運営が登録した公式サイトのURLがあれば、そちらが使われます）。</p>
+      <p className="text-xs text-slate-600">空欄で保存すると、設定を外します（公開ページのボタンは表示されなくなります）。</p>
       <button disabled={busy} className={primary}>保存して公開する</button>
+      {result && <p role={result.ok ? 'status' : 'alert'} className={`rounded p-3 text-sm ${result.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>{result.message}</p>}
     </form>
   </section>;
 }
@@ -138,6 +149,7 @@ export default function SchoolPortal() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [contentResults, setContentResults] = useState<Partial<Record<'photo' | 'message', SaveResult>>>({});
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -178,21 +190,19 @@ export default function SchoolPortal() {
     try { await getPartnershipAuth('school').auth.signOut({ scope: 'local' }); } finally { setPhase('login'); }
   }
 
-  async function post(payload: FormData | { id: string; action: string }) {
+  async function post(payload: { id: string; action: string }) {
     setError('');
     setMessage('');
     setBusy(true);
     try {
-      const multipart = payload instanceof FormData;
-      const response = await fetch(endpoint, { method: 'POST', headers: multipart ? undefined : { 'Content-Type': 'application/json' }, body: multipart ? payload : JSON.stringify(payload) });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok) {
         setError(data.error);
         if ([401, 403, 404].includes(response.status)) { setDetail(null); await load(); }
         return false;
       }
-      if (!multipart) setDetail(data);
-      if (multipart) setMessage('掲載内容を保存しました。');
+      setDetail(data);
       await load();
       return true;
     } catch {
@@ -201,19 +211,36 @@ export default function SchoolPortal() {
     } finally { setBusy(false); }
   }
 
-  async function saveLink(url: string) {
+  async function saveContent(kind: 'photo' | 'message', payload: FormData): Promise<SaveResult> {
+    setError('');
+    setMessage('');
+    const finish = (outcome: SaveResult) => { setContentResults((current) => ({ ...current, [kind]: outcome })); return outcome; };
+    setContentResults((current) => ({ ...current, [kind]: undefined }));
+    try {
+      const response = await fetch(endpoint, { method: 'POST', body: payload });
+      const data = await response.json();
+      if (!response.ok) {
+        if ([401, 403, 404].includes(response.status)) { setDetail(null); await load(); }
+        return finish({ ok: false, message: data.error ?? '掲載内容を保存できませんでした。' });
+      }
+      await load();
+      return finish({ ok: true, message: '保存しました。' });
+    } catch {
+      return finish({ ok: false, message: '通信に失敗しました。' });
+    }
+  }
+
+  async function saveLink(url: string): Promise<{ ok: boolean; message: string }> {
     setError('');
     setMessage('');
     try {
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'official_link', url }) });
       const data = await response.json();
-      if (!response.ok) { setError(data.error); return false; }
-      setMessage(data.url ? '公式サイトのリンク先を保存しました。' : 'リンク先の設定を外しました。');
+      if (!response.ok) return { ok: false, message: data.error ?? 'リンク先を保存できませんでした。' };
       await load();
-      return true;
+      return { ok: true, message: data.url ? '保存しました。公開ページに反映されています。' : '設定を外しました。' };
     } catch {
-      setError('通信に失敗しました。');
-      return false;
+      return { ok: false, message: '通信に失敗しました。' };
     }
   }
 
@@ -256,7 +283,7 @@ export default function SchoolPortal() {
       {dashboard.settings.content_enabled && <div className="grid gap-4 md:grid-cols-2">
         {(['photo', 'message'] as const).map((kind) => {
           const content = dashboard.content.find((item) => item.kind === kind);
-          return <ContentEditor key={content?.id ?? kind} kind={kind} content={content} onSave={post} />;
+          return <ContentEditor key={content?.id ?? kind} kind={kind} content={content} result={contentResults[kind]} onSave={saveContent} />;
         })}
       </div>}
     </>}
