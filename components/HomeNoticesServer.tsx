@@ -12,7 +12,7 @@ export default async function HomeNoticesServer() {
 
   return (
     <section
-      className="mb-8 rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm"
+      className="mt-10 rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm"
       aria-labelledby="home-notices-heading"
     >
       <h2 id="home-notices-heading" className="text-lg font-bold text-gray-900 mb-1">

@@ -55,7 +55,6 @@ export default async function Home() {
         totalReviewCount={data.totalReviewCount}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-0">
-        <HomeNoticesServer />
         <HomeCampaignBanner />
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -349,6 +348,7 @@ export default async function Home() {
         )}
         <PrefectureMapLinks />
         <PressReleaseHomeTeaser />
+        <HomeNoticesServer />
       </div>
     </div>
   );
