@@ -5,6 +5,7 @@ import ReviewCardServer from '@/components/ReviewCardServer';
 import ArticleCardServer from '@/components/ArticleCardServer';
 import HomeHero from '@/components/HomeHero';
 import HomeCampaignBanner from '@/components/HomeCampaignBanner';
+import HomeNoticesServer from '@/components/HomeNoticesServer';
 import ConsultationAiTopBanner from '@/components/ConsultationAiTopBanner';
 import DiagnosisStartLink from '@/components/DiagnosisStartLink';
 import { getHomeData, HOME_TOP_RATED_MIN_REVIEWS } from '@/lib/home/getHomeData';
@@ -54,6 +55,7 @@ export default async function Home() {
         totalReviewCount={data.totalReviewCount}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-0">
+        <HomeNoticesServer />
         <HomeCampaignBanner />
       </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
