@@ -31,6 +31,8 @@ export default function ConsultationAiFloating() {
   };
 
   if (pathname?.endsWith('/consultation-ai')) return null;
+  // 応募フォームは画面下部に固定の「つぎへ」バーがあり、モバイルの相談AIバナー(z-70)が覆い隠してしまうため非表示にする
+  if (pathname?.includes('/my-story-award/apply')) return null;
 
   return (
     <>
