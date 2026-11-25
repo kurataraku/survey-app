@@ -58,6 +58,7 @@ interface Answers {
   attendance_frequency?: string;
   campus_prefecture?: string;
   campus_city?: string;
+  course?: string;
   teaching_style?: string[];
   student_atmosphere?: string[];
   atmosphere_other?: string;
@@ -332,6 +333,16 @@ function Tags({ values }: { values?: string[] }) {
   );
 }
 
+function OptionalAnswer({ label, value }: { label: string; value?: string }) {
+  const text = value?.trim();
+  return (
+    <div className="flex gap-2">
+      <span className="text-gray-500 shrink-0">{label}</span>
+      {text ? <span className="text-gray-800 break-all">{text}</span> : <span className="text-gray-400">未回答</span>}
+    </div>
+  );
+}
+
 function AnswerDetail({ review }: { review: PendingReview }) {
   const [open, setOpen] = useState(false);
   const a = review.answers ?? {};
@@ -357,7 +368,6 @@ function AnswerDetail({ review }: { review: PendingReview }) {
               {a.enrollment_type && <div className="flex gap-2"><span className="text-gray-500 shrink-0">入学タイプ</span><span className="text-gray-800">{a.enrollment_type}</span></div>}
               {a.attendance_frequency && <div className="flex gap-2"><span className="text-gray-500 shrink-0">通学頻度</span><span className="text-gray-800">{a.attendance_frequency}</span></div>}
               {a.campus_prefecture && <div className="flex gap-2"><span className="text-gray-500 shrink-0">都道府県</span><span className="text-gray-800">{a.campus_prefecture}</span></div>}
-              {a.campus_city && <div className="flex gap-2"><span className="text-gray-500 shrink-0">市区町村</span><span className="text-gray-800 break-all">{a.campus_city}</span></div>}
               {review.graduation_path && <div className="flex gap-2"><span className="text-gray-500 shrink-0">卒業後の進路</span><span className="text-gray-800">{review.graduation_path}{review.graduation_path_other ? `（${review.graduation_path_other}）` : ''}</span></div>}
             </div>
           </div>
@@ -371,6 +381,15 @@ function AnswerDetail({ review }: { review: PendingReview }) {
               {a.teaching_style?.length ? <div><span className="text-gray-500 block mb-1">授業スタイル</span><Tags values={a.teaching_style} /></div> : null}
               {a.student_atmosphere?.length ? <div><span className="text-gray-500 block mb-1">生徒の雰囲気</span><Tags values={a.student_atmosphere} /></div> : null}
               {a.atmosphere_other ? <div><span className="text-gray-500 block mb-1">雰囲気（その他）</span><span className="text-gray-800">{a.atmosphere_other}</span></div> : null}
+            </div>
+          </div>
+
+          {/* 任意回答（未回答も明示する） */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-2">任意回答</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+              <OptionalAnswer label="コース" value={a.course} />
+              <OptionalAnswer label="キャンパスの市区町村" value={a.campus_city} />
             </div>
           </div>
 
