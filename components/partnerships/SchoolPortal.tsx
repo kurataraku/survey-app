@@ -9,14 +9,20 @@ import { contentLabels, requestLabels } from '@/lib/partnerships/model';
 import PartnershipMfa from './PartnershipMfa';
 import { getPartnershipAuth } from './auth';
 
-const endpoint = apiPath('/api/school-portal');
+const schoolEndpoint = apiPath('/api/school-portal');
+// 運営が学校の画面を代わりに表示するときのAPI（?school=<学校ID> を付ける）
+const operatorEndpoint = apiPath('/api/admin/partnerships/school-view');
+function portalUrl(operatorSchoolId?: string, params: Record<string, string> = {}) {
+  const query = new URLSearchParams(operatorSchoolId ? { school: operatorSchoolId, ...params } : params).toString();
+  return `${operatorSchoolId ? operatorEndpoint : schoolEndpoint}${query ? `?${query}` : ''}`;
+}
 const input = 'mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2';
 const primary = 'rounded-lg bg-blue-700 px-4 py-2 font-medium text-white disabled:opacity-50';
 const panel = 'space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-6';
 
 type RequestRow = { id: string; status: string; shared_at: string; can_view: boolean };
 type RequestDetail = Pick<RequestRow, 'id' | 'status' | 'shared_at'> & { addressee: string; postal_code: string; address: string; phone: string | null; shipped_at: string | null };
-type Content = { id: string; kind: string; status: string; body: string | null; caption: string | null; alt: string | null; stop_reason: string | null };
+type Content = { id: string; kind: string; status: string; body: string | null; caption: string | null; alt: string | null; stop_reason: string | null; submitted_scope?: string };
 type Dashboard = {
   school: { name: string; slug: string };
   settings: { content_enabled: boolean; request_enabled: boolean };
@@ -70,7 +76,7 @@ type SaveResult = { ok: boolean; message: string };
 
 // 結果は保存ボタンのすぐ下に出す（画面上部のメッセージ欄は、この枠からは見えない位置にあるため）。
 // 保存すると掲載内容のIDが変わり、この枠は作り直されるので、結果は親が持って渡す。
-function ContentEditor({ content, kind, result, onSave }: { content?: Content; kind: 'photo' | 'message'; result?: SaveResult; onSave: (kind: 'photo' | 'message', form: FormData) => Promise<SaveResult> }) {
+function ContentEditor({ content, kind, result, onSave, photoUrl, operator }: { content?: Content; kind: 'photo' | 'message'; result?: SaveResult; onSave: (kind: 'photo' | 'message', form: FormData) => Promise<SaveResult>; photoUrl: (id: string) => string; operator: boolean }) {
   const title = kind === 'photo' ? '学校提供の写真' : '学校からのメッセージ';
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -86,9 +92,9 @@ function ContentEditor({ content, kind, result, onSave }: { content?: Content; k
   const needsReview = content && ['stopped', 'revision_pending'].includes(content.status);
   return <section className={panel}>
     <h3 className="font-bold">{title}</h3>
-    <p className="text-sm text-slate-600">{content ? contentLabels[content.status] : '未登録'}</p>
+    <p className="text-sm text-slate-600">{content ? contentLabels[content.status] : '未登録'}{content?.submitted_scope === 'operator' && '（運営が登録）'}</p>
     {content?.stop_reason && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">修正のお願い {content.stop_reason}</p>}
-    {kind === 'photo' && content && <Image unoptimized src={`${endpoint}?photo=${content.id}`} width={640} height={400} alt={content.alt ?? ''} className="max-h-52 w-full rounded object-contain" />}
+    {kind === 'photo' && content && <Image unoptimized src={photoUrl(content.id)} width={640} height={400} alt={content.alt ?? ''} className="max-h-52 w-full rounded object-contain" />}
     <form method="post" className="space-y-3" onSubmit={submit}>
       <input type="hidden" name="kind" value={kind} />
       {kind === 'photo' ? <>
@@ -109,7 +115,7 @@ function ContentEditor({ content, kind, result, onSave }: { content?: Content; k
         </div>
         <label className="flex gap-2 text-sm"><input type="checkbox" name="permission" required />この写真を公開するために必要な許可を確認しました。</label>
       </> : <label className="block">メッセージ（300字以内）<textarea name="body" className={input} defaultValue={content?.body ?? ''} maxLength={300} rows={5} required /></label>}
-      <button disabled={busy} className={primary}>{needsReview ? '修正版を提出する' : '保存して公開する'}</button>
+      <button disabled={busy} className={primary}>{operator ? '代理で登録して公開する' : needsReview ? '修正版を提出する' : '保存して公開する'}</button>
       {result && <p role={result.ok ? 'status' : 'alert'} className={`rounded p-3 text-sm ${result.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>{result.message}</p>}
     </form>
   </section>;
@@ -140,7 +146,10 @@ function OfficialLinkEditor({ link, onSave }: { link: { url: string | null }; on
   </section>;
 }
 
-export default function SchoolPortal() {
+export default function SchoolPortal({ operatorSchoolId }: { operatorSchoolId?: string }) {
+  // 運営の代理表示か。学校と同じ画面を出し、写真・メッセージ・公式サイトのリンクは代理で登録できる。
+  // 資料請求の「確認済み」「発送済み」は学校だけの操作なので、運営の表示では出さない。
+  const operator = Boolean(operatorSchoolId);
   const [phase, setPhase] = useState<'loading' | 'login' | 'mfa' | 'ready' | 'error'>('loading');
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [month, setMonth] = useState('');
@@ -153,10 +162,14 @@ export default function SchoolPortal() {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await fetch(`${endpoint}?${new URLSearchParams({ month, page: String(page) })}`, { cache: 'no-store', signal });
+      const response = await fetch(portalUrl(operatorSchoolId, { month, page: String(page) }), { cache: 'no-store', signal });
       const data = await response.json();
       if (signal?.aborted) return;
-      if (data.code === 'login' || data.code === 'mfa') {
+      if (operator && data.code === 'login') {
+        setDashboard(null);
+        setPhase('error');
+        setError('運営管理者としてログインしてください。');
+      } else if (data.code === 'login' || data.code === 'mfa') {
         setDashboard(null);
         setDetail(null);
         setPhase(data.code);
@@ -174,7 +187,7 @@ export default function SchoolPortal() {
       setError('学校向け画面を読み込めませんでした。');
       setPhase('error');
     }
-  }, [month, page]);
+  }, [month, page, operator, operatorSchoolId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -195,7 +208,7 @@ export default function SchoolPortal() {
     setMessage('');
     setBusy(true);
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await fetch(portalUrl(operatorSchoolId), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok) {
         setError(data.error);
@@ -217,14 +230,14 @@ export default function SchoolPortal() {
     const finish = (outcome: SaveResult) => { setContentResults((current) => ({ ...current, [kind]: outcome })); return outcome; };
     setContentResults((current) => ({ ...current, [kind]: undefined }));
     try {
-      const response = await fetch(endpoint, { method: 'POST', body: payload });
+      const response = await fetch(portalUrl(operatorSchoolId), { method: 'POST', body: payload });
       const data = await response.json();
       if (!response.ok) {
         if ([401, 403, 404].includes(response.status)) { setDetail(null); await load(); }
         return finish({ ok: false, message: data.error ?? '掲載内容を保存できませんでした。' });
       }
       await load();
-      return finish({ ok: true, message: '保存しました。' });
+      return finish({ ok: true, message: operator ? '代理で登録しました。運営の確認済みとして公開されています。' : '保存しました。' });
     } catch {
       return finish({ ok: false, message: '通信に失敗しました。' });
     }
@@ -234,7 +247,7 @@ export default function SchoolPortal() {
     setError('');
     setMessage('');
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'official_link', url }) });
+      const response = await fetch(portalUrl(operatorSchoolId), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'official_link', url }) });
       const data = await response.json();
       if (!response.ok) return { ok: false, message: data.error ?? 'リンク先を保存できませんでした。' };
       await load();
@@ -246,12 +259,17 @@ export default function SchoolPortal() {
 
   const total = dashboard ? Object.values(dashboard.counts).reduce((sum, value) => sum + value, 0) : 0;
   return <main className="mx-auto min-h-screen max-w-5xl space-y-5 px-4 py-8 sm:px-6">
-    <div className="flex items-start justify-between gap-3"><h1 className="text-2xl font-bold">学校向け管理画面</h1>
-      {phase !== 'loading' && phase !== 'login' && <button onClick={logout} className="text-sm text-blue-700 underline">ログアウト</button>}
+    <div className="flex items-start justify-between gap-3"><h1 className="text-2xl font-bold">学校向け管理画面{operator && '（運営として表示中）'}</h1>
+      {operator
+        ? <Link href={appPath(`/admin/partnerships?school=${operatorSchoolId}`)} className="text-sm text-blue-700 underline">学校提携・資料請求に戻る</Link>
+        : phase !== 'loading' && phase !== 'login' && <button onClick={logout} className="text-sm text-blue-700 underline">ログアウト</button>}
     </div>
+    {operator && <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+      運営として、この学校の管理画面を表示しています。写真・メッセージ・公式サイトのリンクは、代理で登録できます（運営の確認済みとして、すぐに公開されます）。資料請求の「確認済み」「発送済み」の記録は、学校の担当者だけが行えます。
+    </p>}
     {phase === 'loading' && <p>読み込み中…</p>}
     {phase === 'login' && <SchoolLogin onSuccess={() => void load()} />}
-    {phase === 'mfa' && <PartnershipMfa scope="school" onSuccess={() => void load()} />}
+    {phase === 'mfa' && <PartnershipMfa scope={operator ? 'operator' : 'school'} onSuccess={() => void load()} />}
     {error && <p role="alert" className="rounded bg-red-50 p-3 text-red-800">{error}</p>}
     {message && <p role="status" className="rounded bg-emerald-50 p-3 text-emerald-800">{message}</p>}
     {phase === 'ready' && dashboard && <>
@@ -274,8 +292,9 @@ export default function SchoolPortal() {
         {detail && <div className="space-y-2 rounded-lg bg-slate-50 p-4">
           <div className="flex justify-between gap-3"><h4 className="font-bold">郵送先・連絡先</h4><button onClick={() => setDetail(null)} className="text-sm text-blue-700 underline">閉じる</button></div>
           <p>{detail.addressee} 様</p><p>〒{detail.postal_code} {detail.address}</p><p>電話番号 {detail.phone || '入力なし'}</p>
-          {detail.status === 'shared' && <button disabled={busy} className={primary} onClick={() => void post({ id: detail.id, action: 'acknowledged' })}>確認済みにする</button>}
-          {detail.status === 'acknowledged' && <button disabled={busy} className={primary} onClick={() => void post({ id: detail.id, action: 'shipped' })}>発送済みにする</button>}
+          {operator && detail.status !== 'shipped' && <p className="text-sm text-slate-600">確認済み・発送済みの記録は、学校の担当者が行います（現在の状況：{requestLabels[detail.status]}）。</p>}
+          {!operator && detail.status === 'shared' && <button disabled={busy} className={primary} onClick={() => void post({ id: detail.id, action: 'acknowledged' })}>確認済みにする</button>}
+          {!operator && detail.status === 'acknowledged' && <button disabled={busy} className={primary} onClick={() => void post({ id: detail.id, action: 'shipped' })}>発送済みにする</button>}
           {detail.status === 'shipped' && <p>発送済み</p>}
         </div>}
       </section>
@@ -283,7 +302,7 @@ export default function SchoolPortal() {
       {dashboard.settings.content_enabled && <div className="grid gap-4 md:grid-cols-2">
         {(['photo', 'message'] as const).map((kind) => {
           const content = dashboard.content.find((item) => item.kind === kind);
-          return <ContentEditor key={content?.id ?? kind} kind={kind} content={content} result={contentResults[kind]} onSave={saveContent} />;
+          return <ContentEditor key={content?.id ?? kind} kind={kind} content={content} result={contentResults[kind]} onSave={saveContent} photoUrl={(id) => portalUrl(operatorSchoolId, { photo: id })} operator={operator} />;
         })}
       </div>}
     </>}

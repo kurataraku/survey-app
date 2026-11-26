@@ -166,6 +166,7 @@ export default function PartnershipOperator({ initialSchool }: { initialSchool: 
         </select></label>
         <Link className="text-sm text-blue-700 underline" href={appPath('/admin/schools')}>学校一覧から選ぶ</Link>
         {dashboard.school && <Link className="text-sm text-blue-700 underline" href={appPath(`/admin/schools/${schoolId}/edit`)}>学校情報・公式URLを編集</Link>}
+        {dashboard.school && <Link className="rounded-lg border border-blue-300 px-3 py-1 text-sm font-medium text-blue-800" href={appPath(`/admin/partnerships/school?school=${schoolId}`)}>この学校の画面を見る・代理で登録</Link>}
       </div>
       {dashboard.school && <div className="grid gap-4 lg:grid-cols-2">
         <section className={panel}>
